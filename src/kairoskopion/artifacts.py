@@ -19,7 +19,9 @@ from typing import TYPE_CHECKING, Any
 
 from .cards import (
     article_model_card,
+    compliance_checklist_card,
     fit_assessment_card,
+    mismatch_map_card,
     risk_report_card,
     venue_model_card,
 )
@@ -29,7 +31,7 @@ if TYPE_CHECKING:
     from .pipelines.manuscript_venue_fit import ManuscriptVenueFitPipeline, ManuscriptVenueFitResult
 
 _VAULT_DIR = "vault"
-_SUBDIRS = ("articles", "venues", "fits", "risks", "submissions", "traces")
+_SUBDIRS = ("articles", "venues", "fits", "risks", "compliance", "mismatches", "submissions", "traces")
 
 
 def ensure_vault_root(storage_root: Path | str | None = None) -> Path:
@@ -87,6 +89,26 @@ def write_risk_card(
     return _write_card(vault_root, "risks", f"{entity_id}.md", md)
 
 
+def write_compliance_card(
+    data: dict[str, Any],
+    vault_root: Path,
+) -> Path:
+    """Write ComplianceChecklist markdown card to vault/compliance/."""
+    entity_id = data.get("compliance_checklist_id", "unknown")
+    md = compliance_checklist_card(data)
+    return _write_card(vault_root, "compliance", f"{entity_id}.md", md)
+
+
+def write_mismatch_card(
+    data: dict[str, Any],
+    vault_root: Path,
+) -> Path:
+    """Write MismatchMap markdown card to vault/mismatches/."""
+    entity_id = data.get("mismatch_map_id", "unknown")
+    md = mismatch_map_card(data)
+    return _write_card(vault_root, "mismatches", f"{entity_id}.md", md)
+
+
 def write_pipeline_artifact(
     artifact_markdown: str,
     pipeline_run_id: str,
@@ -120,6 +142,14 @@ def write_pipeline_result_cards(
     if result.risk_report:
         written["risk_card"] = write_risk_card(
             result.risk_report.to_dict(), vault_root)
+
+    if result.compliance:
+        written["compliance_card"] = write_compliance_card(
+            result.compliance.to_dict(), vault_root)
+
+    if result.mismatch_map:
+        written["mismatch_card"] = write_mismatch_card(
+            result.mismatch_map.to_dict(), vault_root)
 
     if result.artifact_markdown:
         written["pipeline_artifact"] = write_pipeline_artifact(

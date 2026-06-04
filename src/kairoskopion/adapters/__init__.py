@@ -1,1 +1,1 @@
-"""Kairoskopion data adapters (future implementation)."""
+"""Kairoskopion data adapters — source acquisition layer."""

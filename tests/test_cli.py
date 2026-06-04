@@ -99,6 +99,50 @@ class TestCLIRunFixture:
         assert (env_root / "vault").exists()
 
 
+class TestCLIInspectStorage:
+    def test_exits_zero_empty(self, tmp_path):
+        code = main(["--storage-root", str(tmp_path / "s"), "inspect-storage"])
+        assert code == 0
+
+    def test_shows_no_registries_message(self, tmp_path, capsys):
+        main(["--storage-root", str(tmp_path / "s"), "inspect-storage"])
+        out = capsys.readouterr().out
+        assert "No registries" in out or "run-fixture" in out
+
+    def test_shows_registries_after_run(self, tmp_path, capsys):
+        main(["--storage-root", str(tmp_path / "s"), "run-fixture"])
+        capsys.readouterr()
+        main(["--storage-root", str(tmp_path / "s"), "inspect-storage"])
+        out = capsys.readouterr().out
+        assert "Registries" in out
+        assert "article_models" in out
+        assert "Vault" in out
+        assert "art_" in out
+
+    def test_shows_vault_files(self, tmp_path, capsys):
+        main(["--storage-root", str(tmp_path / "s"), "run-fixture"])
+        capsys.readouterr()
+        main(["--storage-root", str(tmp_path / "s"), "inspect-storage"])
+        out = capsys.readouterr().out
+        assert ".md" in out
+
+
+class TestCLIRunFixtureCards:
+    def test_compliance_card_created(self, tmp_path):
+        main(["--storage-root", str(tmp_path / "s"), "run-fixture"])
+        compliance_dir = tmp_path / "s" / "vault" / "compliance"
+        assert compliance_dir.exists()
+        md_files = list(compliance_dir.glob("*.md"))
+        assert len(md_files) >= 1
+
+    def test_mismatch_card_created(self, tmp_path):
+        main(["--storage-root", str(tmp_path / "s"), "run-fixture"])
+        mm_dir = tmp_path / "s" / "vault" / "mismatches"
+        assert mm_dir.exists()
+        md_files = list(mm_dir.glob("*.md"))
+        assert len(md_files) >= 1
+
+
 class TestCLINoCommand:
     def test_no_args_exits_zero(self, tmp_path):
         code = main(["--storage-root", str(tmp_path / "s")])

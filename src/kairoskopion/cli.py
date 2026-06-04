@@ -1,8 +1,9 @@
-"""Minimal CLI for Kairoskopion.
+"""CLI for Kairoskopion.
 
 Commands:
-    kairoskopion status        — show environment info
-    kairoskopion run-fixture   — run fixture pipeline, persist results
+    kairoskopion status           — show environment info
+    kairoskopion run-fixture      — run fixture pipeline, persist results
+    kairoskopion inspect-storage  — show registry and vault contents
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from .artifacts import write_pipeline_result_cards
 from .persistence import (
     ensure_storage_root,
     list_registries,
+    read_registry,
     registries_exist,
     save_pipeline_result,
     storage_root_from_env,
@@ -41,6 +43,42 @@ def cmd_status(args: argparse.Namespace) -> int:
     if registries_exist(root):
         regs = list_registries(root)
         print(f"Registries:        {', '.join(regs) if regs else '(empty)'}")
+    return 0
+
+
+def cmd_inspect_storage(args: argparse.Namespace) -> int:
+    """Show detailed storage contents."""
+    root = _resolve_storage_root(args)
+    print(f"Kairoskopion storage: {root.resolve()}\n")
+
+    if not registries_exist(root):
+        print("No registries found. Run 'kairoskopion run-fixture' first.")
+        return 0
+
+    regs = list_registries(root)
+    print(f"=== Registries ({len(regs)}) ===\n")
+    for name in regs:
+        records = read_registry(name, storage_root=root)
+        print(f"  {name}: {len(records)} record(s)")
+        for r in records[:3]:
+            # Show first ID-like field
+            for key in (f"{name.rstrip('s')}_id", f"{name}_id", "id",
+                        "operation_id", "gate_id", "pipeline_run_id"):
+                if key in r:
+                    label = r.get("overall_label") or r.get("status") or r.get("lifecycle_status") or ""
+                    print(f"    {r[key]}{f'  ({label})' if label else ''}")
+                    break
+
+    vault_root = root / "vault"
+    if vault_root.exists():
+        md_files = sorted(vault_root.rglob("*.md"))
+        print(f"\n=== Vault ({len(md_files)} card(s)) ===\n")
+        for f in md_files:
+            rel = f.relative_to(vault_root)
+            print(f"  {rel}")
+    else:
+        print("\nNo vault found.")
+
     return 0
 
 
@@ -87,24 +125,26 @@ def cmd_run_fixture(args: argparse.Namespace) -> int:
     print(f"VenueModel:     {result.venue.venue_model_id if result.venue else '?'}")
     print(f"FitAssessment:  {result.fit.fit_assessment_id if result.fit else '?'}")
     print(f"Overall label:  {result.fit.overall_label if result.fit else '?'}")
+    print(f"Mismatches:     {len(result.mismatch_map.mismatches) if result.mismatch_map else 0}")
+    print(f"Risk items:     {len(result.risk_report.risk_items) if result.risk_report else 0}")
+    print(f"Compliance:     {len(result.compliance.checklist_items) if result.compliance else 0} items"
+          f" ({len(result.compliance.missing_items) if result.compliance else 0} missing)")
     print(f"Pipeline run:   {pipeline.run.pipeline_run_id}")
     print(f"Pipeline status:{pipeline.run.status}")
     print(f"Registry root:  {(root / 'registries').resolve()}")
     print(f"Vault root:     {(root / 'vault').resolve()}")
-    print(f"Registries written: {', '.join(reg_paths.keys())}")
-    print(f"Cards written:      {', '.join(card_paths.keys())}")
-    for name, p in card_paths.items():
+    print(f"Registries written: {', '.join(sorted(reg_paths.keys()))}")
+    print(f"Cards written:      {', '.join(sorted(card_paths.keys()))}")
+    for name, p in sorted(card_paths.items()):
         print(f"  {name}: {p}")
     return 0
 
 
 def _find_fixtures_dir() -> Path | None:
     """Search for tests/fixtures/ relative to cwd or package location."""
-    # Try cwd first
     cwd_fixtures = Path.cwd() / "tests" / "fixtures"
     if cwd_fixtures.is_dir():
         return cwd_fixtures
-    # Try relative to package
     pkg_dir = Path(__file__).resolve().parent.parent.parent
     pkg_fixtures = pkg_dir / "tests" / "fixtures"
     if pkg_fixtures.is_dir():
@@ -124,16 +164,21 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     sub = parser.add_subparsers(dest="command")
-
     sub.add_parser("status", help="Show environment status")
     sub.add_parser("run-fixture", help="Run fixture pipeline and persist results")
+    sub.add_parser("inspect-storage", help="Show registry and vault contents")
 
     args = parser.parse_args(argv)
 
-    if args.command == "status":
-        return cmd_status(args)
-    elif args.command == "run-fixture":
-        return cmd_run_fixture(args)
+    commands = {
+        "status": cmd_status,
+        "run-fixture": cmd_run_fixture,
+        "inspect-storage": cmd_inspect_storage,
+    }
+
+    handler = commands.get(args.command)
+    if handler:
+        return handler(args)
     else:
         parser.print_help()
         return 0

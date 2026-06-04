@@ -116,12 +116,61 @@ def submission_pack_card(data: dict[str, Any]) -> str:
     return fm + "\n" + body
 
 
+def compliance_checklist_card(data: dict[str, Any]) -> str:
+    fm = _frontmatter([
+        ("id", data.get("compliance_checklist_id")),
+        ("type", "ComplianceChecklist"),
+        ("lifecycle", data.get("lifecycle_status")),
+    ])
+    body = "# Compliance Checklist\n"
+    items = data.get("checklist_items", [])
+    if items:
+        body += "\n| Category | Requirement | Status | Notes |\n"
+        body += "|----------|-------------|--------|-------|\n"
+        for item in items:
+            body += (
+                f"| {item.get('category', '?')} "
+                f"| {item.get('requirement', '')} "
+                f"| {item.get('status', '?')} "
+                f"| {item.get('notes', '')} |\n"
+            )
+    body += _section("Missing items", data.get("missing_items"))
+    body += _section("Blocking items", data.get("blocking_items"))
+    body += _section("Warnings", data.get("warnings"))
+    body += _section("Guideline sources", data.get("guideline_sources"))
+    return fm + "\n" + body
+
+
+def mismatch_map_card(data: dict[str, Any]) -> str:
+    fm = _frontmatter([
+        ("id", data.get("mismatch_map_id")),
+        ("type", "MismatchMap"),
+        ("fit_assessment_id", data.get("fit_assessment_id")),
+    ])
+    body = "# Mismatch Map\n"
+    body += _section("Summary", data.get("summary"))
+    mismatches = data.get("mismatches", [])
+    if mismatches:
+        body += "\n## Mismatches\n\n"
+        for mm in mismatches:
+            body += (
+                f"- **{mm.get('axis', '?')}** [{mm.get('severity', '?')}]: "
+                f"{mm.get('description', '')} "
+                f"(core: {mm.get('field_core_risk', '?')})\n"
+            )
+    body += _section("Critical", data.get("critical_mismatches"))
+    body += _section("Unknowns", data.get("unknowns"))
+    return fm + "\n" + body
+
+
 CARD_GENERATORS: dict[str, Any] = {
     "ArticleModel": article_model_card,
     "VenueModel": venue_model_card,
     "FitAssessment": fit_assessment_card,
     "RiskReport": risk_report_card,
     "SubmissionPack": submission_pack_card,
+    "ComplianceChecklist": compliance_checklist_card,
+    "MismatchMap": mismatch_map_card,
 }
 
 
