@@ -1,1 +1,1 @@
-"""Kairoskopion domain services (future implementation)."""
+"""Kairoskopion domain services."""

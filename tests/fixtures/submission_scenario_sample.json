@@ -1,0 +1,15 @@
+{
+  "goal": "Publish in Q1 STS journal with Scopus indexing",
+  "target_indexing": "Scopus",
+  "prestige_priority": "high",
+  "speed_priority": "medium",
+  "APC_constraints": "prefer no APC, gold OA not required",
+  "language_constraints": "English",
+  "deadline": "2026-12-01",
+  "rewrite_depth_allowed": "medium",
+  "reframe_depth_allowed": "minor",
+  "risk_tolerance": "moderate",
+  "fallback_allowed": ["special_issue", "conference_proceedings"],
+  "field_core_preservation_priority": "high",
+  "notes": "Author prefers to preserve phenomenological stance and category-error thesis"
+}
