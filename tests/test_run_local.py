@@ -113,12 +113,22 @@ class TestRunLocalErrors:
         assert code == 1
 
     def test_unsupported_extension(self, tmp_path, capsys):
+        """Truly unsupported extension (.xyz) is rejected."""
+        bad = tmp_path / "paper.xyz"
+        bad.write_bytes(b"binary data")
+        code = _run_local(tmp_path, ms_path=str(bad))
+        assert code == 1
+        err = capsys.readouterr().err
+        assert "unsupported extension" in err
+
+    def test_corrupted_docx(self, tmp_path, capsys):
+        """Corrupted DOCX is accepted by validator but extraction fails."""
         bad = tmp_path / "paper.docx"
         bad.write_bytes(b"PK\x03\x04fake")
         code = _run_local(tmp_path, ms_path=str(bad))
         assert code == 1
         err = capsys.readouterr().err
-        assert "unsupported extension" in err
+        assert "could not read text" in err
 
     def test_invalid_scenario_json(self, tmp_path, capsys):
         bad_json = tmp_path / "bad.json"

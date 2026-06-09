@@ -141,7 +141,7 @@ def cmd_run_fixture(args: argparse.Namespace) -> int:
     return 0
 
 
-_SUPPORTED_TEXT_EXTENSIONS = {".md", ".txt", ".json", ".html"}
+_SUPPORTED_EXTENSIONS = {".md", ".txt", ".json", ".html", ".htm", ".pdf", ".docx"}
 
 
 def _validate_input_file(path: Path, label: str) -> str | None:
@@ -153,10 +153,10 @@ def _validate_input_file(path: Path, label: str) -> str | None:
         return f"{label}: file not found: {path}"
     if not path.is_file():
         return f"{label}: not a file: {path}"
-    if path.suffix.lower() not in _SUPPORTED_TEXT_EXTENSIONS:
+    if path.suffix.lower() not in _SUPPORTED_EXTENSIONS:
         return (
             f"{label}: unsupported extension '{path.suffix}'. "
-            f"Supported: {', '.join(sorted(_SUPPORTED_TEXT_EXTENSIONS))}"
+            f"Supported: {', '.join(sorted(_SUPPORTED_EXTENSIONS))}"
         )
     return None
 
@@ -389,6 +389,45 @@ def cmd_validate_bundle(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_intake_file(args: argparse.Namespace) -> int:
+    """Register a single file as a source with extraction."""
+    from .adapters.source_intake import SourceRole, register_local_source
+
+    root = _resolve_storage_root(args)
+    file_path = Path(args.file)
+
+    role_str = getattr(args, "role", "unknown")
+    try:
+        role = SourceRole(role_str)
+    except ValueError:
+        role = SourceRole.UNKNOWN
+
+    snapshot, text = register_local_source(file_path, role=role)
+
+    # Persist snapshot
+    from . import registry as reg
+    from .persistence import ensure_registry_root
+
+    reg_root = ensure_registry_root(root)
+    reg.append("source_snapshots", snapshot.to_dict(), base_dir=reg_root)
+
+    print(f"--- File intake ---")
+    print(f"File:              {file_path}")
+    print(f"Role:              {role.value}")
+    print(f"Content type:      {snapshot.content_type}")
+    print(f"Extraction status: {snapshot.extraction_status}")
+    print(f"Extraction method: {snapshot.parser_used}")
+    print(f"Text length:       {len(text)} chars")
+    if snapshot.content_hash:
+        print(f"Content hash:      {snapshot.content_hash}")
+    print(f"Snapshot ID:       {snapshot.snapshot_id}")
+    print(f"Source ID:         {snapshot.source_id}")
+    if snapshot.extraction_errors:
+        for err in snapshot.extraction_errors:
+            print(f"  Warning: {err}")
+    return 0
+
+
 def _find_fixtures_dir() -> Path | None:
     """Search for tests/fixtures/ relative to cwd or package location."""
     cwd_fixtures = Path.cwd() / "tests" / "fixtures"
@@ -431,16 +470,28 @@ def main(argv: list[str] | None = None) -> int:
     validate_parser = sub.add_parser("validate-bundle", help="Validate a storage bundle")
     validate_parser.add_argument("--bundle", required=True, help="Path to bundle zip")
 
+    intake_parser = sub.add_parser(
+        "intake-file", help="Register a file as a source with text extraction",
+    )
+    intake_parser.add_argument(
+        "--file", required=True,
+        help="Path to file (.md, .txt, .html, .json, .pdf, .docx)",
+    )
+    intake_parser.add_argument(
+        "--role", default="unknown",
+        help="Source role (article_input, venue_guidelines, etc.)",
+    )
+
     run_local_parser = sub.add_parser(
         "run-local", help="Run pipeline on user-provided local files",
     )
     run_local_parser.add_argument(
         "--manuscript", required=True,
-        help="Path to manuscript file (.md or .txt)",
+        help="Path to manuscript file (.md, .txt, .pdf, .docx)",
     )
     run_local_parser.add_argument(
         "--venue-guidelines", required=True,
-        help="Path to venue guidelines file (.md or .txt)",
+        help="Path to venue guidelines file (.md, .txt, .pdf, .docx)",
     )
     run_local_parser.add_argument(
         "--scenario", required=True,
@@ -459,6 +510,7 @@ def main(argv: list[str] | None = None) -> int:
         "export-bundle": cmd_export_bundle,
         "import-bundle": cmd_import_bundle,
         "validate-bundle": cmd_validate_bundle,
+        "intake-file": cmd_intake_file,
     }
 
     handler = commands.get(args.command)

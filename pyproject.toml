@@ -10,9 +10,15 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
+extract = [
+    "pypdf>=4.0",
+    "python-docx>=1.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "pypdf>=4.0",
+    "python-docx>=1.0",
 ]
 
 [project.scripts]

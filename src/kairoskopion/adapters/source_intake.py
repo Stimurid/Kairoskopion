@@ -1,12 +1,16 @@
 """Local source intake adapter (spec §26.2, §27.3).
 
-Registers local files (markdown, text, PDF placeholders) as sources,
+Registers local files (markdown, text, HTML, JSON, PDF, DOCX) as sources,
 creates SourceSnapshot and EvidenceItems. No network access.
+
+PDF extraction requires ``pypdf`` (optional dependency).
+DOCX extraction requires ``python-docx`` (optional dependency).
 """
 
 from __future__ import annotations
 
 import hashlib
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -31,11 +35,40 @@ class SourceRole(str, Enum):
     REVIEW_LETTER = "review_letter"
     USER_NOTE = "user_note"
     COMPLIANCE_GUIDELINE = "compliance_guideline"
+    BACKGROUND_RESEARCH = "background_research"
     UNKNOWN = "unknown"
 
 
+# ---- Extraction status taxonomy ----
+
+EXTRACTION_STATUSES = (
+    "extracted",
+    "partially_extracted",
+    "unsupported",
+    "failed",
+    "binary_not_extracted",
+    "needs_ocr",
+    "encrypted_or_unreadable",
+    "file_not_found",
+    "unknown",
+)
+
+
+# ---- Helpers ----
+
 def _content_hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def _file_metadata(path: Path) -> dict[str, Any]:
+    """Gather file metadata without reading content."""
+    stat = path.stat()
+    return {
+        "filename": path.name,
+        "extension": path.suffix.lower(),
+        "size_bytes": stat.st_size,
+        "modified_at": _now(),
+    }
 
 
 def _detect_content_type(path: Path) -> str:
@@ -47,8 +80,97 @@ def _detect_content_type(path: Path) -> str:
         ".pdf": "application/pdf",
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ".html": "text/html",
+        ".htm": "text/html",
     }.get(suffix, "application/octet-stream")
 
+
+# ---- PDF extraction ----
+
+def _extract_pdf_text(path: Path) -> tuple[str, str, list[str]]:
+    """Extract text from PDF. Returns (text, extraction_status, warnings)."""
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return "", "binary_not_extracted", [
+            "pypdf not installed. Install with: pip install kairoskopion[extract]"
+        ]
+
+    try:
+        reader = PdfReader(str(path))
+    except Exception as exc:
+        return "", "encrypted_or_unreadable", [f"PDF read error: {exc}"]
+
+    if reader.is_encrypted:
+        return "", "encrypted_or_unreadable", ["PDF is encrypted"]
+
+    pages_text: list[str] = []
+    warnings: list[str] = []
+    for i, page in enumerate(reader.pages):
+        try:
+            page_text = page.extract_text() or ""
+            pages_text.append(page_text)
+        except Exception as exc:
+            warnings.append(f"Page {i+1}: extraction error: {exc}")
+
+    full_text = "\n\n".join(pages_text).strip()
+
+    if not full_text:
+        return "", "needs_ocr", [
+            "PDF text extraction returned empty — may be scanned/image-only"
+        ]
+
+    status = "extracted"
+    if warnings:
+        status = "partially_extracted"
+
+    return full_text, status, warnings
+
+
+# ---- DOCX extraction ----
+
+def _extract_docx_text(path: Path) -> tuple[str, str, list[str]]:
+    """Extract text from DOCX. Returns (text, extraction_status, warnings)."""
+    try:
+        from docx import Document
+    except ImportError:
+        return "", "binary_not_extracted", [
+            "python-docx not installed. Install with: pip install kairoskopion[extract]"
+        ]
+
+    try:
+        doc = Document(str(path))
+    except Exception as exc:
+        return "", "failed", [f"DOCX read error: {exc}"]
+
+    paragraphs: list[str] = []
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if text:
+            paragraphs.append(text)
+
+    full_text = "\n\n".join(paragraphs).strip()
+
+    if not full_text:
+        return "", "partially_extracted", ["DOCX contained no paragraph text"]
+
+    return full_text, "extracted", []
+
+
+# ---- HTML text extraction ----
+
+def _extract_html_text(raw: str) -> str:
+    """Simple HTML tag stripping (no external dependency)."""
+    import re
+    # Remove script/style blocks
+    text = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', raw, flags=re.DOTALL | re.IGNORECASE)
+    # Remove tags
+    text = re.sub(r'<[^>]+>', ' ', text)
+    # Collapse whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+# ---- Main registration ----
 
 def register_local_source(
     file_path: Path | str,
@@ -60,11 +182,10 @@ def register_local_source(
     """Register a local file as a source. Returns (snapshot, text_content).
 
     Reads the file, creates a SourceSnapshot with content hash and
-    extraction status. Returns the snapshot and raw text for further
-    processing.
+    extraction status. Supports: .md, .txt, .json, .html, .pdf, .docx.
 
-    For binary files (PDF, DOCX), text is empty and extraction_status
-    is 'not_extracted' — a real extractor adapter is needed later.
+    For unsupported binary files, text is empty and extraction_status
+    reflects the reason.
     """
     path = Path(file_path)
     if not path.exists():
@@ -80,16 +201,50 @@ def register_local_source(
         return snapshot, ""
 
     content_type = _detect_content_type(path)
-    is_text = content_type.startswith("text/") or content_type == "application/json"
-
-    if is_text:
-        text = path.read_text(encoding="utf-8")
-        extraction_status = "extracted"
-    else:
-        text = ""
-        extraction_status = "not_extracted"
-
+    suffix = path.suffix.lower()
+    meta = _file_metadata(path)
     sid = source_id or f"local:{path.name}"
+
+    text = ""
+    extraction_status = "unknown"
+    extraction_errors: list[str] = []
+    extraction_method = "local_file_read"
+    extraction_warnings: list[str] = []
+
+    if content_type.startswith("text/") or content_type == "application/json":
+        # Plain text formats
+        try:
+            raw = path.read_text(encoding="utf-8")
+            if suffix in (".html", ".htm"):
+                text = _extract_html_text(raw)
+                extraction_method = "html_tag_strip"
+            else:
+                text = raw
+            extraction_status = "extracted"
+        except UnicodeDecodeError:
+            extraction_status = "failed"
+            extraction_errors.append("UTF-8 decode error")
+        except Exception as exc:
+            extraction_status = "failed"
+            extraction_errors.append(f"Read error: {exc}")
+
+    elif suffix == ".pdf":
+        text, extraction_status, extraction_warnings = _extract_pdf_text(path)
+        extraction_method = "pypdf"
+        extraction_errors.extend(extraction_warnings)
+
+    elif suffix == ".docx":
+        text, extraction_status, extraction_warnings = _extract_docx_text(path)
+        extraction_method = "python-docx"
+        extraction_errors.extend(extraction_warnings)
+
+    else:
+        # Unsupported binary format
+        extraction_status = "unsupported"
+        extraction_errors.append(
+            f"Unsupported format: {suffix} ({content_type}). "
+            "Supported: .md, .txt, .json, .html, .pdf, .docx"
+        )
 
     snapshot = SourceSnapshot(
         snapshot_id=source_snapshot_id(),
@@ -98,10 +253,10 @@ def register_local_source(
         retrieved_at=_now(),
         content_hash=_content_hash(text) if text else None,
         content_type=content_type,
-        parser_used="local_file_read",
-        text_ref=str(path.resolve()) if is_text else None,
+        parser_used=extraction_method,
+        text_ref=str(path.resolve()) if text else None,
         extraction_status=extraction_status,
-        extraction_errors=[] if is_text else [f"Binary format {content_type} — extractor needed"],
+        extraction_errors=extraction_errors,
     )
     return snapshot, text
 
