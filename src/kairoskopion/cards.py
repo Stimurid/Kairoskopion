@@ -163,6 +163,48 @@ def mismatch_map_card(data: dict[str, Any]) -> str:
     return fm + "\n" + body
 
 
+def citation_ecology_card(data: dict[str, Any]) -> str:
+    fm = _frontmatter([
+        ("id", data.get("citation_ecology_report_id")),
+        ("type", "CitationEcologyReport"),
+        ("bibliography_profile_id", data.get("bibliography_profile_id")),
+        ("lifecycle", data.get("lifecycle_status")),
+    ])
+    body = "# Citation Ecology Report\n"
+    body += f"\n> {data.get('disclaimer', '')}\n"
+    body += _section("Summary", data.get("summary"))
+
+    bib_id = data.get("bibliography_profile_id")
+    if bib_id:
+        body += f"\nBibliography profile: `{bib_id}`\n"
+
+    gaps = data.get("gaps", [])
+    if gaps:
+        body += "\n## Citation Gaps\n\n"
+        for g in gaps:
+            body += (
+                f"- **{g.get('gap_type', '?')}** [{g.get('severity', '?')}]: "
+                f"{g.get('description', '')}\n"
+            )
+            if g.get("suggested_action"):
+                body += f"  - Action: {g['suggested_action']}\n"
+
+    tasks = data.get("tasks", [])
+    if tasks:
+        body += "\n## Citation Tasks\n\n"
+        for t in tasks:
+            api_tag = " [requires external API]" if t.get("requires_external_api") else ""
+            body += (
+                f"- [{t.get('priority', '?')}] **{t.get('task_type', '?')}**: "
+                f"{t.get('description', '')}{api_tag}\n"
+            )
+
+    body += _section("Bridge references", data.get("bridge_references_detected"))
+    body += _section("Warning signals", data.get("warning_signals"))
+    body += _section("Unknowns", data.get("unknowns"))
+    return fm + "\n" + body
+
+
 CARD_GENERATORS: dict[str, Any] = {
     "ArticleModel": article_model_card,
     "VenueModel": venue_model_card,
@@ -171,6 +213,7 @@ CARD_GENERATORS: dict[str, Any] = {
     "SubmissionPack": submission_pack_card,
     "ComplianceChecklist": compliance_checklist_card,
     "MismatchMap": mismatch_map_card,
+    "CitationEcologyReport": citation_ecology_card,
 }
 
 

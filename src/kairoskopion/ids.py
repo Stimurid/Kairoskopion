@@ -82,3 +82,12 @@ def quality_gate_id() -> str:
 
 def decision_id() -> str:
     return generate_id("dec")
+
+def reference_item_id() -> str:
+    return generate_id("ref")
+
+def bibliography_profile_id() -> str:
+    return generate_id("bib")
+
+def citation_ecology_report_id() -> str:
+    return generate_id("citeco")

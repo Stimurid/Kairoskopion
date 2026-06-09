@@ -19,6 +19,8 @@ from ..enums import OutputLevel, PipelineRunStatus
 from ..quality import QualityGateResult, evaluate_fit_gate
 from ..schema import (
     ArticleModel,
+    BibliographyProfile,
+    CitationEcologyReport,
     ComplianceChecklist,
     FitAssessment,
     ManuscriptModel,
@@ -30,6 +32,8 @@ from ..schema import (
     VenueModel,
 )
 from ..services.article_modeling import build_article_model, build_manuscript_model
+from ..services.bibliography_parsing import build_bibliography_profile
+from ..services.citation_ecology import build_citation_ecology_report
 from ..services.compliance import build_compliance_checklist
 from ..services.evidence_audit import audit_pipeline_evidence
 from ..services.fit_assessment import assess_fit
@@ -56,6 +60,8 @@ class ManuscriptVenueFitResult:
         self.rewrite_plan: RewritePlan | None = None
         self.risk_report: RiskReport | None = None
         self.compliance: ComplianceChecklist | None = None
+        self.bibliography_profile: BibliographyProfile | None = None
+        self.citation_ecology: CitationEcologyReport | None = None
         self.fit_gate: QualityGateResult | None = None
         self.evidence_gate: QualityGateResult | None = None
         self.artifact_markdown: str | None = None
@@ -90,6 +96,16 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         result.article = article
         self.run.created_entity_ids.append(article.article_model_id)
         self.trace.entities_created.append(article.article_model_id)
+
+        # Step 3b: Build BibliographyProfile
+        bib_profile = build_bibliography_profile(
+            manuscript_text,
+            manuscript_id=ms.manuscript_id,
+            article_model_id=article.article_model_id,
+        )
+        result.bibliography_profile = bib_profile
+        self.run.created_entity_ids.append(bib_profile.bibliography_profile_id)
+        self.trace.entities_created.append(bib_profile.bibliography_profile_id)
 
         # Step 4–6: Build VenueModel and PublicationRegimeModel
         self.trace.inputs.append(venue_source_ref)
@@ -156,6 +172,14 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         result.compliance = cc
         self.run.created_entity_ids.append(cc.compliance_checklist_id)
         self.trace.entities_created.append(cc.compliance_checklist_id)
+
+        # Step 14: Citation ecology report
+        cit_eco = build_citation_ecology_report(
+            bib_profile, article, venue, venue_guidelines_text,
+        )
+        result.citation_ecology = cit_eco
+        self.run.created_entity_ids.append(cit_eco.citation_ecology_report_id)
+        self.trace.entities_created.append(cit_eco.citation_ecology_report_id)
 
         # Step 15: Evidence audit
         ev_gate = audit_pipeline_evidence(article, venue, fit, mm, risk, cc)
@@ -228,6 +252,24 @@ def _generate_artifact(r: ManuscriptVenueFitResult) -> str:
             parts.append(f"\n**Missing:** {', '.join(r.compliance.missing_items)}")
         parts.append("")
 
+    # Citation ecology
+    if r.citation_ecology:
+        parts.append("## Citation Ecology\n")
+        parts.append(f"> {r.citation_ecology.disclaimer}\n")
+        if r.citation_ecology.summary:
+            parts.append(f"**Summary:** {r.citation_ecology.summary}\n")
+        if r.citation_ecology.gaps:
+            for g in r.citation_ecology.gaps:
+                parts.append(
+                    f"- [{g.get('severity', '?')}] **{g.get('gap_type', '?')}**: "
+                    f"{g.get('description', '')}"
+                )
+        if r.citation_ecology.warning_signals:
+            parts.append("\n**Warnings:**")
+            for w in r.citation_ecology.warning_signals:
+                parts.append(f"- {w}")
+        parts.append("")
+
     # Evidence & unknowns summary
     parts.append("## Evidence & Unknowns\n")
     all_unknowns: list[str] = []
@@ -237,6 +279,7 @@ def _generate_artifact(r: ManuscriptVenueFitResult) -> str:
         ("FitAssessment", r.fit),
         ("MismatchMap", r.mismatch_map),
         ("RiskReport", r.risk_report),
+        ("CitationEcology", r.citation_ecology),
     ]:
         if entity and hasattr(entity, "unknowns") and entity.unknowns:
             for u in entity.unknowns:

@@ -35,6 +35,8 @@ from .enums import (
 )
 from .ids import (
     article_model_id,
+    bibliography_profile_id,
+    citation_ecology_report_id,
     citation_plan_id,
     compliance_checklist_id,
     evidence_item_id,
@@ -43,6 +45,7 @@ from .ids import (
     mismatch_map_id,
     pipeline_run_id,
     publication_regime_id,
+    reference_item_id,
     rewrite_plan_id,
     risk_report_id,
     source_snapshot_id,
@@ -340,6 +343,79 @@ class CitationPlan(_DictMixin):
     evidence_refs: list[str] = _list()
     risk_flags: list[str] = _list()
     lifecycle_status: str = LifecycleStatus.DRAFT.value
+    created_at: str = dc.field(default_factory=_now)
+
+
+# ---------------------------------------------------------------------------
+# Citation ecology (bibliography parsing + venue fit)
+# ---------------------------------------------------------------------------
+
+@dc.dataclass
+class ReferenceItem(_DictMixin):
+    reference_item_id: str = dc.field(default_factory=reference_item_id)
+    raw_text: str = ""
+    year: int | None = _field()
+    doi: str | None = _field()
+    source_kind: str = "unknown"
+    author_fragment: str | None = _field()
+    title_fragment: str | None = _field()
+    venue_fragment: str | None = _field()
+    is_self_citation: bool = False
+    verification_status: str = "not_verified"
+
+
+@dc.dataclass
+class BibliographyProfile(_DictMixin):
+    bibliography_profile_id: str = dc.field(default_factory=bibliography_profile_id)
+    manuscript_id: str | None = _field()
+    article_model_id: str | None = _field()
+    total_references: int = 0
+    references: list[dict[str, Any]] = _list()
+    year_min: int | None = _field()
+    year_max: int | None = _field()
+    year_median: int | None = _field()
+    doi_count: int = 0
+    source_kind_distribution: dict[str, int] = _dict()
+    recency_profile: str | None = _field()
+    unknowns: list[str] = _list()
+    disclaimer: str = "Bibliography parsed heuristically from text. Not externally verified."
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class CitationGap(_DictMixin):
+    gap_id: str = ""
+    gap_type: str = ""
+    description: str | None = _field()
+    severity: str = "informational"
+    suggested_action: str | None = _field()
+    venue_expectation: str | None = _field()
+
+
+@dc.dataclass
+class CitationTask(_DictMixin):
+    task_id: str = ""
+    task_type: str = ""
+    description: str | None = _field()
+    priority: str = "medium"
+    related_gap_id: str | None = _field()
+    requires_external_api: bool = False
+
+
+@dc.dataclass
+class CitationEcologyReport(_DictMixin):
+    citation_ecology_report_id: str = dc.field(default_factory=citation_ecology_report_id)
+    article_model_id: str | None = _field()
+    venue_model_id: str | None = _field()
+    bibliography_profile_id: str | None = _field()
+    gaps: list[dict[str, Any]] = _list()
+    tasks: list[dict[str, Any]] = _list()
+    bridge_references_detected: list[str] = _list()
+    warning_signals: list[str] = _list()
+    unknowns: list[str] = _list()
+    summary: str | None = _field()
+    disclaimer: str = "Citation ecology analysis is heuristic. References not externally verified."
+    lifecycle_status: str = LifecycleStatus.PRELIMINARY.value
     created_at: str = dc.field(default_factory=_now)
 
 

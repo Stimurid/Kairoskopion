@@ -37,7 +37,8 @@ SubmissionPack / WhiteCrow Patch Queue / External Document Actions / VenueMemory
 
 Working pipeline: manuscript + venue guidelines + submission scenario
 -> ArticleModel, VenueModel, FitAssessment (8 axes), MismatchMap, RewritePlan,
-RiskReport, ComplianceChecklist, OperationTrace, QualityGates, markdown artifacts.
+RiskReport, ComplianceChecklist, BibliographyProfile, CitationEcologyReport,
+OperationTrace, QualityGates, markdown artifacts.
 
 Results persist to JSONL registries and markdown vault cards on disk.
 

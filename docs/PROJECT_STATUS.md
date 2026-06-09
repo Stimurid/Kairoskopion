@@ -55,6 +55,8 @@ beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
 | `risk_reporting.py` | RiskReport (7+ risk types) |
 | `compliance.py` | ComplianceChecklist from guidelines |
 | `evidence_audit.py` | Evidence coverage quality gate |
+| `bibliography_parsing.py` | Reference extraction, year/DOI/kind detection, BibliographyProfile |
+| `citation_ecology.py` | Citation gaps, tasks, bridge references, venue expectation matching |
 
 ### Pipelines
 
@@ -106,7 +108,7 @@ Global option: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`.
 
 ## Tests
 
-- **233 tests**, all passing
+- **273 tests**, all passing
 - 16 test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI, source acquisition
@@ -125,7 +127,7 @@ Running `kairoskopion run-fixture` produces:
 - No LLM-assisted extraction (all heuristic regex)
 - No OpenAlex/Crossref/OpenCitations adapters
 - ~~No `--manuscript`/`--venue` CLI args~~ → implemented as `run-local`
-- No citation ecology profiling
+- ~~No citation ecology profiling~~ → implemented as heuristic stub (no external API)
 - No Telegram, web UI, reviewer simulation
 - No submission portal automation
 - No real Litops/WhiteCrow API connection (stubs only)

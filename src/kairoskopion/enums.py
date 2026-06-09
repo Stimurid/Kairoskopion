@@ -290,3 +290,27 @@ class StalenessStatus(str, Enum):
     STALE = "stale"
     EXPIRED = "expired"
     UNKNOWN_FRESHNESS = "unknown_freshness"
+
+
+# --- Reference source kind (heuristic, not verified) ---
+
+class ReferenceSourceKind(str, Enum):
+    JOURNAL_ARTICLE = "journal_article"
+    BOOK = "book"
+    BOOK_CHAPTER = "book_chapter"
+    EDITED_VOLUME = "edited_volume"
+    CONFERENCE_PAPER = "conference_paper"
+    REPORT = "report"
+    THESIS = "thesis"
+    WEB_SOURCE = "web_source"
+    PREPRINT = "preprint"
+    UNKNOWN = "unknown"
+
+
+# --- Citation gap severity ---
+
+class CitationGapSeverity(str, Enum):
+    BLOCKING = "blocking"
+    MAJOR = "major"
+    MINOR = "minor"
+    INFORMATIONAL = "informational"

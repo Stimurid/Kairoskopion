@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 from .cards import (
     article_model_card,
+    citation_ecology_card,
     compliance_checklist_card,
     fit_assessment_card,
     mismatch_map_card,
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
     from .pipelines.manuscript_venue_fit import ManuscriptVenueFitPipeline, ManuscriptVenueFitResult
 
 _VAULT_DIR = "vault"
-_SUBDIRS = ("articles", "venues", "fits", "risks", "compliance", "mismatches", "submissions", "traces")
+_SUBDIRS = ("articles", "venues", "fits", "risks", "compliance", "mismatches", "citations", "submissions", "traces")
 
 
 def ensure_vault_root(storage_root: Path | str | None = None) -> Path:
@@ -109,6 +110,16 @@ def write_mismatch_card(
     return _write_card(vault_root, "mismatches", f"{entity_id}.md", md)
 
 
+def write_citation_ecology_card(
+    data: dict[str, Any],
+    vault_root: Path,
+) -> Path:
+    """Write CitationEcologyReport markdown card to vault/citations/."""
+    entity_id = data.get("citation_ecology_report_id", "unknown")
+    md = citation_ecology_card(data)
+    return _write_card(vault_root, "citations", f"{entity_id}.md", md)
+
+
 def write_pipeline_artifact(
     artifact_markdown: str,
     pipeline_run_id: str,
@@ -150,6 +161,10 @@ def write_pipeline_result_cards(
     if result.mismatch_map:
         written["mismatch_card"] = write_mismatch_card(
             result.mismatch_map.to_dict(), vault_root)
+
+    if result.citation_ecology:
+        written["citation_ecology_card"] = write_citation_ecology_card(
+            result.citation_ecology.to_dict(), vault_root)
 
     if result.artifact_markdown:
         written["pipeline_artifact"] = write_pipeline_artifact(

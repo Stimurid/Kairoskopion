@@ -111,6 +111,14 @@ def save_pipeline_result(
         written["compliance_checklists"] = _save(
             "compliance_checklists", result.compliance.to_dict(), reg_root)
 
+    if result.bibliography_profile:
+        written["bibliography_profiles"] = _save(
+            "bibliography_profiles", result.bibliography_profile.to_dict(), reg_root)
+
+    if result.citation_ecology:
+        written["citation_ecology_reports"] = _save(
+            "citation_ecology_reports", result.citation_ecology.to_dict(), reg_root)
+
     # Pipeline run
     written["pipeline_runs"] = _save(
         "pipeline_runs", pipeline.run.to_dict(), reg_root)

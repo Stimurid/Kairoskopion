@@ -47,12 +47,18 @@ Engineering queue. Each item is a concrete deliverable, not an aspiration.
 - [x] Tests: local files, missing file errors, unsupported extensions, invalid JSON
 - [x] OPERATOR_MANUAL update
 
-## Then: citation ecology stub
+### Citation ecology stub (complete)
 
-- [ ] Bibliography parsing from manuscript text
-- [ ] CitationPlan service with reference bridge detection
-- [ ] Venue citation expectation profile stub
-- [ ] Reference count / style analysis
+- [x] Bibliography parsing from manuscript text (references section extraction, year/DOI/kind detection)
+- [x] BibliographyProfile model with year distribution, source kind distribution, recency profile
+- [x] CitationEcologyReport: gaps, tasks, bridge references, warning signals
+- [x] Reference count / recency / diversity / DOI coverage analysis
+- [x] Venue expectation matching (reference limits, recency requirements)
+- [x] Pipeline integration (steps 3b + 14)
+- [x] JSONL registries (bibliography_profiles, citation_ecology_reports)
+- [x] Vault card (citations/)
+- [x] Artifact includes citation ecology section
+- [x] 40 tests (bibliography parsing + citation ecology + pipeline + persistence integration)
 
 ## Then: external adapter stubs
 
