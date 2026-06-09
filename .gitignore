@@ -33,3 +33,7 @@ htmlcov/
 data/
 registry/
 vault/
+
+.kairoskopion/
+.kairoskopion_demo/
+kairoskopion_demo_bundle.zip

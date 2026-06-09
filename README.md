@@ -52,6 +52,28 @@ Results persist to JSONL registries and markdown vault cards on disk.
 
 No LLM calls, no external API dependencies, no network access.
 
+351 tests passing. MIT license.
+
+## Alpha demo
+
+```bash
+pip install -e ".[dev]"
+
+# Run the demo pipeline with sample files
+kairoskopion --storage-root .kairoskopion_demo run-local \
+  --manuscript examples/sample_manuscript.md \
+  --venue-guidelines examples/sample_venue_guidelines.md \
+  --scenario examples/sample_scenario.json
+
+# Generate vault indexes
+kairoskopion --storage-root .kairoskopion_demo vault-index
+
+# Export as portable bundle
+kairoskopion --storage-root .kairoskopion_demo export-bundle --output demo.zip
+```
+
+See `examples/` for sample files and expected output.
+
 ## Quick start
 
 ```bash
@@ -184,4 +206,4 @@ src/kairoskopion/
 
 ## Licence
 
-Private — not yet published.
+MIT. See `LICENSE`.

@@ -29,13 +29,26 @@ WhiteCrow (field, manuscript, protected core, patch queue)
 Kairoskopion never stores raw external files (Litops's job).
 Kairoskopion never directly overwrites manuscript text (creates patch candidates for WhiteCrow).
 
-## Required reading before any refactor
+## Agent operating loop
 
-Before any structural change, read in this order:
-1. `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` — master spec (12665 lines, 10 waves)
+Before any work, read in this order:
+1. This `CLAUDE.md` — rules, boundaries, anti-slop
 2. `docs/PROJECT_STATUS.md` — current implementation state
-3. `docs/ROADMAP.md` — engineering queue
-4. `docs/DECISIONS.md` — architectural decisions and rationale
+3. `docs/SPEC_COVERAGE_MATRIX.md` — what spec requires vs what exists
+4. `docs/BACKLOG.md` — concrete sprint packages with scope/tests/acceptance
+5. `docs/MILESTONES.md` — version targets
+
+Then:
+- Choose next sprint **only from BACKLOG** unless user overrides
+- Implement on a feature branch (`feature/sprint-name`)
+- Run `pytest` before and after
+- Update: PROJECT_STATUS, ROADMAP, SPEC_COVERAGE_MATRIX, CLAUDE.md (test count, commands)
+- Never silently mark stubs as complete
+- Commit, push feature branch, report
+
+For deep spec questions, read:
+- `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` — master spec (12665 lines, 10 waves)
+- `docs/DECISIONS.md` — architectural decisions and rationale
 
 ## What is implemented (foundation)
 

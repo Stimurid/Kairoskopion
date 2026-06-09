@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest --tb=short -q
+
+      - name: Run CLI smoke test
+        run: |
+          kairoskopion status
+          kairoskopion run-fixture --storage-root /tmp/kairon_ci
+          kairoskopion inspect-storage --storage-root /tmp/kairon_ci
+          kairoskopion vault-index --storage-root /tmp/kairon_ci
+          kairoskopion export-bundle --storage-root /tmp/kairon_ci --output /tmp/kairon_ci_bundle.zip
+          kairoskopion validate-bundle --bundle /tmp/kairon_ci_bundle.zip
