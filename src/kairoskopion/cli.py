@@ -480,6 +480,99 @@ def cmd_build_venue_profile(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_build_submission_pack(args: argparse.Namespace) -> int:
+    """Build submission pack from latest pipeline run artifacts in storage."""
+    from .services.submission_pack import build_submission_pack
+    from .schema import (
+        ArticleModel,
+        ComplianceChecklist,
+        FitAssessment,
+        RiskReport,
+        SubmissionScenario,
+        VenueModel,
+        PublicationTrajectoryReport,
+    )
+
+    root = _resolve_storage_root(args)
+
+    if not registries_exist(root):
+        print("ERROR: no registries found. Run a pipeline first.", file=sys.stderr)
+        return 1
+
+    def _latest(name: str) -> dict | None:
+        records = read_registry(name, storage_root=root)
+        return records[-1] if records else None
+
+    art_d = _latest("article_models")
+    ven_d = _latest("venue_models")
+    sc_d = _latest("submission_scenarios")
+
+    if not art_d:
+        print("ERROR: no article_models in storage. Run pipeline first.", file=sys.stderr)
+        return 1
+    if not ven_d:
+        print("ERROR: no venue_models in storage. Run pipeline first.", file=sys.stderr)
+        return 1
+    if not sc_d:
+        print("ERROR: no submission_scenarios in storage. Run pipeline first.", file=sys.stderr)
+        return 1
+
+    article = ArticleModel.from_dict(art_d)
+    venue = VenueModel.from_dict(ven_d)
+    scenario = SubmissionScenario.from_dict(sc_d)
+
+    fit_d = _latest("fit_assessments")
+    risk_d = _latest("risk_reports")
+    comp_d = _latest("compliance_checklists")
+    traj_d = _latest("trajectory_reports")
+
+    fit = FitAssessment.from_dict(fit_d) if fit_d else None
+    risk = RiskReport.from_dict(risk_d) if risk_d else None
+    compliance = ComplianceChecklist.from_dict(comp_d) if comp_d else None
+    trajectory = PublicationTrajectoryReport.from_dict(traj_d) if traj_d else None
+
+    pack = build_submission_pack(
+        article=article,
+        venue=venue,
+        scenario=scenario,
+        fit=fit,
+        risk=risk,
+        compliance=compliance,
+        trajectory=trajectory,
+    )
+
+    # Persist
+    from . import registry as reg
+    from .persistence import ensure_registry_root
+
+    reg_root = ensure_registry_root(root)
+    reg.append("submission_packs", pack.to_dict(), base_dir=reg_root)
+
+    print("--- Submission Pack ---")
+    print(f"Pack ID:        {pack.submission_pack_id}")
+    print(f"Article:        {pack.article_model_id}")
+    print(f"Venue:          {pack.venue_model_id}")
+    print(f"Ready status:   {pack.ready_status}")
+    print(f"Files:          {', '.join(pack.files)}")
+    print(f"Statements:     {len(pack.statements)}")
+    for s in pack.statements:
+        print(f"  - {s}")
+    if pack.missing_items:
+        print(f"Missing items:  {len(pack.missing_items)}")
+        for m in pack.missing_items:
+            print(f"  ! {m}")
+    if pack.blocking_issues:
+        print(f"Blocking:       {len(pack.blocking_issues)}")
+        for b in pack.blocking_issues:
+            print(f"  X {b}")
+    if pack.warnings:
+        print(f"Warnings:       {len(pack.warnings)}")
+        for w in pack.warnings:
+            print(f"  ~ {w}")
+    print(f"\nCover letter template:\n{pack.cover_letter}")
+    return 0
+
+
 def _find_fixtures_dir() -> Path | None:
     """Search for tests/fixtures/ relative to cwd or package location."""
     cwd_fixtures = Path.cwd() / "tests" / "fixtures"
@@ -565,6 +658,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to submission scenario JSON file (.json)",
     )
 
+    sub.add_parser(
+        "build-submission-pack",
+        help="Build submission pack from latest pipeline run",
+    )
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -579,6 +677,7 @@ def main(argv: list[str] | None = None) -> int:
         "validate-bundle": cmd_validate_bundle,
         "intake-file": cmd_intake_file,
         "build-venue-profile": cmd_build_venue_profile,
+        "build-submission-pack": cmd_build_submission_pack,
     }
 
     handler = commands.get(args.command)
