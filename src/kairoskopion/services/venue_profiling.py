@@ -113,6 +113,17 @@ def build_venue_model(
         evidence_refs=[source_ref] if source_ref else [],
     )
 
+    # Sprint 2: extract enrichment fields (claims, not verified facts)
+    aims_scope = scope_text
+    indexing_claims = _extract_indexing_claims(lower)
+    open_access = _extract_open_access(lower)
+    apc_policy = _extract_apc_policy(lower)
+    review_claims = review_model or "unknown"
+    anonymization = _extract_anonymization(lower)
+    ai_policy = _extract_ai_policy(lower)
+    data_policy = _extract_data_policy(lower)
+    ethics_policy = _extract_ethics_policy(lower)
+
     venue = VenueModel(
         venue_model_id=venue_model_id(),
         canonical_name=journal_name,
@@ -129,6 +140,74 @@ def build_venue_model(
         confidence="medium" if scope_text else "low",
         staleness_status=StalenessStatus.FRESH.value,
         lifecycle_status=LifecycleStatus.DRAFT.value,
+        # Sprint 2: enrichment fields
+        aims_scope_summary=aims_scope,
+        indexing_claims=indexing_claims,
+        open_access_status=open_access,
+        apc_policy=apc_policy,
+        review_process_claims=review_claims,
+        word_limits=word_limits if word_limits else None,
+        anonymization_policy=anonymization,
+        ai_policy=ai_policy,
+        data_policy=data_policy,
+        ethics_policy=ethics_policy,
+        freshness_status="fresh",
     )
 
     return venue, regime
+
+
+def _extract_indexing_claims(lower: str) -> list[str]:
+    """Extract indexing claims from text."""
+    claims: list[str] = []
+    for idx in ("scopus", "web of science", "wos", "pubmed", "medline",
+                "doaj", "ebsco", "erih", "ulrich"):
+        if idx in lower:
+            claims.append(idx)
+    return claims
+
+
+def _extract_open_access(lower: str) -> str | None:
+    if "open access" in lower:
+        if "gold" in lower:
+            return "gold_open_access"
+        if "hybrid" in lower:
+            return "hybrid"
+        return "open_access"
+    return None
+
+
+def _extract_apc_policy(lower: str) -> str | None:
+    if "no apc" in lower or "no article processing" in lower or "no publication fee" in lower:
+        return "no_apc"
+    if "apc" in lower or "article processing charge" in lower:
+        return "apc_required"
+    return None
+
+
+def _extract_anonymization(lower: str) -> str | None:
+    if "double-blind" in lower or "double blind" in lower:
+        return "double_blind"
+    if "single-blind" in lower or "single blind" in lower:
+        return "single_blind"
+    if "open review" in lower:
+        return "open_review"
+    return None
+
+
+def _extract_ai_policy(lower: str) -> str | None:
+    if "ai disclosure" in lower or "ai writing" in lower or "generative ai" in lower:
+        return "ai_policy_present"
+    return None
+
+
+def _extract_data_policy(lower: str) -> str | None:
+    if "data availability" in lower or "data sharing" in lower:
+        return "data_policy_present"
+    return None
+
+
+def _extract_ethics_policy(lower: str) -> str | None:
+    if "ethics approval" in lower or "ethics committee" in lower or "irb" in lower:
+        return "ethics_policy_present"
+    return None

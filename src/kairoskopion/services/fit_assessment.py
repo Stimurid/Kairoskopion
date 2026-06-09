@@ -1,7 +1,12 @@
 """Fit Assessment Service (spec §15.4).
 
-Multi-axis comparison of ArticleModel × VenueModel × SubmissionScenario.
-MVP: deterministic rule-based — no LLM, no numeric scores.
+Multi-axis comparison of ArticleModel x VenueModel x SubmissionScenario.
+MVP: deterministic rule-based -- no LLM, no numeric scores.
+
+Sprint 2: expanded from 8 to 12 axes:
+  topic, discipline, genre, argument_structure, method, citation_ecology,
+  novelty_positioning, language_register, audience, formal_compliance,
+  author_eligibility, publication_regime.
 """
 
 from __future__ import annotations
@@ -33,7 +38,7 @@ def assess_fit(
     venue: VenueModel,
     scenario: SubmissionScenario,
 ) -> FitAssessment:
-    """Produce a multi-axis FitAssessment."""
+    """Produce a multi-axis FitAssessment (12 axes, no single score)."""
     axes: list[dict] = []
     unknowns: list[str] = []
 
@@ -54,7 +59,7 @@ def assess_fit(
             axes.append(_axis("topic", "weak", "Low keyword overlap with venue scope"))
     else:
         axes.append(_axis("topic", "unknown", "Venue scope not available"))
-        unknowns.append("topic fit unknown — venue scope missing")
+        unknowns.append("topic fit unknown -- venue scope missing")
 
     # --- Discipline fit ---
     discipline = (article.disciplinary_register_current or "").lower()
@@ -63,7 +68,7 @@ def assess_fit(
             axes.append(_axis("discipline", "strong", "Article discipline matches STS venue"))
         elif "philosophy" in discipline or "ethics" in discipline:
             axes.append(_axis("discipline", "medium",
-                              "Philosophy/ethics — adjacent to STS but not core"))
+                              "Philosophy/ethics -- adjacent to STS but not core"))
         else:
             axes.append(_axis("discipline", "weak", "Discipline mismatch with STS venue"))
     else:
@@ -84,6 +89,22 @@ def assess_fit(
     else:
         axes.append(_axis("genre", "unknown", "Genre fit not assessable"))
         unknowns.append("genre fit unknown")
+
+    # --- Argument structure fit (Sprint 2) ---
+    if article.core_claims:
+        if article.problem_statement and article.research_question:
+            axes.append(_axis("argument_structure", "strong",
+                              "Article has problem, question, and claims"))
+        elif article.problem_statement or article.research_question:
+            axes.append(_axis("argument_structure", "medium",
+                              "Partial argument structure detected"))
+        else:
+            axes.append(_axis("argument_structure", "weak",
+                              "Claims present but no clear problem/question framing"))
+    else:
+        axes.append(_axis("argument_structure", "unknown",
+                          "Argument structure not extracted"))
+        unknowns.append("argument structure unknown")
 
     # --- Method fit ---
     method = article.method_status
@@ -112,6 +133,17 @@ def assess_fit(
         axes.append(_axis("citation_ecology", "unknown", "Citation ecology not assessed"))
     unknowns.append("citation ecology not profiled against venue corpus")
 
+    # --- Novelty positioning fit (Sprint 2) ---
+    novelty = article.novelty_mode
+    if novelty and novelty != "unknown":
+        # Most venues accept various novelty modes
+        axes.append(_axis("novelty_positioning", "medium",
+                          f"Novelty mode '{novelty}' detected; venue novelty expectations not profiled"))
+    else:
+        axes.append(_axis("novelty_positioning", "unknown",
+                          "Novelty positioning not detected in article"))
+        unknowns.append("novelty positioning unknown")
+
     # --- Language/register fit ---
     if venue.language_policy and article.language:
         if article.language.lower() in venue.language_policy.lower():
@@ -122,15 +154,35 @@ def assess_fit(
         axes.append(_axis("language_register", "unknown", "Language policy unclear"))
         unknowns.append("language fit unknown")
 
+    # --- Audience fit (Sprint 2) ---
+    if article.disciplinary_register_current and scope:
+        # Simple heuristic: if article mentions audience-relevant terms
+        if any(kw in scope for kw in (article.disciplinary_register_current or "").lower().split()):
+            axes.append(_axis("audience", "medium",
+                              "Article discipline appears in venue scope"))
+        else:
+            axes.append(_axis("audience", "unknown",
+                              "Audience alignment not assessable from available data"))
+            unknowns.append("audience fit unknown")
+    else:
+        axes.append(_axis("audience", "unknown", "Audience fit not assessable"))
+        unknowns.append("audience fit unknown")
+
     # --- Formal compliance fit ---
     axes.append(_axis("formal_compliance", "unknown",
-                      "Formal compliance requires ComplianceChecklist — deferred"))
+                      "Formal compliance requires ComplianceChecklist -- deferred"))
     unknowns.append("formal compliance not yet checked")
+
+    # --- Author eligibility fit (Sprint 2) ---
+    # Cannot be assessed without author metadata; mark unknown
+    axes.append(_axis("author_eligibility", "unknown",
+                      "Author eligibility requires author metadata -- not available"))
+    unknowns.append("author eligibility unknown -- no author metadata")
 
     # --- Publication regime fit ---
     if venue.publication_regime_id:
         axes.append(_axis("publication_regime", "medium",
-                          "Classic journal regime — standard submission path"))
+                          "Classic journal regime -- standard submission path"))
     else:
         axes.append(_axis("publication_regime", "unknown", "Publication regime not profiled"))
         unknowns.append("publication regime unknown")
@@ -180,16 +232,16 @@ def assess_fit(
 def _build_recommendation(overall: str, axes: list[dict]) -> str:
     parts: list[str] = []
     if overall == FitLabel.STRONG_CANDIDATE.value:
-        parts.append("Strong candidate — proceed with compliance check and submission pack.")
+        parts.append("Strong candidate -- proceed with compliance check and submission pack.")
     elif overall == FitLabel.POSSIBLE.value:
-        parts.append("Possible fit — address weak axes before submission.")
+        parts.append("Possible fit -- address weak axes before submission.")
     elif overall == FitLabel.POSSIBLE_BUT_COSTLY.value:
-        parts.append("Possible but costly — significant adaptation needed.")
+        parts.append("Possible but costly -- significant adaptation needed.")
         weak = [a["axis"] for a in axes if a["value"] in ("weak", "bad")]
         if weak:
             parts.append(f"Weak axes: {', '.join(weak)}.")
     elif overall == FitLabel.POOR_FIT.value:
-        parts.append("Poor fit — consider alternative venues.")
+        parts.append("Poor fit -- consider alternative venues.")
     else:
-        parts.append("Insufficient data — collect more evidence before assessment.")
+        parts.append("Insufficient data -- collect more evidence before assessment.")
     return " ".join(parts)

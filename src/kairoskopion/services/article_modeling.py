@@ -164,6 +164,16 @@ def build_article_model(
     # Protected core cannot be auto-extracted — always mark unknown
     unknowns.append("protected core not confirmed by user")
 
+    # Sprint 2: practical diagnostic fields
+    lower_text = text.lower()
+    sections_lower = [s.lower() for s in sections]
+    has_refs_section = any("reference" in s or "bibliography" in s for s in sections_lower)
+    has_methods_section = any("method" in s for s in sections_lower)
+    has_data_stmt = "data availability" in lower_text or "data sharing" in lower_text
+    has_ai_disc = ("ai" in lower_text and "disclosure" in lower_text) or \
+                  "artificial intelligence" in lower_text and "generated" in lower_text
+    abstract_text = manuscript.abstract or ""
+
     return ArticleModel(
         article_model_id=article_model_id(),
         source_refs=[source_ref] if source_ref else [],
@@ -184,4 +194,15 @@ def build_article_model(
         confidence="low",
         lifecycle_status=LifecycleStatus.PRELIMINARY.value,
         evidence_refs=[source_ref] if source_ref else [],
+        # Sprint 2: practical diagnostic fields
+        word_count=manuscript.word_count,
+        section_count=len(sections),
+        reference_count=len(manuscript.bibliography_refs),
+        abstract_length=len(abstract_text.split()) if abstract_text else None,
+        has_references_section=has_refs_section,
+        has_methods_section=has_methods_section,
+        has_data_availability_statement=has_data_stmt,
+        has_ai_disclosure=has_ai_disc,
+        manuscript_stage=stage,
+        extraction_status="heuristic",
     )

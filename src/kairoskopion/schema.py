@@ -170,6 +170,18 @@ class ArticleModel(_DictMixin):
     lifecycle_status: str = LifecycleStatus.DRAFT.value
     created_at: str = dc.field(default_factory=_now)
     updated_at: str = dc.field(default_factory=_now)
+    # Sprint 2: practical diagnostic fields
+    word_count: int | None = _field()
+    section_count: int | None = _field()
+    reference_count: int | None = _field()
+    abstract_length: int | None = _field()
+    has_references_section: bool | None = _field()
+    has_methods_section: bool | None = _field()
+    has_data_availability_statement: bool | None = _field()
+    has_ai_disclosure: bool | None = _field()
+    manuscript_stage: str | None = _field()
+    protected_core_status: str | None = _field()
+    extraction_status: str | None = _field()
 
 
 @dc.dataclass
@@ -216,6 +228,19 @@ class VenueModel(_DictMixin):
     lifecycle_status: str = LifecycleStatus.DRAFT.value
     created_at: str = dc.field(default_factory=_now)
     updated_at: str = dc.field(default_factory=_now)
+    # Sprint 2: enrichment fields (claims, not verified facts)
+    aims_scope_summary: str | None = _field()
+    indexing_claims: list[str] = _list()
+    metrics_claims: list[str] = _list()
+    open_access_status: str | None = _field()
+    apc_policy: str | None = _field()
+    review_process_claims: str | None = _field()
+    word_limits: dict[str, Any] | None = _field()
+    anonymization_policy: str | None = _field()
+    ai_policy: str | None = _field()
+    data_policy: str | None = _field()
+    ethics_policy: str | None = _field()
+    freshness_status: str | None = _field()
 
 
 @dc.dataclass
