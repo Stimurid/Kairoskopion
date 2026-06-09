@@ -74,6 +74,23 @@ Engineering queue. Each item is a concrete deliverable, not an aspiration.
 - [x] CLI `adapters-smoke` command
 - [x] 35 tests (serialization, mock adapters, bridge, evidence safety, persistence, no-network)
 
+### Enhanced vault / exchange / freshness (complete)
+
+- [x] Vault indexes: articles, venues, fits, citations, traces, adapters (per-section INDEX.md with tables)
+- [x] Root vault index (INDEX.md) with section counts and links
+- [x] Vault cross-linking: fit→article+venue, mismatch→fit, risk/compliance→article+venue, citation→article+venue
+- [x] Machine-readable vault manifest (manifest.json with card paths, counts, entity IDs)
+- [x] Link validation: detect broken internal markdown links, report as warnings
+- [x] Export storage bundle: zip archive with registries, vault, metadata.json
+- [x] Import storage bundle: append (default) or replace mode
+- [x] Bundle validation: metadata presence, structure checks
+- [x] Freshness tracking: FreshnessPolicy with fresh/aging/stale/expired thresholds
+- [x] Source freshness: detect mock sources by parser_used field
+- [x] Adapter result freshness: is_mock flag → always "mock" status
+- [x] Batch freshness assessment
+- [x] CLI: vault-index, export-bundle, import-bundle, validate-bundle
+- [x] 43 tests (vault indexes, cross-linking, manifest, link validation, export/import, freshness)
+
 ## Then: real external adapters
 
 - [ ] OpenAlex real adapter (requires API polite pool key)
@@ -82,13 +99,6 @@ Engineering queue. Each item is a concrete deliverable, not an aspiration.
 - [ ] Fuzzy title matching for reference linking
 - [ ] Adapter result caching / deduplication
 - [ ] Rate limiting and retry logic
-
-## Then: enhanced vault
-
-- [ ] Vault card cross-linking (fit -> article + venue)
-- [ ] JSON export/import for registries
-- [ ] Timeline/freshness tracking
-- [ ] Staleness detection
 
 ## Then: integration bridges
 

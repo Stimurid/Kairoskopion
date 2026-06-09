@@ -6,14 +6,15 @@
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `feature/external-adapter-stubs` (from `main`) |
+| Branch | `feature/enhanced-vault-exchange-freshness` (from `main`) |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
-| Working tree | clean |
+| Working tree | dirty (vault/exchange/freshness uncommitted) |
 | Python | >=3.11, installed in `.venv` |
 
 ## Commit history (main)
 
 ```
+a0a049b Add external adapter stubs with mock evidence bridge
 327c4ac Add citation ecology stub
 299251e Add run-local pipeline for user files
 9d04df7 Add repository operating layer and foundation docs
@@ -36,13 +37,16 @@ beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
 | `schema.py` | 18+ dataclass models with `to_dict`/`from_dict` |
 | `registry.py` | JSONL append/read/list/find |
 | `persistence.py` | Storage root management, pipeline + adapter result persistence |
-| `artifacts.py` | Vault markdown card filesystem output |
+| `artifacts.py` | Vault markdown card filesystem output with cross-links |
+| `vault.py` | Vault indexes, manifest, cross-linking, link validation |
+| `exchange.py` | Export/import storage bundles (zip) |
+| `freshness.py` | Freshness/staleness tracking for sources and adapter results |
 | `evidence.py` | Evidence layer helpers |
 | `quality.py` | Quality gate evaluators (fit gate, submission gate) |
 | `traces.py` | Operation trace recording |
 | `decisions.py` | User decision tracking |
-| `cards.py` | 7 markdown card generators |
-| `cli.py` | CLI: status, run-fixture, run-local, adapters-smoke, inspect-storage |
+| `cards.py` | 8 markdown card generators |
+| `cli.py` | CLI: 9 commands |
 
 ### Services (`src/kairoskopion/services/`)
 
@@ -93,6 +97,10 @@ beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
 | `kairoskopion run-fixture` | Full fixture pipeline → persist registries + vault cards |
 | `kairoskopion run-local` | Pipeline on user-provided manuscript + venue + scenario files |
 | `kairoskopion adapters-smoke` | Run mock adapters, bridge to source/evidence, persist results |
+| `kairoskopion vault-index` | Generate vault indexes, manifest, and cross-links |
+| `kairoskopion export-bundle --output FILE` | Export storage as zip bundle |
+| `kairoskopion import-bundle --bundle FILE` | Import a storage bundle (append or replace) |
+| `kairoskopion validate-bundle --bundle FILE` | Validate a storage bundle |
 | `kairoskopion inspect-storage` | Registry record counts, entity IDs, vault card listing |
 
 Global option: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`.
@@ -113,24 +121,35 @@ Global option: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`.
     adapter_results.jsonl        source_snapshots.jsonl
     evidence_items.jsonl
   vault/
-    articles/    venues/    fits/      risks/
-    compliance/  mismatches/ citations/ submissions/ traces/
+    INDEX.md             — root index with section counts
+    manifest.json        — machine-readable vault manifest
+    articles/    INDEX.md + {article_model_id}.md
+    venues/      INDEX.md + {venue_model_id}.md
+    fits/        INDEX.md + {fit_assessment_id}.md (cross-linked to article/venue)
+    risks/       {risk_report_id}.md (cross-linked to article/venue)
+    compliance/  {compliance_checklist_id}.md (cross-linked)
+    mismatches/  {mismatch_map_id}.md (cross-linked to fit)
+    citations/   INDEX.md + {citation_ecology_report_id}.md (cross-linked)
+    adapters/    INDEX.md
+    submissions/
+    traces/      INDEX.md + {pipeline_run_id}.md
 ```
 
 ## Tests
 
-- **308 tests**, all passing
-- 17 test files covering: schema, registry, evidence, quality, cards,
+- **351 tests**, all passing
+- 18 test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
-  source acquisition, bibliography parsing, citation ecology, adapters
+  source acquisition, bibliography parsing, citation ecology, adapters,
+  vault indexes, exchange bundles, freshness tracking
 
 ## Fixture pipeline output
 
 Running `kairoskopion run-fixture` produces:
 - FitAssessment: `possible_but_costly`
 - 5 mismatches, 6 risk items, 9 compliance items (3 missing)
-- 13 JSONL registries, 7 vault markdown cards
+- 13 JSONL registries, 7 vault markdown cards (with cross-links)
 
 ## Known omissions
 
@@ -140,9 +159,15 @@ Running `kairoskopion run-fixture` produces:
 - ~~No OpenAlex/Crossref/OpenCitations adapters~~ → implemented as mock stubs (no real API calls)
 - ~~No `--manuscript`/`--venue` CLI args~~ → implemented as `run-local`
 - ~~No citation ecology profiling~~ → implemented as heuristic stub (no external API)
+- ~~No vault cross-linking~~ → implemented (fit→article+venue, mismatch→fit, risk/compliance→article+venue, citation→article+venue)
+- ~~No export/import~~ → implemented as zip bundles with metadata
+- ~~No freshness tracking~~ → implemented (fresh/possibly_stale/stale/expired/mock/unknown_freshness)
 - Mock adapters do not verify references (verification_status stays "not_verified")
 - Mock evidence is VENDOR_CLAIM, never FACT_FROM_SOURCE
 - No title-based fuzzy matching for reference linking (DOI only)
+- Freshness is local metadata only — no real source refresh
+- Vault is local projection, not canonical database (registries are source of truth)
+- Export bundles are for local handoff/backup, not a sync protocol
 - No Telegram, web UI, reviewer simulation
 - No submission portal automation
 - No real Litops/WhiteCrow API connection (stubs only)
@@ -154,8 +179,11 @@ The system can:
 2. Run an 18-step deterministic pipeline
 3. Produce multi-axis fit assessment, mismatch map, rewrite plan, risk report, compliance checklist
 4. Persist all results to JSONL registries
-5. Write human-readable vault markdown cards
+5. Write human-readable vault markdown cards with cross-links
 6. Run mock external adapters and bridge results to evidence layer
-7. Display results via CLI
+7. Generate vault indexes, manifest, and validate internal links
+8. Export/import storage bundles as zip archives
+9. Track freshness/staleness of sources and adapter results
+10. Display results via CLI
 
 All without network access, LLM calls, or external dependencies.

@@ -326,6 +326,69 @@ def cmd_adapters_smoke(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_vault_index(args: argparse.Namespace) -> int:
+    """Generate vault indexes and manifest."""
+    from .vault import write_vault_indexes
+
+    root = _resolve_storage_root(args)
+    written = write_vault_indexes(root)
+    print(f"Vault indexes generated ({len(written)} files):")
+    for name, path in sorted(written.items()):
+        print(f"  {name}: {path}")
+    return 0
+
+
+def cmd_export_bundle(args: argparse.Namespace) -> int:
+    """Export storage as a zip bundle."""
+    from .exchange import export_storage_bundle
+
+    root = _resolve_storage_root(args)
+    output = Path(args.output)
+    export_storage_bundle(root, output)
+    print(f"Bundle exported: {output.resolve()}")
+    return 0
+
+
+def cmd_import_bundle(args: argparse.Namespace) -> int:
+    """Import a storage bundle."""
+    from .exchange import import_storage_bundle
+
+    root = _resolve_storage_root(args)
+    bundle = Path(args.bundle)
+    mode = getattr(args, "mode", "append")
+    result = import_storage_bundle(bundle, root, mode=mode)
+    if result["success"]:
+        print(f"Bundle imported ({mode}):")
+        print(f"  Registries: {result['imported_registries']}")
+        print(f"  Records: {result['imported_records']}")
+        print(f"  Vault files: {result['imported_vault_files']}")
+        return 0
+    else:
+        for e in result.get("errors", []):
+            print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_validate_bundle(args: argparse.Namespace) -> int:
+    """Validate a storage bundle."""
+    from .exchange import validate_bundle
+
+    bundle = Path(args.bundle)
+    result = validate_bundle(bundle)
+    if result["valid"]:
+        print(f"Bundle valid: {bundle}")
+        meta = result.get("metadata", {})
+        print(f"  Version: {meta.get('kairoskopion_version', '?')}")
+        print(f"  Created: {meta.get('created_at', '?')}")
+        print(f"  Registries: {result.get('registry_count', 0)}")
+        print(f"  Vault files: {result.get('vault_file_count', 0)}")
+        return 0
+    else:
+        for e in result.get("errors", []):
+            print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+
 def _find_fixtures_dir() -> Path | None:
     """Search for tests/fixtures/ relative to cwd or package location."""
     cwd_fixtures = Path.cwd() / "tests" / "fixtures"
@@ -355,6 +418,18 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("inspect-storage", help="Show registry and vault contents")
 
     sub.add_parser("adapters-smoke", help="Run mock adapters, save results, print summary")
+    sub.add_parser("vault-index", help="Generate vault indexes and manifest")
+
+    export_parser = sub.add_parser("export-bundle", help="Export storage as zip bundle")
+    export_parser.add_argument("--output", required=True, help="Output zip file path")
+
+    import_parser = sub.add_parser("import-bundle", help="Import a storage bundle")
+    import_parser.add_argument("--bundle", required=True, help="Path to bundle zip")
+    import_parser.add_argument("--mode", default="append", choices=["append", "replace"],
+                               help="Import mode: append (default) or replace")
+
+    validate_parser = sub.add_parser("validate-bundle", help="Validate a storage bundle")
+    validate_parser.add_argument("--bundle", required=True, help="Path to bundle zip")
 
     run_local_parser = sub.add_parser(
         "run-local", help="Run pipeline on user-provided local files",
@@ -380,6 +455,10 @@ def main(argv: list[str] | None = None) -> int:
         "run-local": cmd_run_local,
         "inspect-storage": cmd_inspect_storage,
         "adapters-smoke": cmd_adapters_smoke,
+        "vault-index": cmd_vault_index,
+        "export-bundle": cmd_export_bundle,
+        "import-bundle": cmd_import_bundle,
+        "validate-bundle": cmd_validate_bundle,
     }
 
     handler = commands.get(args.command)

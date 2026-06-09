@@ -48,7 +48,7 @@ Before any structural change, read in this order:
 - Source acquisition: local file registration, text input, URL placeholder
 - Quality gates: fit gate, submission gate, evidence audit
 - Operation traces with timestamps
-- CLI: `status`, `run-fixture`, `inspect-storage`
+- CLI: `status`, `run-fixture`, `run-local`, `adapters-smoke`, `vault-index`, `export-bundle`, `import-bundle`, `validate-bundle`, `inspect-storage`
 - Integration stubs: Litops (5 types), WhiteCrow (6 types)
 
 ## Non-negotiable rules
@@ -129,6 +129,9 @@ Before any structural change, read in this order:
 | `src/kairoskopion/services/` | 11 domain services |
 | `src/kairoskopion/adapters/` | Source intake, URL snapshot, OpenAlex/Crossref/OpenCitations mocks, bridge |
 | `src/kairoskopion/integrations/` | Litops/WhiteCrow stubs |
-| `tests/` | 308+ tests |
+| `src/kairoskopion/vault.py` | Vault indexes, manifest, cross-linking, link validation |
+| `src/kairoskopion/exchange.py` | Export/import storage bundles (zip) |
+| `src/kairoskopion/freshness.py` | Freshness/staleness tracking |
+| `tests/` | 351+ tests |
 | `tests/fixtures/` | Synthetic manuscript, venue, scenario |
 | `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` | Master spec |

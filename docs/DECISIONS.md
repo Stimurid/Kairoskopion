@@ -136,3 +136,30 @@ registry — without network dependency or API key requirements. When real
 adapters are implemented, only the data retrieval changes; the contract,
 bridge, and persistence remain the same. Keeping mock evidence at VENDOR_CLAIM
 prevents false confidence from synthetic data.
+
+## ADR-14: Vault as local projection, not canonical database
+
+**Decision:** The vault (markdown cards, indexes, manifest) is a local
+projection of Kairoskopion state. JSONL registries remain the source of
+structured truth. Vault indexes and manifest can be regenerated at any time
+from registry data.
+
+**Rationale:** Keeping registries as the canonical source means vault files
+can be deleted and regenerated without data loss. Cross-links in vault cards
+use relative paths (`../articles/art_xxx.md`) compatible with Obsidian.
+The manifest (manifest.json) provides machine-readable access to vault
+structure without parsing markdown. Link validation reports broken references
+as warnings rather than errors — the vault is informational, not normative.
+
+## ADR-15: Export bundles for local handoff
+
+**Decision:** Storage bundles are zip archives containing registries, vault,
+and metadata. Import supports append (default) and replace modes. Bundles
+are not a sync protocol — they are for backup and local handoff between
+machines or sessions.
+
+**Rationale:** Researchers work across machines and may need to transfer
+analysis state. A self-contained zip with metadata.json (version, creation
+time, registry counts) is simple, portable, and inspectable. Append mode
+preserves existing data; replace mode is explicit-only to prevent accidental
+data loss. No network protocol, no conflict resolution — just file copy.

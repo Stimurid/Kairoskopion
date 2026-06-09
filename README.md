@@ -44,6 +44,10 @@ External adapter stubs: OpenAlex, Crossref, OpenCitations mock adapters with
 typed contracts and evidence bridge. All mock data only — no real API calls.
 Mock evidence is VENDOR_CLAIM, never FACT_FROM_SOURCE.
 
+Enhanced vault: cross-linked markdown cards with indexes, machine-readable
+manifest, link validation. Export/import zip bundles for local handoff.
+Freshness/staleness tracking for sources and adapter results.
+
 Results persist to JSONL registries and markdown vault cards on disk.
 
 No LLM calls, no external API dependencies, no network access.
@@ -85,6 +89,10 @@ kairoskopion inspect-storage
 | `kairoskopion run-local` | Run pipeline on user-provided manuscript + venue guidelines + scenario files |
 | `kairoskopion inspect-storage` | Show all registries (record counts, entity IDs) and vault card files |
 | `kairoskopion adapters-smoke` | Run mock adapters (OpenAlex/Crossref/OpenCitations), persist results |
+| `kairoskopion vault-index` | Generate vault indexes, manifest, and cross-links |
+| `kairoskopion export-bundle --output FILE` | Export storage as zip bundle |
+| `kairoskopion import-bundle --bundle FILE [--mode append\|replace]` | Import a storage bundle |
+| `kairoskopion validate-bundle --bundle FILE` | Validate a storage bundle |
 
 Use `--storage-root PATH` or env var `KAIROSKOPION_STORAGE_ROOT` to override default `.kairoskopion/` storage.
 
@@ -110,12 +118,16 @@ Use `--storage-root PATH` or env var `KAIROSKOPION_STORAGE_ROOT` to override def
     source_snapshots.jsonl
     evidence_items.jsonl
   vault/
-    articles/    {article_model_id}.md
-    venues/      {venue_model_id}.md
-    fits/        {fit_assessment_id}.md
-    risks/       {risk_report_id}.md
-    compliance/  {compliance_checklist_id}.md
-    mismatches/  {mismatch_map_id}.md
+    INDEX.md             — root index with section counts
+    manifest.json        — machine-readable vault manifest
+    articles/    INDEX.md + {article_model_id}.md
+    venues/      INDEX.md + {venue_model_id}.md
+    fits/        INDEX.md + {fit_assessment_id}.md (cross-linked to article/venue)
+    risks/       {risk_report_id}.md (cross-linked to article/venue)
+    compliance/  {compliance_checklist_id}.md (cross-linked)
+    mismatches/  {mismatch_map_id}.md (cross-linked to fit)
+    citations/   INDEX.md + {citation_ecology_report_id}.md (cross-linked)
+    adapters/    INDEX.md
     submissions/
     traces/      {pipeline_run_id}.md
 ```
@@ -130,13 +142,16 @@ src/kairoskopion/
   schema.py            — 18+ dataclass models with to_dict/from_dict
   registry.py          — JSONL append/read/list/find
   persistence.py       — storage root management, pipeline result persistence
-  artifacts.py         — vault markdown card filesystem output
+  artifacts.py         — vault markdown card filesystem output (with cross-links)
+  vault.py             — vault indexes, manifest, cross-linking, link validation
+  exchange.py          — export/import storage bundles (zip)
+  freshness.py         — freshness/staleness tracking for sources and adapter results
   evidence.py          — evidence layer helpers
   quality.py           — quality gate evaluators (fit gate, submission gate)
   traces.py            — operation trace recording
   decisions.py         — user decision tracking
-  cards.py             — markdown card generators (7 entity types)
-  cli.py               — CLI: status, run-fixture, run-local, adapters-smoke, inspect-storage
+  cards.py             — markdown card generators (8 entity types)
+  cli.py               — CLI: 9 commands (status, run-fixture, run-local, etc.)
 
   services/
     article_modeling.py  — ManuscriptModel + ArticleModel from text

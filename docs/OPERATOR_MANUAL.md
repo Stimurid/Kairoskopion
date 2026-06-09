@@ -36,7 +36,7 @@ pytest -v --cov=kairoskopion
 pytest tests/test_cli.py -v
 ```
 
-All 215+ tests must pass before any commit.
+All 351+ tests must pass before any commit.
 
 ## CLI commands
 
@@ -61,20 +61,29 @@ kairoskopion --storage-root /tmp/kairon_test run-fixture
 Runs the synthetic manuscript + venue pipeline end-to-end.
 Creates 13 JSONL registries and 7 vault markdown cards.
 
-### Inspect stored results
+### Run with local files
 
 ```bash
-kairoskopion inspect-storage
+kairoskopion run-local \
+  --manuscript my_paper.md \
+  --venue-guidelines journal_guidelines.md \
+  --scenario scenario.json \
+  --storage-root ./my_analysis
 ```
 
-Shows: registry record counts, entity IDs, vault card files.
+Accepts `.md`, `.txt`, `.json`, `.html` files. Each input file is registered as a
+SourceSnapshot with content hash and persisted to the `source_snapshots` registry.
 
-### Storage root override
+The scenario file must be valid JSON with at least a `goal` field. Example:
+```json
+{
+  "goal": "Publish in Q1 STS journal",
+  "target_venue_type": "journal",
+  "rewrite_depth": "medium"
+}
+```
 
-Priority (highest first):
-1. `--storage-root PATH` CLI flag
-2. `KAIROSKOPION_STORAGE_ROOT` environment variable
-3. Default: `.kairoskopion/` in current working directory
+Output: same as `run-fixture` — JSONL registries, vault cards, pipeline summary.
 
 ### Run mock adapters
 
@@ -92,6 +101,68 @@ adapter result. No network calls, no API keys needed.
 
 All evidence is marked VENDOR_CLAIM with is_mock=True. References are never
 verified by mock data.
+
+### Generate vault indexes
+
+```bash
+kairoskopion vault-index
+```
+
+Generates per-section INDEX.md files, root INDEX.md, and manifest.json.
+Cross-links in vault cards (fit→article+venue, mismatch→fit, etc.) are created
+during pipeline runs; this command generates the indexes on top.
+
+### Export storage bundle
+
+```bash
+kairoskopion export-bundle --output backup.zip
+```
+
+Creates a zip archive containing:
+- `registries/*.jsonl` — all JSONL registries
+- `vault/**/*.md` — all vault cards and indexes
+- `vault/manifest.json` — vault manifest
+- `metadata.json` — bundle metadata (version, creation time, registry counts)
+
+Vault indexes and manifest are regenerated before archiving.
+
+### Import storage bundle
+
+```bash
+# Append mode (default) — adds records to existing registries
+kairoskopion import-bundle --bundle backup.zip
+
+# Replace mode — overwrites target storage
+kairoskopion import-bundle --bundle backup.zip --mode replace
+```
+
+Imports registries and vault cards from a previously exported bundle.
+In append mode, JSONL records are appended to existing registries.
+In replace mode, the target registries directory is cleared first.
+
+### Validate storage bundle
+
+```bash
+kairoskopion validate-bundle --bundle backup.zip
+```
+
+Checks bundle structure: zip integrity, metadata.json presence, registry
+file presence. Reports errors and warnings without modifying anything.
+
+### Inspect stored results
+
+```bash
+kairoskopion inspect-storage
+```
+
+Shows: registry record counts, entity IDs, vault card files.
+
+### Storage root override
+
+Priority (highest first):
+1. `--storage-root PATH` CLI flag
+2. `KAIROSKOPION_STORAGE_ROOT` environment variable
+3. Default: `.kairoskopion/` in current working directory
 
 ## Where artifacts appear
 
@@ -119,14 +190,18 @@ After `run-fixture`:
     source_snapshots.jsonl      — SourceSnapshot records (run-local, adapters-smoke)
     evidence_items.jsonl        — EvidenceItem records (adapters-smoke)
   vault/
-    articles/    — ArticleModel markdown cards
-    venues/      — VenueModel markdown cards
-    fits/        — FitAssessment report cards
-    risks/       — RiskReport cards
-    compliance/  — ComplianceChecklist cards
-    mismatches/  — MismatchMap cards
-    submissions/ — (empty until SubmissionPack implemented)
-    traces/      — Pipeline run trace reports
+    INDEX.md             — root index with section counts and links
+    manifest.json        — machine-readable vault manifest (counts, card paths)
+    articles/    INDEX.md + ArticleModel markdown cards
+    venues/      INDEX.md + VenueModel markdown cards
+    fits/        INDEX.md + FitAssessment cards (cross-linked to article/venue)
+    risks/       RiskReport cards (cross-linked to article/venue)
+    compliance/  ComplianceChecklist cards (cross-linked)
+    mismatches/  MismatchMap cards (cross-linked to fit)
+    citations/   INDEX.md + CitationEcologyReport cards (cross-linked)
+    adapters/    INDEX.md
+    submissions/ (empty until SubmissionPack implemented)
+    traces/      INDEX.md + Pipeline run trace reports
 ```
 
 ## Reading vault cards
@@ -134,34 +209,13 @@ After `run-fixture`:
 Vault cards are markdown files with YAML frontmatter.
 Open them in any text editor, VS Code, or Obsidian.
 
+Cross-links use relative paths (e.g. `../articles/art_xxx.md`) compatible
+with Obsidian link navigation.
+
 Example:
 ```bash
 cat .kairoskopion/vault/fits/fit_*.md
 ```
-
-## Run with local files
-
-```bash
-kairoskopion run-local \
-  --manuscript my_paper.md \
-  --venue-guidelines journal_guidelines.md \
-  --scenario scenario.json \
-  --storage-root ./my_analysis
-```
-
-Accepts `.md`, `.txt`, `.json`, `.html` files. Each input file is registered as a
-SourceSnapshot with content hash and persisted to the `source_snapshots` registry.
-
-The scenario file must be valid JSON with at least a `goal` field. Example:
-```json
-{
-  "goal": "Publish in Q1 STS journal",
-  "target_venue_type": "journal",
-  "rewrite_depth": "medium"
-}
-```
-
-Output: same as `run-fixture` — JSONL registries, vault cards, pipeline summary.
 
 ## Troubleshooting
 

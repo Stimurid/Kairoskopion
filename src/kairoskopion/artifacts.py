@@ -27,6 +27,13 @@ from .cards import (
     venue_model_card,
 )
 from .persistence import ensure_storage_root
+from .vault import (
+    enrich_citation_card,
+    enrich_compliance_card,
+    enrich_fit_card,
+    enrich_mismatch_card,
+    enrich_risk_card,
+)
 
 if TYPE_CHECKING:
     from .pipelines.manuscript_venue_fit import ManuscriptVenueFitPipeline, ManuscriptVenueFitResult
@@ -73,50 +80,65 @@ def write_venue_card(
 def write_fit_report(
     data: dict[str, Any],
     vault_root: Path,
+    cross_link_data: dict[str, Any] | None = None,
 ) -> Path:
     """Write FitAssessment markdown card to vault/fits/."""
     entity_id = data.get("fit_assessment_id", "unknown")
     md = fit_assessment_card(data)
+    if cross_link_data:
+        md = enrich_fit_card(md, cross_link_data)
     return _write_card(vault_root, "fits", f"{entity_id}.md", md)
 
 
 def write_risk_card(
     data: dict[str, Any],
     vault_root: Path,
+    cross_link_data: dict[str, Any] | None = None,
 ) -> Path:
     """Write RiskReport markdown card to vault/risks/."""
     entity_id = data.get("risk_report_id", "unknown")
     md = risk_report_card(data)
+    if cross_link_data:
+        md = enrich_risk_card(md, cross_link_data)
     return _write_card(vault_root, "risks", f"{entity_id}.md", md)
 
 
 def write_compliance_card(
     data: dict[str, Any],
     vault_root: Path,
+    cross_link_data: dict[str, Any] | None = None,
 ) -> Path:
     """Write ComplianceChecklist markdown card to vault/compliance/."""
     entity_id = data.get("compliance_checklist_id", "unknown")
     md = compliance_checklist_card(data)
+    if cross_link_data:
+        md = enrich_compliance_card(md, cross_link_data)
     return _write_card(vault_root, "compliance", f"{entity_id}.md", md)
 
 
 def write_mismatch_card(
     data: dict[str, Any],
     vault_root: Path,
+    cross_link_data: dict[str, Any] | None = None,
 ) -> Path:
     """Write MismatchMap markdown card to vault/mismatches/."""
     entity_id = data.get("mismatch_map_id", "unknown")
     md = mismatch_map_card(data)
+    if cross_link_data:
+        md = enrich_mismatch_card(md, cross_link_data)
     return _write_card(vault_root, "mismatches", f"{entity_id}.md", md)
 
 
 def write_citation_ecology_card(
     data: dict[str, Any],
     vault_root: Path,
+    cross_link_data: dict[str, Any] | None = None,
 ) -> Path:
     """Write CitationEcologyReport markdown card to vault/citations/."""
     entity_id = data.get("citation_ecology_report_id", "unknown")
     md = citation_ecology_card(data)
+    if cross_link_data:
+        md = enrich_citation_card(md, cross_link_data)
     return _write_card(vault_root, "citations", f"{entity_id}.md", md)
 
 
@@ -147,24 +169,24 @@ def write_pipeline_result_cards(
             result.venue.to_dict(), vault_root)
 
     if result.fit:
-        written["fit_card"] = write_fit_report(
-            result.fit.to_dict(), vault_root)
+        fit_data = result.fit.to_dict()
+        written["fit_card"] = write_fit_report(fit_data, vault_root, cross_link_data=fit_data)
 
     if result.risk_report:
-        written["risk_card"] = write_risk_card(
-            result.risk_report.to_dict(), vault_root)
+        risk_data = result.risk_report.to_dict()
+        written["risk_card"] = write_risk_card(risk_data, vault_root, cross_link_data=risk_data)
 
     if result.compliance:
-        written["compliance_card"] = write_compliance_card(
-            result.compliance.to_dict(), vault_root)
+        comp_data = result.compliance.to_dict()
+        written["compliance_card"] = write_compliance_card(comp_data, vault_root, cross_link_data=comp_data)
 
     if result.mismatch_map:
-        written["mismatch_card"] = write_mismatch_card(
-            result.mismatch_map.to_dict(), vault_root)
+        mm_data = result.mismatch_map.to_dict()
+        written["mismatch_card"] = write_mismatch_card(mm_data, vault_root, cross_link_data=mm_data)
 
     if result.citation_ecology:
-        written["citation_ecology_card"] = write_citation_ecology_card(
-            result.citation_ecology.to_dict(), vault_root)
+        ce_data = result.citation_ecology.to_dict()
+        written["citation_ecology_card"] = write_citation_ecology_card(ce_data, vault_root, cross_link_data=ce_data)
 
     if result.artifact_markdown:
         written["pipeline_artifact"] = write_pipeline_artifact(
