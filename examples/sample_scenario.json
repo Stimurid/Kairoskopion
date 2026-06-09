@@ -1,0 +1,11 @@
+{
+  "goal": "Publish conceptual AI ethics paper in Q1 STS journal",
+  "target_venue_type": "journal",
+  "target_indexing": "scopus_wos",
+  "rewrite_depth": "medium",
+  "language_constraints": "english",
+  "deadline": "2026-12-31",
+  "risk_tolerance": "moderate",
+  "field_core_preservation": "strict",
+  "notes": "Philosophy of mind paper targeting STS audience. Willing to add empirical framing but not to abandon central philosophical thesis."
+}
