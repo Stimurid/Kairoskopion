@@ -450,6 +450,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Override storage root (default: $KAIROSKOPION_STORAGE_ROOT or .kairoskopion/)",
     )
+    parser.add_argument(
+        "--adapter-mode",
+        default="mock",
+        choices=["mock", "real"],
+        help="Adapter mode: 'mock' (deterministic, no network) or 'real' (HTTP API calls with caching). Default: mock.",
+    )
 
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("status", help="Show environment status")

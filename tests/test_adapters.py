@@ -256,26 +256,29 @@ class TestPersistenceIntegration:
 
 
 class TestNoNetwork:
-    def test_no_network_imports_openalex(self):
+    """Adapters use stdlib urllib for real mode (Sprint 3).
+
+    The constraint is: no third-party HTTP libraries (requests, httpx, aiohttp).
+    stdlib urllib.request is allowed — it ships with Python, no extra dependency.
+    """
+
+    def _check_no_third_party_http(self, mod_path: str) -> None:
+        source = Path(mod_path).read_text(encoding="utf-8")
+        for forbidden in ["import requests", "import httpx", "import aiohttp"]:
+            assert forbidden not in source, f"Found '{forbidden}' in {mod_path}"
+
+    def test_no_third_party_http_openalex(self):
         import kairoskopion.adapters.openalex as mod
-        source = Path(mod.__file__).read_text(encoding="utf-8")
-        for forbidden in ["import requests", "import urllib", "import httpx", "import aiohttp"]:
-            assert forbidden not in source
+        self._check_no_third_party_http(mod.__file__)
 
-    def test_no_network_imports_crossref(self):
+    def test_no_third_party_http_crossref(self):
         import kairoskopion.adapters.crossref as mod
-        source = Path(mod.__file__).read_text(encoding="utf-8")
-        for forbidden in ["import requests", "import urllib", "import httpx", "import aiohttp"]:
-            assert forbidden not in source
+        self._check_no_third_party_http(mod.__file__)
 
-    def test_no_network_imports_opencitations(self):
+    def test_no_third_party_http_opencitations(self):
         import kairoskopion.adapters.opencitations as mod
-        source = Path(mod.__file__).read_text(encoding="utf-8")
-        for forbidden in ["import requests", "import urllib", "import httpx", "import aiohttp"]:
-            assert forbidden not in source
+        self._check_no_third_party_http(mod.__file__)
 
-    def test_no_network_imports_bridge(self):
+    def test_no_third_party_http_bridge(self):
         import kairoskopion.adapters.bridge as mod
-        source = Path(mod.__file__).read_text(encoding="utf-8")
-        for forbidden in ["import requests", "import urllib", "import httpx", "import aiohttp"]:
-            assert forbidden not in source
+        self._check_no_third_party_http(mod.__file__)

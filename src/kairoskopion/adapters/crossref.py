@@ -1,13 +1,18 @@
-"""Crossref adapter stub with deterministic mock data.
+"""Crossref adapter: mock mode (deterministic) and real mode (HTTP API).
 
-No real API calls. Returns fixed mock records for DOI metadata lookup.
-All results are marked is_mock=True.
+Mock mode: returns fixed records, no network calls, is_mock=True.
+Real mode: calls api.crossref.org with caching and rate limiting.
+All real results are marked is_mock=False, evidence_status=VENDOR_CLAIM.
 """
 
 from __future__ import annotations
 
+import urllib.parse
+from pathlib import Path
+
 from ..enums import AdapterStatus, EvidenceStatus
 from .base import AdapterConfig, AdapterRecord, AdapterResult
+from .http_client import HttpError, fetch_json
 
 _MOCK_CONFIG = AdapterConfig(
     adapter_name="crossref",
@@ -124,3 +129,166 @@ def search_works_mock(
         unknowns=["Real result count unknown (mock data)"],
         disclaimer="Mock Crossref adapter. No real API call was made.",
     )
+
+
+# ---------------------------------------------------------------------------
+# Real mode
+# ---------------------------------------------------------------------------
+
+_CROSSREF_BASE = "https://api.crossref.org"
+
+
+def _parse_crossref_work(item: dict) -> AdapterRecord:
+    """Parse a Crossref works API item into an AdapterRecord."""
+    title_parts = item.get("title", [])
+    title = title_parts[0] if title_parts else None
+    authors = []
+    for a in item.get("author", []):
+        name = f"{a.get('given', '')} {a.get('family', '')}".strip()
+        if name:
+            authors.append(name)
+    year = None
+    for date_field in ("published-print", "published-online", "created"):
+        dp = item.get(date_field, {}).get("date-parts", [[]])
+        if dp and dp[0] and dp[0][0]:
+            year = dp[0][0]
+            break
+    venue = None
+    containers = item.get("container-title", [])
+    if containers:
+        venue = containers[0]
+    return AdapterRecord(
+        record_id=f"cr_{item.get('DOI', 'unknown')[:30]}",
+        title=title,
+        authors=authors,
+        year=year,
+        doi=item.get("DOI"),
+        venue_name=venue,
+        source_kind=item.get("type", "unknown"),
+        citation_count=item.get("is-referenced-by-count"),
+        is_open_access=None,
+        raw_data=item,
+    )
+
+
+def lookup_doi(
+    doi: str,
+    *,
+    config: AdapterConfig | None = None,
+    cache_dir: Path | None = None,
+) -> AdapterResult:
+    """Look up DOI metadata via the Crossref API (real mode).
+
+    Makes a real HTTP call to api.crossref.org. Results are cached locally.
+    """
+    url = f"{_CROSSREF_BASE}/works/{urllib.parse.quote(doi, safe='')}"
+    try:
+        data = fetch_json(url, cache_dir=cache_dir)
+    except HttpError as exc:
+        if exc.status == 404:
+            return AdapterResult(
+                adapter_name="crossref",
+                query=f"doi:{doi}",
+                status=AdapterStatus.NO_RESULTS.value,
+                records=[],
+                evidence_status=EvidenceStatus.UNKNOWN.value,
+                is_mock=False,
+                total_available=0,
+                warnings=[f"DOI not found: {doi}"],
+            )
+        return AdapterResult(
+            adapter_name="crossref",
+            query=f"doi:{doi}",
+            status=AdapterStatus.ERROR.value,
+            records=[],
+            errors=[{"code": str(exc.status), "message": str(exc)}],
+            evidence_status=EvidenceStatus.UNKNOWN.value,
+            is_mock=False,
+            total_available=0,
+        )
+
+    item = data.get("message", {})
+    record = _parse_crossref_work(item)
+    return AdapterResult(
+        adapter_name="crossref",
+        query=f"doi:{doi}",
+        status=AdapterStatus.SUCCESS.value,
+        records=[record.to_dict()],
+        evidence_status=EvidenceStatus.VENDOR_CLAIM.value,
+        is_mock=False,
+        total_available=1,
+        disclaimer="Retrieved from Crossref API. Metadata is publisher-supplied.",
+    )
+
+
+def search_works(
+    query: str,
+    *,
+    config: AdapterConfig | None = None,
+    max_results: int = 10,
+    cache_dir: Path | None = None,
+) -> AdapterResult:
+    """Search Crossref works API (real mode).
+
+    Makes a real HTTP call. Results are cached locally.
+    """
+    params = urllib.parse.urlencode({
+        "query": query,
+        "rows": min(max_results, 50),
+    })
+    url = f"{_CROSSREF_BASE}/works?{params}"
+    try:
+        data = fetch_json(url, cache_dir=cache_dir)
+    except HttpError as exc:
+        return AdapterResult(
+            adapter_name="crossref",
+            query=query,
+            status=AdapterStatus.ERROR.value,
+            records=[],
+            errors=[{"code": str(exc.status), "message": str(exc)}],
+            evidence_status=EvidenceStatus.UNKNOWN.value,
+            is_mock=False,
+            total_available=0,
+        )
+
+    items = data.get("message", {}).get("items", [])
+    total = data.get("message", {}).get("total-results", len(items))
+    records = [_parse_crossref_work(it).to_dict() for it in items]
+    return AdapterResult(
+        adapter_name="crossref",
+        query=query,
+        status=AdapterStatus.SUCCESS.value,
+        records=records,
+        evidence_status=EvidenceStatus.VENDOR_CLAIM.value,
+        is_mock=False,
+        total_available=total,
+        disclaimer="Retrieved from Crossref API. Metadata is publisher-supplied.",
+    )
+
+
+def lookup_doi_auto(
+    doi: str,
+    *,
+    mode: str = "mock",
+    config: AdapterConfig | None = None,
+    cache_dir: Path | None = None,
+) -> AdapterResult:
+    """Dispatch to mock or real DOI lookup based on mode."""
+    if mode == "real":
+        return lookup_doi(doi, config=config, cache_dir=cache_dir)
+    return lookup_doi_mock(doi, config=config)
+
+
+def search_works_auto(
+    query: str,
+    *,
+    mode: str = "mock",
+    config: AdapterConfig | None = None,
+    max_results: int = 10,
+    cache_dir: Path | None = None,
+) -> AdapterResult:
+    """Dispatch to mock or real search based on mode."""
+    if mode == "real":
+        return search_works(query, config=config, max_results=max_results,
+                            cache_dir=cache_dir)
+    return search_works_mock(query, config=config, max_results=max_results)
