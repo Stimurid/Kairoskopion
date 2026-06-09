@@ -82,6 +82,7 @@ beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
 |---------|-------------|
 | `kairoskopion status` | Version, cwd, storage root, registry/vault existence |
 | `kairoskopion run-fixture` | Full fixture pipeline → persist registries + vault cards |
+| `kairoskopion run-local` | Pipeline on user-provided manuscript + venue + scenario files |
 | `kairoskopion inspect-storage` | Registry record counts, entity IDs, vault card listing |
 
 Global option: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`.
@@ -105,7 +106,7 @@ Global option: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`.
 
 ## Tests
 
-- **215 tests**, all passing
+- **233 tests**, all passing
 - 16 test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI, source acquisition
@@ -123,7 +124,7 @@ Running `kairoskopion run-fixture` produces:
 - No PDF/DOCX text extraction (binary files: `not_extracted`)
 - No LLM-assisted extraction (all heuristic regex)
 - No OpenAlex/Crossref/OpenCitations adapters
-- No `--manuscript`/`--venue` CLI args (only `run-fixture`)
+- ~~No `--manuscript`/`--venue` CLI args~~ → implemented as `run-local`
 - No citation ecology profiling
 - No Telegram, web UI, reviewer simulation
 - No submission portal automation

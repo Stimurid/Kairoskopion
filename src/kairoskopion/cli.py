@@ -3,6 +3,7 @@
 Commands:
     kairoskopion status           — show environment info
     kairoskopion run-fixture      — run fixture pipeline, persist results
+    kairoskopion run-local        — run pipeline on user-provided files
     kairoskopion inspect-storage  — show registry and vault contents
 """
 
@@ -140,6 +141,129 @@ def cmd_run_fixture(args: argparse.Namespace) -> int:
     return 0
 
 
+_SUPPORTED_TEXT_EXTENSIONS = {".md", ".txt", ".json", ".html"}
+
+
+def _validate_input_file(path: Path, label: str) -> str | None:
+    """Validate an input file exists and has a supported extension.
+
+    Returns an error message string, or None if valid.
+    """
+    if not path.exists():
+        return f"{label}: file not found: {path}"
+    if not path.is_file():
+        return f"{label}: not a file: {path}"
+    if path.suffix.lower() not in _SUPPORTED_TEXT_EXTENSIONS:
+        return (
+            f"{label}: unsupported extension '{path.suffix}'. "
+            f"Supported: {', '.join(sorted(_SUPPORTED_TEXT_EXTENSIONS))}"
+        )
+    return None
+
+
+def cmd_run_local(args: argparse.Namespace) -> int:
+    """Run pipeline on user-provided local files."""
+    from .adapters.source_intake import SourceRole, register_local_source
+    from .pipelines.manuscript_venue_fit import ManuscriptVenueFitPipeline
+
+    root = _resolve_storage_root(args)
+
+    ms_path = Path(args.manuscript)
+    vg_path = Path(args.venue_guidelines)
+    sc_path = Path(args.scenario)
+
+    # Validate all files before doing any work
+    errors = []
+    for path, label in [
+        (ms_path, "manuscript"),
+        (vg_path, "venue-guidelines"),
+        (sc_path, "scenario"),
+    ]:
+        err = _validate_input_file(path, label)
+        if err:
+            errors.append(err)
+
+    if errors:
+        for e in errors:
+            print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+    # Register sources
+    ms_snapshot, ms_text = register_local_source(
+        ms_path, role=SourceRole.ARTICLE_INPUT,
+    )
+    if not ms_text:
+        print(f"ERROR: manuscript: could not read text from {ms_path}", file=sys.stderr)
+        return 1
+
+    vg_snapshot, vg_text = register_local_source(
+        vg_path, role=SourceRole.VENUE_GUIDELINES,
+    )
+    if not vg_text:
+        print(f"ERROR: venue-guidelines: could not read text from {vg_path}", file=sys.stderr)
+        return 1
+
+    sc_snapshot, sc_raw = register_local_source(
+        sc_path, role=SourceRole.SUBMISSION_INFO,
+    )
+    if not sc_raw:
+        print(f"ERROR: scenario: could not read text from {sc_path}", file=sys.stderr)
+        return 1
+
+    try:
+        sc_data = json.loads(sc_raw)
+    except json.JSONDecodeError as exc:
+        print(f"ERROR: scenario: invalid JSON in {sc_path}: {exc}", file=sys.stderr)
+        return 1
+
+    # Run pipeline with real source refs
+    pipeline = ManuscriptVenueFitPipeline()
+    result = pipeline.execute(
+        manuscript_text=ms_text,
+        venue_guidelines_text=vg_text,
+        scenario_data=sc_data,
+        manuscript_source_ref=ms_snapshot.source_id,
+        venue_source_ref=vg_snapshot.source_id,
+    )
+
+    # Persist
+    reg_paths = save_pipeline_result(result, pipeline, storage_root=root)
+
+    # Persist source snapshots to registries
+    from . import registry as reg
+    from .persistence import ensure_registry_root
+
+    reg_root = ensure_registry_root(root)
+    for snapshot in (ms_snapshot, vg_snapshot, sc_snapshot):
+        reg.append("source_snapshots", snapshot.to_dict(), base_dir=reg_root)
+
+    card_paths = write_pipeline_result_cards(result, pipeline, storage_root=root)
+
+    # Summary
+    print("--- Pipeline complete (local files) ---")
+    print(f"Manuscript:     {ms_path}")
+    print(f"Venue:          {vg_path}")
+    print(f"Scenario:       {sc_path}")
+    print(f"ArticleModel:   {result.article.article_model_id if result.article else '?'}")
+    print(f"VenueModel:     {result.venue.venue_model_id if result.venue else '?'}")
+    print(f"FitAssessment:  {result.fit.fit_assessment_id if result.fit else '?'}")
+    print(f"Overall label:  {result.fit.overall_label if result.fit else '?'}")
+    print(f"Mismatches:     {len(result.mismatch_map.mismatches) if result.mismatch_map else 0}")
+    print(f"Risk items:     {len(result.risk_report.risk_items) if result.risk_report else 0}")
+    print(f"Compliance:     {len(result.compliance.checklist_items) if result.compliance else 0} items"
+          f" ({len(result.compliance.missing_items) if result.compliance else 0} missing)")
+    print(f"Pipeline run:   {pipeline.run.pipeline_run_id}")
+    print(f"Pipeline status:{pipeline.run.status}")
+    print(f"Sources:        {ms_snapshot.snapshot_id}, {vg_snapshot.snapshot_id}, {sc_snapshot.snapshot_id}")
+    print(f"Registry root:  {(root / 'registries').resolve()}")
+    print(f"Vault root:     {(root / 'vault').resolve()}")
+    print(f"Registries written: {', '.join(sorted(reg_paths.keys()))}")
+    print(f"Cards written:      {', '.join(sorted(card_paths.keys()))}")
+    for name, p in sorted(card_paths.items()):
+        print(f"  {name}: {p}")
+    return 0
+
+
 def _find_fixtures_dir() -> Path | None:
     """Search for tests/fixtures/ relative to cwd or package location."""
     cwd_fixtures = Path.cwd() / "tests" / "fixtures"
@@ -168,11 +292,28 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("run-fixture", help="Run fixture pipeline and persist results")
     sub.add_parser("inspect-storage", help="Show registry and vault contents")
 
+    run_local_parser = sub.add_parser(
+        "run-local", help="Run pipeline on user-provided local files",
+    )
+    run_local_parser.add_argument(
+        "--manuscript", required=True,
+        help="Path to manuscript file (.md or .txt)",
+    )
+    run_local_parser.add_argument(
+        "--venue-guidelines", required=True,
+        help="Path to venue guidelines file (.md or .txt)",
+    )
+    run_local_parser.add_argument(
+        "--scenario", required=True,
+        help="Path to submission scenario JSON file (.json)",
+    )
+
     args = parser.parse_args(argv)
 
     commands = {
         "status": cmd_status,
         "run-fixture": cmd_run_fixture,
+        "run-local": cmd_run_local,
         "inspect-storage": cmd_inspect_storage,
     }
 

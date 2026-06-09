@@ -58,6 +58,12 @@ kairoskopion run-fixture
 # Or with a custom storage root
 kairoskopion run-fixture --storage-root /tmp/kairon_test
 
+# Run on your own files
+kairoskopion run-local \
+  --manuscript my_paper.md \
+  --venue-guidelines journal_guidelines.md \
+  --scenario scenario.json
+
 # Check environment
 kairoskopion status
 
@@ -71,6 +77,7 @@ kairoskopion inspect-storage
 |---------|-------------|
 | `kairoskopion status` | Show version, working directory, storage root, registry/vault existence |
 | `kairoskopion run-fixture` | Run fixture pipeline, persist JSONL registries + vault cards, print summary |
+| `kairoskopion run-local` | Run pipeline on user-provided manuscript + venue guidelines + scenario files |
 | `kairoskopion inspect-storage` | Show all registries (record counts, entity IDs) and vault card files |
 
 Use `--storage-root PATH` or env var `KAIROSKOPION_STORAGE_ROOT` to override default `.kairoskopion/` storage.

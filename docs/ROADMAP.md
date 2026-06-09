@@ -35,17 +35,17 @@ Engineering queue. Each item is a concrete deliverable, not an aspiration.
 - [x] PROJECT_STATUS.md, ROADMAP.md, DECISIONS.md, OPERATOR_MANUAL.md
 - [x] Remote-safe push to GitHub
 
-## Next sprint: real-file pipeline
+### Real-file pipeline (complete)
 
 **Goal:** `kairoskopion run-local --manuscript FILE --venue-guidelines FILE --scenario FILE`
 
-- [ ] CLI command `run-local` accepting local file paths
-- [ ] Source registration wired into pipeline steps
-- [ ] SourceSnapshot + EvidenceItem created per input file
-- [ ] Pipeline runs on arbitrary user-provided files
-- [ ] Vault artifacts and JSONL registries from real files
-- [ ] Tests: local files, missing file errors, unsupported extensions
-- [ ] OPERATOR_MANUAL update
+- [x] CLI command `run-local` accepting local file paths
+- [x] Source registration wired into pipeline steps
+- [x] SourceSnapshot created per input file, persisted to source_snapshots registry
+- [x] Pipeline runs on arbitrary user-provided files
+- [x] Vault artifacts and JSONL registries from real files
+- [x] Tests: local files, missing file errors, unsupported extensions, invalid JSON
+- [x] OPERATOR_MANUAL update
 
 ## Then: citation ecology stub
 

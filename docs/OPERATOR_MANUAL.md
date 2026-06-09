@@ -117,7 +117,7 @@ Example:
 cat .kairoskopion/vault/fits/fit_*.md
 ```
 
-## Run with local files (once implemented)
+## Run with local files
 
 ```bash
 kairoskopion run-local \
@@ -127,7 +127,19 @@ kairoskopion run-local \
   --storage-root ./my_analysis
 ```
 
-This command is being implemented in the next sprint.
+Accepts `.md`, `.txt`, `.json`, `.html` files. Each input file is registered as a
+SourceSnapshot with content hash and persisted to the `source_snapshots` registry.
+
+The scenario file must be valid JSON with at least a `goal` field. Example:
+```json
+{
+  "goal": "Publish in Q1 STS journal",
+  "target_venue_type": "journal",
+  "rewrite_depth": "medium"
+}
+```
+
+Output: same as `run-fixture` — JSONL registries, vault cards, pipeline summary.
 
 ## Troubleshooting
 
