@@ -428,6 +428,58 @@ def cmd_intake_file(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_build_venue_profile(args: argparse.Namespace) -> int:
+    """Build venue profile from multiple source files."""
+    from .services.venue_profile_builder import build_venue_profile
+
+    root = _resolve_storage_root(args)
+    paths = [Path(p) for p in args.files]
+
+    # Validate files exist
+    errors = []
+    for p in paths:
+        if not p.exists():
+            errors.append(f"file not found: {p}")
+        elif p.suffix.lower() not in _SUPPORTED_EXTENSIONS:
+            errors.append(f"unsupported extension: {p}")
+    if errors:
+        for e in errors:
+            print(f"ERROR: {e}", file=sys.stderr)
+        return 1
+
+    result = build_venue_profile(paths)
+
+    # Persist
+    from . import registry as reg
+    from .persistence import ensure_registry_root
+
+    reg_root = ensure_registry_root(root)
+    reg.append("venue_models", result.venue.to_dict(), base_dir=reg_root)
+    reg.append("publication_regimes", result.regime.to_dict(), base_dir=reg_root)
+    for src in result.sources:
+        reg.append("source_snapshots", src.snapshot.to_dict(), base_dir=reg_root)
+
+    print(f"--- Venue Profile Built ---")
+    print(f"Sources:        {result.source_count} files, {result.extracted_count} extracted")
+    print(f"Venue:          {result.venue.canonical_name or '(unnamed)'}")
+    print(f"Venue ID:       {result.venue.venue_model_id}")
+    print(f"Publisher:      {result.venue.publisher_or_owner or 'unknown'}")
+    print(f"Scope:          {(result.venue.scope_summary or '')[:80]}...")
+    print(f"Confidence:     {result.venue.confidence}")
+    print(f"Indexing:       {', '.join(result.venue.indexing_claims) if result.venue.indexing_claims else 'unknown'}")
+    print(f"AI policy:      {result.venue.ai_policy or 'unknown'}")
+    print(f"Data policy:    {result.venue.data_policy or 'unknown'}")
+    print(f"Ethics policy:  {result.venue.ethics_policy or 'unknown'}")
+    print(f"Open access:    {result.venue.open_access_status or 'unknown'}")
+    print(f"Review model:   {result.regime.review_model or 'unknown'}")
+    print(f"Unknowns:       {len(result.venue.unknowns)}")
+    if result.merge_log:
+        print(f"\nMerge log:")
+        for entry in result.merge_log:
+            print(f"  {entry}")
+    return 0
+
+
 def _find_fixtures_dir() -> Path | None:
     """Search for tests/fixtures/ relative to cwd or package location."""
     cwd_fixtures = Path.cwd() / "tests" / "fixtures"
@@ -488,6 +540,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Source role (article_input, venue_guidelines, etc.)",
     )
 
+    venue_profile_parser = sub.add_parser(
+        "build-venue-profile",
+        help="Build venue profile from multiple source files",
+    )
+    venue_profile_parser.add_argument(
+        "--files", nargs="+", required=True,
+        help="Paths to venue source files (guidelines, aims, policies, etc.)",
+    )
+
     run_local_parser = sub.add_parser(
         "run-local", help="Run pipeline on user-provided local files",
     )
@@ -517,6 +578,7 @@ def main(argv: list[str] | None = None) -> int:
         "import-bundle": cmd_import_bundle,
         "validate-bundle": cmd_validate_bundle,
         "intake-file": cmd_intake_file,
+        "build-venue-profile": cmd_build_venue_profile,
     }
 
     handler = commands.get(args.command)
