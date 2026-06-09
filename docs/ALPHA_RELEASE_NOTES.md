@@ -14,8 +14,8 @@ It is a bounded context within the Litops-WhiteCrow ecosystem.
 ## What works in this alpha
 
 ### Core pipeline
-- Provide a manuscript (.md/.txt), venue guidelines, and submission scenario
-- Get a multi-axis fit assessment (8 axes: topic, discipline, genre, method, citation ecology, language register, formal compliance, publication regime)
+- Provide a manuscript (.md/.txt/.pdf/.docx), venue guidelines, and submission scenario
+- Get a multi-axis fit assessment (12 axes: topic, discipline, genre, argument_structure, method, citation_ecology, novelty_positioning, language_register, audience, formal_compliance, author_eligibility, publication_regime)
 - Get a mismatch map showing where and why fit fails
 - Get a rewrite plan with actionable changes
 - Get a risk report with severity levels
@@ -29,16 +29,20 @@ It is a bounded context within the Litops-WhiteCrow ecosystem.
 - Export/import storage bundles as zip archives
 - Freshness/staleness tracking for sources
 
-### External adapters (mock)
-- OpenAlex, Crossref, OpenCitations — typed contracts with deterministic mock data
+### External adapters (mock + real)
+- OpenAlex, Crossref, OpenCitations — mock (default) and real modes with HTTP caching and rate limiting
 - Evidence bridge: adapter results become SourceSnapshots and EvidenceItems
 - Mock evidence is always VENDOR_CLAIM (never FACT_FROM_SOURCE)
 
+### Integration bridges
+- Litops-compatible JSONL export (sources + artifacts)
+- WhiteCrow patch queue export (mismatches, rewrites, compliance, risks → patches)
+
 ### CLI
-9 commands: `status`, `run-fixture`, `run-local`, `inspect-storage`, `adapters-smoke`, `vault-index`, `export-bundle`, `import-bundle`, `validate-bundle`
+14 commands: `status`, `run-fixture`, `run-local`, `inspect-storage`, `adapters-smoke`, `vault-index`, `export-bundle`, `import-bundle`, `validate-bundle`, `intake-file`, `build-venue-profile`, `build-submission-pack`, `export-litops-pack`, `export-whitecrow-patches`
 
 ### Quality
-- 351 passing tests
+- 556 passing tests
 - No external dependencies at runtime
 - No network calls
 - No LLM calls
@@ -46,14 +50,12 @@ It is a bounded context within the Litops-WhiteCrow ecosystem.
 
 ## What does NOT work yet
 
-- **No PDF/DOCX extraction** — only .md/.txt/.json/.html accepted
-- **No real API calls** — adapters are mock only
 - **No LLM-assisted extraction** — all heuristic/regex
-- **No venue deep profiling** — single guidelines file only
-- **No SubmissionPack** entity
+- **No OCR** — scanned PDFs remain `needs_ocr`
 - **No review loop** (ReviewOutcome, RevisionPlan, VenueMemory)
 - **No UI beyond CLI**
-- **No Litops/WhiteCrow live integration** (stubs only)
+- **No live Litops/WhiteCrow API** — export bridges only
+- **No submission portal automation**
 
 ## How to try it
 

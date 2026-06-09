@@ -53,22 +53,30 @@ For deep spec questions, read:
 ## What is implemented (foundation)
 
 - 18+ dataclass domain models with `to_dict`/`from_dict`
-- 22 domain enums (EvidenceStatus, FitAxisValue, FieldCoreImpact, etc.)
-- 9 deterministic domain services (no LLM)
-- 16-step ManuscriptVenueFitPipeline
-- JSONL append-only persistence (13 registries)
-- Vault markdown cards (7 entity types + pipeline trace)
-- Source acquisition: local file registration, text input, URL placeholder
+- 23 domain enums (EvidenceStatus, FitAxisValue, FieldCoreImpact, etc.)
+- 13 deterministic domain services (no LLM)
+- 18-step ManuscriptVenueFitPipeline
+- JSONL append-only persistence (17+ registries)
+- Vault markdown cards (8 entity types + pipeline trace)
+- Source acquisition: local file registration (.md, .txt, .json, .html, .pdf, .docx), text input, URL placeholder
+- PDF extraction (pypdf), DOCX extraction (python-docx) — optional deps
 - Quality gates: fit gate, submission gate, evidence audit
 - Operation traces with timestamps
-- CLI: `status`, `run-fixture`, `run-local`, `adapters-smoke`, `vault-index`, `export-bundle`, `import-bundle`, `validate-bundle`, `inspect-storage`
-- Integration stubs: Litops (5 types), WhiteCrow (6 types)
+- Real optional adapters: OpenAlex, Crossref, OpenCitations with HTTP caching and rate limiting (mock default)
+- Multi-source venue profiling from local files
+- Bibliography multi-style parsing (APA, numbered, Vancouver, Chicago)
+- Publication trajectory reports
+- Submission pack preparation with readiness assessment
+- Litops compatibility bridge (export-litops-pack)
+- WhiteCrow patch queue bridge (export-whitecrow-patches)
+- CLI: 14 commands (`status`, `run-fixture`, `run-local`, `adapters-smoke`, `vault-index`, `export-bundle`, `import-bundle`, `validate-bundle`, `inspect-storage`, `intake-file`, `build-venue-profile`, `build-submission-pack`, `export-litops-pack`, `export-whitecrow-patches`)
+- Integration: Litops bridge (JSONL export), WhiteCrow bridge (patch queue export)
 
 ## Non-negotiable rules
 
 ### Evidence & domain
 1. **Evidence-first.** Every claim must trace to a source or be marked UNKNOWN.
-2. **No single fit score.** FitAssessment is always multi-axis (8 axes: topic, discipline, genre, method, citation_ecology, language_register, formal_compliance, publication_regime).
+2. **No single fit score.** FitAssessment is always multi-axis (12 axes: topic, discipline, genre, argument_structure, method, citation_ecology, novelty_positioning, language_register, audience, formal_compliance, author_eligibility, publication_regime).
 3. **Unknowns preserved.** UNKNOWN must not silently become absent. If data is missing, mark it UNKNOWN or INACCESSIBLE.
 4. **No fake references.** Never fabricate citation data, DOIs, or source entries.
 5. **No external API as required dependency.** The system must work fully offline with local files.
@@ -139,12 +147,12 @@ For deep spec questions, read:
 | `src/kairoskopion/enums.py` | All domain enums |
 | `src/kairoskopion/cli.py` | CLI entry point |
 | `src/kairoskopion/pipelines/manuscript_venue_fit.py` | Main pipeline |
-| `src/kairoskopion/services/` | 11 domain services |
-| `src/kairoskopion/adapters/` | Source intake, URL snapshot, OpenAlex/Crossref/OpenCitations mocks, bridge |
-| `src/kairoskopion/integrations/` | Litops/WhiteCrow stubs |
+| `src/kairoskopion/services/` | 13 domain services |
+| `src/kairoskopion/adapters/` | Source intake (PDF/DOCX), URL snapshot, OpenAlex/Crossref/OpenCitations (mock+real), HTTP client, bridge |
+| `src/kairoskopion/integrations/` | Litops bridge, WhiteCrow bridge, stubs |
 | `src/kairoskopion/vault.py` | Vault indexes, manifest, cross-linking, link validation |
 | `src/kairoskopion/exchange.py` | Export/import storage bundles (zip) |
 | `src/kairoskopion/freshness.py` | Freshness/staleness tracking |
-| `tests/` | 351+ tests |
+| `tests/` | 556+ tests |
 | `tests/fixtures/` | Synthetic manuscript, venue, scenario |
 | `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` | Master spec |

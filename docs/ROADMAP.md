@@ -91,20 +91,46 @@ Engineering queue. Each item is a concrete deliverable, not an aspiration.
 - [x] CLI: vault-index, export-bundle, import-bundle, validate-bundle
 - [x] 43 tests (vault indexes, cross-linking, manifest, link validation, export/import, freshness)
 
-## Then: real external adapters
+## Document intake & entity completeness (complete)
 
-- [ ] OpenAlex real adapter (requires API polite pool key)
-- [ ] Crossref real adapter (rate-limited, no auth required)
-- [ ] OpenCitations real adapter
-- [ ] Fuzzy title matching for reference linking
-- [ ] Adapter result caching / deduplication
-- [ ] Rate limiting and retry logic
+- [x] PDF text extraction (pypdf), DOCX text extraction (python-docx)
+- [x] Extraction status taxonomy (9 statuses)
+- [x] FitAssessment expanded to 12 axes
+- [x] RiskReport expanded to 18 risk types
+- [x] ArticleModel practical fields, VenueModel enrichment fields
+- [x] CLI: `intake-file`
 
-## Then: integration bridges
+## Real external adapters (complete)
 
-- [ ] Litops compatibility bridge (source registration API, ContextPack, Artifact export)
-- [ ] WhiteCrow patch queue bridge (ProtectedCore import, PatchCandidate export)
+- [x] HTTP client with stdlib urllib, caching, rate limiting
+- [x] OpenAlex real adapter (work search)
+- [x] Crossref real adapter (DOI lookup + search)
+- [x] OpenCitations real adapter (citation links)
+- [x] Adapter result caching with TTL
+- [x] Per-host rate limiting (1s interval)
+- [x] CLI: `--adapter-mode mock|real`
+
+## Venue profiling & bibliography (complete)
+
+- [x] Multi-source venue profiling from local files
+- [x] Multi-style bibliography parsing (APA, numbered, Vancouver, Chicago)
+- [x] PublicationTrajectoryReport synthesis
+- [x] CLI: `build-venue-profile`
+
+## Reports & submission (complete)
+
+- [x] SubmissionPack with readiness assessment
+- [x] Cover letter template generation
+- [x] Required statements detection
+- [x] CLI: `build-submission-pack`
+
+## Integration bridges (complete)
+
+- [x] Litops compatibility bridge (JSONL export, source/artifact mapping)
+- [x] WhiteCrow patch queue bridge (mismatch/rewrite/compliance/risk → patches)
+- [x] CLI: `export-litops-pack`, `export-whitecrow-patches`
 - [ ] Vault sync with Litops Vault (Obsidian)
+- [ ] Fuzzy title matching for reference linking
 
 ## Later (only when explicitly requested)
 

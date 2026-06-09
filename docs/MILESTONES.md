@@ -4,9 +4,9 @@
 
 ---
 
-## v0.1.0-alpha — Usable Local Build (current)
+## v0.1.0-alpha — Usable Local Build
 
-**Status:** Released on `main`
+**Status:** Released on `main` (superseded)
 
 **Included capabilities:**
 - Domain skeleton: 18+ dataclass models, 23 enums, JSONL registries
@@ -38,7 +38,7 @@
 
 ## v0.2.0-local-documents — Robust Local File Intake
 
-**Status:** Planned (Backlog Sprint 1)
+**Status:** Complete (Sprint 1)
 
 **Included capabilities (cumulative):**
 - Everything in v0.1.0-alpha
@@ -63,7 +63,7 @@
 
 ## v0.3.0-real-adapters-optional — Real Metadata Adapters
 
-**Status:** Planned (Backlog Sprint 2)
+**Status:** Complete (Sprints 2–3)
 
 **Included capabilities (cumulative):**
 - Everything in v0.2.0
@@ -89,7 +89,7 @@
 
 ## v0.4.0-venue-profile — Venue Profile Builder
 
-**Status:** Planned (Backlog Sprint 3 + 4)
+**Status:** Complete (Sprints 4–5)
 
 **Included capabilities (cumulative):**
 - Everything in v0.3.0
@@ -116,7 +116,7 @@
 
 ## v0.5.0-litops-bridge — Litops Compatibility
 
-**Status:** Planned (Backlog Sprint 5 + 6)
+**Status:** Complete (Sprints 6–7)
 
 **Included capabilities (cumulative):**
 - Everything in v0.4.0
@@ -138,9 +138,9 @@
 
 ---
 
-## v0.6.0-whitecrow-bridge — WhiteCrow Patch Queue
+## v0.6.0-whitecrow-bridge — WhiteCrow Patch Queue (current)
 
-**Status:** Planned (Backlog Sprint 7)
+**Status:** Complete (Sprint 8), on `feature/autonomous-local-docs-entities-adapters`
 
 **Included capabilities (cumulative):**
 - Everything in v0.5.0
@@ -154,7 +154,7 @@
 - No Google Docs integration
 - No automatic manuscript modification
 
-**Tests expected:** 500+
+**Tests:** 556 passing
 
 ---
 

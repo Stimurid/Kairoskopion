@@ -6,14 +6,24 @@
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `main` (all feature branches merged) |
+| Branch | `feature/autonomous-local-docs-entities-adapters` (8 sprints ahead of main) |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
 | Working tree | clean |
 | Python | >=3.11 |
 
-## Commit history (main)
+## Commit history (feature branch)
 
 ```
+2726c7b Add WhiteCrow patch queue bridge for manuscript change proposals
+47d8513 Add Litops compatibility bridge for cross-project export
+bcc40c5 Add structured submission pack preparation layer
+f5fa3ba Add bibliography multi-style parsing and trajectory report
+94ea872 Add multi-source venue profile builder
+f1420b3 Add real optional adapters with caching and rate limiting
+762bd61 Expand core entity coverage for fit and risk modeling
+8c2a2ce Add robust local document intake
+a7d32c1 Fix stale status docs and add Entity Completeness sprint to backlog
+d111089 Add spec coverage, backlog, and alpha demo packaging
 9b4571e Add enhanced vault, exchange bundles, and freshness tracking
 a0a049b Add external adapter stubs with mock evidence bridge
 327c4ac Add citation ecology stub
@@ -33,9 +43,9 @@ beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
 
 | Module | Contents |
 |--------|----------|
-| `ids.py` | UUID-based ID generation with 19 prefixes |
+| `ids.py` | UUID-based ID generation with 20 prefixes |
 | `enums.py` | 23 domain enums |
-| `schema.py` | 18+ dataclass models with `to_dict`/`from_dict` |
+| `schema.py` | 20+ dataclass models with `to_dict`/`from_dict` |
 | `registry.py` | JSONL append/read/list/find |
 | `persistence.py` | Storage root management, pipeline + adapter result persistence |
 | `artifacts.py` | Vault markdown card filesystem output with cross-links |
@@ -47,7 +57,7 @@ beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
 | `traces.py` | Operation trace recording |
 | `decisions.py` | User decision tracking |
 | `cards.py` | 8 markdown card generators |
-| `cli.py` | CLI: 9 commands (status, run-fixture, run-local, inspect-storage, adapters-smoke, vault-index, export-bundle, import-bundle, validate-bundle) |
+| `cli.py` | CLI: 14 commands (status, run-fixture, run-local, inspect-storage, adapters-smoke, vault-index, export-bundle, import-bundle, validate-bundle, intake-file, build-venue-profile, build-submission-pack, export-litops-pack, export-whitecrow-patches) |
 
 ### Services (`src/kairoskopion/services/`)
 
@@ -56,14 +66,17 @@ beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
 | `article_modeling.py` | ManuscriptModel + ArticleModel from text |
 | `venue_profiling.py` | VenueModel + PublicationRegimeModel from guidelines |
 | `scenario.py` | SubmissionScenario from user input |
-| `fit_assessment.py` | Multi-axis fit comparison (8 axes) |
+| `fit_assessment.py` | Multi-axis fit comparison (12 axes) |
 | `mismatch_mapping.py` | MismatchMap from weak/bad axes |
 | `rewrite_planning.py` | RewritePlan action list |
-| `risk_reporting.py` | RiskReport (7+ risk types) |
+| `risk_reporting.py` | RiskReport (18 risk types) |
 | `compliance.py` | ComplianceChecklist from guidelines |
 | `evidence_audit.py` | Evidence coverage quality gate |
-| `bibliography_parsing.py` | Reference extraction, year/DOI/kind detection, BibliographyProfile |
+| `bibliography_parsing.py` | Reference extraction, multi-style parsing (APA/numbered/Vancouver/Chicago), BibliographyProfile |
 | `citation_ecology.py` | Citation gaps, tasks, bridge references, venue expectation matching |
+| `venue_profile_builder.py` | Multi-source venue profiling from local files |
+| `trajectory_report.py` | PublicationTrajectoryReport synthesizing fit+risk+bibliography |
+| `submission_pack.py` | SubmissionPack preparation with readiness assessment |
 
 ### Pipelines
 
@@ -76,11 +89,12 @@ beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
 | Adapter | Status |
 |---------|--------|
 | `base.py` | Adapter contracts: AdapterResult, AdapterRecord, AdapterConfig, AdapterError |
-| `source_intake.py` | Local file/text registration, 14 source roles |
+| `source_intake.py` | Local file/text registration with PDF/DOCX extraction, 14 source roles |
 | `url_snapshot.py` | URL placeholder (no real fetch) |
-| `openalex.py` | Mock adapter — deterministic work search, no API calls |
-| `crossref.py` | Mock adapter — DOI lookup + search, no API calls |
-| `opencitations.py` | Mock adapter — citation link query, no API calls |
+| `http_client.py` | Shared HTTP client (stdlib urllib) with caching and rate limiting |
+| `openalex.py` | Mock + real adapter — work search |
+| `crossref.py` | Mock + real adapter — DOI lookup + search |
+| `opencitations.py` | Mock + real adapter — citation link query |
 | `bridge.py` | Adapter → SourceSnapshot / EvidenceItem conversion |
 
 ### Integration stubs
@@ -88,7 +102,9 @@ beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
 | Module | Types |
 |--------|-------|
 | `litops.py` | 5 stub dataclasses (SourceRef, ContextPackRef, ArtifactRef, VaultProjection, WorksetRef) |
+| `litops_bridge.py` | Litops-compatible JSONL export (sources + artifacts) |
 | `whitecrow.py` | 6 stub dataclasses (FieldModelRef, ProtectedCore, PatchCandidate, ExternalDocAction, ManuscriptRef, ArticleTrajectoryRef) |
+| `whitecrow_bridge.py` | WhiteCrow patch queue export (mismatch/rewrite/compliance/risk → patches) |
 
 ## CLI commands
 
@@ -103,8 +119,13 @@ beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
 | `kairoskopion import-bundle --bundle FILE` | Import a storage bundle (append or replace) |
 | `kairoskopion validate-bundle --bundle FILE` | Validate a storage bundle |
 | `kairoskopion inspect-storage` | Registry record counts, entity IDs, vault card listing |
+| `kairoskopion intake-file --file FILE --role ROLE` | Register a file with text extraction (PDF/DOCX/MD/TXT/HTML) |
+| `kairoskopion build-venue-profile --files FILE [FILE ...]` | Build venue profile from multiple source files |
+| `kairoskopion build-submission-pack` | Build submission pack from latest pipeline run |
+| `kairoskopion export-litops-pack --output-dir DIR` | Export pipeline artifacts as Litops-compatible JSONL |
+| `kairoskopion export-whitecrow-patches --output-dir DIR` | Export patch queue for WhiteCrow from pipeline artifacts |
 
-Global option: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`.
+Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--adapter-mode mock|real`.
 
 ## Storage layout
 
@@ -138,40 +159,39 @@ Global option: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`.
 
 ## Tests
 
-- **351 tests**, all passing
-- 18 test files covering: schema, registry, evidence, quality, cards,
+- **556 tests**, all passing
+- 24 test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
   source acquisition, bibliography parsing, citation ecology, adapters,
-  vault indexes, exchange bundles, freshness tracking
+  vault indexes, exchange bundles, freshness tracking,
+  document intake (PDF/DOCX), entity completeness (12 fit axes, 18 risk types),
+  real adapters (HTTP cache, rate limiting), venue profile builder,
+  bibliography & trajectory reports, submission pack, Litops bridge, WhiteCrow bridge
 
 ## Fixture pipeline output
 
 Running `kairoskopion run-fixture` produces:
 - FitAssessment: `possible_but_costly`
-- 5 mismatches, 6 risk items, 9 compliance items (3 missing)
-- 13 JSONL registries, 7 vault markdown cards (with cross-links)
+- 8 mismatches, 10 risk items, 9 compliance items (3 missing)
+- 15 JSONL registries, 8 vault markdown cards (with cross-links)
 
 ## Known omissions
 
-- No real HTTP fetch (URL adapter is placeholder only)
-- No PDF/DOCX text extraction (binary files: `not_extracted`)
+- ~~No PDF/DOCX text extraction~~ → implemented (pypdf, python-docx)
+- ~~No real API calls~~ → implemented as optional real mode (mock default)
+- ~~No SubmissionPack~~ → implemented with readiness assessment
+- ~~No Litops/WhiteCrow integration~~ → implemented as JSONL export bridges
 - No LLM-assisted extraction (all heuristic regex)
-- ~~No OpenAlex/Crossref/OpenCitations adapters~~ → implemented as mock stubs (no real API calls)
-- ~~No `--manuscript`/`--venue` CLI args~~ → implemented as `run-local`
-- ~~No citation ecology profiling~~ → implemented as heuristic stub (no external API)
-- ~~No vault cross-linking~~ → implemented (fit→article+venue, mismatch→fit, risk/compliance→article+venue, citation→article+venue)
-- ~~No export/import~~ → implemented as zip bundles with metadata
-- ~~No freshness tracking~~ → implemented (fresh/possibly_stale/stale/expired/mock/unknown_freshness)
+- No real HTTP fetch for URL adapter (placeholder only)
 - Mock adapters do not verify references (verification_status stays "not_verified")
 - Mock evidence is VENDOR_CLAIM, never FACT_FROM_SOURCE
 - No title-based fuzzy matching for reference linking (DOI only)
 - Freshness is local metadata only — no real source refresh
-- Vault is local projection, not canonical database (registries are source of truth)
-- Export bundles are for local handoff/backup, not a sync protocol
+- No OCR for scanned PDFs
 - No Telegram, web UI, reviewer simulation
 - No submission portal automation
-- No real Litops/WhiteCrow API connection (stubs only)
+- No live Litops/WhiteCrow API connection (export bridges only)
 
 ## What "usable local build" means
 

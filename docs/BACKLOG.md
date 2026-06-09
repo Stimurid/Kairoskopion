@@ -6,7 +6,7 @@ Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.m
 
 ---
 
-## Sprint 1: Real Document Intake
+## Sprint 1: Real Document Intake ✓ DONE
 
 **Goal:** Accept PDF, DOCX, TXT, MD, HTML files and extract text content for pipeline processing.
 
@@ -50,7 +50,7 @@ Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.m
 
 ---
 
-## Sprint 2: Entity Completeness
+## Sprint 2: Entity Completeness ✓ DONE
 
 **Goal:** Bring core entities closer to spec before adding more external intelligence.
 
@@ -138,7 +138,7 @@ Claims must be claims, not facts, unless source/evidence supports them.
 
 ---
 
-## Sprint 3: Real Optional Adapters
+## Sprint 3: Real Optional Adapters ✓ DONE
 
 **Goal:** Connect OpenAlex, Crossref, OpenCitations APIs with real HTTP calls, disabled by default.
 
@@ -171,7 +171,7 @@ Claims must be claims, not facts, unless source/evidence supports them.
 
 ---
 
-## Sprint 4: Venue Profile Builder
+## Sprint 4: Venue Profile Builder ✓ DONE
 
 **Goal:** Turn venue guidelines and saved local pages into a rich VenueProfile.
 
@@ -198,7 +198,7 @@ Claims must be claims, not facts, unless source/evidence supports them.
 
 ---
 
-## Sprint 5: Bibliography Robustness + Report Quality
+## Sprint 5: Bibliography Robustness + Report Quality ✓ DONE
 
 **Goal:** Make citation ecology and reports useful for real article positioning.
 
@@ -217,7 +217,7 @@ Claims must be claims, not facts, unless source/evidence supports them.
 
 ---
 
-## Sprint 6: SubmissionPack + Reports
+## Sprint 6: SubmissionPack + Reports ✓ DONE
 
 **Goal:** Create structured SubmissionPack preparation layer.
 
@@ -233,7 +233,7 @@ Claims must be claims, not facts, unless source/evidence supports them.
 
 ---
 
-## Sprint 7: Litops Compatibility Bridge
+## Sprint 7: Litops Compatibility Bridge ✓ DONE
 
 **Goal:** Create local Litops-compatible export without coupling repos.
 
@@ -248,7 +248,7 @@ Claims must be claims, not facts, unless source/evidence supports them.
 
 ---
 
-## Sprint 8: WhiteCrow Patch Queue Bridge
+## Sprint 8: WhiteCrow Patch Queue Bridge ✓ DONE
 
 **Goal:** Create first protected-core-aware patch queue export.
 
