@@ -6,14 +6,15 @@
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `feature/enhanced-vault-exchange-freshness` (from `main`) |
+| Branch | `main` (all feature branches merged) |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
-| Working tree | dirty (vault/exchange/freshness uncommitted) |
-| Python | >=3.11, installed in `.venv` |
+| Working tree | clean |
+| Python | >=3.11 |
 
 ## Commit history (main)
 
 ```
+9b4571e Add enhanced vault, exchange bundles, and freshness tracking
 a0a049b Add external adapter stubs with mock evidence bridge
 327c4ac Add citation ecology stub
 299251e Add run-local pipeline for user files
@@ -46,7 +47,7 @@ beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
 | `traces.py` | Operation trace recording |
 | `decisions.py` | User decision tracking |
 | `cards.py` | 8 markdown card generators |
-| `cli.py` | CLI: 9 commands |
+| `cli.py` | CLI: 9 commands (status, run-fixture, run-local, inspect-storage, adapters-smoke, vault-index, export-bundle, import-bundle, validate-bundle) |
 
 ### Services (`src/kairoskopion/services/`)
 
