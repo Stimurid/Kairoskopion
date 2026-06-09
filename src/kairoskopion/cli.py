@@ -573,6 +573,67 @@ def cmd_build_submission_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_export_whitecrow_patches(args: argparse.Namespace) -> int:
+    """Export WhiteCrow patch queue from latest pipeline artifacts."""
+    from .integrations.whitecrow_bridge import build_whitecrow_patch_queue, write_whitecrow_patches
+    from .schema import (
+        ComplianceChecklist,
+        MismatchMap,
+        RewritePlan,
+        RiskReport,
+    )
+
+    root = _resolve_storage_root(args)
+    output_dir = Path(args.output_dir)
+    target_doc = getattr(args, "target_doc", None)
+
+    if not registries_exist(root):
+        print("ERROR: no registries found. Run a pipeline first.", file=sys.stderr)
+        return 1
+
+    def _latest(name: str) -> dict | None:
+        records = read_registry(name, storage_root=root)
+        return records[-1] if records else None
+
+    mm_d = _latest("mismatch_maps")
+    rw_d = _latest("rewrite_plans")
+    comp_d = _latest("compliance_checklists")
+    risk_d = _latest("risk_reports")
+
+    mismatch_map = MismatchMap.from_dict(mm_d) if mm_d else None
+    rewrite_plan = RewritePlan.from_dict(rw_d) if rw_d else None
+    compliance = ComplianceChecklist.from_dict(comp_d) if comp_d else None
+    risk = RiskReport.from_dict(risk_d) if risk_d else None
+
+    patches = build_whitecrow_patch_queue(
+        mismatch_map=mismatch_map,
+        rewrite_plan=rewrite_plan,
+        compliance=compliance,
+        risk=risk,
+        target_document_ref=target_doc,
+    )
+
+    if not patches:
+        print("No patches generated — no mismatches, rewrites, compliance gaps, or blocking risks found.")
+        return 0
+
+    path = write_whitecrow_patches(patches, output_dir)
+
+    print("--- WhiteCrow Patch Export ---")
+    print(f"Output:         {path.resolve()}")
+    print(f"Total patches:  {len(patches)}")
+    by_type: dict[str, int] = {}
+    for p in patches:
+        ct = p.get("change_type", "unknown")
+        by_type[ct] = by_type.get(ct, 0) + 1
+    for ct, count in sorted(by_type.items()):
+        print(f"  {ct}: {count}")
+    blocking = [p for p in patches if "[BLOCKING]" in p.get("change_summary", "")]
+    if blocking:
+        print(f"Blocking patches: {len(blocking)}")
+    return 0
+
+
 def cmd_export_litops_pack(args: argparse.Namespace) -> int:
     """Export latest pipeline artifacts as Litops-compatible JSONL."""
     from .integrations.litops_bridge import build_litops_export_pack, write_litops_export
@@ -739,6 +800,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Directory to write Litops JSONL files into",
     )
 
+    whitecrow_parser = sub.add_parser(
+        "export-whitecrow-patches",
+        help="Export patch queue for WhiteCrow from pipeline artifacts",
+    )
+    whitecrow_parser.add_argument(
+        "--output-dir", required=True,
+        help="Directory to write WhiteCrow patch queue JSONL into",
+    )
+    whitecrow_parser.add_argument(
+        "--target-doc", default=None,
+        help="Target document reference for patches (optional)",
+    )
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -755,6 +829,7 @@ def main(argv: list[str] | None = None) -> int:
         "build-venue-profile": cmd_build_venue_profile,
         "build-submission-pack": cmd_build_submission_pack,
         "export-litops-pack": cmd_export_litops_pack,
+        "export-whitecrow-patches": cmd_export_whitecrow_patches,
     }
 
     handler = commands.get(args.command)
