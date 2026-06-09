@@ -264,6 +264,68 @@ def cmd_run_local(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_adapters_smoke(args: argparse.Namespace) -> int:
+    """Run mock adapters, save results, print summary."""
+    from .adapters.bridge import (
+        convert_adapter_record_to_evidence_item,
+        convert_adapter_result_to_source_snapshot,
+    )
+    from .adapters.crossref import lookup_doi_mock, search_works_mock as crossref_search
+    from .adapters.openalex import search_works_mock as openalex_search
+    from .adapters.opencitations import get_citations_mock
+    from .persistence import save_adapter_result
+
+    root = _resolve_storage_root(args)
+
+    results = []
+    oalex = openalex_search("consciousness hard problem")
+    results.append(("openalex:search", oalex))
+
+    cref_search = crossref_search("consciousness philosophy")
+    results.append(("crossref:search", cref_search))
+
+    cref_doi = lookup_doi_mock("10.2307/2183914")
+    results.append(("crossref:doi", cref_doi))
+
+    ocit = get_citations_mock("10.1126/science.1234567", direction="references")
+    results.append(("opencitations:refs", ocit))
+
+    # Persist and bridge
+    from . import registry as reg
+    from .persistence import ensure_registry_root
+
+    reg_root = ensure_registry_root(root)
+    total_records = 0
+    total_evidence = 0
+
+    print("--- Adapter smoke test ---\n")
+    for label, result in results:
+        save_adapter_result(result.to_dict(), storage_root=root)
+        snapshot = convert_adapter_result_to_source_snapshot(result)
+        reg.append("source_snapshots", snapshot.to_dict(), base_dir=reg_root)
+
+        n = len(result.records)
+        total_records += n
+        print(f"  {label}: {result.status}, {n} record(s), mock={result.is_mock}")
+
+        for rec in result.records:
+            evi = convert_adapter_record_to_evidence_item(
+                rec,
+                adapter_name=result.adapter_name,
+                is_mock=result.is_mock,
+                source_id=snapshot.source_id,
+            )
+            reg.append("evidence_items", evi.to_dict(), base_dir=reg_root)
+            total_evidence += 1
+
+    print(f"\nTotal adapter results: {len(results)}")
+    print(f"Total records: {total_records}")
+    print(f"Total evidence items: {total_evidence}")
+    print(f"Registry root: {(root / 'registries').resolve()}")
+    print(f"\nAll results are MOCK. No external API calls were made.")
+    return 0
+
+
 def _find_fixtures_dir() -> Path | None:
     """Search for tests/fixtures/ relative to cwd or package location."""
     cwd_fixtures = Path.cwd() / "tests" / "fixtures"
@@ -292,6 +354,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("run-fixture", help="Run fixture pipeline and persist results")
     sub.add_parser("inspect-storage", help="Show registry and vault contents")
 
+    sub.add_parser("adapters-smoke", help="Run mock adapters, save results, print summary")
+
     run_local_parser = sub.add_parser(
         "run-local", help="Run pipeline on user-provided local files",
     )
@@ -315,6 +379,7 @@ def main(argv: list[str] | None = None) -> int:
         "run-fixture": cmd_run_fixture,
         "run-local": cmd_run_local,
         "inspect-storage": cmd_inspect_storage,
+        "adapters-smoke": cmd_adapters_smoke,
     }
 
     handler = commands.get(args.command)

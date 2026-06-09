@@ -91,3 +91,6 @@ def bibliography_profile_id() -> str:
 
 def citation_ecology_report_id() -> str:
     return generate_id("citeco")
+
+def adapter_result_id() -> str:
+    return generate_timestamp_id("adpt")

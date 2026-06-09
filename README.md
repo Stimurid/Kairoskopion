@@ -40,6 +40,10 @@ Working pipeline: manuscript + venue guidelines + submission scenario
 RiskReport, ComplianceChecklist, BibliographyProfile, CitationEcologyReport,
 OperationTrace, QualityGates, markdown artifacts.
 
+External adapter stubs: OpenAlex, Crossref, OpenCitations mock adapters with
+typed contracts and evidence bridge. All mock data only — no real API calls.
+Mock evidence is VENDOR_CLAIM, never FACT_FROM_SOURCE.
+
 Results persist to JSONL registries and markdown vault cards on disk.
 
 No LLM calls, no external API dependencies, no network access.
@@ -80,6 +84,7 @@ kairoskopion inspect-storage
 | `kairoskopion run-fixture` | Run fixture pipeline, persist JSONL registries + vault cards, print summary |
 | `kairoskopion run-local` | Run pipeline on user-provided manuscript + venue guidelines + scenario files |
 | `kairoskopion inspect-storage` | Show all registries (record counts, entity IDs) and vault card files |
+| `kairoskopion adapters-smoke` | Run mock adapters (OpenAlex/Crossref/OpenCitations), persist results |
 
 Use `--storage-root PATH` or env var `KAIROSKOPION_STORAGE_ROOT` to override default `.kairoskopion/` storage.
 
@@ -101,6 +106,9 @@ Use `--storage-root PATH` or env var `KAIROSKOPION_STORAGE_ROOT` to override def
     pipeline_runs.jsonl
     operation_traces.jsonl
     quality_gates.jsonl
+    adapter_results.jsonl
+    source_snapshots.jsonl
+    evidence_items.jsonl
   vault/
     articles/    {article_model_id}.md
     venues/      {venue_model_id}.md
@@ -118,7 +126,7 @@ Use `--storage-root PATH` or env var `KAIROSKOPION_STORAGE_ROOT` to override def
 src/kairoskopion/
   __init__.py          — package, version
   ids.py               — UUID-based entity ID generation
-  enums.py             — 22 domain enums (EvidenceStatus, LifecycleStatus, ...)
+  enums.py             — 23 domain enums (EvidenceStatus, AdapterStatus, ...)
   schema.py            — 18+ dataclass models with to_dict/from_dict
   registry.py          — JSONL append/read/list/find
   persistence.py       — storage root management, pipeline result persistence
@@ -128,7 +136,7 @@ src/kairoskopion/
   traces.py            — operation trace recording
   decisions.py         — user decision tracking
   cards.py             — markdown card generators (7 entity types)
-  cli.py               — CLI: status, run-fixture, inspect-storage
+  cli.py               — CLI: status, run-fixture, run-local, adapters-smoke, inspect-storage
 
   services/
     article_modeling.py  — ManuscriptModel + ArticleModel from text
@@ -146,8 +154,13 @@ src/kairoskopion/
     manuscript_venue_fit.py  — one manuscript x one venue pipeline
 
   adapters/
+    base.py             — adapter contracts (AdapterResult, AdapterRecord, AdapterConfig)
     source_intake.py    — local file/text source registration
     url_snapshot.py     — URL placeholder (no real fetch in MVP)
+    openalex.py         — OpenAlex mock adapter (deterministic, no API calls)
+    crossref.py         — Crossref mock adapter (DOI lookup + search, no API calls)
+    opencitations.py    — OpenCitations mock adapter (citation links, no API calls)
+    bridge.py           — adapter result → SourceSnapshot / EvidenceItem conversion
 
   integrations/
     litops.py           — Litops compatibility stubs

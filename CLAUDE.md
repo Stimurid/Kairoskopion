@@ -126,9 +126,9 @@ Before any structural change, read in this order:
 | `src/kairoskopion/enums.py` | All domain enums |
 | `src/kairoskopion/cli.py` | CLI entry point |
 | `src/kairoskopion/pipelines/manuscript_venue_fit.py` | Main pipeline |
-| `src/kairoskopion/services/` | 9 domain services |
-| `src/kairoskopion/adapters/` | Source intake, URL snapshot |
+| `src/kairoskopion/services/` | 11 domain services |
+| `src/kairoskopion/adapters/` | Source intake, URL snapshot, OpenAlex/Crossref/OpenCitations mocks, bridge |
 | `src/kairoskopion/integrations/` | Litops/WhiteCrow stubs |
-| `tests/` | 215+ tests |
+| `tests/` | 308+ tests |
 | `tests/fixtures/` | Synthetic manuscript, venue, scenario |
 | `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` | Master spec |

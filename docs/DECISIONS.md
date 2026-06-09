@@ -121,3 +121,18 @@ core as "not confirmed by user".
 **Rationale:** The protected core is the researcher's intellectual
 property and identity. No automated system should modify it without
 conscious human consent.
+
+## ADR-13: Mock adapters as stable contracts
+
+**Decision:** External adapter stubs (OpenAlex, Crossref, OpenCitations)
+return deterministic mock data with is_mock=True and evidence_status=VENDOR_CLAIM.
+Mock evidence never gets FACT_FROM_SOURCE status. References are never marked
+verified by mock data.
+
+**Rationale:** The adapter contract (typed input/output, evidence bridge,
+persistence) must be stable before connecting real APIs. Mock data lets us
+test the full integration path — adapter → SourceSnapshot → EvidenceItem →
+registry — without network dependency or API key requirements. When real
+adapters are implemented, only the data retrieval changes; the contract,
+bridge, and persistence remain the same. Keeping mock evidence at VENDOR_CLAIM
+prevents false confidence from synthetic data.

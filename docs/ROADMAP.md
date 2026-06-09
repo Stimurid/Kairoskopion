@@ -60,13 +60,28 @@ Engineering queue. Each item is a concrete deliverable, not an aspiration.
 - [x] Artifact includes citation ecology section
 - [x] 40 tests (bibliography parsing + citation ecology + pipeline + persistence integration)
 
-## Then: external adapter stubs
+### External adapter stubs (complete)
 
-- [ ] OpenAlex adapter stub with mock responses
-- [ ] Crossref DOI lookup stub with mock responses
-- [ ] OpenCitations stub
-- [ ] Adapter tests with mocked data
-- [ ] SourceSnapshot creation from adapter results
+- [x] Adapter contracts: AdapterResult, AdapterRecord, AdapterConfig, AdapterError, AdapterStatus enum
+- [x] OpenAlex mock adapter with deterministic work search
+- [x] Crossref mock adapter with DOI lookup + search
+- [x] OpenCitations mock adapter with citation link query
+- [x] Evidence bridge: adapter result → SourceSnapshot, adapter record → EvidenceItem
+- [x] Reference linking stub (DOI-based matching, no fuzzy title matching)
+- [x] Mock evidence marked VENDOR_CLAIM, never FACT_FROM_SOURCE
+- [x] References never marked verified by mock data
+- [x] JSONL persistence: adapter_results, source_snapshots, evidence_items registries
+- [x] CLI `adapters-smoke` command
+- [x] 35 tests (serialization, mock adapters, bridge, evidence safety, persistence, no-network)
+
+## Then: real external adapters
+
+- [ ] OpenAlex real adapter (requires API polite pool key)
+- [ ] Crossref real adapter (rate-limited, no auth required)
+- [ ] OpenCitations real adapter
+- [ ] Fuzzy title matching for reference linking
+- [ ] Adapter result caching / deduplication
+- [ ] Rate limiting and retry logic
 
 ## Then: enhanced vault
 

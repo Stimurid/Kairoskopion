@@ -76,6 +76,23 @@ Priority (highest first):
 2. `KAIROSKOPION_STORAGE_ROOT` environment variable
 3. Default: `.kairoskopion/` in current working directory
 
+### Run mock adapters
+
+```bash
+# Default storage root
+kairoskopion adapters-smoke
+
+# Custom storage root
+kairoskopion --storage-root /tmp/kairon_test adapters-smoke
+```
+
+Runs all three mock adapters (OpenAlex, Crossref, OpenCitations) with fixed
+deterministic data. Creates SourceSnapshot and EvidenceItem records for each
+adapter result. No network calls, no API keys needed.
+
+All evidence is marked VENDOR_CLAIM with is_mock=True. References are never
+verified by mock data.
+
 ## Where artifacts appear
 
 After `run-fixture`:
@@ -96,6 +113,11 @@ After `run-fixture`:
     quality_gates.jsonl       — QualityGateResult records
     publication_regimes.jsonl
     submission_scenarios.jsonl
+    bibliography_profiles.jsonl
+    citation_ecology_reports.jsonl
+    adapter_results.jsonl       — AdapterResult records (adapters-smoke)
+    source_snapshots.jsonl      — SourceSnapshot records (run-local, adapters-smoke)
+    evidence_items.jsonl        — EvidenceItem records (adapters-smoke)
   vault/
     articles/    — ArticleModel markdown cards
     venues/      — VenueModel markdown cards

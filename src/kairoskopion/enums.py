@@ -314,3 +314,13 @@ class CitationGapSeverity(str, Enum):
     MAJOR = "major"
     MINOR = "minor"
     INFORMATIONAL = "informational"
+
+
+# --- External adapter status ---
+
+class AdapterStatus(str, Enum):
+    SUCCESS = "success"
+    PARTIAL = "partial"
+    NO_RESULTS = "no_results"
+    ERROR = "error"
+    MOCK = "mock"

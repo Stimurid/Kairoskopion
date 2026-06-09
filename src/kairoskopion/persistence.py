@@ -138,6 +138,15 @@ def save_pipeline_result(
     return written
 
 
+def save_adapter_result(
+    result_dict: dict[str, Any],
+    storage_root: Path | str | None = None,
+) -> Path:
+    """Persist an adapter result to the adapter_results registry."""
+    reg_root = ensure_registry_root(storage_root)
+    return _save("adapter_results", result_dict, reg_root)
+
+
 def list_registries(storage_root: Path | str | None = None) -> list[str]:
     """List all .jsonl registry names under storage root."""
     reg_root = ensure_storage_root(storage_root) / _REGISTRIES_DIR
