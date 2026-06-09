@@ -51,6 +51,7 @@ from .ids import (
     source_snapshot_id,
     submission_pack_id,
     submission_scenario_id,
+    trajectory_report_id,
     venue_model_id,
 )
 
@@ -402,6 +403,7 @@ class BibliographyProfile(_DictMixin):
     doi_count: int = 0
     source_kind_distribution: dict[str, int] = _dict()
     recency_profile: str | None = _field()
+    reference_style: str | None = _field()
     unknowns: list[str] = _list()
     disclaimer: str = "Bibliography parsed heuristically from text. Not externally verified."
     created_at: str = dc.field(default_factory=_now)
@@ -510,6 +512,30 @@ class SubmissionPack(_DictMixin):
     ready_status: str = SubmissionReadiness.NOT_READY.value
     created_at: str = dc.field(default_factory=_now)
     updated_at: str = dc.field(default_factory=_now)
+
+
+# ---------------------------------------------------------------------------
+# Publication Trajectory Report (Sprint 5)
+# ---------------------------------------------------------------------------
+
+@dc.dataclass
+class PublicationTrajectoryReport(_DictMixin):
+    """Comprehensive summary combining fit, risk, bibliography, and recommendations."""
+    report_id: str = dc.field(default_factory=trajectory_report_id)
+    article_model_id: str | None = _field()
+    venue_model_id: str | None = _field()
+    fit_summary: str | None = _field()
+    risk_summary: str | None = _field()
+    bibliography_summary: str | None = _field()
+    strengths: list[str] = _list()
+    weaknesses: list[str] = _list()
+    critical_actions: list[str] = _list()
+    optional_improvements: list[str] = _list()
+    overall_recommendation: str | None = _field()
+    confidence: str | None = _field()
+    unknowns: list[str] = _list()
+    lifecycle_status: str = LifecycleStatus.DRAFT.value
+    created_at: str = dc.field(default_factory=_now)
 
 
 # ---------------------------------------------------------------------------

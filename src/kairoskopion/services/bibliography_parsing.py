@@ -58,18 +58,94 @@ def extract_references_section(text: str) -> str | None:
     return rest.strip()
 
 
+def detect_reference_style(section_text: str) -> str:
+    """Detect the reference citation style used in the section.
+
+    Returns one of: 'apa', 'numbered', 'author_date', 'chicago_note',
+    'vancouver', 'unknown'.
+    """
+    lines = [l.strip() for l in section_text.strip().splitlines() if l.strip()]
+    if not lines:
+        return "unknown"
+
+    # Check for numbered style (1. ..., [1] ..., (1) ...)
+    numbered_count = sum(1 for l in lines if re.match(r"^(\[?\d+\]?\.?\s|\(\d+\)\s)", l))
+    if numbered_count > len(lines) * 0.6:
+        # Distinguish Vancouver from generic numbered
+        if any(";" in l and re.search(r"\d{4}", l) for l in lines[:5]):
+            return "vancouver"
+        return "numbered"
+
+    # Check for APA style: Author, A. A. (Year).
+    apa_count = sum(1 for l in lines if re.match(r"^[A-Z][a-z]+,?\s.*\(\d{4}", l))
+    if apa_count > len(lines) * 0.5:
+        return "apa"
+
+    # Check for Chicago author-date: Author Year.
+    chicago_count = sum(1 for l in lines if re.match(r"^[A-Z][a-z]+.*\d{4}\.", l))
+    if chicago_count > len(lines) * 0.5:
+        return "author_date"
+
+    # Check for bullet/dash style
+    bullet_count = sum(1 for l in lines if re.match(r"^[-•*–—]", l))
+    if bullet_count > len(lines) * 0.5:
+        return "author_date"
+
+    return "unknown"
+
+
 def split_references(section_text: str) -> list[str]:
-    """Split a references section into individual reference strings."""
+    """Split a references section into individual reference strings.
+
+    Handles multiple citation styles:
+    - Bullet/dash lists (- Reference text)
+    - Numbered lists (1. Reference text, [1] Reference text)
+    - Plain paragraph-per-reference
+    - Multi-line references (continuation lines joined)
+    """
     lines = section_text.strip().splitlines()
-    refs = []
+    refs: list[str] = []
+    current: list[str] = []
+
     for line in lines:
-        line = line.strip()
-        if not line:
+        stripped = line.strip()
+        if not stripped:
+            # Blank line: flush current
+            if current:
+                joined = " ".join(current)
+                if len(joined) > 10:
+                    refs.append(joined)
+                current = []
             continue
-        cleaned = re.sub(r"^[-•*–—]\s*", "", line).strip()
-        cleaned = re.sub(r"^\d+\.\s*", "", cleaned).strip()
-        if len(cleaned) > 10:
-            refs.append(cleaned)
+
+        # Check if this is a new reference start
+        is_new_ref = bool(
+            re.match(r"^[-•*–—]\s+", stripped) or     # bullet
+            re.match(r"^\[?\d+\]?\.?\s", stripped) or  # numbered
+            re.match(r"^\(\d+\)\s", stripped) or       # (1) style
+            re.match(r"^[A-Z][a-z]+", stripped)        # capital start (typical author name)
+        )
+
+        if is_new_ref and current:
+            joined = " ".join(current)
+            if len(joined) > 10:
+                refs.append(joined)
+            current = []
+
+        # Clean leading markers
+        cleaned = re.sub(r"^[-•*–—]\s*", "", stripped).strip()
+        cleaned = re.sub(r"^\[?\d+\]?\.?\s*", "", cleaned).strip()
+        cleaned = re.sub(r"^\(\d+\)\s*", "", cleaned).strip()
+
+        if cleaned:
+            current.append(cleaned)
+
+    # Flush last reference
+    if current:
+        joined = " ".join(current)
+        if len(joined) > 10:
+            refs.append(joined)
+
     return refs
 
 
@@ -178,6 +254,7 @@ def build_bibliography_profile(
             unknowns=unknowns,
         )
 
+    ref_style = detect_reference_style(section)
     raw_refs = split_references(section)
     if not raw_refs:
         unknowns.append("References section found but no parseable items")
@@ -218,6 +295,7 @@ def build_bibliography_profile(
         doi_count=len(dois),
         source_kind_distribution=kind_dist,
         recency_profile=recency,
+        reference_style=ref_style,
         unknowns=unknowns,
     )
 

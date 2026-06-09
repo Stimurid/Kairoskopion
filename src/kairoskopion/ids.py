@@ -94,3 +94,6 @@ def citation_ecology_report_id() -> str:
 
 def adapter_result_id() -> str:
     return generate_timestamp_id("adpt")
+
+def trajectory_report_id() -> str:
+    return generate_id("ptr")
