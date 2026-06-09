@@ -573,6 +573,73 @@ def cmd_build_submission_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_export_litops_pack(args: argparse.Namespace) -> int:
+    """Export latest pipeline artifacts as Litops-compatible JSONL."""
+    from .integrations.litops_bridge import build_litops_export_pack, write_litops_export
+    from .schema import (
+        ArticleModel,
+        BibliographyProfile,
+        FitAssessment,
+        PublicationTrajectoryReport,
+        RiskReport,
+        SubmissionPack,
+        VenueModel,
+    )
+
+    root = _resolve_storage_root(args)
+    output_dir = Path(args.output_dir)
+
+    if not registries_exist(root):
+        print("ERROR: no registries found. Run a pipeline first.", file=sys.stderr)
+        return 1
+
+    def _latest(name: str) -> dict | None:
+        records = read_registry(name, storage_root=root)
+        return records[-1] if records else None
+
+    art_d = _latest("article_models")
+    ven_d = _latest("venue_models")
+
+    if not art_d and not ven_d:
+        print("ERROR: no article or venue models in storage.", file=sys.stderr)
+        return 1
+
+    article = ArticleModel.from_dict(art_d) if art_d else None
+    venue = VenueModel.from_dict(ven_d) if ven_d else None
+
+    fit_d = _latest("fit_assessments")
+    risk_d = _latest("risk_reports")
+    traj_d = _latest("trajectory_reports")
+    pack_d = _latest("submission_packs")
+    bib_d = _latest("bibliography_profiles")
+
+    fit = FitAssessment.from_dict(fit_d) if fit_d else None
+    risk = RiskReport.from_dict(risk_d) if risk_d else None
+    trajectory = PublicationTrajectoryReport.from_dict(traj_d) if traj_d else None
+    pack = SubmissionPack.from_dict(pack_d) if pack_d else None
+    bibliography = BibliographyProfile.from_dict(bib_d) if bib_d else None
+
+    export_pack = build_litops_export_pack(
+        article=article,
+        venue=venue,
+        fit=fit,
+        risk=risk,
+        trajectory=trajectory,
+        pack=pack,
+        bibliography=bibliography,
+    )
+
+    written = write_litops_export(export_pack, output_dir)
+
+    print("--- Litops Export ---")
+    print(f"Output dir:     {output_dir.resolve()}")
+    print(f"Sources:        {len(export_pack.get('sources', []))}")
+    print(f"Artifacts:      {len(export_pack.get('artifacts', []))}")
+    for name, path in sorted(written.items()):
+        print(f"  {name}: {path}")
+    return 0
+
+
 def _find_fixtures_dir() -> Path | None:
     """Search for tests/fixtures/ relative to cwd or package location."""
     cwd_fixtures = Path.cwd() / "tests" / "fixtures"
@@ -663,6 +730,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Build submission pack from latest pipeline run",
     )
 
+    litops_parser = sub.add_parser(
+        "export-litops-pack",
+        help="Export pipeline artifacts as Litops-compatible JSONL",
+    )
+    litops_parser.add_argument(
+        "--output-dir", required=True,
+        help="Directory to write Litops JSONL files into",
+    )
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -678,6 +754,7 @@ def main(argv: list[str] | None = None) -> int:
         "intake-file": cmd_intake_file,
         "build-venue-profile": cmd_build_venue_profile,
         "build-submission-pack": cmd_build_submission_pack,
+        "export-litops-pack": cmd_export_litops_pack,
     }
 
     handler = commands.get(args.command)
