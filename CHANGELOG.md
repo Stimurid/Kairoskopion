@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] — Generalized Venue-Fit Anti-Overfitting Repairs
+## [0.2.0-alpha-rc4] — 2026-06-10
+
+> Tag: `v0.2.0-alpha-rc4`. Generalized venue-fit anti-overfitting repairs (D12-D15).
 
 ### Fixed
 - **D12:** Word limit extraction now distinguishes abstract limits (200-250 words) from article body limits (5000-12000 words). `_extract_article_word_limit()` skips abstract-line matches and requires hi >= 1000.

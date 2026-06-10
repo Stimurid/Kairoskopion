@@ -6,8 +6,8 @@
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `main` at `83f4028` |
-| Tag | `v0.2.0-alpha-rc3` |
+| Branch | `main` at merge of `33769ad` |
+| Tag | `v0.2.0-alpha-rc4` |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
 | Working tree | clean |
 | Python | >=3.11 |
@@ -15,6 +15,7 @@
 ## Recent commit history (main)
 
 ```
+xxxxxxx Close D12-D15: generalized venue-fit anti-overfitting repairs
 83f4028 Fix language policy extraction, close D10/D11 with evidence-pack rerun
 62f2f8e Close D6/D8/D9: conditional rewrite plan, title extraction, source_kind
 1959541 Add Logos target trial audit and bounded quality repairs
