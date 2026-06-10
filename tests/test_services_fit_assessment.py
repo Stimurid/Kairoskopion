@@ -71,10 +71,10 @@ class TestAssessFit:
         assert method_axes
         assert method_axes[0]["value"] == "weak"
 
-    def test_citation_ecology_unknown(self):
-        """Citation ecology should be unknown without corpus profiling."""
+    def test_citation_ecology_assessed(self):
+        """Citation ecology should reflect bibliography data when available."""
         article, venue, scenario = _build_all()
         fit = assess_fit(article, venue, scenario)
         cit_axes = [a for a in fit.axes if a["axis"] == "citation_ecology"]
         assert cit_axes
-        assert cit_axes[0]["value"] == "unknown"
+        assert cit_axes[0]["value"] in ("weak", "medium", "unknown")

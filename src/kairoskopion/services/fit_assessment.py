@@ -11,6 +11,8 @@ Sprint 2: expanded from 8 to 12 axes:
 
 from __future__ import annotations
 
+import re
+
 from ..enums import (
     AssessmentLevel,
     FitAxisValue,
@@ -21,6 +23,59 @@ from ..enums import (
 )
 from ..ids import fit_assessment_id
 from ..schema import ArticleModel, FitAssessment, SubmissionScenario, VenueModel
+
+
+_DISCIPLINE_KEYWORDS: dict[str, list[str]] = {
+    "philosophy": ["philosophy", "philosophical", "phenomenology", "epistemology",
+                   "ontology", "hermeneutic", "metaphysics"],
+    "social_theory": ["social theory", "social sciences", "sociology", "sociological"],
+    "cultural_studies": ["cultural studies", "cultural theory", "culture"],
+    "education": ["education", "pedagogy", "higher education", "university",
+                  "academic", "curriculum"],
+    "sts": ["sts", "science and technology studies", "science studies"],
+    "political_science": ["political science", "political philosophy", "politics",
+                          "governance", "democracy"],
+    "ethics": ["ethics", "bioethics", "research ethics", "ai ethics"],
+    "humanities": ["humanities", "literary", "philology", "history of ideas"],
+    "psychology": ["psychology", "cognitive", "behavioral"],
+    "economics": ["economics", "economic", "political economy"],
+    "computer_science": ["computer science", "artificial intelligence",
+                         "machine learning", "computational"],
+    "media_studies": ["media studies", "communication", "journalism"],
+    "law": ["law", "legal", "jurisprudence"],
+}
+
+_ADJACENCY: dict[str, set[str]] = {
+    "philosophy": {"ethics", "social_theory", "humanities", "political_science", "sts"},
+    "social_theory": {"philosophy", "cultural_studies", "political_science", "sts"},
+    "cultural_studies": {"social_theory", "humanities", "media_studies"},
+    "education": {"social_theory", "psychology", "philosophy"},
+    "sts": {"philosophy", "social_theory", "ethics"},
+    "political_science": {"philosophy", "social_theory", "law", "economics"},
+    "ethics": {"philosophy", "law", "sts"},
+    "humanities": {"philosophy", "cultural_studies", "education"},
+    "psychology": {"education", "social_theory"},
+    "economics": {"political_science", "social_theory"},
+    "computer_science": {"sts", "ethics"},
+    "media_studies": {"cultural_studies", "social_theory"},
+    "law": {"political_science", "ethics"},
+}
+
+
+def _detect_disciplines(text: str) -> set[str]:
+    lower = text.lower()
+    found: set[str] = set()
+    for discipline, keywords in _DISCIPLINE_KEYWORDS.items():
+        if any(kw in lower for kw in keywords):
+            found.add(discipline)
+    return found
+
+
+def _adjacent_disciplines(disciplines: set[str]) -> set[str]:
+    adj: set[str] = set()
+    for d in disciplines:
+        adj.update(_ADJACENCY.get(d, set()))
+    return adj
 
 
 def _axis(name: str, value: str, notes: str, evidence: list[str] | None = None) -> dict:
@@ -63,14 +118,24 @@ def assess_fit(
 
     # --- Discipline fit ---
     discipline = (article.disciplinary_register_current or "").lower()
-    if "sts" in scope or "science and technology studies" in scope:
-        if "sts" in discipline or "sociology" in discipline:
-            axes.append(_axis("discipline", "strong", "Article discipline matches STS venue"))
-        elif "philosophy" in discipline or "ethics" in discipline:
+    venue_disciplines = _detect_disciplines(scope)
+    article_disciplines = _detect_disciplines(f"{discipline} {article_text}")
+    if venue_disciplines and article_disciplines:
+        overlap = venue_disciplines & article_disciplines
+        if overlap:
+            axes.append(_axis("discipline", "strong",
+                              f"Discipline overlap: {', '.join(sorted(overlap))}"))
+        elif venue_disciplines & _adjacent_disciplines(article_disciplines):
             axes.append(_axis("discipline", "medium",
-                              "Philosophy/ethics -- adjacent to STS but not core"))
+                              "Article discipline is adjacent to venue focus"))
         else:
-            axes.append(_axis("discipline", "weak", "Discipline mismatch with STS venue"))
+            axes.append(_axis("discipline", "weak",
+                              f"Discipline mismatch: article={', '.join(sorted(article_disciplines))}, "
+                              f"venue={', '.join(sorted(venue_disciplines))}"))
+    elif venue_disciplines:
+        axes.append(_axis("discipline", "unknown",
+                          "Article discipline not detected"))
+        unknowns.append("discipline fit unknown -- article discipline unclear")
     else:
         axes.append(_axis("discipline", "unknown", "Venue discipline focus unclear"))
         unknowns.append("discipline fit unknown")
@@ -125,13 +190,22 @@ def assess_fit(
             axes.append(_axis("method", "medium", "No strong method preference detected in venue"))
 
     # --- Citation ecology fit ---
-    bib_count = len(article.citation_ecology_current or "")
-    if article.citation_ecology_current and "references found" in article.citation_ecology_current:
-        axes.append(_axis("citation_ecology", "unknown",
-                          "Bibliography present but venue citation expectations not profiled"))
+    cite_text = (article.citation_ecology_current or "").lower()
+    if cite_text and "references found" in cite_text:
+        ref_match = re.search(r"(\d+)\s+references?\s+found", cite_text)
+        ref_count = int(ref_match.group(1)) if ref_match else 0
+        if ref_count >= 20:
+            axes.append(_axis("citation_ecology", "medium",
+                              f"Bibliography present ({ref_count} refs) but venue expectations not profiled"))
+        elif ref_count > 0:
+            axes.append(_axis("citation_ecology", "weak",
+                              f"Thin bibliography ({ref_count} refs) -- may need strengthening"))
+        else:
+            axes.append(_axis("citation_ecology", "unknown", "Citation ecology not assessed"))
+            unknowns.append("citation ecology not profiled against venue corpus")
     else:
         axes.append(_axis("citation_ecology", "unknown", "Citation ecology not assessed"))
-    unknowns.append("citation ecology not profiled against venue corpus")
+        unknowns.append("citation ecology not profiled against venue corpus")
 
     # --- Novelty positioning fit (Sprint 2) ---
     novelty = article.novelty_mode
@@ -155,15 +229,18 @@ def assess_fit(
         unknowns.append("language fit unknown")
 
     # --- Audience fit (Sprint 2) ---
-    if article.disciplinary_register_current and scope:
-        # Simple heuristic: if article mentions audience-relevant terms
-        if any(kw in scope for kw in (article.disciplinary_register_current or "").lower().split()):
+    if venue_disciplines and article_disciplines:
+        audience_overlap = venue_disciplines & (article_disciplines | _adjacent_disciplines(article_disciplines))
+        if audience_overlap:
             axes.append(_axis("audience", "medium",
-                              "Article discipline appears in venue scope"))
+                              "Article discipline overlaps venue audience"))
         else:
-            axes.append(_axis("audience", "unknown",
-                              "Audience alignment not assessable from available data"))
-            unknowns.append("audience fit unknown")
+            axes.append(_axis("audience", "weak",
+                              "Article discipline outside venue's core audience"))
+    elif scope and article_text:
+        axes.append(_axis("audience", "unknown",
+                          "Audience alignment not assessable from available data"))
+        unknowns.append("audience fit unknown")
     else:
         axes.append(_axis("audience", "unknown", "Audience fit not assessable"))
         unknowns.append("audience fit unknown")

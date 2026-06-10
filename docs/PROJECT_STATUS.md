@@ -1,41 +1,41 @@
 # Project Status — Kairoskopion
 
-**Last updated:** 2026-06-09
+**Last updated:** 2026-06-10
 
 ## Repository
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `feature/autonomous-local-docs-entities-adapters` (8 sprints ahead of main) |
+| Branch | `main` at `83f4028` |
+| Tag | `v0.2.0-alpha-rc3` |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
 | Working tree | clean |
 | Python | >=3.11 |
 
-## Commit history (feature branch)
+## Recent commit history (main)
 
 ```
+83f4028 Fix language policy extraction, close D10/D11 with evidence-pack rerun
+62f2f8e Close D6/D8/D9: conditional rewrite plan, title extraction, source_kind
+1959541 Add Logos target trial audit and bounded quality repairs
+7684f4f Add HTTP cache dir and zip bundles to .gitignore
+41cdfc3 Update all docs for Sprints 1-8 completion
 2726c7b Add WhiteCrow patch queue bridge for manuscript change proposals
 47d8513 Add Litops compatibility bridge for cross-project export
 bcc40c5 Add structured submission pack preparation layer
-f5fa3ba Add bibliography multi-style parsing and trajectory report
-94ea872 Add multi-source venue profile builder
-f1420b3 Add real optional adapters with caching and rate limiting
-762bd61 Expand core entity coverage for fit and risk modeling
-8c2a2ce Add robust local document intake
-a7d32c1 Fix stale status docs and add Entity Completeness sprint to backlog
-d111089 Add spec coverage, backlog, and alpha demo packaging
-9b4571e Add enhanced vault, exchange bundles, and freshness tracking
-a0a049b Add external adapter stubs with mock evidence bridge
-327c4ac Add citation ecology stub
-299251e Add run-local pipeline for user files
-9d04df7 Add repository operating layer and foundation docs
-ca9c2fb Update documentation for first usable local build
-beaf1bd Add source acquisition layer, inspect-storage, vault card expansion
-5d3b048 Add persistence, vault output, and CLI smoke
-91fa714 Add fixture manuscript-venue fit pipeline
-24dab23 Audit Pass: add negative-case tests, fixtures, pipeline base
-8e841f9 Bootstrap Kairoskopion MVP0 domain skeleton
 ```
+
+## Trial history
+
+Logos (Логос) was used as a **target-known trial case** to validate the pipeline
+with a real venue. It is NOT the product target. Kairoskopion is a general
+evidence-first article-to-venue trajectory engine.
+
+- Logos seed trial: exposed D1-D9 (venue extraction, genre, method, rewrite plan, bibliography)
+- Logos evidence-pack rerun: exposed D10-D11 (evidence upgrade, language policy extraction)
+- Generalized venue-fit anti-overfitting pass: D12-D15 (word limit distinction, article type extraction, discipline matching, unassessed axes)
+- All repairs were generalized — no Logos-specific hardcoding
+- 16 generalized venue-fit regression tests with 3 synthetic fixtures prove no Logos overfitting
 
 ## Modules implemented
 
@@ -159,15 +159,17 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **556 tests**, all passing
-- 24 test files covering: schema, registry, evidence, quality, cards,
+- **613 tests**, all passing
+- 27+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
   source acquisition, bibliography parsing, citation ecology, adapters,
   vault indexes, exchange bundles, freshness tracking,
   document intake (PDF/DOCX), entity completeness (12 fit axes, 18 risk types),
   real adapters (HTTP cache, rate limiting), venue profile builder,
-  bibliography & trajectory reports, submission pack, Litops bridge, WhiteCrow bridge
+  bibliography & trajectory reports, submission pack, Litops bridge, WhiteCrow bridge,
+  rewrite planning (conditional actions), language policy extraction,
+  generalized venue-fit (language blocker, word limits, article types, discipline matching)
 
 ## Fixture pipeline output
 

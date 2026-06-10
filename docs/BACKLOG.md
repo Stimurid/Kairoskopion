@@ -30,6 +30,30 @@ Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.m
 
 ---
 
+## Generalized Venue-Fit Anti-Overfitting Repairs ✓ DONE (2026-06-10)
+
+**Goal:** Extract reusable product logic from the Logos trial so Kairoskopion improves for arbitrary manuscripts and venues. No Logos-specific hardcoding.
+
+**Phases completed:**
+1. ✓ Reality audit: identified 7 generalized invariants from trial experience
+2. ✓ Anti-overfitting code review: confirmed no Logos-specific hardcoding in pipeline
+3. ✓ Doc updates: CHANGELOG, README, CLAUDE.md, PROJECT_STATUS version alignment
+4. ✓ Code fixes: D12 (word limit distinction), D13 (article type extraction), D14 (discipline matching), D15 (citation ecology + audience axes)
+5. ✓ Generalized regression tests: 3 synthetic fixtures + 16 tests proving generic behavior
+6. ✓ Full test suite green (613 tests)
+
+**Defects closed:**
+- D12: Word limit extraction confused abstract limits with article body limits
+- D13: Article type extraction only recognized bold format (missed numbered/bullet lists)
+- D14: Discipline matching was STS-only — replaced with generic 13-discipline keyword taxonomy + adjacency graph
+- D15: Citation ecology always returned unknown — now uses bibliography reference count; audience axis uses discipline overlap
+
+**Branch:** `feature/generalized-venue-fit-anti-overfit-repairs`
+**Tests added:** 16 new tests (613 total, was 597)
+**Invariants doc:** `docs/GENERALIZED_VENUE_FIT_INVARIANTS.md`
+
+---
+
 ## Logos Target Trial Quality Audit ✓ DONE (2026-06-10)
 
 **Goal:** Fix 9 product defects found during first real-use-case trial (philosophical article targeting Logos journal with conservative UNKNOWN venue seed).

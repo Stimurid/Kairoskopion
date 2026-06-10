@@ -92,13 +92,36 @@ def _extract_section(text: str, heading: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
+_ARTICLE_TYPE_KEYWORDS = (
+    "article", "review", "commentary", "essay", "report",
+    "contribution", "letter", "note", "editorial", "opinion",
+    "perspective", "case study", "meta-analysis", "systematic review",
+)
+
+
 def _extract_article_types(text: str) -> list[str]:
     types: list[str] = []
-    for m in re.finditer(r"-\s*\*\*(.+?)\*\*", text):
-        name = m.group(1).strip()
-        if "article" in name.lower() or "review" in name.lower() or "commentary" in name.lower():
-            types.append(name.lower().replace(" ", "_"))
-    return types or []
+    seen: set[str] = set()
+
+    section = _extract_section(text, "Article Types")
+    source = section or text
+
+    for m in re.finditer(r"-\s*\*\*(.+?)\*\*", source):
+        _add_type(m.group(1).strip(), types, seen)
+    for m in re.finditer(r"^\s*\d+\.\s+(.+?)(?:\s*\(|$)", source, re.MULTILINE):
+        _add_type(m.group(1).strip(), types, seen)
+    for m in re.finditer(r"^\s*[-*]\s+([A-Z].+?)(?:\s*\(|$)", source, re.MULTILINE):
+        _add_type(m.group(1).strip(), types, seen)
+    return types
+
+
+def _add_type(name: str, types: list[str], seen: set[str]) -> None:
+    lower = name.lower()
+    if any(kw in lower for kw in _ARTICLE_TYPE_KEYWORDS):
+        slug = lower.replace(" ", "_")
+        if slug not in seen:
+            seen.add(slug)
+            types.append(slug)
 
 
 def _detect_review_model(text: str) -> str | None:

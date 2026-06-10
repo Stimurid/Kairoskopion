@@ -13,6 +13,27 @@ from ..ids import compliance_checklist_id
 from ..schema import ArticleModel, ComplianceChecklist, ManuscriptModel, VenueModel
 
 
+def _extract_article_word_limit(gl: str) -> tuple[int, int] | None:
+    """Extract article body word limit, ignoring abstract word limits.
+
+    Returns (lo, hi) if an article-level word limit is found, None otherwise.
+    A word range that appears on the same line as 'abstract' is skipped.
+    """
+    for m in re.finditer(r"(\d[\d,]*)\s*[-–]\s*(\d[\d,]*)\s*words?", gl):
+        line_start = gl.rfind("\n", 0, m.start()) + 1
+        line_end = gl.find("\n", m.end())
+        if line_end == -1:
+            line_end = len(gl)
+        line = gl[line_start:line_end]
+        if "abstract" in line:
+            continue
+        lo = int(m.group(1).replace(",", ""))
+        hi = int(m.group(2).replace(",", ""))
+        if hi >= 1000:
+            return (lo, hi)
+    return None
+
+
 def _check(category: str, requirement: str, status: str,
            source_ref: str = "", notes: str = "") -> dict:
     return {
@@ -77,11 +98,10 @@ def build_compliance_checklist(
         items.append(_check("keywords", "Keywords", "missing"))
         missing.append("keywords")
 
-    # --- Word count ---
-    wc_match = re.search(r"(\d[\d,]*)\s*[-–]\s*(\d[\d,]*)\s*words?", gl)
-    if wc_match and manuscript.word_count:
-        lo = int(wc_match.group(1).replace(",", ""))
-        hi = int(wc_match.group(2).replace(",", ""))
+    # --- Word count (article body limit, NOT abstract limit) ---
+    article_wc = _extract_article_word_limit(gl)
+    if article_wc and manuscript.word_count:
+        lo, hi = article_wc
         if lo <= manuscript.word_count <= hi:
             items.append(_check("word_count", f"Word count {lo}–{hi}", "present",
                                 notes=f"Current: {manuscript.word_count}"))

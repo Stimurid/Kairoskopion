@@ -2,7 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.7.0-logos-evidence-pack] — 2026-06-10
+## [Unreleased] — Generalized Venue-Fit Anti-Overfitting Repairs
+
+### Fixed
+- **D12:** Word limit extraction now distinguishes abstract limits (200-250 words) from article body limits (5000-12000 words). `_extract_article_word_limit()` skips abstract-line matches and requires hi >= 1000.
+- **D13:** Article type extraction supports numbered lists (`1. Research articles`) and plain bullet lists (`- Research Article`) in addition to bold format (`- **Research Article**`). Keyword filtering prevents false positives.
+- **D14:** Discipline matching is no longer STS-only. Generic keyword taxonomy (13 disciplines) with adjacency graph detects overlap between manuscript and venue disciplines.
+- **D15:** Citation ecology now returns weak/medium based on bibliography reference count instead of always unknown. Audience axis uses discipline overlap data.
+
+### Added
+- `docs/GENERALIZED_VENUE_FIT_INVARIANTS.md` — 7 generalized invariants extracted from trial experience
+- 3 synthetic test fixtures: English philosophy venue, Russian-only venue, separated word limits venue
+- 16 generalized venue-fit regression tests (`test_generalized_venue_fit.py`) proving language blocker, word limit distinction, article type extraction, discipline matching, audience axis, citation ecology, and genre assessment all work for arbitrary venues
+
+### Stats
+- 613 tests passing (was 597)
+- D12-D15 closed: anti-overfitting generalization pass
+
+---
+
+## [0.2.0-alpha-rc3] — 2026-06-10
+
+> Tag: `v0.2.0-alpha-rc3`. Logos evidence-pack rerun (target-known trial case, not product target).
 
 ### Fixed
 - **D11:** Language policy extraction no longer confuses metadata language with article body language. New `_extract_language_policy()` checks dedicated Language Policy section, scope signals, and Submission Requirements with proper disambiguation. Journals requiring bilingual metadata but Russian-only articles are now correctly identified.

@@ -153,6 +153,6 @@ For deep spec questions, read:
 | `src/kairoskopion/vault.py` | Vault indexes, manifest, cross-linking, link validation |
 | `src/kairoskopion/exchange.py` | Export/import storage bundles (zip) |
 | `src/kairoskopion/freshness.py` | Freshness/staleness tracking |
-| `tests/` | 556+ tests |
+| `tests/` | 613+ tests |
 | `tests/fixtures/` | Synthetic manuscript, venue, scenario |
 | `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` | Master spec |
