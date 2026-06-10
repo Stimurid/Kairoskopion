@@ -36,4 +36,6 @@ vault/
 
 .kairoskopion/
 .kairoskopion_demo/
+.kairoskopion_cache/
 kairoskopion_demo_bundle.zip
+*.zip
