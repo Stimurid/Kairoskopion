@@ -34,7 +34,7 @@ _CONFERENCE_MARKERS = [
     "proceedings", "conference", "workshop", "symposium",
     "proc.", "conf.",
 ]
-_CHAPTER_MARKERS = ["in:", "in ", "chapter", " eds.", " ed.", "(ed", "(eds"]
+_CHAPTER_MARKERS = ["in:", " eds.", " ed.", "(ed.", "(eds.", "(eds)", "chapter in"]
 _THESIS_MARKERS = ["thesis", "dissertation", "phd", "doctoral"]
 _WEB_MARKERS = ["http://", "https://", "www.", "accessed", "retrieved from"]
 _PREPRINT_MARKERS = ["arxiv", "preprint", "biorxiv", "medrxiv", "ssrn"]
@@ -173,6 +173,17 @@ def parse_reference(raw: str) -> ReferenceItem:
     )
 
 
+_REPORT_MARKERS = [
+    "report", "working paper", "policy brief", "white paper",
+    "technical report", "discussion paper",
+]
+_REPORT_ORG_MARKERS = [
+    "unesco", "oecd", "world bank", "world economic forum", "wef",
+    "mckinsey", "deloitte", "rand", "brookings", "nber",
+    "european commission", "united nations",
+]
+
+
 def _detect_source_kind(raw: str) -> str:
     lower = raw.lower()
 
@@ -192,12 +203,27 @@ def _detect_source_kind(raw: str) -> str:
         if marker in lower:
             return ReferenceSourceKind.WEB_SOURCE.value
 
-    for marker in _CHAPTER_MARKERS:
+    for marker in _REPORT_MARKERS:
         if marker in lower:
-            return ReferenceSourceKind.BOOK_CHAPTER.value
+            return ReferenceSourceKind.REPORT.value
+
+    for marker in _REPORT_ORG_MARKERS:
+        if marker in lower:
+            return ReferenceSourceKind.REPORT.value
 
     has_journal = any(m in lower for m in _JOURNAL_MARKERS)
     has_book = any(m in lower for m in _BOOK_MARKERS)
+    has_doi = bool(_DOI_PATTERN.search(raw))
+    has_chapter = any(m in lower for m in _CHAPTER_MARKERS)
+
+    if has_doi and has_journal:
+        return ReferenceSourceKind.JOURNAL_ARTICLE.value
+
+    if has_doi and not has_book and not has_chapter:
+        return ReferenceSourceKind.JOURNAL_ARTICLE.value
+
+    if has_chapter:
+        return ReferenceSourceKind.BOOK_CHAPTER.value
 
     if has_journal and not has_book:
         return ReferenceSourceKind.JOURNAL_ARTICLE.value
@@ -222,17 +248,37 @@ def _extract_author_fragment(raw: str) -> str | None:
 
 
 def _extract_title_fragment(raw: str) -> str | None:
-    """Extract probable title — text after year in parentheses, before period."""
-    match = re.search(r"\(\d{4}[a-z]?\)\s*\.?\s*(.+?)(?:\.|$)", raw)
-    if match:
-        title = match.group(1).strip().rstrip(".")
+    """Extract probable title from multiple citation styles."""
+    # APA style: Author (Year). Title.
+    m = re.search(r"\(\d{4}[a-z]?\)\s*\.?\s*(.+?)(?:\.\s|$)", raw)
+    if m:
+        title = m.group(1).strip().rstrip(".")
         if len(title) > 5:
             return title
-    match2 = re.search(r"\d{4}[a-z]?\)\s*\.?\s*(.+?)(?:\.|$)", raw)
-    if match2:
-        title = match2.group(1).strip().rstrip(".")
+
+    # Chicago author-date: Author. Year. Title. ...
+    # Also handles: Author, First. Year. Title. ...
+    m = re.search(r"\.\s*\d{4}[a-z]?\.\s+(.+?)(?:\.\s|$)", raw)
+    if m:
+        title = m.group(1).strip().rstrip(".")
         if len(title) > 5:
             return title
+
+    # Numbered style: 1. Author (Year) Title ...  or  Author Year. Title.
+    m = re.search(r"\b\d{4}[a-z]?\b[.)]*\s+(.+?)(?:\.\s|$)", raw)
+    if m:
+        candidate = m.group(1).strip().rstrip(".")
+        if candidate and not re.match(r"^(Oxford|Cambridge|MIT|Springer|Routledge)\b", candidate):
+            if len(candidate) > 5:
+                return candidate
+
+    # Quoted title: "Title" or «Title»
+    m = re.search(r'["“«](.+?)["”»]', raw)
+    if m:
+        title = m.group(1).strip()
+        if len(title) > 5:
+            return title
+
     return None
 
 

@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1-logos-trial-quality] — 2026-06-10
+
+### Fixed (Logos Target Trial — D1-D9)
+- **D1:** Venue name extraction from seed files (multi-format heading/field parsing)
+- **D2:** Venue model no longer hallucinates structured fields from UNKNOWN seeds (UNKNOWN-section-aware extraction)
+- **D3:** Venue unknowns propagated from explicit UNKNOWN sections in seed files
+- **D4:** Genre classification handles philosophical/theoretical articles (multi-marker scoring)
+- **D5:** Method classification handles conceptual/philosophical articles
+- **D6:** RewritePlan generates conditional trajectory actions under venue uncertainty (evidence collection, guideline verification, language/citation bridge preparation)
+- **D7:** AI disclosure detection no longer false-positives on AI-as-topic articles
+- **D8:** Bibliography parser extracts title_fragment from Chicago/APA/author-date/quoted references
+- **D9:** source_kind classification improved: report detection (UNESCO, OECD, working papers), DOI-based journal inference, tightened chapter markers
+
+### Added
+- `tests/test_rewrite_planning.py` — 10 tests for conditional rewrite behavior
+- 6 title_fragment extraction tests, 9 source_kind classification tests
+- Trial report: `docs/TRIAL_LOGOS_REPORT.md` with full 10-section audit
+
+### Stats
+- 592 tests passing (was 556)
+- RewritePlan: 13 actions under venue uncertainty (was 0)
+- Bibliography: 42/42 titles extracted (was 0/42)
+
+---
+
 ## [0.6.0-whitecrow-bridge] — 2026-06-09
 
 ### Added (Sprints 1–8)

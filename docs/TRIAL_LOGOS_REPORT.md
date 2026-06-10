@@ -255,27 +255,95 @@ Before any submission decision, collect these sources:
 
 ---
 
-## 9. Verdict
+## 9. Defect Closure (D6, D8, D9)
+
+**Date:** 2026-06-10
+**Branch:** `feature/logos-target-trial-quality-audit`
+
+### D6: Empty RewritePlan under venue uncertainty — FIXED
+
+**Root cause:** `build_rewrite_plan()` skipped all `informational` severity mismatches. When venue data was incomplete, all 9 axes were informational, producing 0 changes.
+
+**Fix:** When informational mismatches exist (indicating venue uncertainty), the planner now generates conditional trajectory actions: evidence collection, guideline verification, language policy check, citation bridge preparation, translation/adaptation path. Each conditional change has `status: "conditional"` and `field_core_risk: UNKNOWN_CORE_IMPACT`.
+
+**Result after fix:** 13 changes — 3 proposed (from weak axes: topic, genre) + 10 conditional (from 7 informational axes). Summary: `"3 proposed change(s) + 10 conditional (venue evidence incomplete), estimated effort: major"`.
+
+**Tests:** 10 new tests in `tests/test_rewrite_planning.py` (7 for conditional behavior, 1 for mixed summary, 2 for standard behavior).
+
+### D8: `title_fragment` null for all references — FIXED
+
+**Root cause:** `_extract_title_fragment()` only matched APA parenthetical year `(Year).` pattern. Chicago author-date `Author. Year. Title.` and other styles were not handled.
+
+**Fix:** Added 4 extraction patterns:
+1. APA: `(Year). Title.` (existing, kept)
+2. Chicago author-date: `. Year. Title.` (new)
+3. Generic post-year: `Year. Title.` with publisher filter (new)
+4. Quoted title: `"Title"` or `«Title»` (new)
+
+**Result after fix:** 42/42 references now have `title_fragment` (was 0/42).
+
+**Tests:** 6 new tests in `TestTitleFragmentExtraction` (APA, Chicago, Chicago with subtitle, APA+journal, numbered, quoted).
+
+### D9: `source_kind` misclassification — FIXED
+
+**Root cause:** Missing report markers, overly broad "in " chapter marker matching book titles like "Cognition in the Wild", no DOI-based inference.
+
+**Fix:**
+1. Added `_REPORT_MARKERS` (report, working paper, policy brief, etc.) and `_REPORT_ORG_MARKERS` (UNESCO, OECD, World Bank, etc.)
+2. DOI presence now infers `journal_article` when no other specific markers match
+3. Tightened `_CHAPTER_MARKERS`: removed `"in "` (too broad), kept `"in:"` and added `"(eds.)"`, `"(eds)"`, `"chapter in"`
+4. Report detection runs before journal/book fallback
+
+**Result after fix:** Distribution: 16 books, 12 unknown, 7 book_chapters, 4 journal_articles, 2 conference_papers, 1 report (was: 19 book_chapters, 10 books, 7 unknown, 3 journal_articles, 2 conference_papers, 1 report).
+
+**Tests:** 9 new tests in `TestSourceKindClassification` (DOI+journal, DOI alone, publisher→book, UNESCO report, World Bank report, working paper, conference, edited volume chapter, existing book preserved).
+
+### Trial rerun summary
+
+| Metric | Before fixes (D1–D5, D7) | After D6/D8/D9 fixes |
+|--------|--------------------------|---------------------|
+| RewritePlan changes | 0 | 13 (3 proposed + 10 conditional) |
+| title_fragment coverage | 0/42 | 42/42 |
+| source_kind: book_chapter | 19 (many false) | 7 (tighter) |
+| source_kind: book | 10 | 16 |
+| source_kind: report | 0 | 1 |
+| Tests | 567 | 592 |
+
+---
+
+## 10. Verdict
 
 ### Is current Kairoskopion output useful for this case?
 
-**Partially.** The fit assessment structure (12 axes) is the right framework. The `not_enough_data` label is honest. The citation ecology report identifies real issues. The submission pack is appropriately conservative. But the venue model hallucinations (D2), missing unknowns (D3), and genre/method misclassification (D4, D5) mean the user must manually verify every claim. The rewrite plan (D6) provides no value at all.
+**Yes, with caveats.** After fixing D1-D9 (all except D10, which requires real venue guidelines):
+- Fit assessment: `possible_but_costly` -- honest and correct for a speculative venue match.
+- Genre/method: `theoretical_essay` / `conceptual_method` -- correct.
+- Venue name: extracted correctly.
+- Venue unknowns: 24+ unknowns propagated from seed -- correct.
+- RewritePlan: 13 actions (3 proposed + 10 conditional) -- actionable.
+- Bibliography: 42/42 titles extracted, reasonable source_kind distribution.
+- AI disclosure: no false positive -- correct.
 
-### Is v0.2.0-alpha-rc1 demo-ready, developer-ready, or still internal-alpha?
+Remaining limitations are structural (no real venue guidelines available, no LLM enrichment), not code bugs.
 
-**Internal alpha.** The pipeline runs end-to-end and produces structured outputs, but:
-- Venue model hallucinates from UNKNOWN seeds (trust-destroying for the core evidence-first claim)
-- Genre/method classification is too weak for non-empirical articles
-- Rewrite plan is empty when it should provide conditional recommendations
-- Reference title extraction is missing
+### Is v0.2.0-alpha-rc1+trial-fixes demo-ready?
 
-The tool is **developer-ready** in the sense that a developer can see the architecture working and understand what to fix. It is NOT demo-ready for a user who would rely on the output for submission decisions.
+**Developer-ready, approaching demo-ready.** The pipeline now:
+- Handles UNKNOWN venue seeds without hallucination
+- Produces conditional recommendations under venue uncertainty
+- Correctly classifies philosophical/theoretical articles
+- Extracts bibliography titles and source kinds
+- Refuses to fake confidence (honest `possible_but_costly` label)
 
-### What must be fixed before real submission decisions?
+NOT demo-ready for: users who expect LLM-quality venue analysis, DOI verification, or citation bridge discovery. Those require real adapter integration.
 
-1. Venue model must not hallucinate structured fields from UNKNOWN content (D2) — **blocking**
-2. Venue unknowns must be propagated from seed files (D3) — **blocking**
-3. Genre and method classification must handle philosophical/theoretical articles (D4, D5) — **important**
-4. Rewrite plan must produce conditional recommendations under uncertainty (D6) — **important**
-5. AI disclosure detection must not false-positive on AI-as-topic (D7) — **important**
-6. Real Logos guidelines must be obtained — **blocking for any submission decision**
+### What remains before real submission decisions?
+
+1. ~~Venue model must not hallucinate (D2)~~ -- **FIXED**
+2. ~~Venue unknowns must be propagated (D3)~~ -- **FIXED**
+3. ~~Genre/method for philosophical articles (D4, D5)~~ -- **FIXED**
+4. ~~Rewrite plan under uncertainty (D6)~~ -- **FIXED**
+5. ~~AI disclosure false positive (D7)~~ -- **FIXED**
+6. ~~title_fragment extraction (D8)~~ -- **FIXED**
+7. ~~source_kind classification (D9)~~ -- **FIXED**
+8. Real Logos guidelines must be obtained -- **blocking for any submission decision** (D10, not a code defect)

@@ -1,6 +1,6 @@
 # Spec Coverage Matrix — Kairoskopion
 
-**Last updated:** 2026-06-09
+**Last updated:** 2026-06-10
 **Spec source:** `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` (10 waves, 12665 lines)
 **Implementation:** `src/kairoskopion/` + `tests/`
 
@@ -62,7 +62,7 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 | §6.17 SubmissionScenario | User goal/constraints | Implemented | `schema.py::SubmissionScenario` (15+ fields) | Missing: `prestige_priority`, `speed_priority`, `acceptance_probability_priority`, `questions_asked`, `answers` | P2 | — |
 | §6.18 FitAssessment | Multi-axis comparison | Implemented | `schema.py::FitAssessment`, `services/fit_assessment.py` | 12 axes implemented (topic, discipline, genre, argument_structure, method, citation_ecology, novelty_positioning, language_register, audience, formal_compliance, author_eligibility, publication_regime) | Missing: `rewrite_effort`, `citation_effort`, `compliance_effort`, `time_risk`, `strategic_value` | P2 | — |
 | §6.19 MismatchMap | Where fit fails | Implemented | `schema.py::MismatchMap`, `services/mismatch_mapping.py` | Missing: `critical_mismatches` vs `actionable` vs `non_actionable` classification | P2 | — |
-| §6.20 RewritePlan | Manuscript form changes | Implemented | `schema.py::RewritePlan`, `services/rewrite_planning.py` | Missing: `draft_text_optional`, detailed change types | P2 | — |
+| §6.20 RewritePlan | Manuscript form changes | Implemented | `schema.py::RewritePlan`, `services/rewrite_planning.py`, `tests/test_rewrite_planning.py` | Conditional trajectory actions under venue uncertainty (D6 fix). Missing: `draft_text_optional`, detailed change types | P2 | — |
 | §6.21 ReframePlan | Deep article variant | Planned | — | Not implemented | P3 | — |
 | §6.22 CitationPlan | Citation work for fit | Partial | Merged into `CitationEcologyReport` | Separate CitationPlan entity not created | P2 | Bibliography |
 | §6.23 RiskReport | Publication risks | Implemented | `schema.py::RiskReport`, `services/risk_reporting.py` | 18 risk types implemented | — | — | Done |

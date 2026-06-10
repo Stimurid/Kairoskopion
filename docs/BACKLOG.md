@@ -1,8 +1,29 @@
 # Engineering Backlog — Kairoskopion
 
-**Last updated:** 2026-06-09
+**Last updated:** 2026-06-10
 
 Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.md → PROJECT_STATUS → SPEC_COVERAGE_MATRIX → this BACKLOG, picks the next sprint, implements on a feature branch, updates docs/tests/status, commits, pushes. No manual micromanagement required.
+
+---
+
+## Logos Target Trial Quality Audit ✓ DONE (2026-06-10)
+
+**Goal:** Fix 9 product defects found during first real-use-case trial (philosophical article targeting Logos journal with conservative UNKNOWN venue seed).
+
+**Defects closed:**
+- D1: Venue name extraction from seed files
+- D2: Venue model hallucination from UNKNOWN seeds
+- D3: Venue unknowns propagation
+- D4: Genre misclassification for philosophical articles
+- D5: Method misclassification for conceptual articles
+- D6: Empty RewritePlan under venue uncertainty → conditional trajectory actions
+- D7: AI disclosure false positive on AI-as-topic
+- D8: title_fragment null for all references → multi-style extraction
+- D9: source_kind misclassification → report detection, DOI inference, tightened chapter markers
+
+**Branch:** `feature/logos-target-trial-quality-audit`
+**Tests added:** 25 new tests (592 total, was 567 after D1-D5/D7, was 556 before trial)
+**Report:** `docs/TRIAL_LOGOS_REPORT.md`
 
 ---
 

@@ -142,6 +142,95 @@ class TestBuildBibliographyProfile:
         assert profile.total_references >= 1
 
 
+class TestTitleFragmentExtraction:
+    """D8: title_fragment must be extracted from Chicago/APA/author-date references."""
+
+    def test_apa_style(self):
+        ref = parse_reference("Chalmers, D. (1996). The Conscious Mind. Oxford University Press.")
+        assert ref.title_fragment is not None
+        assert "Conscious Mind" in ref.title_fragment
+
+    def test_chicago_author_date(self):
+        ref = parse_reference("Clark, Burton. 1998. Creating Entrepreneurial Universities. Pergamon Press.")
+        assert ref.title_fragment is not None
+        assert "Entrepreneurial" in ref.title_fragment
+
+    def test_chicago_with_subtitle(self):
+        ref = parse_reference(
+            "Vygotsky, Lev. 1978. Mind in Society: The Development of Higher Psychological Processes. "
+            "Harvard University Press."
+        )
+        assert ref.title_fragment is not None
+        assert "Mind in Society" in ref.title_fragment
+
+    def test_apa_with_journal(self):
+        ref = parse_reference(
+            "Nagel, T. (1974). What Is It Like to Be a Bat? Philosophical Review, 83(4), 435-450."
+        )
+        assert ref.title_fragment is not None
+        assert "Bat" in ref.title_fragment
+
+    def test_numbered_reference(self):
+        ref = parse_reference(
+            "Brown, T. et al. 2020. Language Models are Few-Shot Learners. NeurIPS 2020."
+        )
+        assert ref.title_fragment is not None
+        assert "Few-Shot" in ref.title_fragment
+
+    def test_quoted_title(self):
+        ref = parse_reference(
+            'Floridi, L. 2023. "AI as Agency Without Intelligence." Philosophy & Technology, 36(1).'
+        )
+        assert ref.title_fragment is not None
+        assert "Agency" in ref.title_fragment
+
+
+class TestSourceKindClassification:
+    """D9: source_kind should correctly classify obvious cases."""
+
+    def test_doi_with_journal_markers(self):
+        ref = parse_reference(
+            "Smith, J. (2020). Title. Journal of X, 10(2). 10.1234/jx.2020.001"
+        )
+        assert ref.source_kind == "journal_article"
+
+    def test_doi_alone_implies_journal(self):
+        ref = parse_reference("Author (2020). Title. 10.1234/abc123")
+        assert ref.source_kind == "journal_article"
+
+    def test_publisher_implies_book(self):
+        ref = parse_reference(
+            "Clark, Burton. 1998. Creating Entrepreneurial Universities. Pergamon Press."
+        )
+        assert ref.source_kind == "book"
+
+    def test_unesco_report(self):
+        ref = parse_reference("UNESCO. 2021. Reimagining Our Futures Together. UNESCO Report.")
+        assert ref.source_kind == "report"
+
+    def test_world_bank_report(self):
+        ref = parse_reference("World Bank. 2019. World Development Report 2019.")
+        assert ref.source_kind == "report"
+
+    def test_working_paper(self):
+        ref = parse_reference("Author (2022). Title. NBER Working Paper No. 30000.")
+        assert ref.source_kind == "report"
+
+    def test_conference_paper(self):
+        ref = parse_reference("Smith (2019). Title. Proceedings of ICML 2019.")
+        assert ref.source_kind == "conference_paper"
+
+    def test_chapter_in_edited_volume(self):
+        ref = parse_reference(
+            "Author (2020). Chapter Title. In: Editor (ed.). Book Title. Publisher."
+        )
+        assert ref.source_kind == "book_chapter"
+
+    def test_existing_book_detection_preserved(self):
+        ref = parse_reference("Chalmers, D. (1996). The Conscious Mind. Oxford University Press.")
+        assert ref.source_kind == "book"
+
+
 class TestNoNetwork:
     def test_no_network_imports(self):
         import kairoskopion.services.bibliography_parsing as mod
