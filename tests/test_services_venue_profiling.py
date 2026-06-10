@@ -59,3 +59,67 @@ class TestBuildVenueModel:
         venue, regime = build_venue_model(_load_guidelines(), source_ref="src_gl")
         assert "src_gl" in venue.source_refs
         assert "src_gl" in regime.evidence_refs
+
+
+UNKNOWN_SEED = """# Venue Seed Profile: Логос / Logos
+
+## Journal Identity
+
+- **Name:** Логос / Logos
+- **Publisher:** Unknown — requires verification
+
+## Known or Externally Claimed
+
+- Russian philosophical journal.
+- VAK / Scopus / indexing claims require independent verification.
+
+## UNKNOWN — Require Source Evidence Before Use
+
+- official author guidelines URL
+- word limit
+- citation style
+- peer review model
+- APC/open access policy
+- AI use policy
+- data availability policy
+- ethics policy
+- submission route
+"""
+
+
+class TestUnknownSeedHandling:
+    """Venue profiler must not hallucinate structured fields from UNKNOWN seeds."""
+
+    def test_extracts_name_from_seed_format(self):
+        venue, _ = build_venue_model(UNKNOWN_SEED)
+        assert venue.canonical_name is not None
+        assert "Логос" in venue.canonical_name
+
+    def test_does_not_hallucinate_open_access(self):
+        venue, _ = build_venue_model(UNKNOWN_SEED)
+        assert venue.open_access_status is None
+
+    def test_does_not_hallucinate_apc(self):
+        venue, _ = build_venue_model(UNKNOWN_SEED)
+        assert venue.apc_policy is None
+
+    def test_does_not_hallucinate_review_model(self):
+        venue, _ = build_venue_model(UNKNOWN_SEED)
+        assert venue.anonymization_policy is None
+
+    def test_propagates_explicit_unknowns(self):
+        venue, _ = build_venue_model(UNKNOWN_SEED)
+        assert len(venue.unknowns) >= 5
+        unknown_text = " ".join(venue.unknowns).lower()
+        assert "word limit" in unknown_text
+        assert "citation style" in unknown_text
+        assert "peer review" in unknown_text
+
+    def test_low_confidence_for_seed(self):
+        venue, _ = build_venue_model(UNKNOWN_SEED)
+        assert venue.confidence == "low"
+
+    def test_real_guidelines_still_extract_policies(self):
+        """Ensure normal guidelines with real policy info still extract correctly."""
+        venue, _ = build_venue_model(_load_guidelines())
+        assert venue.open_access_status is not None or venue.review_process_claims != "unknown"

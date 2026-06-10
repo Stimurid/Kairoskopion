@@ -37,5 +37,9 @@ vault/
 .kairoskopion/
 .kairoskopion_demo/
 .kairoskopion_cache/
+.kairoskopion_private_trial/
+.kairoskopion_logos_trial/
 kairoskopion_demo_bundle.zip
 *.zip
+
+private_inputs/

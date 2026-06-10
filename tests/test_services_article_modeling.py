@@ -89,3 +89,74 @@ class TestBuildArticleModel:
         am = build_article_model(ms, short)
         assert am.article_stage == ArticleStage.ABSTRACT.value
         assert am.lifecycle_status == LifecycleStatus.PRELIMINARY.value
+
+
+PHILOSOPHICAL_ARTICLE = """# Universities After AI: Epistemic Legitimation
+
+## Generations of the University
+
+The university performs epistemic legitimation. It turns a practice into a form
+of knowledge through procedures of dispute, teaching, and inheritance.
+
+## Collective Intellectual Work
+
+When intellectual work becomes collective, the university function shifts from
+transmitting content to organizing participation. The Moscow Methodological
+Circle and Engelbart approached distributed intellectual production.
+
+## AI as Distributed Intellectual Production
+
+AI introduces distributed intellectual production. The university must treat
+this as the practice requiring legitimation. The empirical observation is that
+AI changes institutional arrangements, but the method here is philosophical
+argument, not empirical measurement.
+
+## Hybrid Cognitive Units
+
+A hybrid cognitive unit is a cross-stack unit of practice. It names the
+distributed arrangement in which framing, validation, trace, and responsibility
+are held.
+
+## Second-Tier Universities
+
+The second-tier university becomes a second-order integrator. It translates
+external technological capacity into local regimes of validation and inheritance.
+
+## References
+
+Aquinas, Thomas. 1947. Summa Theologica.
+Vygotsky, Lev. 1978. Mind in Society.
+Shchedrovitsky, Georgy. 1995. Selected Works.
+Clark, Burton. 1998. Creating Entrepreneurial Universities.
+Engelbart, Douglas. 1962. Augmenting Human Intellect.
+"""
+
+
+class TestPhilosophicalArticle:
+    """Genre/method detection for philosophical-theoretical articles."""
+
+    def test_genre_is_theoretical_essay(self):
+        ms = build_manuscript_model(PHILOSOPHICAL_ARTICLE)
+        am = build_article_model(ms, PHILOSOPHICAL_ARTICLE)
+        assert am.genre_current == Genre.THEORETICAL_ESSAY.value
+
+    def test_method_is_conceptual(self):
+        ms = build_manuscript_model(PHILOSOPHICAL_ARTICLE)
+        am = build_article_model(ms, PHILOSOPHICAL_ARTICLE)
+        assert am.method_status in (
+            MethodStatus.CONCEPTUAL_METHOD.value,
+            MethodStatus.MIXED.value,
+        )
+
+    def test_no_false_ai_disclosure(self):
+        """Article about AI should not trigger AI disclosure detection."""
+        ms = build_manuscript_model(PHILOSOPHICAL_ARTICLE)
+        am = build_article_model(ms, PHILOSOPHICAL_ARTICLE)
+        assert am.has_ai_disclosure is False
+
+    def test_real_ai_disclosure_detected(self):
+        """An actual AI disclosure statement should be detected."""
+        text = PHILOSOPHICAL_ARTICLE + "\n\nAI disclosure: AI tools were used in drafting.\n"
+        ms = build_manuscript_model(text)
+        am = build_article_model(ms, text)
+        assert am.has_ai_disclosure is True

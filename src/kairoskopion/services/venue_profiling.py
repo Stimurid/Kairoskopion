@@ -21,7 +21,69 @@ from ..schema import PublicationRegimeModel, VenueModel
 
 def _extract_field(text: str, label: str) -> str | None:
     m = re.search(rf"\*\*{label}:\*\*\s*(.+)", text, re.IGNORECASE)
+    if not m:
+        m = re.search(rf"^-\s*\*\*{label}:\*\*\s*(.+)", text, re.IGNORECASE | re.MULTILINE)
+    if not m:
+        m = re.search(rf"^{label}:\s*(.+)", text, re.IGNORECASE | re.MULTILINE)
     return m.group(1).strip() if m else None
+
+
+def _extract_venue_name(text: str) -> str | None:
+    """Extract venue name from multiple heading/field formats."""
+    name = _extract_field(text, "Journal")
+    if name:
+        return name
+    name = _extract_field(text, "Name")
+    if name:
+        return name
+    m = re.search(r"^#\s+(?:Venue\s+(?:Seed\s+)?Profile:\s*)?(.+)", text.strip())
+    if m:
+        title = m.group(1).strip()
+        for prefix in ("Venue Seed Profile:", "Venue Profile:"):
+            if title.startswith(prefix):
+                title = title[len(prefix):].strip()
+        if title:
+            return title
+    return None
+
+
+def _text_mentions_as_unknown(text: str, keyword: str) -> bool:
+    """Check if a keyword appears in the text only in UNKNOWN/unverified context.
+
+    Returns True if every occurrence of the keyword is inside an UNKNOWN section
+    or on a line with explicit unknown/unverified markers.
+    """
+    lower = text.lower()
+    kw = keyword.lower()
+    if kw not in lower:
+        return False
+    in_unknown_section = False
+    found_outside_unknown = False
+    unknown_markers = [
+        "unknown", "not found", "not available",
+        "not obtained", "unverified", "requires verification",
+        "require verification", "require independent",
+        "claims require",
+    ]
+    for line in text.splitlines():
+        stripped = line.strip()
+        ll = stripped.lower()
+        if re.match(r"^#+\s*UNKNOWN", stripped, re.IGNORECASE) or ll.startswith("unknown"):
+            in_unknown_section = True
+            continue
+        if re.match(r"^#+\s", stripped) and "unknown" not in ll:
+            in_unknown_section = False
+            continue
+        if ll.startswith("## ") and "unknown" not in ll:
+            in_unknown_section = False
+            continue
+        if kw in ll:
+            if in_unknown_section:
+                continue
+            if any(m in ll for m in unknown_markers):
+                continue
+            found_outside_unknown = True
+    return not found_outside_unknown
 
 
 def _extract_section(text: str, heading: str) -> str | None:
@@ -77,17 +139,22 @@ def build_venue_model(
     source_ref: str | None = None,
 ) -> tuple[VenueModel, PublicationRegimeModel]:
     """Parse venue guidelines into VenueModel + PublicationRegimeModel."""
-    journal_name = _extract_field(text, "Journal")
+    journal_name = _extract_venue_name(text)
     publisher = _extract_field(text, "Publisher")
     url = _extract_field(text, "URL")
     scope_text = _extract_section(text, "Aims and Scope")
+    if not scope_text:
+        scope_text = _extract_section(text, "Likely Venue Orientation")
     article_types = _extract_article_types(text)
     review_model = _detect_review_model(text)
     regime_type = _detect_regime(text)
     word_limits = _extract_word_limits(text)
 
-    # Detect unknowns
+    # Collect explicit UNKNOWN items from seed files
     unknowns: list[str] = []
+    unknowns.extend(_extract_explicit_unknowns(text))
+
+    # Detect missing information (inverse logic) only for items NOT already in explicit unknowns
     lower = text.lower()
     if "ai disclosure" not in lower and "ai writing" not in lower:
         unknowns.append("AI disclosure policy not found")
@@ -114,15 +181,17 @@ def build_venue_model(
     )
 
     # Sprint 2: extract enrichment fields (claims, not verified facts)
+    # Skip extraction when keywords appear only in UNKNOWN/unverified context
     aims_scope = scope_text
     indexing_claims = _extract_indexing_claims(lower)
-    open_access = _extract_open_access(lower)
-    apc_policy = _extract_apc_policy(lower)
-    review_claims = review_model or "unknown"
-    anonymization = _extract_anonymization(lower)
-    ai_policy = _extract_ai_policy(lower)
-    data_policy = _extract_data_policy(lower)
-    ethics_policy = _extract_ethics_policy(lower)
+    open_access = None if _text_mentions_as_unknown(text, "open access") else _extract_open_access(lower)
+    apc_policy = None if _text_mentions_as_unknown(text, "apc") else _extract_apc_policy(lower)
+    review_model_safe = None if _text_mentions_as_unknown(text, "peer review") else review_model
+    review_claims = review_model_safe or "unknown"
+    anonymization = None if _text_mentions_as_unknown(text, "blind") else _extract_anonymization(lower)
+    ai_policy = None if _text_mentions_as_unknown(text, "ai") else _extract_ai_policy(lower)
+    data_policy = None if _text_mentions_as_unknown(text, "data") else _extract_data_policy(lower)
+    ethics_policy = None if _text_mentions_as_unknown(text, "ethics") else _extract_ethics_policy(lower)
 
     venue = VenueModel(
         venue_model_id=venue_model_id(),
@@ -211,3 +280,24 @@ def _extract_ethics_policy(lower: str) -> str | None:
     if "ethics approval" in lower or "ethics committee" in lower or "irb" in lower:
         return "ethics_policy_present"
     return None
+
+
+def _extract_explicit_unknowns(text: str) -> list[str]:
+    """Extract items listed under UNKNOWN sections in venue seed files."""
+    unknowns: list[str] = []
+    in_unknown_section = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if re.match(r"^#+\s*UNKNOWN", stripped, re.IGNORECASE) or stripped.startswith("UNKNOWN"):
+            in_unknown_section = True
+            continue
+        if in_unknown_section:
+            if re.match(r"^#+\s", stripped) or (stripped and not stripped.startswith("-")):
+                if not stripped.startswith("-"):
+                    in_unknown_section = False
+                    continue
+            if stripped.startswith("- "):
+                item = stripped[2:].rstrip(";.,")
+                if item:
+                    unknowns.append(item)
+    return unknowns
