@@ -123,3 +123,49 @@ class TestUnknownSeedHandling:
         """Ensure normal guidelines with real policy info still extract correctly."""
         venue, _ = build_venue_model(_load_guidelines())
         assert venue.open_access_status is not None or venue.review_process_claims != "unknown"
+
+
+class TestLanguagePolicyExtraction:
+    def test_russian_language_section(self):
+        text = (
+            "# Test Journal\n\n"
+            "## Language Policy\n\n"
+            "The journal is Russian-language only for article body text.\n"
+            "Metadata must be in Russian and English.\n"
+        )
+        venue, _ = build_venue_model(text)
+        assert venue.language_policy == "Russian"
+
+    def test_english_metadata_not_english_journal(self):
+        text = (
+            "# Test Journal\n\n"
+            "## Submission Requirements\n\n"
+            "- **Metadata:** title and abstract must be in BOTH Russian AND English\n"
+            "- **Abstract:** 200-250 words\n"
+        )
+        venue, _ = build_venue_model(text)
+        assert venue.language_policy != "English"
+
+    def test_russian_scope_signal(self):
+        text = (
+            "# Test Journal\n\n"
+            "## Aims and Scope\n\n"
+            "A leading Russian-language journal in philosophy.\n"
+        )
+        venue, _ = build_venue_model(text)
+        assert venue.language_policy == "Russian"
+
+    def test_english_only_submission(self):
+        text = (
+            "# Test Journal\n\n"
+            "## Submission Requirements\n\n"
+            "- **Language:** English only\n"
+            "- **Abstract:** required\n"
+        )
+        venue, _ = build_venue_model(text)
+        assert venue.language_policy == "English"
+
+    def test_no_language_info_returns_none(self):
+        text = "# Test Journal\n\n## Scope\n\nSome scope text.\n"
+        venue, _ = build_venue_model(text)
+        assert venue.language_policy is None

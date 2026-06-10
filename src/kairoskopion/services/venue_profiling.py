@@ -166,10 +166,7 @@ def build_venue_model(
         unknowns.append("indexing information not found")
 
     # Language
-    lang_section = _extract_section(text, "Submission Requirements")
-    language = None
-    if lang_section and "english" in lang_section.lower():
-        language = "English"
+    language = _extract_language_policy(text)
 
     regime = PublicationRegimeModel(
         publication_regime_id=publication_regime_id(),
@@ -224,6 +221,51 @@ def build_venue_model(
     )
 
     return venue, regime
+
+
+def _extract_language_policy(text: str) -> str | None:
+    """Extract article body language from venue guidelines.
+
+    Checks dedicated Language Policy section first, then scope/about text,
+    then Submission Requirements as fallback. Distinguishes metadata language
+    requirements from article body language.
+    """
+    lower = text.lower()
+
+    lang_section = _extract_section(text, "Language Policy")
+    if lang_section:
+        ls = lang_section.lower()
+        if "russian-language only" in ls or "russian only" in ls:
+            return "Russian"
+        if any(m in ls for m in (
+            "русскоязычный", "russian-language journal",
+            "almost certainly russian", "russian-language only for article body",
+        )):
+            return "Russian"
+        if "english" in ls and "russian" not in ls:
+            return "English"
+        if "russian" in ls and "english" not in ls:
+            return "Russian"
+        if "russian" in ls and "english" in ls:
+            if "metadata" in ls and "english" in ls:
+                return "Russian"
+            return "Multilingual"
+
+    scope_section = _extract_section(text, "Aims and Scope") or _extract_section(text, "Scope")
+    if scope_section:
+        ss = scope_section.lower()
+        if "russian-language journal" in ss or "русскоязычный" in ss:
+            return "Russian"
+
+    req_section = _extract_section(text, "Submission Requirements")
+    if req_section:
+        rs = req_section.lower()
+        if "metadata" in rs and "english" in rs and "russian" in rs:
+            return None
+        if "english" in rs:
+            return "English"
+
+    return None
 
 
 def _extract_indexing_claims(lower: str) -> list[str]:

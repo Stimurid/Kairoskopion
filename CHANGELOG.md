@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0-logos-evidence-pack] — 2026-06-10
+
+### Fixed
+- **D11:** Language policy extraction no longer confuses metadata language with article body language. New `_extract_language_policy()` checks dedicated Language Policy section, scope signals, and Submission Requirements with proper disambiguation. Journals requiring bilingual metadata but Russian-only articles are now correctly identified.
+
+### Added
+- Logos venue evidence pack: 10 source notes from official/external sources
+- Full pipeline rerun with evidence pack (poor_fit, 1 blocking mismatch)
+- 5 new language policy extraction tests (`TestLanguagePolicyExtraction`)
+- Comparison report: `docs/TRIAL_LOGOS_EVIDENCE_RERUN_REPORT.md`
+
+### Changed
+- Fit assessment: possible_but_costly → **poor_fit** (language barrier surfaced)
+- Mismatch map: 0 blocking → **1 blocking** (language_register)
+- Risk report: 0 blocking → **1 blocking** (desk_reject_risk)
+- Submission pack: needs_file_update → **not_ready** (2 blocking items)
+- Rewrite plan: 3 proposed + 10 conditional → **4 proposed + 8 conditional**
+
+### Stats
+- 597 tests passing (was 592)
+- D10 closed: UNKNOWN seed replaced with real evidence pack
+- D11 closed: language policy extraction bug
+
+---
+
 ## [0.6.1-logos-trial-quality] — 2026-06-10
 
 ### Fixed (Logos Target Trial — D1-D9)

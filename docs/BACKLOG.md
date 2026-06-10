@@ -6,6 +6,30 @@ Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.m
 
 ---
 
+## Logos Venue Evidence Pack + Rerun ✓ DONE (2026-06-10)
+
+**Goal:** Close D10 — replace conservative UNKNOWN venue seed with real evidence pack collected from official Logos journal sources. Close D11 — fix language policy extraction bug found during evidence-pack rerun.
+
+**Phases completed:**
+1. ✓ Audit existing seed (10 UNKNOWN items, 22 unknowns)
+2. ✓ Identify official sources (logosjournal.ru pages, RCSI portal, external indexers)
+3. ✓ Collect evidence (10 source notes under private_inputs/)
+4. ✓ Build venue evidence pack (synthesized with evidence status categories)
+5. ✓ Rerun pipeline (poor_fit, 1 blocking mismatch — language)
+6. ✓ Comparison report (docs/TRIAL_LOGOS_EVIDENCE_RERUN_REPORT.md)
+7. ✓ Bounded repair (D11 — language policy extraction)
+8. ✓ Tests, safety check, commit, push
+
+**Defects closed:**
+- D10: UNKNOWN seed replaced with real evidence pack
+- D11: Language policy extraction confused metadata language with article body language
+
+**Branch:** `feature/logos-venue-evidence-pack-rerun`
+**Tests added:** 5 new tests (597 total, was 592)
+**Report:** `docs/TRIAL_LOGOS_EVIDENCE_RERUN_REPORT.md`
+
+---
+
 ## Logos Target Trial Quality Audit ✓ DONE (2026-06-10)
 
 **Goal:** Fix 9 product defects found during first real-use-case trial (philosophical article targeting Logos journal with conservative UNKNOWN venue seed).
