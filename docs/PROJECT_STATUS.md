@@ -1,13 +1,13 @@
 # Project Status — Kairoskopion
 
-**Last updated:** 2026-06-10
+**Last updated:** 2026-06-11
 
 ## Repository
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `main` at merge of `33769ad` |
-| Tag | `v0.2.0-alpha-rc4` |
+| Branch | `main` at merge of `f726e8e` |
+| Tag | `v0.2.0-alpha-rc5` |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
 | Working tree | clean |
 | Python | >=3.11 |
@@ -15,7 +15,9 @@
 ## Recent commit history (main)
 
 ```
-xxxxxxx Close D12-D15: generalized venue-fit anti-overfitting repairs
+f726e8e Add arbitrary manuscript x venue validation matrix
+b8a94bb Prep v0.2.0-alpha-rc4 release
+33769ad Close D12-D15: generalized venue-fit anti-overfitting repairs
 83f4028 Fix language policy extraction, close D10/D11 with evidence-pack rerun
 62f2f8e Close D6/D8/D9: conditional rewrite plan, title extraction, source_kind
 1959541 Add Logos target trial audit and bounded quality repairs

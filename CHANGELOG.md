@@ -2,7 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] — Arbitrary Manuscript x Venue Validation Matrix
+## [0.2.0-alpha-rc5] — 2026-06-11
+
+> Tag: `v0.2.0-alpha-rc5`. Arbitrary manuscript x venue validation matrix proving general-purpose behavior.
 
 ### Fixed
 - **D16:** Method detection expanded with broader conceptual markers (`normative framework`, `we argue that`, `theoretical framework`, etc.) and empirical markers (`mixed-methods`, `quantitative`, `thematic analysis`, etc.). Fixes false `unknown` for non-philosophical conceptual articles.
