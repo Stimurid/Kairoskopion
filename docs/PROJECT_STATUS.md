@@ -37,6 +37,8 @@ evidence-first article-to-venue trajectory engine.
 - Generalized venue-fit anti-overfitting pass: D12-D15 (word limit distinction, article type extraction, discipline matching, unassessed axes)
 - All repairs were generalized — no Logos-specific hardcoding
 - 16 generalized venue-fit regression tests with 3 synthetic fixtures prove no Logos overfitting
+- Arbitrary manuscript x venue validation matrix: 8 fixture combinations, 28 behavioral tests, 6 CLI smoke cases
+- D16-D17 closed: method detection broadened, citation ecology thresholds refined
 
 ## Modules implemented
 
@@ -160,8 +162,8 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **613 tests**, all passing
-- 27+ test files covering: schema, registry, evidence, quality, cards,
+- **641 tests**, all passing
+- 28+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
   source acquisition, bibliography parsing, citation ecology, adapters,
@@ -170,7 +172,8 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
   real adapters (HTTP cache, rate limiting), venue profile builder,
   bibliography & trajectory reports, submission pack, Litops bridge, WhiteCrow bridge,
   rewrite planning (conditional actions), language policy extraction,
-  generalized venue-fit (language blocker, word limits, article types, discipline matching)
+  generalized venue-fit (language blocker, word limits, article types, discipline matching),
+  arbitrary manuscript x venue validation matrix (6 behavioral cases, 28 tests)
 
 ## Fixture pipeline output
 

@@ -1,8 +1,30 @@
 # Engineering Backlog — Kairoskopion
 
-**Last updated:** 2026-06-10
+**Last updated:** 2026-06-11
 
 Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.md → PROJECT_STATUS → SPEC_COVERAGE_MATRIX → this BACKLOG, picks the next sprint, implements on a feature branch, updates docs/tests/status, commits, pushes. No manual micromanagement required.
+
+---
+
+## Arbitrary Manuscript x Venue Validation Matrix ✓ DONE (2026-06-11)
+
+**Goal:** Prove Kairoskopion behaves as a general evidence-first article-to-venue trajectory engine for arbitrary manuscripts and venues, not just the Logos trial.
+
+**Phases completed:**
+1. ✓ Validation matrix spec: 6 behavioral cases defined
+2. ✓ Synthetic fixtures: 3 manuscripts + 5 venues (all non-private)
+3. ✓ Behavioral tests: 28 tests across 6 test classes
+4. ✓ CLI smoke script: 6/6 pass via `kairoskopion run-local`
+5. ✓ Bounded repairs: D16 (method detection), D17 (citation ecology thresholds + risk)
+6. ✓ Validation matrix report: `docs/VALIDATION_MATRIX_REPORT.md`
+
+**Defects closed:**
+- D16: Method detection missed normative/theoretical/argumentative markers
+- D17: Citation ecology threshold too coarse (20 refs); citation_gap risk missing for weak bibliography
+
+**Branch:** `feature/arbitrary-manuscript-venue-validation-matrix`
+**Tests added:** 28 new tests (641 total, was 613)
+**Report:** `docs/VALIDATION_MATRIX_REPORT.md`
 
 ---
 

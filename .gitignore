@@ -40,6 +40,7 @@ vault/
 .kairoskopion_private_trial/
 .kairoskopion_logos_trial/
 .kairoskopion_logos_trial_evidence/
+.kairoskopion_validation_matrix/
 kairoskopion_demo_bundle.zip
 *.zip
 

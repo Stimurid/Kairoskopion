@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — Arbitrary Manuscript x Venue Validation Matrix
+
+### Fixed
+- **D16:** Method detection expanded with broader conceptual markers (`normative framework`, `we argue that`, `theoretical framework`, etc.) and empirical markers (`mixed-methods`, `quantitative`, `thematic analysis`, etc.). Fixes false `unknown` for non-philosophical conceptual articles.
+- **D17:** Citation ecology thresholds refined (8-14 refs = `medium`, was `weak` below 20). Risk report now generates `citation_gap` risk for `weak` citation ecology, not only `unknown`.
+
+### Added
+- Validation matrix spec: 6 behavioral cases covering good fit, language blocker, method/genre blocker, missing evidence, formal compliance, citation ecology
+- 3 synthetic manuscript fixtures + 5 synthetic venue fixtures (all non-private)
+- 28 validation matrix behavioral tests (`test_validation_matrix_behavior.py`)
+- CLI smoke script (`scripts/run_validation_matrix.ps1`) running all 6 cases
+- Validation matrix report: `docs/VALIDATION_MATRIX_REPORT.md`
+
+### Stats
+- 641 tests passing (was 613)
+- D16-D17 closed: method detection + citation ecology improvements
+
+---
+
 ## [0.2.0-alpha-rc4] — 2026-06-10
 
 > Tag: `v0.2.0-alpha-rc4`. Generalized venue-fit anti-overfitting repairs (D12-D15).

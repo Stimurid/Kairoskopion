@@ -52,7 +52,7 @@ Results persist to JSONL registries and markdown vault cards on disk.
 
 No LLM calls, no external API dependencies, no network access.
 
-613 tests passing. MIT license.
+641 tests passing. MIT license.
 
 ## Alpha demo
 

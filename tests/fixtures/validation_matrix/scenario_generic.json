@@ -1,0 +1,6 @@
+{
+  "goal": "validation_matrix_smoke_test",
+  "target_venue_type": "journal",
+  "submission_type": "unsolicited",
+  "timeline": "6_months"
+}

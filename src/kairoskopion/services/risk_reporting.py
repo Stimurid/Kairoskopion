@@ -118,12 +118,18 @@ def build_risk_report(
              user_action=True)
 
     # --- Citation gap ---
-    if _axis_value("citation_ecology") == "unknown":
+    cit_val = _axis_value("citation_ecology")
+    if cit_val == "unknown":
         _add("citation_gap",
              "Citation ecology not yet assessed -- risk of missing key venue references",
              "major", "medium",
              "Profile venue citation expectations and conduct bridge search")
         unknowns.append("citation ecology not profiled")
+    elif cit_val == "weak":
+        _add("citation_gap",
+             "Thin bibliography -- may lack key references expected by venue",
+             "major", "medium",
+             "Strengthen bibliography with venue-relevant references")
 
     # --- Language quality ---
     if _axis_value("language_register") in ("bad", "weak"):

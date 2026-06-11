@@ -91,9 +91,14 @@ def _detect_method(text: str) -> str:
         "conceptual analysis", "conceptual argument", "philosophical argument",
         "category error", "epistemic legitimation", "institutional analysis",
         "genealogy of", "historical genealogy", "philosophical",
+        "normative framework", "normative theory", "theoretical framework",
+        "conceptual framework", "critical analysis", "deliberative",
+        "we argue that", "this paper argues", "this essay argues",
     ]
     empirical_markers = ["experiment", "survey", "interview", "ethnograph",
-                         "dataset", "sample size", "regression", "statistical"]
+                         "dataset", "sample size", "regression", "statistical",
+                         "mixed-methods", "quantitative", "qualitative data",
+                         "thematic analysis", "participants"]
     # Count hits — a philosophical article may mention "empirical" in passing
     conceptual_hits = sum(1 for k in conceptual_markers if k in lower)
     empirical_hits = sum(1 for k in empirical_markers if k in lower)

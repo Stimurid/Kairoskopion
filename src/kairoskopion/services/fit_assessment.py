@@ -194,9 +194,12 @@ def assess_fit(
     if cite_text and "references found" in cite_text:
         ref_match = re.search(r"(\d+)\s+references?\s+found", cite_text)
         ref_count = int(ref_match.group(1)) if ref_match else 0
-        if ref_count >= 20:
+        if ref_count >= 15:
             axes.append(_axis("citation_ecology", "medium",
                               f"Bibliography present ({ref_count} refs) but venue expectations not profiled"))
+        elif ref_count >= 8:
+            axes.append(_axis("citation_ecology", "medium",
+                              f"Moderate bibliography ({ref_count} refs) — may need strengthening for some venues"))
         elif ref_count > 0:
             axes.append(_axis("citation_ecology", "weak",
                               f"Thin bibliography ({ref_count} refs) -- may need strengthening"))
