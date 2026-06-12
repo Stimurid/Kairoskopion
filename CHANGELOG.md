@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — Source Authority and Integrity Model v0
+
+### Added
+- **Source authority model** (`source_authority.py`): SourceAuthorityClaim, SourceAuthorityAssessment, EvidenceConflict, EvidenceReconciliationResult, PublicationHistoryModel, PriorVersion, CitationIntegrityCheck, ReportingGuidelineSelection
+- **Source authority enums** (`enums.py`): SourceAccessMode (12), SourceAuthorityScope (20), AuthorityStrength (4), ConflictType (4), ConflictSeverity (3), ConflictResolutionStatus (5), RetractionStatus (7), PriorVersionType (9)
+- **Authority checker service** (`services/source_authority.py`): deterministic authority matrix, claim validation, conflict detection, evidence reconciliation
+- **EvidenceAuditor integration**: optional authority_assessments and evidence_conflicts parameters for source authority and conflict checking
+- **GPT-16 alignment matrix** (`docs/GPT16_ALIGNMENT_MATRIX.md`): canonical 16-point architectural critique coverage tracking
+- **12 backlog sprint entries** (GP-1 through GP-12) for GPT-16 items
+- 53 new tests (943 total, was 890)
+- Documentation: SOURCE_AUTHORITY_MODEL_V0.md, EVIDENCE_CONFLICT_RECONCILIATION_V0.md, GPT16_ALIGNMENT_BACKLOG_PATCH.md
+
 ## [Unreleased] — UC-1 Demo Pack v0
 
 ### Added

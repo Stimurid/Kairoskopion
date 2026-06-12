@@ -146,7 +146,12 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 | Spec area | Required capability | Status | Evidence | Missing | Priority | Sprint |
 |-----------|-------------------|--------|----------|---------|----------|--------|
 | §116 Quality gates | Fit gate, submission gate | Implemented | `quality.py` (fit_quality_gate, submission_quality_gate) | — | — | Done |
-| §117 Evidence audit | Evidence coverage check | Implemented | `services/evidence_audit.py` | — | — | Done |
+| §117 Evidence audit | Evidence coverage check | Implemented | `services/evidence_audit.py` (+ optional authority/conflict params) | — | — | Done |
+| §117.1 Source authority separation | Access mode ≠ authority scope | Implemented | `source_authority.py`, `services/source_authority.py`, `enums.py` (SourceAccessMode, SourceAuthorityScope, AuthorityStrength) | Authority matrix deterministic; no adapter-level enforcement yet | — | GP-1 |
+| §117.2 Evidence conflict/reconciliation | Cross-source conflict detection | Implemented | `source_authority.py` (EvidenceConflict, EvidenceReconciliationResult), `services/source_authority.py` (detect_conflicts, reconcile_evidence) | No agent-driven reconciliation flow | P1 | GP-2 |
+| §117.3 Citation integrity gate | Retraction/PubPeer/DOI checks | Partial | `source_authority.py::CitationIntegrityCheck` model, `enums.py::RetractionStatus` | Model only; no live integration | P1 | GP-3 |
+| §117.4 Publication history | Prior versions/preprint/thesis tracking | Partial | `source_authority.py::PublicationHistoryModel`, `PriorVersion` | Model only; requires user/source input | P1 | GP-4 |
+| §117.5 Reporting guideline selection | EQUATOR per article type | Partial | `source_authority.py::ReportingGuidelineSelection` | Model only; no selection logic | P2 | GP-6 |
 | §118–130 Evaluation details | Anti-hallucination, logging, audit | Partial | Operation traces, quality gates exist | No anti-hallucination controls (no LLM yet), no formal audit protocol | P3 | LLM layer |
 
 ## Wave 9 — Security, Legal, Privacy (§131–140)
@@ -173,13 +178,13 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 
 | Status | Count | % of spec areas |
 |--------|-------|-----------------|
-| Implemented | 43 | 60% |
-| Partial | 11 | 15% |
+| Implemented | 46 | 60% |
+| Partial | 14 | 18% |
 | Stub | 2 | 3% |
-| Planned | 12 | 17% |
+| Planned | 12 | 16% |
 | Deferred | 2 | 3% |
 | Rejected | 0 | 0% |
-| **Total tracked** | **72** | — |
+| **Total tracked** | **77** | — |
 
 ### What is solid
 

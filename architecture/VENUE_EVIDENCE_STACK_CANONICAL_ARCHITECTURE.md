@@ -502,6 +502,54 @@ Tasks:
 5. **VenuePublicationProfile enrichment** — feed corpus patterns into existing profile builder
 6. **Vault: corpus samples** — store sampled article metadata as JSONL in vault
 
+---
+
+## 9. Source Authority and Access Separation
+
+**Added:** 2026-06-13 (GPT-16 alignment, point 7)
+
+### Architectural rule
+
+> Full-text access is not metadata authority.
+> Metadata authority is not publication-pattern authority.
+> Official venue claim is not independent verification.
+> Corpus evidence is not formal policy.
+> User memory is not public fact.
+
+### SourceAccessMode (how we accessed the source)
+
+`metadata_api` | `full_text_pdf` | `full_text_html` | `official_webpage` | `submission_system_page` | `editorial_board_page` | `corpus_sample` | `citation_graph` | `index_registry` | `user_memory` | `review_history` | `manual_note`
+
+### SourceAuthorityScope (what the source can legitimately claim)
+
+`venue_identity` | `issn_identity` | `publisher_identity` | `formal_requirements` | `submission_policy` | `publication_regime` | `indexing_status` | `article_metadata` | `article_full_text` | `citation_relations` | `corpus_pattern` | `editorial_board_signal` | `community_signal` | `author_identity` | `affiliation_identity` | `funding_statement` | `ai_disclosure_policy` | `reporting_guideline` | `prior_outcome` | `tacit_signal`
+
+### Authority rules (examples)
+
+| Access mode | Can support | Cannot support |
+|-------------|------------|----------------|
+| metadata_api (OpenAlex, Crossref) | venue_identity, ISSN, publisher, article_metadata, citation_relations | corpus_pattern, formal_requirements, editorial taste |
+| full_text_pdf/html | article_full_text, corpus_pattern, citation_relations | ISSN, indexing, formal policy, submission policy |
+| official_webpage | venue_identity, formal_requirements, submission_policy, AI disclosure | independent indexing verification, corpus pattern |
+| corpus_sample | corpus_pattern, citation_relations | submission eligibility, formal policy, indexing |
+| user_memory | prior_outcome, tacit_signal | venue identity, public venue fact |
+| index_registry | indexing_status, venue_identity, ISSN | corpus pattern, editorial taste |
+
+### Implementation
+
+- Enums: `src/kairoskopion/enums.py` — `SourceAccessMode`, `SourceAuthorityScope`, `AuthorityStrength`
+- Models: `src/kairoskopion/source_authority.py` — `SourceAuthorityClaim`, `SourceAuthorityAssessment`, `EvidenceConflict`, `EvidenceReconciliationResult`, `PublicationHistoryModel`, `CitationIntegrityCheck`, `ReportingGuidelineSelection`
+- Service: `src/kairoskopion/services/source_authority.py` — authority matrix, claim checking, conflict detection, reconciliation
+- Integration: `src/kairoskopion/services/evidence_audit.py` — optional `authority_assessments` and `evidence_conflicts` parameters
+- Tests: `tests/test_source_authority.py` — 53 tests covering all models, authority rules, and auditor integration
+
+### Limitations (v0)
+
+- Authority matrix is deterministic; no confidence scoring
+- No live retraction/PubPeer integration (models are placeholders)
+- PublicationHistoryModel requires user or source input
+- FullTextAccess/MetadataAuthority separation is rule-based, not enforced at adapter level yet
+
 **Deliverable:** `kairon venue-deep-profile --venue-issn 1234-5678` builds profile
 from real corpus, not just guidelines.
 

@@ -47,8 +47,9 @@ evidence-first article-to-venue trajectory engine.
 | Module | Contents |
 |--------|----------|
 | `ids.py` | UUID-based ID generation with 31 prefixes |
-| `enums.py` | 28 domain enums |
+| `enums.py` | 37 domain enums (28 original + 9 source authority/integrity) |
 | `schema.py` | 29+ dataclass models with `to_dict`/`from_dict` |
+| `source_authority.py` | Source authority domain models: SourceAuthorityClaim, SourceAuthorityAssessment, EvidenceConflict, EvidenceReconciliationResult, PublicationHistoryModel, PriorVersion, CitationIntegrityCheck, ReportingGuidelineSelection |
 | `registry.py` | JSONL append/read/list/find |
 | `persistence.py` | Storage root management, pipeline + adapter result persistence |
 | `artifacts.py` | Vault markdown card filesystem output with cross-links |
@@ -92,6 +93,7 @@ evidence-first article-to-venue trajectory engine.
 | `venue_evidence_stack.py` | Venue Evidence Stack orchestrator: depth-driven evidence collection across 8 levels |
 | `corpus_sampler.py` | Corpus sampling: PublishedArticleCorpus from fixtures with distribution analysis |
 | `corpus_analyzer.py` | Corpus analysis: method/school/citation pattern extraction |
+| `source_authority.py` | Source authority checker: authority matrix, claim validation, conflict detection, evidence reconciliation |
 
 ### Storage (`src/kairoskopion/storage/`)
 
@@ -261,7 +263,7 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **890 tests**, all passing (35 new in UC-1 Demo Pack v0)
+- **943 tests**, all passing (53 new in source authority model v0, 35 in UC-1 Demo Pack v0)
 - 50+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,

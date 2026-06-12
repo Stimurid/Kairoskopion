@@ -432,3 +432,94 @@ class WorkflowImplementationStatus(str, Enum):
     EXECUTABLE = "executable"
     EXECUTABLE_STUB = "executable_stub"
     SKELETON = "skeleton"
+
+
+# --- Source authority (GPT-16 §7 — access/authority separation) ---
+
+class SourceAccessMode(str, Enum):
+    METADATA_API = "metadata_api"
+    FULL_TEXT_PDF = "full_text_pdf"
+    FULL_TEXT_HTML = "full_text_html"
+    OFFICIAL_WEBPAGE = "official_webpage"
+    SUBMISSION_SYSTEM_PAGE = "submission_system_page"
+    EDITORIAL_BOARD_PAGE = "editorial_board_page"
+    CORPUS_SAMPLE = "corpus_sample"
+    CITATION_GRAPH = "citation_graph"
+    INDEX_REGISTRY = "index_registry"
+    USER_MEMORY = "user_memory"
+    REVIEW_HISTORY = "review_history"
+    MANUAL_NOTE = "manual_note"
+
+
+class SourceAuthorityScope(str, Enum):
+    VENUE_IDENTITY = "venue_identity"
+    ISSN_IDENTITY = "issn_identity"
+    PUBLISHER_IDENTITY = "publisher_identity"
+    FORMAL_REQUIREMENTS = "formal_requirements"
+    SUBMISSION_POLICY = "submission_policy"
+    PUBLICATION_REGIME = "publication_regime"
+    INDEXING_STATUS = "indexing_status"
+    ARTICLE_METADATA = "article_metadata"
+    ARTICLE_FULL_TEXT = "article_full_text"
+    CITATION_RELATIONS = "citation_relations"
+    CORPUS_PATTERN = "corpus_pattern"
+    EDITORIAL_BOARD_SIGNAL = "editorial_board_signal"
+    COMMUNITY_SIGNAL = "community_signal"
+    AUTHOR_IDENTITY = "author_identity"
+    AFFILIATION_IDENTITY = "affiliation_identity"
+    FUNDING_STATEMENT = "funding_statement"
+    AI_DISCLOSURE_POLICY = "ai_disclosure_policy"
+    REPORTING_GUIDELINE = "reporting_guideline"
+    PRIOR_OUTCOME = "prior_outcome"
+    TACIT_SIGNAL = "tacit_signal"
+
+
+class AuthorityStrength(str, Enum):
+    AUTHORITATIVE = "authoritative"
+    SUPPORTED = "supported"
+    WEAK = "weak"
+    UNSUPPORTED = "unsupported"
+    PROHIBITED = "prohibited"
+
+
+class ConflictType(str, Enum):
+    VALUE_MISMATCH = "value_mismatch"
+    STATUS_MISMATCH = "status_mismatch"
+    FRESHNESS_MISMATCH = "freshness_mismatch"
+    AUTHORITY_MISMATCH = "authority_mismatch"
+
+
+class ConflictSeverity(str, Enum):
+    BLOCKING = "blocking"
+    WARNING = "warning"
+    INFORMATIONAL = "informational"
+
+
+class ConflictResolutionStatus(str, Enum):
+    UNRESOLVED = "unresolved"
+    RESOLVED_BY_AUTHORITY = "resolved_by_authority"
+    RESOLVED_BY_USER = "resolved_by_user"
+    RESOLVED_BY_FRESHNESS = "resolved_by_freshness"
+    DEFERRED = "deferred"
+
+
+class RetractionStatus(str, Enum):
+    NOT_CHECKED = "not_checked"
+    NOT_RETRACTED = "not_retracted"
+    RETRACTED = "retracted"
+    EXPRESSION_OF_CONCERN = "expression_of_concern"
+    CORRECTION_ISSUED = "correction_issued"
+    CHECK_FAILED = "check_failed"
+    UNKNOWN = "unknown"
+
+
+class PriorVersionType(str, Enum):
+    PREPRINT = "preprint"
+    CONFERENCE_PAPER = "conference_paper"
+    THESIS_CHAPTER = "thesis_chapter"
+    WORKING_PAPER = "working_paper"
+    BLOG_OR_WHITE_PAPER = "blog_or_white_paper"
+    DATASET_COMPANION = "dataset_companion"
+    PREVIOUS_SUBMISSION = "previous_submission"
+    LANGUAGE_VERSION = "language_version"
+    OTHER = "other"

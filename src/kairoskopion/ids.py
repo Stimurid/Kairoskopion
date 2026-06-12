@@ -154,3 +154,27 @@ def workflow_result_id() -> str:
 
 def workflow_trace_id() -> str:
     return generate_timestamp_id("wftrc")
+
+
+# --- Source authority / integrity IDs ---
+
+def source_authority_claim_id() -> str:
+    return generate_id("sacl")
+
+def source_authority_assessment_id() -> str:
+    return generate_id("saas")
+
+def evidence_conflict_id() -> str:
+    return generate_id("econ")
+
+def evidence_reconciliation_id() -> str:
+    return generate_id("erec")
+
+def publication_history_id() -> str:
+    return generate_id("phist")
+
+def citation_integrity_check_id() -> str:
+    return generate_id("cint")
+
+def reporting_guideline_selection_id() -> str:
+    return generate_id("rgsel")

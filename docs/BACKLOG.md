@@ -485,6 +485,90 @@ Claims must be claims, not facts, unless source/evidence supports them.
 
 ---
 
+## GPT-16 Alignment Sprints (added 2026-06-13)
+
+See `docs/GPT16_ALIGNMENT_MATRIX.md` for full matrix. These sprints cover items
+that are in the spec but were missing from the backlog.
+
+### Sprint GP-1: Source Authority and Access Separation (P0)
+
+**Status:** v0 DONE (2026-06-13, `feature/source-authority-integrity-v0`)
+- SourceAccessMode / SourceAuthorityScope enums
+- SourceAuthorityClaim, SourceAuthorityAssessment models
+- Authority checker service with deterministic matrix
+- EvidenceAuditor integration (optional authority/conflict params)
+- 53 tests
+
+### Sprint GP-2: Evidence Conflict and Reconciliation (P0)
+
+**Status:** v0 DONE (foundation models in source_authority.py)
+- EvidenceConflict model with conflict_type, severity, resolution_status
+- EvidenceReconciliationResult model
+- detect_conflicts() and reconcile_evidence() in service
+- Future: agent-driven reconciliation, user confirmation flow
+
+### Sprint GP-3: Citation Integrity Gate (P1)
+
+**Status:** Model DONE, service FUTURE
+- CitationIntegrityCheck model (retraction, PubPeer, expression of concern, DOI resolution)
+- RetractionStatus enum
+- Future: live Crossref Retraction Watch integration, PubPeer API
+
+### Sprint GP-4: Publication History Model (P1)
+
+**Status:** Model DONE, population FUTURE
+- PublicationHistoryModel with prior_versions, preprint/thesis/conference overlap
+- PriorVersion model, PriorVersionType enum
+- Future: user input flow, preprint server lookup, thesis repository check
+
+### Sprint GP-5: Corpus Representativeness Hardening (P1)
+
+**Status:** Field exists (selection_strategy), enforcement FUTURE
+- PublishedArticleCorpus already has selection_strategy field
+- Future: bias_notes enforcement, representativeness warnings in FitAssessment
+
+### Sprint GP-6: Reporting Guideline Selector (P2)
+
+**Status:** Model DONE, selector logic FUTURE
+- ReportingGuidelineSelection model
+- Future: EQUATOR database mapping, article-type → guideline selection rules
+
+### Sprint GP-7: Author/Affiliation/Funder Identity (P2)
+
+**Status:** FUTURE
+- AuthorSubmissionProfile model (ORCID, ROR affiliation, CRediT roles, funder IDs)
+- Future: ORCID API integration, ROR affiliation normalization
+
+### Sprint GP-8: AI Disclosure and Prompt-Injection Scanner (P2)
+
+**Status:** FUTURE (risk_officer checks AI disclosure flag)
+- AIUseDisclosureScanner agent
+- Future: ICMJE compliance checker, manuscript prompt-injection scanner
+
+### Sprint GP-9: Submission-System Readiness (P2)
+
+**Status:** FUTURE
+- OJS/Editorial Manager/ScholarOne field mapping
+- SubmissionPack portal alignment checks
+
+### Sprint GP-10: OpportunityModel for Special Issues/CFPs (P2)
+
+**Status:** FUTURE
+- OpportunityModel (CFP, special issue, symposium, guest editors, deadline)
+- Future: CFP channel watcher, association website scraper
+
+### Sprint GP-11: Evaluation Suite Expansion (P3)
+
+**Status:** PARTIAL (UC-1 demo pack + 6 validation cases)
+- Future: adversarial fixtures (bad journal, corpus contradicts aims, sparse bibliography)
+- Scenario-specific evaluation metrics from spec
+
+### Sprint GP-12: Failure-as-State Enforcement (P0)
+
+**Status:** AdapterResult has status values; enforcement FUTURE
+- Future: audit that no adapter silently drops failures
+- Integration test: inaccessible source → INACCESSIBLE status preserved through pipeline
+
 ## Later (only when explicitly requested)
 
 - Telegram intake bot

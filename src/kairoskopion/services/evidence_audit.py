@@ -2,11 +2,16 @@
 
 Checks that outputs have evidence backing and flags unsupported claims.
 MVP: checks presence of source_refs, evidence_refs, unknowns on key entities.
+Extended: optional source authority assessment and evidence conflict detection.
 """
 
 from __future__ import annotations
 
-from ..enums import QualityGateStatus
+from ..enums import (
+    AuthorityStrength,
+    ConflictResolutionStatus,
+    QualityGateStatus,
+)
 from ..ids import quality_gate_id
 from ..quality import QualityGateResult
 from ..schema import (
@@ -17,6 +22,10 @@ from ..schema import (
     RiskReport,
     VenueModel,
 )
+from ..source_authority import (
+    EvidenceConflict,
+    SourceAuthorityAssessment,
+)
 
 
 def audit_pipeline_evidence(
@@ -26,6 +35,8 @@ def audit_pipeline_evidence(
     mismatch_map: MismatchMap,
     risk: RiskReport,
     compliance: ComplianceChecklist,
+    authority_assessments: list[SourceAuthorityAssessment] | None = None,
+    evidence_conflicts: list[EvidenceConflict] | None = None,
 ) -> QualityGateResult:
     """Run evidence audit across pipeline outputs."""
     warnings: list[str] = []
@@ -67,12 +78,41 @@ def audit_pipeline_evidence(
     if fit.overall_label != "strong_candidate" and not mismatch_map.mismatches:
         warnings.append("Non-strong fit but MismatchMap is empty")
 
+    # --- Source authority checks (optional) ---
+    if authority_assessments:
+        for assessment in authority_assessments:
+            if assessment.unsupported_claims:
+                for uc in assessment.unsupported_claims:
+                    strength = uc.get("authority_strength", "")
+                    if strength == AuthorityStrength.PROHIBITED.value:
+                        blocking.append(
+                            f"Prohibited authority use: source '{assessment.source_ref}' "
+                            f"claim '{uc.get('claim_key', '?')}' "
+                            f"scope '{uc.get('authority_scope', '?')}'"
+                        )
+                    else:
+                        unsupported.append(
+                            f"Unsupported authority: source '{assessment.source_ref}' "
+                            f"claim '{uc.get('claim_key', '?')}'"
+                        )
+
+    # --- Evidence conflict checks (optional) ---
+    if evidence_conflicts:
+        for conflict in evidence_conflicts:
+            if conflict.resolution_status == ConflictResolutionStatus.UNRESOLVED.value:
+                msg = (
+                    f"Unresolved evidence conflict: entity '{conflict.entity_id}' "
+                    f"field '{conflict.field_name}' ({conflict.severity})"
+                )
+                if conflict.severity == "blocking":
+                    blocking.append(msg)
+                else:
+                    warnings.append(msg)
+
     # Aggregate
-    if missing_sources:
-        status = QualityGateStatus.PASSED_WITH_WARNINGS.value
-    elif blocking:
+    if blocking:
         status = QualityGateStatus.FAILED_BLOCKING.value
-    elif warnings:
+    elif missing_sources or warnings or unsupported:
         status = QualityGateStatus.PASSED_WITH_WARNINGS.value
     else:
         status = QualityGateStatus.PASSED.value
