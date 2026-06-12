@@ -347,3 +347,38 @@ class VenueSourceType(str, Enum):
     PUBLISHER_PAGE = "publisher_page"
     THIRD_PARTY_SUMMARY = "third_party_summary"
     MANUAL_NOTE = "manual_note"
+
+
+class DisciplinaryFitStrength(str, Enum):
+    """How well an article fits a disciplinary pathway."""
+    STRONG = "strong"
+    MEDIUM = "medium"
+    WEAK = "weak"
+    INCOMPATIBLE = "incompatible"
+    UNKNOWN = "unknown"
+
+
+class ArgumentMoveType(str, Enum):
+    """Type of intellectual/argument move in an article."""
+    PROBLEM_STATEMENT = "problem_statement"
+    GENEALOGY = "genealogy"
+    CONCEPT_RECONSTRUCTION = "concept_reconstruction"
+    SCHOOL_CRITIQUE = "school_critique"
+    MODEL_BUILDING = "model_building"
+    COMPARATIVE_ANALYSIS = "comparative_analysis"
+    DISCIPLINARY_TRANSLATION = "disciplinary_translation"
+    POLEMICAL_ESSAY = "polemical_essay"
+    EMPIRICAL_CONCEPTUAL_HYBRID = "empirical_conceptual_hybrid"
+    SYSTEMATIC_REVIEW = "systematic_review"
+    METHODOLOGY_PIECE = "methodology_piece"
+    UNKNOWN = "unknown"
+
+
+class VariantRelation(str, Enum):
+    """How an ArticleVariant relates to the original."""
+    SURFACE_REWRITE = "surface_rewrite"
+    DEEP_REFRAME = "deep_reframe"
+    SIBLING_MANUSCRIPT = "sibling_manuscript"
+    DISCIPLINARY_TRANSLATION = "disciplinary_translation"
+    SPLIT_FRAGMENT = "split_fragment"
+    LANGUAGE_TRANSLATION = "language_translation"

@@ -6,26 +6,22 @@
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `main` at merge of `f726e8e` |
-| Tag | `v0.2.0-alpha-rc5` |
+| Branch | `main` at `88ad9b1` |
+| Tag | `v0.2.0-alpha-rc6` |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
-| Working tree | clean |
+| Working tree | dirty (UC-1 agents + LLM config batch) |
 | Python | >=3.11 |
 
 ## Recent commit history (main)
 
 ```
+88ad9b1 Fix stale test/CLI counts in docs (641->673 tests, 14->16 commands)
+32a2a2e Add venue evidence registry v0
+3934f94 Prep v0.2.0-alpha-rc5 release
 f726e8e Add arbitrary manuscript x venue validation matrix
 b8a94bb Prep v0.2.0-alpha-rc4 release
 33769ad Close D12-D15: generalized venue-fit anti-overfitting repairs
 83f4028 Fix language policy extraction, close D10/D11 with evidence-pack rerun
-62f2f8e Close D6/D8/D9: conditional rewrite plan, title extraction, source_kind
-1959541 Add Logos target trial audit and bounded quality repairs
-7684f4f Add HTTP cache dir and zip bundles to .gitignore
-41cdfc3 Update all docs for Sprints 1-8 completion
-2726c7b Add WhiteCrow patch queue bridge for manuscript change proposals
-47d8513 Add Litops compatibility bridge for cross-project export
-bcc40c5 Add structured submission pack preparation layer
 ```
 
 ## Trial history
@@ -41,6 +37,7 @@ evidence-first article-to-venue trajectory engine.
 - 16 generalized venue-fit regression tests with 3 synthetic fixtures prove no Logos overfitting
 - Arbitrary manuscript x venue validation matrix: 8 fixture combinations, 28 behavioral tests, 6 CLI smoke cases
 - D16-D17 closed: method detection broadened, citation ecology thresholds refined
+- UC-1 semantic profiling substrate: 5 agents, 5 prompt families, 7 new entities, 3 new enums, LLM config — not full Agent Runtime, but agent contract + deterministic fallback + LLM path operational
 
 ## Modules implemented
 
@@ -48,9 +45,9 @@ evidence-first article-to-venue trajectory engine.
 
 | Module | Contents |
 |--------|----------|
-| `ids.py` | UUID-based ID generation with 24 prefixes |
-| `enums.py` | 25 domain enums |
-| `schema.py` | 22+ dataclass models with `to_dict`/`from_dict` |
+| `ids.py` | UUID-based ID generation with 31 prefixes |
+| `enums.py` | 28 domain enums |
+| `schema.py` | 29+ dataclass models with `to_dict`/`from_dict` |
 | `registry.py` | JSONL append/read/list/find |
 | `persistence.py` | Storage root management, pipeline + adapter result persistence |
 | `artifacts.py` | Vault markdown card filesystem output with cross-links |
@@ -88,7 +85,37 @@ evidence-first article-to-venue trajectory engine.
 
 | Pipeline | Steps |
 |----------|-------|
-| `manuscript_venue_fit.py` | 18-step deterministic pipeline |
+| `manuscript_venue_fit.py` | 18-step pipeline (deterministic or LLM-backed via agent contract) |
+
+### LLM subsystem (`src/kairoskopion/llm/`)
+
+| Module | Purpose |
+|--------|---------|
+| `config.py` | LLMConfig with two-level env fallback, 5 model presets, diagnostics |
+| `openai_compat.py` | OpenAI-compatible provider with error taxonomy, retry, structured output |
+| `provider.py` | LLMProvider Protocol |
+| `response.py` | LLMResponse dataclass |
+
+### Agents (`src/kairoskopion/agents/`)
+
+| Agent | Role |
+|-------|------|
+| `contract.py` | AgentInput/AgentOutput/AgentRole ABC |
+| `article_modeler.py` | ArticleModelerAgent — article modeling |
+| `venue_profiler.py` | VenueProfilerAgent — venue fact extraction |
+| `fit_assessor.py` | FitAssessorAgent — fit assessment |
+| `semantic_profiler.py` | ArticleSemanticProfilerAgent — UC-1 semantic profiling |
+| `disciplinary_mapper.py` | DisciplinaryPathwayMapperAgent — UC-1 disciplinary pathways |
+
+### Prompt families (`src/kairoskopion/prompts/`)
+
+| Family | Agent |
+|--------|-------|
+| `article_modeling.py` | ArticleModelerAgent |
+| `venue_fact_extraction.py` | VenueProfilerAgent |
+| `fit_assessment.py` | FitAssessorAgent |
+| `semantic_profiling.py` | ArticleSemanticProfilerAgent |
+| `disciplinary_mapping.py` | DisciplinaryPathwayMapperAgent |
 
 ### Adapters
 

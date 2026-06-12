@@ -109,3 +109,24 @@ def venue_claim_id() -> str:
 
 def venue_evidence_pack_id() -> str:
     return generate_id("vpack")
+
+def article_semantic_profile_id() -> str:
+    return generate_id("asp")
+
+def disciplinary_pathway_id() -> str:
+    return generate_id("dpath")
+
+def article_variant_id() -> str:
+    return generate_id("avar")
+
+def editorial_board_profile_id() -> str:
+    return generate_id("ebp")
+
+def published_article_corpus_id() -> str:
+    return generate_id("pac")
+
+def citation_expectation_profile_id() -> str:
+    return generate_id("cexp")
+
+def venue_publication_profile_id() -> str:
+    return generate_id("vpp")

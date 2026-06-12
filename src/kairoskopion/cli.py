@@ -33,8 +33,35 @@ def _resolve_storage_root(args: argparse.Namespace) -> Path:
     return storage_root_from_env()
 
 
+def _resolve_llm_provider(args: argparse.Namespace):
+    """Build LLMProvider from CLI args or env, returns None if not configured."""
+    model = getattr(args, "llm_model", None)
+    base_url = getattr(args, "llm_base_url", None)
+    api_key_env = getattr(args, "llm_api_key_env", None)
+
+    if model and base_url:
+        from .llm.config import LLMConfig
+        from .llm.openai_compat import OpenAICompatProvider
+        cfg = LLMConfig(
+            model=model,
+            base_url=base_url,
+            api_key_env=api_key_env or "KAIROSKOPION_LLM_API_KEY",
+        )
+        return OpenAICompatProvider(cfg)
+
+    from .llm.config import LLMConfig
+    cfg = LLMConfig.from_env()
+    if cfg is not None:
+        from .llm.openai_compat import OpenAICompatProvider
+        return OpenAICompatProvider(cfg)
+
+    return None
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     """Show environment status."""
+    from .llm.config import is_llm_available, provider_status
+
     root = _resolve_storage_root(args)
     print(f"Kairoskopion v{__version__}")
     print(f"Working directory: {Path.cwd()}")
@@ -44,6 +71,16 @@ def cmd_status(args: argparse.Namespace) -> int:
     if registries_exist(root):
         regs = list_registries(root)
         print(f"Registries:        {', '.join(regs) if regs else '(empty)'}")
+    # LLM status
+    llm = provider_status()
+    print(f"LLM available:     {llm['available']}")
+    if llm["available"]:
+        print(f"LLM provider:      {llm['provider']}")
+        print(f"LLM model:         {llm['model']}")
+        print(f"LLM base URL:      {llm['base_url']}")
+        print(f"LLM has API key:   {llm['has_api_key']}")
+    else:
+        print(f"LLM reason:        {llm.get('reason', 'not configured')}")
     return 0
 
 
@@ -109,7 +146,12 @@ def cmd_run_fixture(args: argparse.Namespace) -> int:
     sc_data = json.loads(sc_path.read_text(encoding="utf-8"))
 
     # Run pipeline
-    pipeline = ManuscriptVenueFitPipeline()
+    llm = _resolve_llm_provider(args)
+    pipeline = ManuscriptVenueFitPipeline(llm_provider=llm)
+    if llm:
+        print(f"LLM provider: {getattr(llm, '_config', None) and llm._config.model or 'configured'}")
+    else:
+        print("LLM provider: none (deterministic mode)")
     result = pipeline.execute(
         manuscript_text=ms_text,
         venue_guidelines_text=gl_text,
@@ -217,7 +259,12 @@ def cmd_run_local(args: argparse.Namespace) -> int:
         return 1
 
     # Run pipeline with real source refs
-    pipeline = ManuscriptVenueFitPipeline()
+    llm = _resolve_llm_provider(args)
+    pipeline = ManuscriptVenueFitPipeline(llm_provider=llm)
+    if llm:
+        print(f"LLM provider: {getattr(llm, '_config', None) and llm._config.model or 'configured'}")
+    else:
+        print("LLM provider: none (deterministic mode)")
     result = pipeline.execute(
         manuscript_text=ms_text,
         venue_guidelines_text=vg_text,
@@ -837,7 +884,12 @@ def main(argv: list[str] | None = None) -> int:
 
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("status", help="Show environment status")
-    sub.add_parser("run-fixture", help="Run fixture pipeline and persist results")
+
+    run_fixture_parser = sub.add_parser("run-fixture", help="Run fixture pipeline and persist results")
+    run_fixture_parser.add_argument("--llm-model", default=None, help="LLM model name (e.g. gpt-4o)")
+    run_fixture_parser.add_argument("--llm-base-url", default=None, help="LLM API base URL")
+    run_fixture_parser.add_argument("--llm-api-key-env", default=None, help="Env var name for API key (default: KAIROSKOPION_LLM_API_KEY)")
+
     sub.add_parser("inspect-storage", help="Show registry and vault contents")
 
     sub.add_parser("adapters-smoke", help="Run mock adapters, save results, print summary")
@@ -890,6 +942,9 @@ def main(argv: list[str] | None = None) -> int:
         "--scenario", required=True,
         help="Path to submission scenario JSON file (.json)",
     )
+    run_local_parser.add_argument("--llm-model", default=None, help="LLM model name (e.g. gpt-4o)")
+    run_local_parser.add_argument("--llm-base-url", default=None, help="LLM API base URL")
+    run_local_parser.add_argument("--llm-api-key-env", default=None, help="Env var name for API key (default: KAIROSKOPION_LLM_API_KEY)")
 
     sub.add_parser(
         "build-submission-pack",

@@ -55,8 +55,15 @@ from .ids import (
     venue_claim_id,
     venue_evidence_pack_id,
     venue_model_id,
+    venue_publication_profile_id,
     venue_record_id,
     venue_source_id,
+    article_semantic_profile_id,
+    article_variant_id,
+    citation_expectation_profile_id,
+    disciplinary_pathway_id,
+    editorial_board_profile_id,
+    published_article_corpus_id,
 )
 
 
@@ -623,4 +630,197 @@ class VenueEvidencePack(_DictMixin):
     conflicts: list[dict[str, Any]] = _list()
     stale_warnings: list[str] = _list()
     build_log: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+# ---------------------------------------------------------------------------
+# UC-1 Draft-to-Venue-Pool Positioning entities (GPT analysis 2026-06-12)
+# ---------------------------------------------------------------------------
+
+@dc.dataclass
+class ArticleSemanticProfile(_DictMixin):
+    """Extended semantic profile beyond ArticleModel base fields.
+
+    Captures disciplinary register, school/tradition affiliations,
+    argument move type, theoretical shoulders, and the protected core —
+    everything needed for Disciplinary Pathway Mapper and Venue Pool Discovery.
+    """
+    article_semantic_profile_id: str = dc.field(default_factory=article_semantic_profile_id)
+    article_model_id: str | None = _field()
+    # Disciplinary classification (multiple registers possible)
+    disciplinary_registers: list[str] = _list()
+    primary_discipline: str | None = _field()
+    # School/tradition taxonomy
+    schools_and_traditions: list[str] = _list()
+    theoretical_shoulders: list[str] = _list()
+    opponents_or_foils: list[str] = _list()
+    # Argument structure
+    argument_move_type: str | None = _field()
+    argument_move_description: str | None = _field()
+    # Citation ecology signals
+    citation_bridges_needed: list[str] = _list()
+    citation_ecology_description: str | None = _field()
+    # Protected core (what must NOT be destroyed in adaptation)
+    protected_core_candidates: list[str] = _list()
+    mutable_zones: list[str] = _list()
+    field_core_nonnegotiables: list[str] = _list()
+    # Audience
+    intended_audience: str | None = _field()
+    audience_expertise_level: str | None = _field()
+    # Meta
+    unknowns: list[str] = _list()
+    confidence: str | None = _field()
+    evidence_refs: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class DisciplinaryPathway(_DictMixin):
+    """One possible disciplinary branch for an article.
+
+    The Disciplinary Pathway Mapper produces a ranked list of these,
+    each representing an academic world the article could enter.
+    """
+    disciplinary_pathway_id: str = dc.field(default_factory=disciplinary_pathway_id)
+    article_model_id: str | None = _field()
+    discipline_name: str | None = _field()
+    fit_strength: str | None = _field()
+    reasoning: str | None = _field()
+    # What adaptation would this pathway require?
+    required_adaptations: list[str] = _list()
+    field_core_risk: str | None = _field()
+    # Venue signals: which kinds of venues exist in this space
+    venue_type_hints: list[str] = _list()
+    example_venue_names: list[str] = _list()
+    language_options: list[str] = _list()
+    indexing_options: list[str] = _list()
+    # Ranking
+    rank: int | None = _field()
+    strategic_value_notes: str | None = _field()
+    unknowns: list[str] = _list()
+    confidence: str | None = _field()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class ArticleVariant(_DictMixin):
+    """A publication-trajectory variant of the original article.
+
+    One Field/Idea can have multiple publication fates: philosophical,
+    STS-oriented, AI-ethics, conference, Russian-language, English-language.
+    Each variant tracks what changed, what was preserved, and which
+    venues it targets.
+    """
+    article_variant_id: str = dc.field(default_factory=article_variant_id)
+    source_article_model_id: str | None = _field()
+    variant_relation: str | None = _field()
+    target_discipline: str | None = _field()
+    target_venue_ids: list[str] = _list()
+    # What changes from the original
+    reframe_description: str | None = _field()
+    changes_required: list[str] = _list()
+    preserved_from_original: list[str] = _list()
+    field_core_loss_risk: str | None = _field()
+    # Variant properties
+    estimated_effort: str | None = _field()
+    language: str | None = _field()
+    genre_target: str | None = _field()
+    # Decision support
+    same_article_rewrite_possible: bool | None = _field()
+    deep_reframe_required: bool | None = _field()
+    sibling_article_recommended: bool | None = _field()
+    do_not_submit_as_one_piece: bool | None = _field()
+    # Meta
+    unknowns: list[str] = _list()
+    confidence: str | None = _field()
+    lifecycle_status: str = LifecycleStatus.DRAFT.value
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class VenuePublicationProfile(_DictMixin):
+    """Symmetric profile of a venue on the same axes as ArticleSemanticProfile.
+
+    Enables Article × Venue comparison as two-profile matching
+    rather than article-vs-requirements checking.
+    """
+    venue_publication_profile_id: str = dc.field(default_factory=venue_publication_profile_id)
+    venue_model_id: str | None = _field()
+    # Disciplinary center of gravity
+    disciplinary_center: list[str] = _list()
+    primary_discipline: str | None = _field()
+    # School/tradition distribution
+    schools_and_traditions_distribution: list[dict[str, Any]] = _list()
+    # What the venue actually publishes (from corpus analysis)
+    genre_move_distribution: list[dict[str, Any]] = _list()
+    method_expectations: list[str] = _list()
+    accepted_argument_forms: list[str] = _list()
+    # Citation patterns
+    citation_ecology_expectations: str | None = _field()
+    typical_reference_count_range: str | None = _field()
+    dominant_citation_traditions: list[str] = _list()
+    # Other
+    novelty_modes_published: list[str] = _list()
+    audience_description: str | None = _field()
+    language_register_expectations: str | None = _field()
+    # Evidence quality
+    corpus_size: int | None = _field()
+    corpus_period: str | None = _field()
+    unknowns: list[str] = _list()
+    confidence: str | None = _field()
+    evidence_refs: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class EditorialBoardProfile(_DictMixin):
+    """Disciplinary signal from the editorial board composition."""
+    editorial_board_profile_id: str = dc.field(default_factory=editorial_board_profile_id)
+    venue_model_id: str | None = _field()
+    board_size: int | None = _field()
+    disciplinary_center_of_gravity: str | None = _field()
+    discipline_distribution: list[dict[str, Any]] = _list()
+    institution_distribution: list[dict[str, Any]] = _list()
+    geographic_distribution: list[dict[str, Any]] = _list()
+    notable_members: list[str] = _list()
+    unknowns: list[str] = _list()
+    confidence: str | None = _field()
+    evidence_refs: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class PublishedArticleCorpus(_DictMixin):
+    """Summary of recent articles published by a venue — corpus-level features."""
+    published_article_corpus_id: str = dc.field(default_factory=published_article_corpus_id)
+    venue_model_id: str | None = _field()
+    corpus_size: int | None = _field()
+    collection_period: str | None = _field()
+    genre_distribution: list[dict[str, Any]] = _list()
+    method_distribution: list[dict[str, Any]] = _list()
+    topic_clusters: list[str] = _list()
+    average_word_count: int | None = _field()
+    average_reference_count: int | None = _field()
+    language_distribution: list[dict[str, Any]] = _list()
+    unknowns: list[str] = _list()
+    confidence: str | None = _field()
+    evidence_refs: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class CitationExpectationProfile(_DictMixin):
+    """What citation patterns a venue expects, derived from corpus analysis."""
+    citation_expectation_profile_id: str = dc.field(default_factory=citation_expectation_profile_id)
+    venue_model_id: str | None = _field()
+    typical_reference_count: str | None = _field()
+    dominant_traditions: list[str] = _list()
+    expected_bridge_references: list[str] = _list()
+    self_citation_rate: str | None = _field()
+    recency_bias: str | None = _field()
+    canonical_works_expected: list[str] = _list()
+    absent_traditions_risk: list[str] = _list()
+    unknowns: list[str] = _list()
+    confidence: str | None = _field()
+    evidence_refs: list[str] = _list()
     created_at: str = dc.field(default_factory=_now)

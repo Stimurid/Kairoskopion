@@ -2,7 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] — Venue Registry v0
+## [Unreleased] — UC-1 Semantic Profiling Agents + LLM Config
+
+### Added
+- **LLM subsystem** (`src/kairoskopion/llm/`): OpenAI-compatible provider with litops-aligned config
+  - Two-level env fallback: `KAIROSKOPION_LLM_*` → `LLM_*` (litops pattern)
+  - 5 model presets (302.ai×3, OpenAI×2), `is_llm_available()`, `provider_status()` diagnostics
+  - Error taxonomy: PROVIDER_HTTP_ERROR, PROVIDER_TIMEOUT, NETWORK_ERROR, INVALID_JSON, EMPTY_RESPONSE_TEXT, RETRIES_EXHAUSTED
+  - `reasoning_content` support for Qwen models
+- **Agent contract** (`src/kairoskopion/agents/contract.py`): AgentInput/AgentOutput, AgentRole ABC with `execute()` (LLM) + `execute_deterministic()` (fallback) + `run()` dispatch
+- **5 agents** (`src/kairoskopion/agents/`):
+  - ArticleModelerAgent — article modeling from text
+  - VenueProfilerAgent — venue fact extraction
+  - FitAssessorAgent — article×venue fit assessment
+  - ArticleSemanticProfilerAgent — disciplinary registers, schools/traditions, argument move, protected core (UC-1 step 3)
+  - DisciplinaryPathwayMapperAgent — ranked disciplinary pathways with fit strength, adaptations, field core risk (UC-1 step 4)
+- **5 prompt families** (`src/kairoskopion/prompts/`): article_modeling, venue_fact_extraction, fit_assessment, semantic_profiling, disciplinary_mapping — each with system prompt, user template, JSON output schema, validator
+- **7 new schema entities**: ArticleSemanticProfile, DisciplinaryPathway, ArticleVariant, VenuePublicationProfile, EditorialBoardProfile, PublishedArticleCorpus, CitationExpectationProfile
+- **3 new enums**: DisciplinaryFitStrength (5 values), ArgumentMoveType (12 values), VariantRelation (6 values)
+- **7 new ID factories**: `asp_`, `dpath_`, `avar_`, `vpp_`, `ebp_`, `pac_`, `cexp_`
+- CLI: `--llm-model`, `--llm-base-url`, `--llm-api-key-env` on `run-fixture`/`run-local`; `status` shows LLM availability
+- ManuscriptVenueFitPipeline now accepts `llm_provider` and runs agents through contract
+- 33 new tests (706 total, was 673)
+
+### Changed
+- Pipeline uses AgentInput/AgentOutput through agent contract instead of direct service calls for article/venue/fit steps
+
+---
+
+## [Unreleased-prior] — Venue Registry v0
 
 ### Added
 - Venue evidence registry: VenueRecord, VenueSource, VenueClaim, VenueEvidencePack data model

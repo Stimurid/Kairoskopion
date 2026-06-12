@@ -1,14 +1,19 @@
 """Pipeline 1: One manuscript × one target venue (spec §37).
 
-Deterministic fixture-driven pipeline.  No LLM calls, no web fetching.
+Supports two execution modes:
+- Deterministic (no LLM): heuristic extraction, same as before.
+- LLM-assisted: agents extract ArticleModel, VenueModel, FitAssessment
+  with semantic understanding. Deterministic diagnostics still computed.
 """
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any
 
+from ..agents.article_modeler import ArticleModelerAgent
+from ..agents.contract import AgentInput
+from ..agents.fit_assessor import FitAssessorAgent
+from ..agents.venue_profiler import VenueProfilerAgent
 from ..cards import (
     article_model_card,
     fit_assessment_card,
@@ -16,6 +21,8 @@ from ..cards import (
     venue_model_card,
 )
 from ..enums import OutputLevel, PipelineRunStatus
+from ..ids import pipeline_run_id as _new_run_id
+from ..llm.provider import LLMProvider
 from ..quality import QualityGateResult, evaluate_fit_gate
 from ..schema import (
     ArticleModel,
@@ -65,12 +72,20 @@ class ManuscriptVenueFitResult:
         self.fit_gate: QualityGateResult | None = None
         self.evidence_gate: QualityGateResult | None = None
         self.artifact_markdown: str | None = None
+        self.llm_trace: list[dict[str, Any]] | None = None
 
 
 class ManuscriptVenueFitPipeline(PipelineBase):
     """One manuscript × one target venue pipeline."""
 
     pipeline_type = "manuscript_venue_fit"
+
+    def __init__(self, *, llm_provider: LLMProvider | None = None) -> None:
+        super().__init__()
+        self.llm = llm_provider
+        self._article_agent = ArticleModelerAgent()
+        self._venue_agent = VenueProfilerAgent()
+        self._fit_agent = FitAssessorAgent()
 
     def execute(
         self,
@@ -84,20 +99,36 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         """Run the full pipeline.  Returns all created entities."""
         self.mark_running()
         result = ManuscriptVenueFitResult()
+        llm_trace: list[dict[str, Any]] = []
 
         # Step 1–3: Build ManuscriptModel and ArticleModel
         self.trace.inputs.append(manuscript_source_ref)
+
+        article_input = AgentInput(
+            operation_id=self.run.pipeline_run_id,
+            agent_role_id="article_modeler",
+            source_refs=[manuscript_source_ref],
+            raw_text=manuscript_text,
+        )
+        article_output = self._article_agent.run(article_input, self.llm)
+
+        # Reconstruct typed entities from agent output
         ms = build_manuscript_model(manuscript_text, source_ref=manuscript_source_ref)
         result.manuscript = ms
         self.run.created_entity_ids.append(ms.manuscript_id)
         self.trace.entities_created.append(ms.manuscript_id)
 
-        article = build_article_model(ms, manuscript_text, source_ref=manuscript_source_ref)
+        article = ArticleModel.from_dict(article_output.output_entity)
         result.article = article
         self.run.created_entity_ids.append(article.article_model_id)
         self.trace.entities_created.append(article.article_model_id)
 
-        # Step 3b: Build BibliographyProfile
+        if article_output.llm_usage:
+            llm_trace.append({"agent": "article_modeler", **article_output.llm_usage})
+        if article_output.trace_notes:
+            _append_notes(self.trace, article_output.trace_notes)
+
+        # Step 3b: Build BibliographyProfile (always deterministic)
         bib_profile = build_bibliography_profile(
             manuscript_text,
             manuscript_id=ms.manuscript_id,
@@ -109,12 +140,32 @@ class ManuscriptVenueFitPipeline(PipelineBase):
 
         # Step 4–6: Build VenueModel and PublicationRegimeModel
         self.trace.inputs.append(venue_source_ref)
-        venue, regime = build_venue_model(venue_guidelines_text, source_ref=venue_source_ref)
+
+        venue_input = AgentInput(
+            operation_id=self.run.pipeline_run_id,
+            agent_role_id="venue_profiler",
+            source_refs=[venue_source_ref],
+            raw_text=venue_guidelines_text,
+            user_constraints={
+                "source_type": "author_guidelines",
+            },
+        )
+        venue_output = self._venue_agent.run(venue_input, self.llm)
+
+        venue_dict = venue_output.output_entity
+        regime_dict = venue_dict.pop("_regime", {})
+        venue = VenueModel.from_dict(venue_dict)
+        regime = PublicationRegimeModel.from_dict(regime_dict) if regime_dict else PublicationRegimeModel()
         result.venue = venue
         result.regime = regime
         self.run.created_entity_ids.append(venue.venue_model_id)
         self.run.created_entity_ids.append(regime.publication_regime_id)
         self.trace.entities_created.extend([venue.venue_model_id, regime.publication_regime_id])
+
+        if venue_output.llm_usage:
+            llm_trace.append({"agent": "venue_profiler", **venue_output.llm_usage})
+        if venue_output.trace_notes:
+            _append_notes(self.trace, venue_output.trace_notes)
 
         # Step 7: Build SubmissionScenario
         scenario = build_scenario_from_dict(
@@ -131,26 +182,41 @@ class ManuscriptVenueFitPipeline(PipelineBase):
             has_article_source=bool(article.source_refs),
             has_venue_source=bool(venue.source_refs),
             has_scenario=scenario.goal is not None,
-            has_evidence_per_axis=False,  # no per-axis evidence in fixture mode
+            has_evidence_per_axis=False,
             has_context_pack=False,
         )
         result.fit_gate = fit_gate
         self.record_gate(fit_gate)
 
         # Step 8: FitAssessment
-        fit = assess_fit(article, venue, scenario)
+        fit_input = AgentInput(
+            operation_id=self.run.pipeline_run_id,
+            agent_role_id="fit_assessor",
+            entities={
+                "article": article.to_dict(),
+                "venue": venue.to_dict(),
+                "scenario": scenario.to_dict(),
+            },
+        )
+        fit_output = self._fit_agent.run(fit_input, self.llm)
+        fit = FitAssessment.from_dict(fit_output.output_entity)
         result.fit = fit
         self.run.created_entity_ids.append(fit.fit_assessment_id)
         self.trace.entities_created.append(fit.fit_assessment_id)
 
-        # Step 9: MismatchMap
+        if fit_output.llm_usage:
+            llm_trace.append({"agent": "fit_assessor", **fit_output.llm_usage})
+        if fit_output.trace_notes:
+            _append_notes(self.trace, fit_output.trace_notes)
+
+        # Step 9: MismatchMap (deterministic from fit)
         mm = build_mismatch_map(fit)
         result.mismatch_map = mm
         fit.mismatch_map_id = mm.mismatch_map_id
         self.run.created_entity_ids.append(mm.mismatch_map_id)
         self.trace.entities_created.append(mm.mismatch_map_id)
 
-        # Step 10: RewritePlan
+        # Step 10: RewritePlan (deterministic from mismatches)
         rw = build_rewrite_plan(
             mm,
             article_model_id=article.article_model_id,
@@ -161,19 +227,19 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         self.run.created_entity_ids.append(rw.rewrite_plan_id)
         self.trace.entities_created.append(rw.rewrite_plan_id)
 
-        # Step 12: RiskReport
+        # Step 12: RiskReport (deterministic)
         risk = build_risk_report(article, venue, scenario, fit, mm)
         result.risk_report = risk
         self.run.created_entity_ids.append(risk.risk_report_id)
         self.trace.entities_created.append(risk.risk_report_id)
 
-        # Step 13: ComplianceChecklist
+        # Step 13: ComplianceChecklist (deterministic)
         cc = build_compliance_checklist(article, ms, venue, venue_guidelines_text)
         result.compliance = cc
         self.run.created_entity_ids.append(cc.compliance_checklist_id)
         self.trace.entities_created.append(cc.compliance_checklist_id)
 
-        # Step 14: Citation ecology report
+        # Step 14: Citation ecology report (deterministic)
         cit_eco = build_citation_ecology_report(
             bib_profile, article, venue, venue_guidelines_text,
         )
@@ -188,11 +254,20 @@ class ManuscriptVenueFitPipeline(PipelineBase):
 
         # Step 16: Generate artifact
         result.artifact_markdown = _generate_artifact(result)
+        result.llm_trace = llm_trace if llm_trace else None
 
         # Finish
         self.trace.sources_accessed = [manuscript_source_ref, venue_source_ref]
         self.finish(output_level=OutputLevel.PRELIMINARY)
         return result
+
+
+def _append_notes(trace, notes: list[str]) -> None:
+    joined = "; ".join(notes)
+    if trace.notes:
+        trace.notes = trace.notes + "; " + joined
+    else:
+        trace.notes = joined
 
 
 def _generate_artifact(r: ManuscriptVenueFitResult) -> str:
@@ -303,5 +378,15 @@ def _generate_artifact(r: ManuscriptVenueFitResult) -> str:
         if r.evidence_gate.warnings:
             for w in r.evidence_gate.warnings:
                 parts.append(f"  - {w}")
+
+    # LLM usage summary
+    if r.llm_trace:
+        parts.append("\n## LLM Usage\n")
+        for entry in r.llm_trace:
+            parts.append(
+                f"- **{entry.get('agent', '?')}**: model={entry.get('model', '?')}, "
+                f"tokens={entry.get('input_tokens', 0)}+{entry.get('output_tokens', 0)}, "
+                f"latency={entry.get('latency_ms', 0):.0f}ms"
+            )
 
     return "\n".join(parts)

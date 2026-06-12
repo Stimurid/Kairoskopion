@@ -52,10 +52,13 @@ For deep spec questions, read:
 
 ## What is implemented (foundation)
 
-- 22+ dataclass domain models with `to_dict`/`from_dict`
-- 25 domain enums (EvidenceStatus, FitAxisValue, FieldCoreImpact, VenueClaimStatus, VenueSourceType, etc.)
-- 13 deterministic domain services (no LLM)
-- 18-step ManuscriptVenueFitPipeline
+- 29+ dataclass domain models with `to_dict`/`from_dict`
+- 28 domain enums (EvidenceStatus, FitAxisValue, FieldCoreImpact, VenueClaimStatus, VenueSourceType, DisciplinaryFitStrength, ArgumentMoveType, VariantRelation, etc.)
+- 13 deterministic domain services
+- 5 agents with dual execution (LLM + deterministic fallback): ArticleModeler, VenueProfiler, FitAssessor, ArticleSemanticProfiler, DisciplinaryPathwayMapper
+- 5 prompt families with JSON output schemas and validators
+- LLM subsystem: OpenAI-compatible provider, litops-aligned config, 5 model presets, error taxonomy
+- 18-step ManuscriptVenueFitPipeline (now with optional LLM via agent contract)
 - JSONL append-only persistence (17+ registries)
 - Vault markdown cards (8 entity types + pipeline trace)
 - Source acquisition: local file registration (.md, .txt, .json, .html, .pdf, .docx), text input, URL placeholder
@@ -85,7 +88,7 @@ For deep spec questions, read:
 7. **Protected core.** Core-touching changes from WhiteCrow require explicit user acceptance.
 
 ### Code & architecture
-8. **No LLM calls** until the source/evidence/persistence layer is stable and tested.
+8. **LLM is optional.** All agents have deterministic fallback. LLM config via env vars, never hardcoded keys.
 9. **No Telegram, Web UI, reviewer simulation** until explicitly requested.
 10. **Do not reduce the system to one LLM prompt.**
 11. **Do not rewrite the project or add new agents** without explicit request.

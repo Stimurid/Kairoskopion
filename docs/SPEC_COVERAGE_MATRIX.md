@@ -48,16 +48,16 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 | §6.3 ArticleModel | Publication-facing article model | Partial | `schema.py::ArticleModel` (20+ fields) | Missing: `title_candidates`, `abstract_candidates`, `theoretical_shoulders`, `opponents_or_contrasts`, `audience_candidates`, `mutable_zones`, `high_risk_zones` | P1 | — |
 | §6.4 ManuscriptModel | Structural text map | Partial | `schema.py::ManuscriptModel` | Missing: `section_blocks`, `figures`, `tables`, `supplementary_materials`, `block_mapping_status` | P2 | Doc intake |
 | §6.5 FieldModelReference | WhiteCrow field pointer | Stub | `integrations/whitecrow.py::FieldModelRef` | No functional creation | P3 | WhiteCrow bridge |
-| §6.6 ArticleVariant | Publication-oriented variant | Planned | — | Not implemented | P3 | — |
+| §6.6 ArticleVariant | Publication-oriented variant | Implemented | `schema.py::ArticleVariant`, `enums.py::VariantRelation` (6 types) | — | — | UC-1 agents |
 | §6.7 VenueModel | Publication container model | Partial | `schema.py::VenueModel` (15+ fields) | Missing: `journal_model_id`, `section_model_ids`, `issue_model_ids`, `editorial_board_profile_id`, `published_corpus_id`, `citation_expectation_profile_id`, `tacit_signal_ids`, `prior_outcome_ids` | P1 | Venue profile |
 | §6.8 JournalModel | Serial journal entity | Planned | — | Not implemented (VenueModel covers basics) | P2 | Venue profile |
 | §6.9 SectionModel | Journal section/article type | Planned | — | Not implemented | P2 | Venue profile |
 | §6.10 IssueModel/SpecialIssueModel | Time-bound containers | Planned | — | Not implemented | P3 | — |
 | §6.11 PublicationRegimeModel | How publication works | Partial | `schema.py::PublicationRegimeModel`, `enums.py::PublicationRegimeType` (13 types) | Only enum + description; no `fit_axes_modifier`, `compliance_modifier`, `risk_modifier` | P2 | — |
-| §6.12 EditorialBoardProfile | Editorial structure | Planned | — | Not implemented | P3 | — |
-| §6.13 PublishedArticleCorpus | Corpus for pattern inference | Planned | — | Not implemented | P2 | Venue profile |
+| §6.12 EditorialBoardProfile | Editorial structure | Implemented | `schema.py::EditorialBoardProfile` | No population logic yet | P2 | UC-1 agents |
+| §6.13 PublishedArticleCorpus | Corpus for pattern inference | Implemented | `schema.py::PublishedArticleCorpus` | No population logic yet | P2 | UC-1 agents |
 | §6.14 PublishedArticlePattern | Corpus-derived observations | Planned | — | Not implemented | P2 | Venue profile |
-| §6.15 CitationExpectationProfile | Venue citation expectations | Planned | — | Partially covered by CitationEcologyReport | P2 | Bibliography robustness |
+| §6.15 CitationExpectationProfile | Venue citation expectations | Implemented | `schema.py::CitationExpectationProfile` | No population logic yet; partially covered by CitationEcologyReport | P2 | UC-1 agents |
 | §6.16 TacitVenueSignal | Non-formal knowledge | Planned | — | Not implemented | P3 | — |
 | §6.17 SubmissionScenario | User goal/constraints | Implemented | `schema.py::SubmissionScenario` (15+ fields) | Missing: `prestige_priority`, `speed_priority`, `acceptance_probability_priority`, `questions_asked`, `answers` | P2 | — |
 | §6.18 FitAssessment | Multi-axis comparison | Implemented | `schema.py::FitAssessment`, `services/fit_assessment.py` | 12 axes implemented (topic, discipline, genre, argument_structure, method, citation_ecology, novelty_positioning, language_register, audience, formal_compliance, author_eligibility, publication_regime) | Missing: `rewrite_effort`, `citation_effort`, `compliance_effort`, `time_risk`, `strategic_value` | P2 | — |

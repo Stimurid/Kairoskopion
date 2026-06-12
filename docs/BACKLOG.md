@@ -6,6 +6,29 @@ Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.m
 
 ---
 
+## UC-1 Semantic Profiling Agents + LLM Config ✓ DONE (2026-06-12)
+
+**Goal:** Implement UC-1 "Draft-to-Venue-Pool Positioning" substrate: LLM config aligned with litops/quint, agent contract, 5 agents (3 pipeline + 2 UC-1 profiling), 5 prompt families, 7 new schema entities, 3 new enums. Production LLM config supported but deterministic fallback always available.
+
+**Phases completed:**
+1. ✓ LLM subsystem: config, OpenAI-compatible provider, error taxonomy, diagnostics
+2. ✓ Agent contract: AgentInput/AgentOutput/AgentRole with dual execution paths
+3. ✓ 3 pipeline agents: ArticleModeler, VenueProfiler, FitAssessor
+4. ✓ 2 UC-1 agents: ArticleSemanticProfiler, DisciplinaryPathwayMapper
+5. ✓ 5 prompt families with system prompts, user templates, JSON schemas, validators
+6. ✓ 7 new entities: ArticleSemanticProfile, DisciplinaryPathway, ArticleVariant, VenuePublicationProfile, EditorialBoardProfile, PublishedArticleCorpus, CitationExpectationProfile
+7. ✓ 3 new enums: DisciplinaryFitStrength, ArgumentMoveType, VariantRelation
+8. ✓ Pipeline rewrite to use agent contract
+9. ✓ CLI LLM options: --llm-model, --llm-base-url, --llm-api-key-env
+10. ✓ 33 new tests, 706 total
+
+**What this is NOT:** Full Agent Runtime (spec Wave 6). This is the agent contract + concrete agents. Agent orchestration, runtime loop, operation journal are future work.
+
+**Branch:** `main` (direct commit by user request)
+**Tests added:** 33 new tests (706 total, was 673)
+
+---
+
 ## Venue Registry / Source Collector Architecture v0 ✓ DONE (2026-06-12)
 
 **Goal:** Design and implement a general venue evidence registry with data model, provenance discipline, import path, seed corpus format, CLI integration, and report integration.
