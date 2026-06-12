@@ -189,7 +189,7 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 - JSONL persistence (17+ registries)
 - Vault markdown cards with cross-links, indexes, manifest
 - Export/import bundles, freshness tracking, quality gates
-- CLI (14 commands)
+- CLI (16 commands)
 
 ### What is honestly missing
 

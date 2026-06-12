@@ -165,7 +165,7 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **641 tests**, all passing
+- **673 tests**, all passing
 - 28+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
