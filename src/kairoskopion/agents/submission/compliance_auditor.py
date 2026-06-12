@@ -5,7 +5,7 @@ from __future__ import annotations
 from ..base_shell import missing_input_output, service_output
 from ..contract import AgentInput, AgentOutput, AgentRole
 from ...llm.provider import LLMProvider
-from ...schema import ArticleModel, VenueModel
+from ...schema import ArticleModel, ManuscriptModel, VenueModel
 from ...services.compliance import build_compliance_checklist
 
 
@@ -23,7 +23,25 @@ class ComplianceAuditorAgent(AgentRole):
 
         article = ArticleModel.from_dict(article_data)
         venue = VenueModel.from_dict(venue_data)
-        checklist = build_compliance_checklist(article, venue)
+
+        manuscript_data = inp.entities.get("manuscript")
+        if manuscript_data:
+            manuscript = ManuscriptModel.from_dict(manuscript_data)
+        else:
+            manuscript = ManuscriptModel(
+                manuscript_id="ms-from-agent",
+                article_model_id=article.article_model_id,
+                title=article.title,
+                abstract=article.abstract,
+                keywords=list(article.keywords) if article.keywords else [],
+                sections=[],
+                word_count=0,
+                language=article.language if hasattr(article, "language") else "en",
+            )
+
+        guidelines_text = inp.entities.get("venue_guidelines_text", "")
+
+        checklist = build_compliance_checklist(article, manuscript, venue, guidelines_text)
 
         return service_output(
             "ComplianceChecklist",

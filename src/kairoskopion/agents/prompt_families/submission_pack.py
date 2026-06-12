@@ -17,9 +17,9 @@ PURPOSE = (
 INPUT_CONTRACT = {
     "article_model": "ArticleModel dict",
     "venue_model": "VenueModel dict",
-    "compliance_checklist": "ComplianceChecklist dict",
-    "risk_report": "RiskReport dict",
-    "rewrite_plan": "Optional RewritePlan dict",
+    "scenario": "SubmissionScenario dict",
+    "compliance_checklist": "Optional ComplianceChecklist dict",
+    "risk_report": "Optional RiskReport dict",
 }
 OUTPUT_CONTRACT = {
     "submission_pack": "SubmissionPack dict with readiness assessment",
@@ -61,12 +61,22 @@ Assess submission readiness for this article-venue pair.
 {article_json}
 ```
 
-## ComplianceChecklist
+## VenueModel
+```json
+{venue_json}
+```
+
+## SubmissionScenario
+```json
+{scenario_json}
+```
+
+## ComplianceChecklist (may be empty)
 ```json
 {compliance_json}
 ```
 
-## RiskReport
+## RiskReport (may be empty)
 ```json
 {risk_json}
 ```
@@ -118,8 +128,12 @@ SUBMISSION_PACK_FAMILY = {
     "family_id": FAMILY_ID,
     "agent_role_id": "submission_pack_builder",
     "version": VERSION,
+    "purpose": PURPOSE,
     "system_prompt": SYSTEM_PROMPT,
     "user_prompt_template": USER_TEMPLATE,
     "output_schema": OUTPUT_SCHEMA,
     "validator": validate_submission_pack,
+    "forbidden_behaviors": FORBIDDEN_BEHAVIORS,
+    "evidence_requirements": EVIDENCE_REQUIREMENTS,
+    "unknown_handling": UNKNOWN_HANDLING,
 }

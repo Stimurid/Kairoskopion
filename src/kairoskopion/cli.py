@@ -958,11 +958,18 @@ def cmd_run_agent_workflow(args: argparse.Namespace) -> int:
         venue_data = json.loads(Path(args.venue_json).read_text(encoding="utf-8"))
         initial_entities["venue"] = venue_data
 
+    if getattr(args, "venue_guidelines", None):
+        guidelines_text = Path(args.venue_guidelines).read_text(encoding="utf-8")
+        initial_entities["venue_guidelines_text"] = guidelines_text
+
     provider = _resolve_llm_provider(args)
+
+    stop_on_fail = getattr(args, "stop_on_failure", False)
 
     _safe_print(f"Running workflow: {spec.display_name}")
     _safe_print(f"Steps: {len(spec.steps)}")
     _safe_print(f"LLM provider: {'configured' if provider else 'none (deterministic only)'}")
+    _safe_print(f"Stop on failure: {stop_on_fail}")
     _safe_print("")
 
     result = run_workflow(
@@ -971,6 +978,7 @@ def cmd_run_agent_workflow(args: argparse.Namespace) -> int:
         raw_text=initial_entities.get("raw_text"),
         provider=provider,
         prefer_deterministic=not getattr(args, "use_llm", False),
+        stop_on_failure=stop_on_fail,
     )
 
     _safe_print(f"Status: {result.status}")
@@ -979,6 +987,14 @@ def cmd_run_agent_workflow(args: argparse.Namespace) -> int:
     for sr in result.step_results:
         status_mark = "OK" if sr.get("status") == "completed" else sr.get("status", "?").upper()
         _safe_print(f"  [{status_mark}] step[{sr['step_index']}] {sr['agent_role_id']}")
+
+    trace = getattr(result, "_trace", None)
+    if getattr(args, "show_trace", False) and trace:
+        _safe_print("")
+        _safe_print("--- Workflow Trace ---")
+        trace_dict = trace.to_dict() if hasattr(trace, "to_dict") else {}
+        for entry in trace_dict.get("steps_log", []):
+            _safe_print(f"  {entry}")
 
     if args.output:
         out = Path(args.output)
@@ -1136,6 +1152,9 @@ def main(argv: list[str] | None = None) -> int:
     run_wf_parser.add_argument("--venue-json", default=None, help="Path to venue JSON file")
     run_wf_parser.add_argument("--output", default=None, help="Output JSON file for full result")
     run_wf_parser.add_argument("--use-llm", action="store_true", help="Prefer LLM execution over deterministic")
+    run_wf_parser.add_argument("--stop-on-failure", action="store_true", default=False, help="Stop workflow on first step failure")
+    run_wf_parser.add_argument("--venue-guidelines", default=None, help="Path to venue guidelines text file")
+    run_wf_parser.add_argument("--show-trace", action="store_true", default=False, help="Show workflow trace log after run")
     run_wf_parser.add_argument("--llm-model", default=None, help="LLM model name")
     run_wf_parser.add_argument("--llm-base-url", default=None, help="LLM API base URL")
     run_wf_parser.add_argument("--llm-api-key-env", default=None, help="Env var for API key")

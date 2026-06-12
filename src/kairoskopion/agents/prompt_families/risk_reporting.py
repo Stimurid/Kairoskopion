@@ -103,13 +103,27 @@ OUTPUT_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "risk_type": {"type": "string"},
-                    "severity": {"type": "string"},
+                    "risk_type": {
+                        "type": "string",
+                        "enum": [
+                            "desk_rejection", "scope_mismatch", "method_gap",
+                            "genre_mismatch", "language_barrier", "citation_gap",
+                            "novelty_concern", "compliance_gap", "timing_risk",
+                            "author_eligibility", "field_core_destruction",
+                            "ethical_concern", "career_risk", "indexing_risk",
+                            "cost_risk", "review_hostility", "regime_instability",
+                            "evidence_insufficiency",
+                        ],
+                    },
+                    "severity": {
+                        "type": "string",
+                        "enum": ["critical", "high", "medium", "low", "informational"],
+                    },
                     "description": {"type": "string"},
                     "evidence": {"type": "string"},
                     "mitigation": {"type": ["string", "null"]},
                 },
-                "required": ["risk_type", "severity", "description"],
+                "required": ["risk_type", "severity", "description", "evidence"],
             },
         },
         "overall_risk_level": {
@@ -148,8 +162,12 @@ RISK_REPORTING_FAMILY = {
     "family_id": FAMILY_ID,
     "agent_role_id": "risk_officer",
     "version": VERSION,
+    "purpose": PURPOSE,
     "system_prompt": SYSTEM_PROMPT,
     "user_prompt_template": USER_TEMPLATE,
     "output_schema": OUTPUT_SCHEMA,
     "validator": validate_risk_report,
+    "forbidden_behaviors": FORBIDDEN_BEHAVIORS,
+    "evidence_requirements": EVIDENCE_REQUIREMENTS,
+    "unknown_handling": UNKNOWN_HANDLING,
 }

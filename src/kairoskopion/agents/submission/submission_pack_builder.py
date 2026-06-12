@@ -7,7 +7,7 @@ from ..contract import AgentInput, AgentOutput, AgentRole
 from ...llm.provider import LLMProvider
 from ...schema import (
     ArticleModel, ComplianceChecklist, FitAssessment,
-    MismatchMap, RewritePlan, RiskReport, VenueModel,
+    RiskReport, SubmissionScenario, VenueModel,
 )
 from ...services.submission_pack import build_submission_pack
 
@@ -20,21 +20,19 @@ class SubmissionPackBuilderAgent(AgentRole):
 
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
         e = inp.entities
-        if not e.get("article") or not e.get("venue"):
-            return missing_input_output("SubmissionPack", "article and venue")
+        if not e.get("article") or not e.get("venue") or not e.get("scenario"):
+            return missing_input_output("SubmissionPack", "article, venue, and scenario")
 
         article = ArticleModel.from_dict(e["article"])
         venue = VenueModel.from_dict(e["venue"])
+        scenario = SubmissionScenario.from_dict(e["scenario"])
         fit = FitAssessment.from_dict(e["fit_assessment"]) if e.get("fit_assessment") else None
-        mm = MismatchMap.from_dict(e["mismatch_map"]) if e.get("mismatch_map") else None
-        rw = RewritePlan.from_dict(e["rewrite_plan"]) if e.get("rewrite_plan") else None
         risk = RiskReport.from_dict(e["risk_report"]) if e.get("risk_report") else None
         cc = ComplianceChecklist.from_dict(e["compliance"]) if e.get("compliance") else None
 
         pack = build_submission_pack(
-            article=article, venue=venue, fit=fit,
-            mismatch_map=mm, rewrite_plan=rw,
-            risk_report=risk, compliance=cc,
+            article=article, venue=venue, scenario=scenario,
+            fit=fit, risk=risk, compliance=cc,
         )
 
         return service_output(

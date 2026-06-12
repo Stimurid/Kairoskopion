@@ -103,15 +103,17 @@ DISCIPLINARY_MAPPING_OUTPUT_SCHEMA: dict = {
                     },
                     "field_core_risk": {
                         "type": ["string", "null"],
-                        "description": "Risk level: none, low, medium, high, destructive",
+                        "enum": ["none", "low", "medium", "high", "destructive", None],
                     },
                     "venue_type_hints": {
                         "type": "array",
                         "items": {"type": "string"},
+                        "description": "Generic venue type labels (e.g. 'philosophy journal', 'STS proceedings')",
                     },
                     "example_venue_names": {
                         "type": "array",
                         "items": {"type": "string"},
+                        "description": "Only include if you are certain the venue exists and publishes in this area. Omit rather than guess.",
                     },
                     "language_options": {
                         "type": "array",

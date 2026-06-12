@@ -152,8 +152,12 @@ MISMATCH_MAPPING_FAMILY = {
     "family_id": FAMILY_ID,
     "agent_role_id": "mismatch_mapper",
     "version": VERSION,
+    "purpose": PURPOSE,
     "system_prompt": SYSTEM_PROMPT,
     "user_prompt_template": USER_TEMPLATE,
     "output_schema": OUTPUT_SCHEMA,
     "validator": validate_mismatch_mapping,
+    "forbidden_behaviors": FORBIDDEN_BEHAVIORS,
+    "evidence_requirements": EVIDENCE_REQUIREMENTS,
+    "unknown_handling": UNKNOWN_HANDLING,
 }

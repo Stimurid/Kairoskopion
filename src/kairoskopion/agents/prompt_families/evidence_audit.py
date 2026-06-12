@@ -112,6 +112,16 @@ def validate_evidence_audit(data: dict) -> list[str]:
     warnings: list[str] = []
     if data.get("fabrication_risks") and data.get("quality_gate") == "PASS":
         warnings.append("Fabrication risks present but gate is PASS")
+    coverage = data.get("source_coverage_pct")
+    gate = data.get("quality_gate")
+    if coverage is not None and gate:
+        if gate == "PASS" and coverage < 80:
+            warnings.append(f"Gate is PASS but source coverage {coverage}% < 80% threshold")
+        if gate == "FAIL" and coverage >= 80 and not data.get("fabrication_risks"):
+            warnings.append(f"Gate is FAIL but coverage {coverage}% >= 80% with no fabrication risks")
+    unknown_count = data.get("unknown_count")
+    if unknown_count is not None and gate == "PASS" and unknown_count > 5:
+        warnings.append(f"Gate is PASS but {unknown_count} unknowns > 5 threshold")
     return warnings
 
 
@@ -119,8 +129,12 @@ EVIDENCE_AUDIT_FAMILY = {
     "family_id": FAMILY_ID,
     "agent_role_id": "evidence_auditor",
     "version": VERSION,
+    "purpose": PURPOSE,
     "system_prompt": SYSTEM_PROMPT,
     "user_prompt_template": USER_TEMPLATE,
     "output_schema": OUTPUT_SCHEMA,
     "validator": validate_evidence_audit,
+    "forbidden_behaviors": FORBIDDEN_BEHAVIORS,
+    "evidence_requirements": EVIDENCE_REQUIREMENTS,
+    "unknown_handling": UNKNOWN_HANDLING,
 }

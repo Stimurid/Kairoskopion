@@ -128,8 +128,12 @@ CORPUS_PATTERN_MINING_FAMILY = {
     "family_id": FAMILY_ID,
     "agent_role_id": "published_corpus_builder",
     "version": VERSION,
+    "purpose": PURPOSE,
     "system_prompt": SYSTEM_PROMPT,
     "user_prompt_template": USER_TEMPLATE,
     "output_schema": OUTPUT_SCHEMA,
     "validator": validate_corpus_patterns,
+    "forbidden_behaviors": FORBIDDEN_BEHAVIORS,
+    "evidence_requirements": EVIDENCE_REQUIREMENTS,
+    "unknown_handling": UNKNOWN_HANDLING,
 }

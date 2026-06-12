@@ -80,7 +80,17 @@ OUTPUT_SCHEMA: dict = {
     "title": "PublicationRegimeResult",
     "type": "object",
     "properties": {
-        "regime_type": {"type": "string"},
+        "regime_type": {
+            "type": "string",
+            "enum": [
+                "classic_journal_article", "special_issue_article",
+                "research_topic_article", "conference_proceedings",
+                "mega_journal", "reviewed_preprint", "publish_then_review",
+                "open_review_conference", "humanities_special_issue",
+                "book_symposium", "focused_debate", "edited_volume",
+                "non_focus_q3_or_local", "zine_or_nonstandard", "unknown",
+            ],
+        },
         "review_type": {
             "type": "string",
             "enum": ["single_blind", "double_blind", "open_review",
@@ -137,8 +147,12 @@ PUBLICATION_REGIME_FAMILY = {
     "family_id": FAMILY_ID,
     "agent_role_id": "publication_regime_classifier",
     "version": VERSION,
+    "purpose": PURPOSE,
     "system_prompt": SYSTEM_PROMPT,
     "user_prompt_template": USER_TEMPLATE,
     "output_schema": OUTPUT_SCHEMA,
     "validator": validate_publication_regime,
+    "forbidden_behaviors": FORBIDDEN_BEHAVIORS,
+    "evidence_requirements": EVIDENCE_REQUIREMENTS,
+    "unknown_handling": UNKNOWN_HANDLING,
 }

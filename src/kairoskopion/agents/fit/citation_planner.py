@@ -6,6 +6,7 @@ from ..base_shell import missing_input_output, service_output
 from ..contract import AgentInput, AgentOutput, AgentRole
 from ...llm.provider import LLMProvider
 from ...schema import ArticleModel, VenueModel
+from ...services.bibliography_parsing import build_bibliography_profile
 from ...services.citation_ecology import build_citation_ecology_report
 
 
@@ -23,7 +24,18 @@ class CitationPlannerAgent(AgentRole):
 
         article = ArticleModel.from_dict(article_data)
         venue = VenueModel.from_dict(venue_data)
-        report = build_citation_ecology_report(article, venue)
+
+        bib_data = inp.entities.get("bibliography_profile")
+        if bib_data:
+            from ...schema import BibliographyProfile
+            bib_profile = BibliographyProfile.from_dict(bib_data)
+        else:
+            manuscript_text = inp.raw_text or ""
+            bib_profile = build_bibliography_profile(manuscript_text)
+
+        guidelines_text = inp.entities.get("venue_guidelines_text", "")
+
+        report = build_citation_ecology_report(bib_profile, article, venue, guidelines_text)
 
         return service_output(
             "CitationEcologyReport",
