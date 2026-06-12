@@ -6,6 +6,31 @@ Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.m
 
 ---
 
+## Agentic Contour v0.1 (UC-1 Orchestrated Layer) ✓ DONE (2026-06-12)
+
+**Goal:** Implement the full UC-1 orchestrated agent layer: runtime models, 26 agent shells (7 layers), registry, executor, orchestrator, 4 workflow specs, 16 prompt families, 7 CLI commands. All operational agents wrap existing deterministic services. Review layer is contract-only (6 stubs). No fabrication.
+
+**Phases completed:**
+1. ✓ Runtime models: 13 dataclasses (AgentSpec, AgentTask, AgentRun, AgentResult, AgentTrace, AgentFailure, AgentToolCall, WorkflowStepSpec, AgenticWorkflowSpec, WorkflowRun, WorkflowResult, WorkflowTrace)
+2. ✓ 7 new enums + 7 new ID factories
+3. ✓ 11 new prompt families + catalog (16 total)
+4. ✓ 21 new agent shells (4 control, 4 venue, 3 fit, 3 submission, 6 review, 1 evidence) + base_shell utilities
+5. ✓ Agent registry: 26 AgentSpec entries, layer filtering, class instantiation
+6. ✓ Executor: single-agent execution with task/run/trace tracking
+7. ✓ Orchestrator: sequential workflow with shared entity pool, skip_if_missing
+8. ✓ 4 workflow specs: direct_manuscript_venue_fit (8), uc1_draft_to_venue_pool (12), venue_deep_profile (3), review_loop (6, skeleton)
+9. ✓ 7 CLI commands: list-agents, inspect-agent, list-prompt-families, inspect-prompt-family, list-workflows, inspect-workflow, run-agent-workflow
+10. ✓ 76 new tests (782 total, was 706)
+11. ✓ Architecture + report docs
+
+**What this is NOT:** LLM execution exercised, review-layer functional, parallel orchestration.
+
+**Branch:** `feature/agentic-contour-uc1-v01`
+**Tests added:** 76 new tests (782 total)
+**Report:** `docs/AGENTIC_CONTOUR_V0_REPORT.md`
+
+---
+
 ## UC-1 Semantic Profiling Agents + LLM Config ✓ DONE (2026-06-12)
 
 **Goal:** Implement UC-1 "Draft-to-Venue-Pool Positioning" substrate: LLM config aligned with litops/quint, agent contract, 5 agents (3 pipeline + 2 UC-1 profiling), 5 prompt families, 7 new schema entities, 3 new enums. Production LLM config supported but deterministic fallback always available.

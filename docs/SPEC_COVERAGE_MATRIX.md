@@ -124,7 +124,12 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 
 | Spec area | Required capability | Status | Evidence | Missing | Priority | Sprint |
 |-----------|-------------------|--------|----------|---------|----------|--------|
-| §68–93 Agent/prompt layer | LLM agent roles, prompt templates, orchestration | Deferred | All services are deterministic (no LLM) | No agent roles, no prompt families, no orchestration | P3 | LLM layer |
+| §68 Agent contract | AgentInput/AgentOutput/AgentRole ABC | Implemented | `agents/contract.py` | — | — | Done |
+| §69 Agent registry | AgentSpec registry with layer/mode/status | Implemented | `agents/registry.py` (26 specs, 7 layers) | — | — | Done |
+| §70 Agent execution | Task/Run/Result/Trace lifecycle | Implemented | `agents/executor.py`, `agents/runtime_models.py` | LLM execution path not exercised in tests | P2 | — |
+| §71 Workflow orchestration | Sequential step execution with entity pool | Implemented | `agents/orchestrator.py`, `agents/workflows.py` (4 workflows) | No parallel orchestration | P2 | — |
+| §72–82 Agent roles (26) | Control, article, venue, fit, submission, review, evidence | Partial | 20 operational agents, 6 contract-only stubs (review layer) | Review layer requires LLM | P2 | Review loop |
+| §83–93 Prompt families (16) | System prompts, user templates, output schemas, validators | Implemented | `agents/prompt_families/` (16 families in catalog) | — | — | Done |
 
 ## Wave 7 — UI/UX (§94–115)
 
@@ -164,17 +169,17 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 
 | Status | Count | % of spec areas |
 |--------|-------|-----------------|
-| Implemented | 38 | 57% |
-| Partial | 10 | 15% |
+| Implemented | 43 | 60% |
+| Partial | 11 | 15% |
 | Stub | 2 | 3% |
-| Planned | 12 | 18% |
-| Deferred | 3 | 4% |
+| Planned | 12 | 17% |
+| Deferred | 2 | 3% |
 | Rejected | 0 | 0% |
-| **Total tracked** | **67** | — |
+| **Total tracked** | **72** | — |
 
 ### What is solid
 
-- Core formula pipeline (18 steps, 556 tests)
+- Core formula pipeline (18 steps, 782 tests)
 - Evidence status taxonomy (11 statuses)
 - Multi-axis fit (12 axes, no single score)
 - Risk report (18 risk types)
@@ -189,11 +194,18 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 - JSONL persistence (17+ registries)
 - Vault markdown cards with cross-links, indexes, manifest
 - Export/import bundles, freshness tracking, quality gates
-- CLI (16 commands)
+- CLI (23 commands)
+- Agent contract with dual execution (deterministic + LLM)
+- Agent registry (26 specs, 7 layers)
+- Workflow orchestrator with 4 workflow specs
+- 16 prompt families with schemas and validators
+- Venue evidence registry with seed import and evidence pack build
 
 ### What is honestly missing
 
-- **No LLM-assisted extraction**: P3, explicitly deferred
+- **Review layer agents** are contract-only stubs (6 agents, LLM required): P2
+- **No LLM execution paths exercised in tests**: P2
+- **No parallel workflow orchestration**: P2
 - **No UI beyond CLI**: P3, explicitly deferred
 - **No ReviewLoop** entities (ReviewOutcome, RevisionPlan, VenueMemory): P3
 - **No JournalModel/SectionModel/IssueModel** sub-entities: P2

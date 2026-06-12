@@ -857,6 +857,14 @@ def cmd_build_venue_evidence_pack(args: argparse.Namespace) -> int:
 # Agent / workflow CLI commands (Agentic Contour v0.1)
 # ---------------------------------------------------------------------------
 
+def _print_json(data: dict) -> None:
+    """Print JSON safely on Windows consoles (cp1251/cp1252)."""
+    text = json.dumps(data, indent=2, ensure_ascii=False, default=str)
+    sys.stdout.buffer.write(text.encode("utf-8", errors="replace"))
+    sys.stdout.buffer.write(b"\n")
+    sys.stdout.buffer.flush()
+
+
 def cmd_list_agents(args: argparse.Namespace) -> int:
     from .agents.registry import list_agent_specs
     specs = list_agent_specs()
@@ -877,7 +885,7 @@ def cmd_inspect_agent(args: argparse.Namespace) -> int:
     except KeyError:
         print(f"Unknown agent: {args.role_id}", file=sys.stderr)
         return 1
-    print(json.dumps(spec.to_dict(), indent=2, ensure_ascii=False))
+    _print_json(spec.to_dict())
     return 0
 
 
@@ -897,11 +905,11 @@ def cmd_inspect_prompt_family(args: argparse.Namespace) -> int:
         print(f"Unknown prompt family: {args.family_id}", file=sys.stderr)
         return 1
     if getattr(args, "full", False):
-        safe = dict(fam)
+        safe = {k: v for k, v in fam.items() if not callable(v)}
     else:
-        safe = {k: v for k, v in fam.items() if k != "output_schema"}
+        safe = {k: v for k, v in fam.items() if k != "output_schema" and not callable(v)}
         safe["output_schema"] = "(omitted, use --full to include)"
-    print(json.dumps(safe, indent=2, ensure_ascii=False, default=str))
+    _print_json(safe)
     return 0
 
 
@@ -920,7 +928,7 @@ def cmd_inspect_workflow(args: argparse.Namespace) -> int:
     except KeyError:
         print(f"Unknown workflow: {args.workflow_id}", file=sys.stderr)
         return 1
-    print(json.dumps(wf.to_dict(), indent=2, ensure_ascii=False))
+    _print_json(wf.to_dict())
     return 0
 
 

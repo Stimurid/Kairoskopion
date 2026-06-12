@@ -6,8 +6,8 @@
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `main` at `c78beef` |
-| Tag | `v0.2.0-alpha-rc7` |
+| Branch | `feature/agentic-contour-uc1-v01` at `56f4b88` (pending merge to `main`) |
+| Tag | `v0.2.0-alpha-rc7` (next: `v0.2.0-alpha-rc8`) |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
 | Working tree | clean |
 | Python | >=3.11 |
@@ -38,6 +38,7 @@ evidence-first article-to-venue trajectory engine.
 - Arbitrary manuscript x venue validation matrix: 8 fixture combinations, 28 behavioral tests, 6 CLI smoke cases
 - D16-D17 closed: method detection broadened, citation ecology thresholds refined
 - UC-1 semantic profiling substrate: 5 agents, 5 prompt families, 7 new entities, 3 new enums, LLM config — not full Agent Runtime, but agent contract + deterministic fallback + LLM path operational
+- Agentic Contour v0.1: 26 agents (7 layers), registry, executor, orchestrator, 4 workflows, 16 prompt families, 7 new CLI commands — full UC-1 orchestrated layer
 
 ## Modules implemented
 
@@ -59,7 +60,7 @@ evidence-first article-to-venue trajectory engine.
 | `traces.py` | Operation trace recording |
 | `decisions.py` | User decision tracking |
 | `cards.py` | 8 markdown card generators |
-| `cli.py` | CLI: 16 commands (status, run-fixture, run-local, inspect-storage, adapters-smoke, vault-index, export-bundle, import-bundle, validate-bundle, intake-file, build-venue-profile, build-submission-pack, export-litops-pack, export-whitecrow-patches, import-venue-seed, build-venue-evidence-pack) |
+| `cli.py` | CLI: 23 commands (status, run-fixture, run-local, inspect-storage, adapters-smoke, vault-index, export-bundle, import-bundle, validate-bundle, intake-file, build-venue-profile, build-submission-pack, export-litops-pack, export-whitecrow-patches, import-venue-seed, build-venue-evidence-pack, list-agents, inspect-agent, list-prompt-families, inspect-prompt-family, list-workflows, inspect-workflow, run-agent-workflow) |
 
 ### Services (`src/kairoskopion/services/`)
 
@@ -98,16 +99,25 @@ evidence-first article-to-venue trajectory engine.
 
 ### Agents (`src/kairoskopion/agents/`)
 
-| Agent | Role |
-|-------|------|
+| Module | Role |
+|--------|------|
 | `contract.py` | AgentInput/AgentOutput/AgentRole ABC |
-| `article_modeler.py` | ArticleModelerAgent — article modeling |
-| `venue_profiler.py` | VenueProfilerAgent — venue fact extraction |
-| `fit_assessor.py` | FitAssessorAgent — fit assessment |
-| `semantic_profiler.py` | ArticleSemanticProfilerAgent — UC-1 semantic profiling |
-| `disciplinary_mapper.py` | DisciplinaryPathwayMapperAgent — UC-1 disciplinary pathways |
+| `runtime_models.py` | AgentSpec, AgentTask, AgentRun, AgentResult, AgentTrace, WorkflowStepSpec, etc. |
+| `base_shell.py` | service_output(), contract_only_output(), missing_input_output() |
+| `registry.py` | 26 AgentSpec entries (7 layers), lookup, instantiation |
+| `executor.py` | Single-agent execution with task/run/trace tracking |
+| `orchestrator.py` | Sequential workflow execution with entity pool |
+| `workflows.py` | 4 workflow specs + registry |
+| `prompt_families/` | 16 prompt family modules + catalog |
+| `control/` | 4 agents: IntentClassifier, ScenarioProber, ResearchPlanner, StatusJob |
+| `article/` | 3 agents: ArticleModeler, SemanticProfiler, DisciplinaryMapper |
+| `venue/` | 5 agents: VenueProfiler, VenueIdentifier, VenueDiscovery, PublicationRegimeClassifier, VenuePublicationProfileBuilder |
+| `fit/` | 4 agents: FitAssessor, MismatchMapper, RewritePlanner, CitationPlanner |
+| `submission/` | 3 agents: RiskOfficer, ComplianceAuditor, SubmissionPackBuilder |
+| `review/` | 6 agents (contract-only): ReviewerSimulation, ReviewOutcomeAnalyst, RevisionPlanner, RebuttalArchitect, TacitSignalStructurer, VenueMemoryKeeper |
+| `evidence/` | 1 agent: EvidenceAuditor |
 
-### Prompt families (`src/kairoskopion/prompts/`)
+### Prompt families (`src/kairoskopion/prompts/` + `src/kairoskopion/agents/prompt_families/`)
 
 | Family | Agent |
 |--------|-------|
@@ -116,6 +126,17 @@ evidence-first article-to-venue trajectory engine.
 | `fit_assessment.py` | FitAssessorAgent |
 | `semantic_profiling.py` | ArticleSemanticProfilerAgent |
 | `disciplinary_mapping.py` | DisciplinaryPathwayMapperAgent |
+| `scenario_interview.py` | ScenarioProber |
+| `publication_regime.py` | PublicationRegimeClassifier |
+| `corpus_pattern_mining.py` | VenuePublicationProfileBuilder |
+| `citation_ecology.py` | CitationPlanner |
+| `mismatch_mapping.py` | MismatchMapper |
+| `rewrite_planning.py` | RewritePlanner |
+| `risk_reporting.py` | RiskOfficer |
+| `compliance_checklist.py` | ComplianceAuditor |
+| `submission_pack.py` | SubmissionPackBuilder |
+| `review_outcome.py` | ReviewOutcomeAnalyst |
+| `evidence_audit.py` | EvidenceAuditor |
 
 ### Adapters
 
@@ -167,7 +188,7 @@ evidence-first article-to-venue trajectory engine.
 | `kairoskopion inspect-workflow WORKFLOW_ID` | Show workflow spec as JSON |
 | `kairoskopion run-agent-workflow WORKFLOW_ID` | Run an agentic workflow |
 
-Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--adapter-mode mock|real`.
+Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--adapter-mode mock|real`; `--llm-model`, `--llm-base-url`, `--llm-api-key-env` for LLM-backed commands.
 
 ## Storage layout
 
@@ -201,8 +222,8 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **782 tests**, all passing
-- 43+ test files covering: schema, registry, evidence, quality, cards,
+- **782 tests**, all passing (76 new in Agentic Contour v0.1)
+- 49+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
   source acquisition, bibliography parsing, citation ecology, adapters,
