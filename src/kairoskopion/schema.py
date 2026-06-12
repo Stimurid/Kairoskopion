@@ -52,7 +52,11 @@ from .ids import (
     submission_pack_id,
     submission_scenario_id,
     trajectory_report_id,
+    venue_claim_id,
+    venue_evidence_pack_id,
     venue_model_id,
+    venue_record_id,
+    venue_source_id,
 )
 
 
@@ -559,3 +563,64 @@ class PipelineRun(_DictMixin):
     output_level: str = OutputLevel.PRELIMINARY.value
     started_at: str = dc.field(default_factory=_now)
     finished_at: str | None = _field()
+
+
+# ---------------------------------------------------------------------------
+# Venue Registry (venue-registry-source-collector v0)
+# ---------------------------------------------------------------------------
+
+@dc.dataclass
+class VenueRecord(_DictMixin):
+    venue_record_id: str = dc.field(default_factory=venue_record_id)
+    canonical_name: str | None = _field()
+    aliases: list[str] = _list()
+    issn: str | None = _field()
+    eissn: str | None = _field()
+    publisher: str | None = _field()
+    official_urls: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+    updated_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class VenueSource(_DictMixin):
+    venue_source_id: str = dc.field(default_factory=venue_source_id)
+    venue_record_id: str | None = _field()
+    source_url: str | None = _field()
+    source_title: str | None = _field()
+    source_type: str | None = _field()
+    retrieved_at: str | None = _field()
+    freshness_window_days: int | None = _field()
+    extracted_by: str | None = _field()
+    extraction_method: str | None = _field()
+    notes: str | None = _field()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class VenueClaim(_DictMixin):
+    venue_claim_id: str = dc.field(default_factory=venue_claim_id)
+    venue_record_id: str | None = _field()
+    venue_source_id: str | None = _field()
+    claim_path: str | None = _field()
+    claim_value: Any = _field()
+    evidence_status: str | None = _field()
+    confidence: str | None = _field()
+    quote_or_summary: str | None = _field()
+    conflict_group: str | None = _field()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class VenueEvidencePack(_DictMixin):
+    evidence_pack_id: str = dc.field(default_factory=venue_evidence_pack_id)
+    venue_record_id: str | None = _field()
+    profile: dict[str, Any] = _dict()
+    official_facts: list[str] = _list()
+    external_claims: list[str] = _list()
+    inferences: list[str] = _list()
+    unknowns: list[str] = _list()
+    conflicts: list[dict[str, Any]] = _list()
+    stale_warnings: list[str] = _list()
+    build_log: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)

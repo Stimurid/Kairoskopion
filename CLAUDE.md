@@ -52,8 +52,8 @@ For deep spec questions, read:
 
 ## What is implemented (foundation)
 
-- 18+ dataclass domain models with `to_dict`/`from_dict`
-- 23 domain enums (EvidenceStatus, FitAxisValue, FieldCoreImpact, etc.)
+- 22+ dataclass domain models with `to_dict`/`from_dict`
+- 25 domain enums (EvidenceStatus, FitAxisValue, FieldCoreImpact, VenueClaimStatus, VenueSourceType, etc.)
 - 13 deterministic domain services (no LLM)
 - 18-step ManuscriptVenueFitPipeline
 - JSONL append-only persistence (17+ registries)
@@ -69,7 +69,8 @@ For deep spec questions, read:
 - Submission pack preparation with readiness assessment
 - Litops compatibility bridge (export-litops-pack)
 - WhiteCrow patch queue bridge (export-whitecrow-patches)
-- CLI: 14 commands (`status`, `run-fixture`, `run-local`, `adapters-smoke`, `vault-index`, `export-bundle`, `import-bundle`, `validate-bundle`, `inspect-storage`, `intake-file`, `build-venue-profile`, `build-submission-pack`, `export-litops-pack`, `export-whitecrow-patches`)
+- Venue evidence registry: VenueRecord/VenueSource/VenueClaim/VenueEvidencePack, seed corpus import, evidence pack build with conflict resolution
+- CLI: 16 commands (`status`, `run-fixture`, `run-local`, `adapters-smoke`, `vault-index`, `export-bundle`, `import-bundle`, `validate-bundle`, `inspect-storage`, `intake-file`, `build-venue-profile`, `build-submission-pack`, `export-litops-pack`, `export-whitecrow-patches`, `import-venue-seed`, `build-venue-evidence-pack`)
 - Integration: Litops bridge (JSONL export), WhiteCrow bridge (patch queue export)
 
 ## Non-negotiable rules

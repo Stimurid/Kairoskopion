@@ -97,3 +97,15 @@ def adapter_result_id() -> str:
 
 def trajectory_report_id() -> str:
     return generate_id("ptr")
+
+def venue_record_id() -> str:
+    return generate_id("vrec")
+
+def venue_source_id() -> str:
+    return generate_id("vsrc")
+
+def venue_claim_id() -> str:
+    return generate_id("vclm")
+
+def venue_evidence_pack_id() -> str:
+    return generate_id("vpack")

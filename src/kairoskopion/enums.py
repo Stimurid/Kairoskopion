@@ -324,3 +324,26 @@ class AdapterStatus(str, Enum):
     NO_RESULTS = "no_results"
     ERROR = "error"
     MOCK = "mock"
+
+
+class VenueClaimStatus(str, Enum):
+    OFFICIAL_FACT = "official_fact"
+    EXTERNAL_CLAIM = "external_claim"
+    INFERENCE = "inference"
+    UNKNOWN = "unknown"
+    CONFLICTING = "conflicting"
+    STALE = "stale"
+    DEPRECATED = "deprecated"
+
+
+class VenueSourceType(str, Enum):
+    OFFICIAL_HOMEPAGE = "official_homepage"
+    OFFICIAL_AUTHOR_GUIDELINES = "official_author_guidelines"
+    OFFICIAL_EDITORIAL_POLICY = "official_editorial_policy"
+    OFFICIAL_ARCHIVE = "official_archive"
+    OFFICIAL_CONTACTS = "official_contacts"
+    REGISTRY_CARD = "registry_card"
+    INDEXER_PAGE = "indexer_page"
+    PUBLISHER_PAGE = "publisher_page"
+    THIRD_PARTY_SUMMARY = "third_party_summary"
+    MANUAL_NOTE = "manual_note"

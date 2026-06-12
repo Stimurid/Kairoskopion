@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — Venue Registry v0
+
+### Added
+- Venue evidence registry: VenueRecord, VenueSource, VenueClaim, VenueEvidencePack data model
+- VenueClaimStatus enum (7 statuses), VenueSourceType enum (10 types)
+- Venue registry service module (`services/venue_registry.py`): import, persist, build, conflict resolution, Markdown rendering
+- Seed corpus: 5 synthetic venues (34 claims, 12 sources) in `examples/venue_seed_corpus/`
+- CLI: `import-venue-seed`, `build-venue-evidence-pack` (16 total, was 14)
+- Architecture spec: `docs/VENUE_REGISTRY_ARCHITECTURE.md`
+- 32 venue registry tests (673 total, was 641)
+
+### Fixed
+- Conflict group detection: claims with `conflict_group` marker now correctly trigger conflict reporting even when only one claim in the pair is marked
+
+---
+
 ## [0.2.0-alpha-rc5] — 2026-06-11
 
 > Tag: `v0.2.0-alpha-rc5`. Arbitrary manuscript x venue validation matrix proving general-purpose behavior.

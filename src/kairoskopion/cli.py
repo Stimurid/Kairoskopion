@@ -701,6 +701,111 @@ def cmd_export_litops_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_import_venue_seed(args: argparse.Namespace) -> int:
+    """Import venue seed corpus into venue registries."""
+    from .services.venue_registry import import_venue_seed_corpus, persist_import_result
+
+    corpus_dir = Path(args.corpus)
+    storage = _resolve_storage_root(args)
+
+    print(f"Importing venue seed corpus from {corpus_dir.resolve()} ...")
+    result = import_venue_seed_corpus(corpus_dir)
+
+    if not result.success:
+        print("FAILED — validation errors:", file=sys.stderr)
+        for err in result.errors:
+            print(f"  ERROR: {err}", file=sys.stderr)
+        return 1
+
+    if result.warnings:
+        for w in result.warnings:
+            print(f"  WARNING: {w}")
+
+    written = persist_import_result(result, storage)
+
+    print(f"Venues:   {len(result.venues)}")
+    print(f"Sources:  {len(result.sources)}")
+    print(f"Claims:   {len(result.claims)}")
+    print(f"Storage:  {storage.resolve()}")
+    for name, path in sorted(written.items()):
+        print(f"  {name}: {path}")
+    return 0
+
+
+def cmd_build_venue_evidence_pack(args: argparse.Namespace) -> int:
+    """Build venue evidence pack from registry data."""
+    from .services.venue_registry import (
+        build_venue_evidence_pack,
+        evidence_pack_to_markdown,
+        import_venue_seed_corpus,
+    )
+
+    storage = _resolve_storage_root(args)
+    reg_root = storage / "registries"
+
+    venues_path = reg_root / "venue_records.jsonl"
+    sources_path = reg_root / "venue_sources.jsonl"
+    claims_path = reg_root / "venue_claims.jsonl"
+
+    missing = [p for p in [venues_path, sources_path, claims_path] if not p.exists()]
+    if missing:
+        print(
+            "Venue registries not found. Run 'import-venue-seed' first.",
+            file=sys.stderr,
+        )
+        for p in missing:
+            print(f"  Missing: {p}", file=sys.stderr)
+        return 1
+
+    from .schema import VenueClaim, VenueRecord, VenueSource
+
+    venues = []
+    with venues_path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                venues.append(VenueRecord.from_dict(json.loads(line)))
+
+    sources = []
+    with sources_path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                sources.append(VenueSource.from_dict(json.loads(line)))
+
+    claims = []
+    with claims_path.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                claims.append(VenueClaim.from_dict(json.loads(line)))
+
+    pack = build_venue_evidence_pack(args.venue_id, venues, sources, claims)
+    if pack is None:
+        print(f"Venue not found: {args.venue_id}", file=sys.stderr)
+        print(f"Available venues ({len(venues)}):", file=sys.stderr)
+        for v in venues:
+            aliases = f" (aliases: {', '.join(v.aliases)})" if v.aliases else ""
+            print(f"  {v.venue_record_id}: {v.canonical_name}{aliases}", file=sys.stderr)
+        return 1
+
+    md = evidence_pack_to_markdown(pack)
+
+    if args.output:
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(md, encoding="utf-8")
+        print(f"Evidence pack written to {out.resolve()}")
+        print(f"  Venue: {pack.profile.get('name', '?')}")
+        print(f"  Official facts: {len(pack.official_facts)}")
+        print(f"  Conflicts: {len(pack.conflicts)}")
+        print(f"  Unknowns: {len(pack.unknowns)}")
+    else:
+        print(md)
+
+    return 0
+
+
 def _find_fixtures_dir() -> Path | None:
     """Search for tests/fixtures/ relative to cwd or package location."""
     cwd_fixtures = Path.cwd() / "tests" / "fixtures"
@@ -813,6 +918,28 @@ def main(argv: list[str] | None = None) -> int:
         help="Target document reference for patches (optional)",
     )
 
+    import_seed_parser = sub.add_parser(
+        "import-venue-seed",
+        help="Import venue seed corpus (JSONL) into venue registries",
+    )
+    import_seed_parser.add_argument(
+        "--corpus", required=True,
+        help="Path to seed corpus directory containing venues.jsonl, sources.jsonl, claims.jsonl",
+    )
+
+    build_epack_parser = sub.add_parser(
+        "build-venue-evidence-pack",
+        help="Build venue evidence pack from registry data",
+    )
+    build_epack_parser.add_argument(
+        "--venue-id", required=True,
+        help="Venue record ID, alias, or canonical name",
+    )
+    build_epack_parser.add_argument(
+        "--output", default=None,
+        help="Output Markdown file path (default: stdout)",
+    )
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -830,6 +957,8 @@ def main(argv: list[str] | None = None) -> int:
         "build-submission-pack": cmd_build_submission_pack,
         "export-litops-pack": cmd_export_litops_pack,
         "export-whitecrow-patches": cmd_export_whitecrow_patches,
+        "import-venue-seed": cmd_import_venue_seed,
+        "build-venue-evidence-pack": cmd_build_venue_evidence_pack,
     }
 
     handler = commands.get(args.command)

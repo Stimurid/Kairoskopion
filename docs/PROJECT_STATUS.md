@@ -1,6 +1,6 @@
 # Project Status — Kairoskopion
 
-**Last updated:** 2026-06-11
+**Last updated:** 2026-06-12
 
 ## Repository
 
@@ -48,9 +48,9 @@ evidence-first article-to-venue trajectory engine.
 
 | Module | Contents |
 |--------|----------|
-| `ids.py` | UUID-based ID generation with 20 prefixes |
-| `enums.py` | 23 domain enums |
-| `schema.py` | 20+ dataclass models with `to_dict`/`from_dict` |
+| `ids.py` | UUID-based ID generation with 24 prefixes |
+| `enums.py` | 25 domain enums |
+| `schema.py` | 22+ dataclass models with `to_dict`/`from_dict` |
 | `registry.py` | JSONL append/read/list/find |
 | `persistence.py` | Storage root management, pipeline + adapter result persistence |
 | `artifacts.py` | Vault markdown card filesystem output with cross-links |
@@ -62,7 +62,7 @@ evidence-first article-to-venue trajectory engine.
 | `traces.py` | Operation trace recording |
 | `decisions.py` | User decision tracking |
 | `cards.py` | 8 markdown card generators |
-| `cli.py` | CLI: 14 commands (status, run-fixture, run-local, inspect-storage, adapters-smoke, vault-index, export-bundle, import-bundle, validate-bundle, intake-file, build-venue-profile, build-submission-pack, export-litops-pack, export-whitecrow-patches) |
+| `cli.py` | CLI: 16 commands (status, run-fixture, run-local, inspect-storage, adapters-smoke, vault-index, export-bundle, import-bundle, validate-bundle, intake-file, build-venue-profile, build-submission-pack, export-litops-pack, export-whitecrow-patches, import-venue-seed, build-venue-evidence-pack) |
 
 ### Services (`src/kairoskopion/services/`)
 
@@ -82,6 +82,7 @@ evidence-first article-to-venue trajectory engine.
 | `venue_profile_builder.py` | Multi-source venue profiling from local files |
 | `trajectory_report.py` | PublicationTrajectoryReport synthesizing fit+risk+bibliography |
 | `submission_pack.py` | SubmissionPack preparation with readiness assessment |
+| `venue_registry.py` | Venue evidence registry: seed import, evidence pack build, conflict resolution, Markdown rendering |
 
 ### Pipelines
 

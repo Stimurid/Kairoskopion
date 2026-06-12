@@ -1,8 +1,29 @@
 # Engineering Backlog — Kairoskopion
 
-**Last updated:** 2026-06-11
+**Last updated:** 2026-06-12
 
 Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.md → PROJECT_STATUS → SPEC_COVERAGE_MATRIX → this BACKLOG, picks the next sprint, implements on a feature branch, updates docs/tests/status, commits, pushes. No manual micromanagement required.
+
+---
+
+## Venue Registry / Source Collector Architecture v0 ✓ DONE (2026-06-12)
+
+**Goal:** Design and implement a general venue evidence registry with data model, provenance discipline, import path, seed corpus format, CLI integration, and report integration.
+
+**Phases completed:**
+1. ✓ Architecture spec: `docs/VENUE_REGISTRY_ARCHITECTURE.md`
+2. ✓ Seed corpus: 5 synthetic venues in `examples/venue_seed_corpus/`
+3. ✓ Enums: VenueClaimStatus (7), VenueSourceType (10)
+4. ✓ Domain model: VenueRecord, VenueSource, VenueClaim, VenueEvidencePack
+5. ✓ Service module: import, persist, build, conflict resolution, Markdown rendering
+6. ✓ CLI: `import-venue-seed`, `build-venue-evidence-pack`
+7. ✓ Synthetic trial: evidence pack → run-local pipeline
+8. ✓ Bug fix: conflict_group detection
+9. ✓ Docs update: CHANGELOG, BACKLOG, PROJECT_STATUS, README, CLAUDE.md
+10. ✓ 32 tests, 673 total
+
+**Branch:** `feature/venue-registry-source-collector-v0`
+**Report:** `docs/VENUE_REGISTRY_V0_REPORT.md`
 
 ---
 
