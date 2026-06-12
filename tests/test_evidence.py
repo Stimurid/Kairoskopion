@@ -60,7 +60,8 @@ class TestValidateEvidenceStatus:
 class TestEvidenceStatusEnum:
     def test_all_statuses_present(self):
         expected = {
-            "FACT_FROM_SOURCE", "VENDOR_CLAIM", "CORPUS_OBSERVATION",
+            "FACT_FROM_SOURCE", "FACT_FROM_API_METADATA",
+            "VENDOR_CLAIM", "CORPUS_OBSERVATION",
             "INFERENCE", "TACIT_SIGNAL", "USER_NOTE", "PRIOR_OUTCOME",
             "UNKNOWN", "INACCESSIBLE", "STALE", "CONFLICTING_EVIDENCE",
         }

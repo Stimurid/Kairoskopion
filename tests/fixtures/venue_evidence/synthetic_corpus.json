@@ -1,0 +1,80 @@
+[
+  {
+    "title": "Technology Mediation and the Good Life: A Postphenomenological Analysis",
+    "abstract": "This article develops a postphenomenological framework for understanding how technologies mediate moral experience. Drawing on Verbeek and Ihde, we argue that technology mediation theory must be extended to account for emerging AI systems.",
+    "keywords": ["postphenomenology", "technology mediation", "ethics", "AI", "Verbeek"],
+    "genre": "conceptual_article",
+    "method": "conceptual_method",
+    "year": 2024,
+    "language": "en",
+    "word_count": 8500,
+    "reference_count": 52,
+    "has_fulltext": true,
+    "topics": ["Philosophy of Technology", "Ethics of AI"]
+  },
+  {
+    "title": "Algorithmic Fairness in Hiring: An Empirical Study of Bias Detection Tools",
+    "abstract": "We conduct a comparative analysis of five algorithmic fairness tools applied to hiring datasets. Our survey of 200 HR professionals reveals significant gaps between technical fairness metrics and organizational justice perceptions.",
+    "keywords": ["algorithmic fairness", "hiring", "bias", "empirical", "survey"],
+    "genre": "research_article",
+    "method": "empirical_method",
+    "year": 2025,
+    "language": "en",
+    "word_count": 9200,
+    "reference_count": 68,
+    "has_fulltext": true,
+    "topics": ["AI Ethics", "Algorithmic Fairness"]
+  },
+  {
+    "title": "Actor-Network Theory Meets Autonomous Vehicles: Reassembling the Social in Self-Driving",
+    "abstract": "Applying Latourian actor-network theory to the autonomous vehicle ecosystem, this article traces how human and non-human actors co-construct the sociotechnical assemblage of self-driving. We present ethnographic observations from three AV testing sites.",
+    "keywords": ["STS", "actor-network theory", "autonomous vehicles", "Latour", "ethnography"],
+    "genre": "research_article",
+    "method": "case_based",
+    "year": 2024,
+    "language": "en",
+    "word_count": 10200,
+    "reference_count": 45,
+    "has_fulltext": true,
+    "topics": ["STS", "Autonomous Vehicles"]
+  },
+  {
+    "title": "The Concept of Digital Sovereignty: A Genealogical Investigation",
+    "abstract": "This paper reconstructs the genealogy of digital sovereignty from Westphalian sovereignty through cyber-sovereignty to contemporary data governance debates. We argue that the concept requires fundamental rethinking in light of distributed architectures.",
+    "keywords": ["digital sovereignty", "genealogy", "concept reconstruction", "governance"],
+    "genre": "theoretical_essay",
+    "method": "conceptual_method",
+    "year": 2025,
+    "language": "en",
+    "word_count": 7800,
+    "reference_count": 61,
+    "has_fulltext": false,
+    "topics": ["Philosophy of Technology", "Digital Governance"]
+  },
+  {
+    "title": "Heidegger's Question Concerning AI: Gestell Revisited",
+    "abstract": "We revisit Heidegger's concept of Gestell (enframing) in relation to artificial intelligence systems. While acknowledging the interpretive challenges of applying Heidegger to contemporary technology, we propose that the standing-reserve framework illuminates aspects of AI that instrumental analyses miss.",
+    "keywords": ["Heidegger", "Gestell", "AI", "philosophy of technology", "phenomenology"],
+    "genre": "theoretical_essay",
+    "method": "conceptual_method",
+    "year": 2024,
+    "language": "en",
+    "word_count": 9000,
+    "reference_count": 38,
+    "has_fulltext": true,
+    "topics": ["History of Philosophy", "Philosophy of Technology"]
+  },
+  {
+    "title": "Responsible Innovation in Practice: A Mixed-Methods Study of Three European Living Labs",
+    "abstract": "This article presents findings from a mixed-methods investigation of responsible innovation frameworks deployed in three European living labs. We combine qualitative interviews (n=45) with survey data (n=312) to evaluate whether RI principles translate into measurable outcomes.",
+    "keywords": ["responsible innovation", "living labs", "mixed methods", "Europe", "evaluation"],
+    "genre": "research_article",
+    "method": "mixed",
+    "year": 2025,
+    "language": "en",
+    "word_count": 11000,
+    "reference_count": 72,
+    "has_fulltext": true,
+    "topics": ["STS", "Innovation Studies"]
+  }
+]

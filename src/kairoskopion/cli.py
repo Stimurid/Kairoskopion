@@ -1020,6 +1020,85 @@ def _find_fixtures_dir() -> Path | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# Phase 9: Venue Evidence Stack CLI commands
+# ---------------------------------------------------------------------------
+
+
+def cmd_inspect_venue_depth_policy(args: argparse.Namespace) -> int:
+    from .venue_depth import get_depth_policy
+
+    try:
+        policy = get_depth_policy(args.purpose)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    print(json.dumps(policy.to_dict(), indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_build_venue_evidence_stack(args: argparse.Namespace) -> int:
+    from .services.venue_evidence_stack import build_venue_evidence_stack
+
+    result = build_venue_evidence_stack(
+        venue_name=args.venue_name,
+        venue_issn=args.issn,
+        purpose=args.purpose,
+        offline=True,
+    )
+    output = json.dumps(result.to_dict(), indent=2, ensure_ascii=False, default=str)
+    if args.output:
+        Path(args.output).write_text(output, encoding="utf-8")
+        print(f"Written to {args.output}")
+    else:
+        print(output)
+    return 0
+
+
+def cmd_sample_venue_corpus(args: argparse.Namespace) -> int:
+    from .services.corpus_sampler import sample_venue_corpus
+
+    fixture_path = Path(args.fixture)
+    if not fixture_path.exists():
+        print(f"Fixture file not found: {fixture_path}", file=sys.stderr)
+        return 1
+    articles = json.loads(fixture_path.read_text(encoding="utf-8"))
+    result = sample_venue_corpus(
+        venue_model_id=args.venue_id,
+        article_fixtures=articles,
+    )
+    output = json.dumps(result.to_dict(), indent=2, ensure_ascii=False, default=str)
+    if args.output:
+        Path(args.output).write_text(output, encoding="utf-8")
+        print(f"Written to {args.output}")
+    else:
+        print(output)
+    return 0
+
+
+def cmd_analyze_venue_corpus(args: argparse.Namespace) -> int:
+    from .services.corpus_analyzer import analyze_venue_corpus
+    from .schema import PublishedArticleCorpus
+
+    fixture_path = Path(args.fixture)
+    if not fixture_path.exists():
+        print(f"Fixture file not found: {fixture_path}", file=sys.stderr)
+        return 1
+    articles = json.loads(fixture_path.read_text(encoding="utf-8"))
+    corpus = PublishedArticleCorpus(
+        venue_model_id=args.venue_id,
+        corpus_size=len(articles),
+    )
+    result = analyze_venue_corpus(corpus, article_texts=articles)
+    output = json.dumps(result.to_dict(), indent=2, ensure_ascii=False, default=str)
+    if args.output:
+        Path(args.output).write_text(output, encoding="utf-8")
+        print(f"Written to {args.output}")
+    else:
+        print(output)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="kairoskopion",
@@ -1181,6 +1260,71 @@ def main(argv: list[str] | None = None) -> int:
         help="Output Markdown file path (default: stdout)",
     )
 
+    # --- Phase 9: Venue Evidence Stack CLI commands ---
+    depth_policy_parser = sub.add_parser(
+        "inspect-venue-depth-policy",
+        help="Show depth policy for a given purpose",
+    )
+    depth_policy_parser.add_argument(
+        "--purpose", default="quick_look",
+        help="Purpose: quick_look, fit_assessment, venue_deep_profile, submission_ready",
+    )
+
+    build_stack_parser = sub.add_parser(
+        "build-venue-evidence-stack",
+        help="Build venue evidence stack to depth required by purpose",
+    )
+    build_stack_parser.add_argument(
+        "--venue-name", default=None,
+        help="Venue canonical name",
+    )
+    build_stack_parser.add_argument(
+        "--issn", default=None,
+        help="Venue ISSN",
+    )
+    build_stack_parser.add_argument(
+        "--purpose", default="quick_look",
+        help="Purpose: quick_look, fit_assessment, venue_deep_profile, submission_ready",
+    )
+    build_stack_parser.add_argument(
+        "--output", default=None,
+        help="Output JSON file path (default: stdout)",
+    )
+
+    sample_corpus_parser = sub.add_parser(
+        "sample-venue-corpus",
+        help="Build a PublishedArticleCorpus from fixture articles",
+    )
+    sample_corpus_parser.add_argument(
+        "--fixture", required=True,
+        help="Path to article fixtures JSON file",
+    )
+    sample_corpus_parser.add_argument(
+        "--venue-id", default=None,
+        help="Venue model ID",
+    )
+    sample_corpus_parser.add_argument(
+        "--output", default=None,
+        help="Output JSON file path (default: stdout)",
+    )
+
+    analyze_corpus_parser = sub.add_parser(
+        "analyze-venue-corpus",
+        help="Analyze a venue corpus for method/school patterns",
+    )
+    analyze_corpus_parser.add_argument(
+        "--fixture", required=True,
+        help="Path to article fixtures JSON file",
+    )
+    analyze_corpus_parser.add_argument(
+        "--venue-id", default=None,
+        help="Venue model ID",
+    )
+    analyze_corpus_parser.add_argument(
+        "--output", default=None,
+        help="Output JSON file path (default: stdout)",
+    )
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -1207,6 +1351,10 @@ def main(argv: list[str] | None = None) -> int:
         "list-workflows": cmd_list_workflows,
         "inspect-workflow": cmd_inspect_workflow,
         "run-agent-workflow": cmd_run_agent_workflow,
+        "inspect-venue-depth-policy": cmd_inspect_venue_depth_policy,
+        "build-venue-evidence-stack": cmd_build_venue_evidence_stack,
+        "sample-venue-corpus": cmd_sample_venue_corpus,
+        "analyze-venue-corpus": cmd_analyze_venue_corpus,
     }
 
     handler = commands.get(args.command)

@@ -1,0 +1,19 @@
+{
+  "venue_record_id": "vrec_synth_philtec",
+  "canonical_name": "Synthetic Philosophy of Technology Journal",
+  "aliases": ["SynthPhilTech", "SPTJ"],
+  "issn": "0000-0001",
+  "eissn": "0000-0002",
+  "publisher": "Synthetic Academic Press",
+  "official_urls": ["https://example.com/sptj"],
+  "venue_type": "journal",
+  "scope_summary": "Publishes original research in philosophy of technology, STS, AI ethics, and related interdisciplinary fields.",
+  "article_types_supported": ["research_article", "theoretical_essay", "commentary", "review"],
+  "language_policy": "English only",
+  "review_process": "double_blind",
+  "word_limits": {"max": 10000, "abstract_max": 250},
+  "open_access": "hybrid",
+  "apc_amount": "EUR 2990",
+  "indexing_claims": ["Scopus", "Web of Science ESCI", "PhilPapers"],
+  "topics": ["Philosophy of Technology", "Ethics of AI", "STS", "Digital Ethics"]
+}
