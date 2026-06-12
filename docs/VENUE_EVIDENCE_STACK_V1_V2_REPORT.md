@@ -64,7 +64,7 @@ Implemented the Venue Evidence Stack foundation: 8-level depth model, demand-dri
 - L6 external citation graph (OpenCitations live mode)
 - L7 user memory/outcomes tracking
 - Live API mode for all adapters (currently offline_stub only)
-- Vault persistence across CLI invocations (currently in-memory per run)
+- Vault persistence across CLI invocations (LocalFsVault implementation exists and is tested, but CLI commands do not pass a vault instance — they operate in-memory per run; wiring vault to CLI is a future task)
 
 ## Constraints honored
 

@@ -18,7 +18,7 @@ Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.m
 5. ✓ VenuePublicationProfileBuilderAgent rewrite: depth-aware, corpus/citation/editorial consumption
 6. ✓ Workflow wiring: venue_identifier in direct_fit (9 steps), corpus_sampler in venue_deep_profile (4 steps)
 7. ✓ CLI smoke: all 4 new commands produce valid output
-8. ✓ Documentation: 4 new docs (REPORT, DEPTH_POLICY, VAULT_BACKEND_ARCHITECTURE, CORPUS_PROFILER), 5 updated (CHANGELOG, PROJECT_STATUS, BACKLOG, SPEC_COVERAGE_MATRIX)
+8. ✓ Documentation: 4 new docs (REPORT, VENUE_DEPTH_POLICY, VAULT_BACKEND_ARCHITECTURE, VENUE_CORPUS_PROFILER_V2), 5 updated (CHANGELOG, PROJECT_STATUS, BACKLOG, SPEC_COVERAGE_MATRIX)
 9. ✓ Full validation: 855 tests passing, 0 failures
 10. ✓ Commit and push
 

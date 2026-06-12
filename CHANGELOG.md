@@ -17,7 +17,7 @@ All notable changes to this project will be documented in this file.
 - **4 new CLI commands**: inspect-venue-depth-policy, build-venue-evidence-stack, sample-venue-corpus, analyze-venue-corpus
 - **New enum value**: FACT_FROM_API_METADATA in EvidenceStatus
 - 73 new tests (855 total, was 782)
-- 4 new docs: REPORT, DEPTH_POLICY, VAULT_BACKEND_ARCHITECTURE, CORPUS_PROFILER
+- 4 new docs: REPORT, VENUE_DEPTH_POLICY, VAULT_BACKEND_ARCHITECTURE, VENUE_CORPUS_PROFILER_V2
 
 ### Fixed
 - `topic_clusters` type drift: `list[str]` → `list[dict[str, Any]]` to match corpus sampler output
