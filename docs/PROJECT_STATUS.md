@@ -6,10 +6,10 @@
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `main` at `88ad9b1` |
-| Tag | `v0.2.0-alpha-rc6` |
+| Branch | `main` at `c78beef` |
+| Tag | `v0.2.0-alpha-rc7` |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
-| Working tree | dirty (UC-1 agents + LLM config batch) |
+| Working tree | clean |
 | Python | >=3.11 |
 
 ## Recent commit history (main)
@@ -192,7 +192,7 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **673 tests**, all passing
+- **706 tests**, all passing
 - 28+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
