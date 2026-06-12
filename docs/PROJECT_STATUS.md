@@ -157,6 +157,15 @@ evidence-first article-to-venue trajectory engine.
 | `kairoskopion build-submission-pack` | Build submission pack from latest pipeline run |
 | `kairoskopion export-litops-pack --output-dir DIR` | Export pipeline artifacts as Litops-compatible JSONL |
 | `kairoskopion export-whitecrow-patches --output-dir DIR` | Export patch queue for WhiteCrow from pipeline artifacts |
+| `kairoskopion import-venue-seed --corpus DIR` | Import venue seed corpus into registries |
+| `kairoskopion build-venue-evidence-pack --venue-id ID` | Build venue evidence pack from registry |
+| `kairoskopion list-agents [--layer L]` | List all registered agents |
+| `kairoskopion inspect-agent ROLE_ID` | Show agent spec as JSON |
+| `kairoskopion list-prompt-families` | List all prompt families |
+| `kairoskopion inspect-prompt-family FAMILY_ID` | Show prompt family details |
+| `kairoskopion list-workflows` | List all workflow specs |
+| `kairoskopion inspect-workflow WORKFLOW_ID` | Show workflow spec as JSON |
+| `kairoskopion run-agent-workflow WORKFLOW_ID` | Run an agentic workflow |
 
 Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--adapter-mode mock|real`.
 
@@ -192,8 +201,8 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **706 tests**, all passing
-- 28+ test files covering: schema, registry, evidence, quality, cards,
+- **782 tests**, all passing
+- 43+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
   source acquisition, bibliography parsing, citation ecology, adapters,
@@ -203,7 +212,9 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
   bibliography & trajectory reports, submission pack, Litops bridge, WhiteCrow bridge,
   rewrite planning (conditional actions), language policy extraction,
   generalized venue-fit (language blocker, word limits, article types, discipline matching),
-  arbitrary manuscript x venue validation matrix (6 behavioral cases, 28 tests)
+  arbitrary manuscript x venue validation matrix (6 behavioral cases, 28 tests),
+  agentic runtime models, agent registry (26 agents), agent shells, executor,
+  orchestrator/workflows, agentic CLI commands
 
 ## Fixture pipeline output
 

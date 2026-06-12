@@ -7,13 +7,73 @@ from .fit_assessor import FitAssessorAgent
 from .semantic_profiler import ArticleSemanticProfilerAgent
 from .venue_profiler import VenueProfilerAgent
 
+from .control import (
+    IntentClassifierAgent,
+    ResearchPlannerAgent,
+    ScenarioProberAgent,
+    StatusJobAgent,
+)
+from .venue import (
+    PublicationRegimeClassifierAgent,
+    VenueDiscoveryAgent,
+    VenueIdentifierAgent,
+    VenuePublicationProfileBuilderAgent,
+)
+from .fit import (
+    CitationPlannerAgent,
+    MismatchMapperAgent,
+    RewritePlannerAgent,
+)
+from .submission import (
+    ComplianceAuditorAgent,
+    RiskOfficerAgent,
+    SubmissionPackBuilderAgent,
+)
+from .review import (
+    RebuttalArchitectAgent,
+    ReviewOutcomeAnalystAgent,
+    ReviewerSimulationAgent,
+    RevisionPlannerAgent,
+    TacitSignalStructurerAgent,
+    VenueMemoryKeeperAgent,
+)
+from .evidence import EvidenceAuditorAgent
+
 __all__ = [
     "AgentInput",
     "AgentOutput",
     "AgentRole",
+    # Article layer (existing)
     "ArticleModelerAgent",
     "ArticleSemanticProfilerAgent",
     "DisciplinaryPathwayMapperAgent",
-    "FitAssessorAgent",
+    # Control layer
+    "IntentClassifierAgent",
+    "ResearchPlannerAgent",
+    "ScenarioProberAgent",
+    "StatusJobAgent",
+    # Venue layer
+    "PublicationRegimeClassifierAgent",
+    "VenueDiscoveryAgent",
+    "VenueIdentifierAgent",
+    "VenuePublicationProfileBuilderAgent",
     "VenueProfilerAgent",
+    # Fit layer
+    "CitationPlannerAgent",
+    "FitAssessorAgent",
+    "MismatchMapperAgent",
+    "RewritePlannerAgent",
+    # Submission layer
+    "ComplianceAuditorAgent",
+    "RiskOfficerAgent",
+    "SubmissionPackBuilderAgent",
+    # Review layer (all contract-only)
+    "RebuttalArchitectAgent",
+    "ReviewOutcomeAnalystAgent",
+    "ReviewerSimulationAgent",
+    "RevisionPlannerAgent",
+    "TacitSignalStructurerAgent",
+    "VenueMemoryKeeperAgent",
+    # Evidence layer
+    "EvidenceAuditorAgent",
 ]

@@ -130,3 +130,27 @@ def citation_expectation_profile_id() -> str:
 
 def venue_publication_profile_id() -> str:
     return generate_id("vpp")
+
+
+# --- Agentic contour IDs ---
+
+def agent_task_id() -> str:
+    return generate_timestamp_id("atask")
+
+def agent_run_id() -> str:
+    return generate_timestamp_id("arun")
+
+def agent_result_id() -> str:
+    return generate_id("ares")
+
+def agent_trace_id() -> str:
+    return generate_timestamp_id("atrc")
+
+def workflow_run_id() -> str:
+    return generate_timestamp_id("wfrun")
+
+def workflow_result_id() -> str:
+    return generate_id("wfres")
+
+def workflow_trace_id() -> str:
+    return generate_timestamp_id("wftrc")

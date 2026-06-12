@@ -2,7 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] — UC-1 Semantic Profiling Agents + LLM Config
+## [Unreleased] — Agentic Contour v0.1 (UC-1 Orchestrated Layer)
+
+### Added
+- **Agentic runtime models** (`agents/runtime_models.py`): AgentSpec, AgentTask, AgentRun, AgentResult, AgentTrace, AgentFailure, AgentToolCall, WorkflowStepSpec, AgenticWorkflowSpec, WorkflowRun, WorkflowResult, WorkflowTrace — all with `_DictMixin` serialization
+- **Agent registry** (`agents/registry.py`): 26 AgentSpec entries across 7 layers (control, article, venue, fit, submission, review, evidence) with lookup, instantiation, and class map
+- **Agent executor** (`agents/executor.py`): single-agent execution with task/run/trace tracking, deterministic/LLM dispatch, failure capture
+- **Workflow orchestrator** (`agents/orchestrator.py`): sequential workflow execution with shared entity pool, skip_if_missing, stop_on_failure
+- **4 workflow specs** (`agents/workflows.py`): direct_manuscript_venue_fit (8 steps), uc1_draft_to_venue_pool_positioning (12 steps), venue_deep_profile (3 steps), review_loop (6 steps, skeleton)
+- **21 new agent shells**: 4 control (IntentClassifier, ScenarioProber, ResearchPlanner, StatusJob), 4 venue (VenueIdentifier, VenueDiscovery, PublicationRegimeClassifier, VenuePublicationProfileBuilder), 3 fit (MismatchMapper, RewritePlanner, CitationPlanner), 3 submission (RiskOfficer, ComplianceAuditor, SubmissionPackBuilder), 6 review (all contract-only stubs), 1 evidence (EvidenceAuditor)
+- **Base shell utilities** (`agents/base_shell.py`): service_output(), contract_only_output(), missing_input_output()
+- **11 new prompt families** (`agents/prompt_families/`): scenario_interview, publication_regime, corpus_pattern_mining, citation_ecology, mismatch_mapping, rewrite_planning, risk_reporting, compliance_checklist, submission_pack, review_outcome, evidence_audit
+- **Prompt family catalog** (`agents/prompt_families/catalog.py`): all 16 families aggregated (5 existing + 11 new)
+- **7 new CLI commands**: list-agents, inspect-agent, list-prompt-families, inspect-prompt-family, list-workflows, inspect-workflow, run-agent-workflow
+- **7 new enums**: AgentLayer, AgentExecutionMode, AgentImplementationStatus, AgentRunStatus, WorkflowRunStatus, WorkflowImplementationStatus
+- **7 new ID factories**: atask_, arun_, ares_, atrc_, wfrun_, wfres_, wftrc_
+- 76 new tests (782 total, was 706)
+
+## [v0.2.0-alpha-rc7] — UC-1 Semantic Profiling Agents + LLM Config
 
 ### Added
 - **LLM subsystem** (`src/kairoskopion/llm/`): OpenAI-compatible provider with litops-aligned config

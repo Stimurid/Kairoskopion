@@ -382,3 +382,52 @@ class VariantRelation(str, Enum):
     DISCIPLINARY_TRANSLATION = "disciplinary_translation"
     SPLIT_FRAGMENT = "split_fragment"
     LANGUAGE_TRANSLATION = "language_translation"
+
+
+# --- Agent layer enums (Wave 6, Agentic Contour v0.1) ---
+
+class AgentLayer(str, Enum):
+    CONTROL = "control"
+    ARTICLE = "article"
+    VENUE = "venue"
+    FIT = "fit"
+    SUBMISSION = "submission"
+    REVIEW = "review"
+    EVIDENCE = "evidence"
+
+
+class AgentExecutionMode(str, Enum):
+    DETERMINISTIC = "deterministic"
+    LLM_OPTIONAL = "llm_optional"
+    LLM_REQUIRED = "llm_required"
+    CONTRACT_ONLY = "contract_only"
+
+
+class AgentImplementationStatus(str, Enum):
+    OPERATIONAL_NOW = "operational_now"
+    EXECUTABLE_STUB = "executable_stub"
+    PROMPT_ONLY = "prompt_only"
+    FUTURE = "future"
+
+
+class AgentRunStatus(str, Enum):
+    CREATED = "created"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class WorkflowRunStatus(str, Enum):
+    CREATED = "created"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class WorkflowImplementationStatus(str, Enum):
+    EXECUTABLE = "executable"
+    EXECUTABLE_STUB = "executable_stub"
+    SKELETON = "skeleton"

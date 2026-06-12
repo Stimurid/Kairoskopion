@@ -853,6 +853,130 @@ def cmd_build_venue_evidence_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# Agent / workflow CLI commands (Agentic Contour v0.1)
+# ---------------------------------------------------------------------------
+
+def cmd_list_agents(args: argparse.Namespace) -> int:
+    from .agents.registry import list_agent_specs
+    specs = list_agent_specs()
+    layer_filter = getattr(args, "layer", None)
+    if layer_filter:
+        specs = [s for s in specs if s.layer == layer_filter]
+    for s in specs:
+        status = s.implementation_status
+        print(f"  {s.role_id:<40} [{s.layer:<12}] {status}")
+    print(f"\n{len(specs)} agents")
+    return 0
+
+
+def cmd_inspect_agent(args: argparse.Namespace) -> int:
+    from .agents.registry import get_agent_spec
+    try:
+        spec = get_agent_spec(args.role_id)
+    except KeyError:
+        print(f"Unknown agent: {args.role_id}", file=sys.stderr)
+        return 1
+    print(json.dumps(spec.to_dict(), indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_list_prompt_families(args: argparse.Namespace) -> int:
+    from .agents.prompt_families.catalog import list_prompt_families
+    families = list_prompt_families()
+    for fid in families:
+        print(f"  {fid}")
+    print(f"\n{len(families)} prompt families")
+    return 0
+
+
+def cmd_inspect_prompt_family(args: argparse.Namespace) -> int:
+    from .agents.prompt_families.catalog import get_prompt_family
+    fam = get_prompt_family(args.family_id)
+    if fam is None:
+        print(f"Unknown prompt family: {args.family_id}", file=sys.stderr)
+        return 1
+    if getattr(args, "full", False):
+        safe = dict(fam)
+    else:
+        safe = {k: v for k, v in fam.items() if k != "output_schema"}
+        safe["output_schema"] = "(omitted, use --full to include)"
+    print(json.dumps(safe, indent=2, ensure_ascii=False, default=str))
+    return 0
+
+
+def cmd_list_workflows(args: argparse.Namespace) -> int:
+    from .agents.workflows import list_workflow_specs
+    for wf in list_workflow_specs():
+        n_steps = len(wf.steps)
+        print(f"  {wf.workflow_id:<45} [{wf.implementation_status:<15}] {n_steps} steps")
+    return 0
+
+
+def cmd_inspect_workflow(args: argparse.Namespace) -> int:
+    from .agents.workflows import get_workflow_spec
+    try:
+        wf = get_workflow_spec(args.workflow_id)
+    except KeyError:
+        print(f"Unknown workflow: {args.workflow_id}", file=sys.stderr)
+        return 1
+    print(json.dumps(wf.to_dict(), indent=2, ensure_ascii=False))
+    return 0
+
+
+def cmd_run_agent_workflow(args: argparse.Namespace) -> int:
+    from .agents.workflows import get_workflow_spec
+    from .agents.orchestrator import run_workflow
+
+    try:
+        spec = get_workflow_spec(args.workflow_id)
+    except KeyError:
+        print(f"Unknown workflow: {args.workflow_id}", file=sys.stderr)
+        return 1
+
+    initial_entities: dict = {}
+    if args.manuscript:
+        text = Path(args.manuscript).read_text(encoding="utf-8")
+        initial_entities["raw_text"] = text
+
+    if args.venue_json:
+        venue_data = json.loads(Path(args.venue_json).read_text(encoding="utf-8"))
+        initial_entities["venue"] = venue_data
+
+    provider = _resolve_llm_provider(args)
+
+    print(f"Running workflow: {spec.display_name}")
+    print(f"Steps: {len(spec.steps)}")
+    print(f"LLM provider: {'configured' if provider else 'none (deterministic only)'}")
+    print()
+
+    result = run_workflow(
+        spec,
+        initial_entities=initial_entities,
+        raw_text=initial_entities.get("raw_text"),
+        provider=provider,
+        prefer_deterministic=not getattr(args, "use_llm", False),
+    )
+
+    print(f"Status: {result.status}")
+    print(f"Steps completed: {len([s for s in result.step_results if s.get('status') == 'completed'])}/{len(spec.steps)}")
+    print()
+    for sr in result.step_results:
+        status_mark = "OK" if sr.get("status") == "completed" else sr.get("status", "?").upper()
+        print(f"  [{status_mark}] step[{sr['step_index']}] {sr['agent_role_id']}")
+
+    if args.output:
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(
+            json.dumps(result.to_dict(), indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        print(f"\nFull result written to {out.resolve()}")
+
+    return 0 if result.status == "completed" else 1
+
+
 def _find_fixtures_dir() -> Path | None:
     """Search for tests/fixtures/ relative to cwd or package location."""
     cwd_fixtures = Path.cwd() / "tests" / "fixtures"
@@ -973,6 +1097,34 @@ def main(argv: list[str] | None = None) -> int:
         help="Target document reference for patches (optional)",
     )
 
+    # --- Agent / workflow subparsers ---
+    list_agents_parser = sub.add_parser("list-agents", help="List all registered agents")
+    list_agents_parser.add_argument("--layer", default=None, help="Filter by layer (control, article, venue, fit, submission, review, evidence)")
+
+    inspect_agent_parser = sub.add_parser("inspect-agent", help="Show agent spec as JSON")
+    inspect_agent_parser.add_argument("role_id", help="Agent role_id")
+
+    sub.add_parser("list-prompt-families", help="List all prompt families")
+
+    inspect_pf_parser = sub.add_parser("inspect-prompt-family", help="Show prompt family details")
+    inspect_pf_parser.add_argument("family_id", help="Prompt family ID")
+    inspect_pf_parser.add_argument("--full", action="store_true", help="Include output schema")
+
+    sub.add_parser("list-workflows", help="List all workflow specs")
+
+    inspect_wf_parser = sub.add_parser("inspect-workflow", help="Show workflow spec as JSON")
+    inspect_wf_parser.add_argument("workflow_id", help="Workflow ID")
+
+    run_wf_parser = sub.add_parser("run-agent-workflow", help="Run an agentic workflow")
+    run_wf_parser.add_argument("workflow_id", help="Workflow ID to run")
+    run_wf_parser.add_argument("--manuscript", default=None, help="Path to manuscript file")
+    run_wf_parser.add_argument("--venue-json", default=None, help="Path to venue JSON file")
+    run_wf_parser.add_argument("--output", default=None, help="Output JSON file for full result")
+    run_wf_parser.add_argument("--use-llm", action="store_true", help="Prefer LLM execution over deterministic")
+    run_wf_parser.add_argument("--llm-model", default=None, help="LLM model name")
+    run_wf_parser.add_argument("--llm-base-url", default=None, help="LLM API base URL")
+    run_wf_parser.add_argument("--llm-api-key-env", default=None, help="Env var for API key")
+
     import_seed_parser = sub.add_parser(
         "import-venue-seed",
         help="Import venue seed corpus (JSONL) into venue registries",
@@ -1014,6 +1166,13 @@ def main(argv: list[str] | None = None) -> int:
         "export-whitecrow-patches": cmd_export_whitecrow_patches,
         "import-venue-seed": cmd_import_venue_seed,
         "build-venue-evidence-pack": cmd_build_venue_evidence_pack,
+        "list-agents": cmd_list_agents,
+        "inspect-agent": cmd_inspect_agent,
+        "list-prompt-families": cmd_list_prompt_families,
+        "inspect-prompt-family": cmd_inspect_prompt_family,
+        "list-workflows": cmd_list_workflows,
+        "inspect-workflow": cmd_inspect_workflow,
+        "run-agent-workflow": cmd_run_agent_workflow,
     }
 
     handler = commands.get(args.command)
