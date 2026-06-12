@@ -104,10 +104,10 @@ _SPECS: list[AgentSpec] = [
         role_id="venue_identifier",
         display_name="Venue Identifier",
         layer="venue",
-        implementation_status="executable_stub",
+        implementation_status="operational_now",
         execution_mode="deterministic",
-        input_contract={"raw_text": "venue name or ISSN"},
-        output_contract={"VenueModel": "resolved venue stub"},
+        input_contract={"venue_reference": "name/ISSN/URL dict or raw_text"},
+        output_contract={"VenueIdentification": "identity candidate + resolution_status + unknowns"},
         mvp_phase="v0.1",
         first_workflows=["direct_manuscript_venue_fit"],
     ),
@@ -142,6 +142,17 @@ _SPECS: list[AgentSpec] = [
         prompt_family_ids=["publication_regime"],
         input_contract={"entities.venue": "VenueModel dict"},
         output_contract={"PublicationRegime": "regime classification"},
+        mvp_phase="v0.1",
+        first_workflows=["venue_deep_profile"],
+    ),
+    AgentSpec(
+        role_id="corpus_sampler",
+        display_name="Corpus Sampler",
+        layer="venue",
+        implementation_status="operational_now",
+        execution_mode="deterministic",
+        input_contract={"entities.venue": "VenueModel dict"},
+        output_contract={"CorpusSample": "PublishedArticleCorpus + sampling notes"},
         mvp_phase="v0.1",
         first_workflows=["venue_deep_profile"],
     ),
@@ -358,7 +369,7 @@ def _build_agent_class_map() -> dict[str, type]:
         ResearchPlannerAgent, StatusJobAgent,
     )
     from .venue import (
-        VenueIdentifierAgent, VenueDiscoveryAgent,
+        CorpusSamplerAgent, VenueIdentifierAgent, VenueDiscoveryAgent,
         PublicationRegimeClassifierAgent, VenuePublicationProfileBuilderAgent,
     )
     from .fit import (
@@ -385,6 +396,7 @@ def _build_agent_class_map() -> dict[str, type]:
         "venue_identifier": VenueIdentifierAgent,
         "venue_discovery": VenueDiscoveryAgent,
         "venue_profiler": VenueProfilerAgent,
+        "corpus_sampler": CorpusSamplerAgent,
         "publication_regime_classifier": PublicationRegimeClassifierAgent,
         "venue_publication_profile_builder": VenuePublicationProfileBuilderAgent,
         "fit_assessor": FitAssessorAgent,

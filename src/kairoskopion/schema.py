@@ -798,7 +798,7 @@ class PublishedArticleCorpus(_DictMixin):
     collection_period: str | None = _field()
     genre_distribution: list[dict[str, Any]] = _list()
     method_distribution: list[dict[str, Any]] = _list()
-    topic_clusters: list[str] = _list()
+    topic_clusters: list[dict[str, Any]] = _list()
     average_word_count: int | None = _field()
     average_reference_count: int | None = _field()
     language_distribution: list[dict[str, Any]] = _list()

@@ -6,7 +6,7 @@
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `feature/agentic-contour-uc1-v01` at `56f4b88` (pending merge to `main`) |
+| Branch | `feature/venue-evidence-stack-v1-v2` (V1–V2 foundation, pending merge) |
 | Tag | `v0.2.0-alpha-rc7` (next: `v0.2.0-alpha-rc8`) |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
 | Working tree | clean |
@@ -39,6 +39,7 @@ evidence-first article-to-venue trajectory engine.
 - D16-D17 closed: method detection broadened, citation ecology thresholds refined
 - UC-1 semantic profiling substrate: 5 agents, 5 prompt families, 7 new entities, 3 new enums, LLM config — not full Agent Runtime, but agent contract + deterministic fallback + LLM path operational
 - Agentic Contour v0.1: 26 agents (7 layers), registry, executor, orchestrator, 4 workflows, 16 prompt families, 7 new CLI commands — full UC-1 orchestrated layer
+- Venue Evidence Stack V1–V2: 8-level depth model, vault storage, 4 venue adapters, corpus profiler, 3 agent upgrades, workflow wiring, 4 new CLI commands
 
 ## Modules implemented
 
@@ -60,7 +61,7 @@ evidence-first article-to-venue trajectory engine.
 | `traces.py` | Operation trace recording |
 | `decisions.py` | User decision tracking |
 | `cards.py` | 8 markdown card generators |
-| `cli.py` | CLI: 23 commands (status, run-fixture, run-local, inspect-storage, adapters-smoke, vault-index, export-bundle, import-bundle, validate-bundle, intake-file, build-venue-profile, build-submission-pack, export-litops-pack, export-whitecrow-patches, import-venue-seed, build-venue-evidence-pack, list-agents, inspect-agent, list-prompt-families, inspect-prompt-family, list-workflows, inspect-workflow, run-agent-workflow) |
+| `cli.py` | CLI: 27 commands (23 existing + inspect-venue-depth-policy, build-venue-evidence-stack, sample-venue-corpus, analyze-venue-corpus) |
 
 ### Services (`src/kairoskopion/services/`)
 
@@ -81,6 +82,32 @@ evidence-first article-to-venue trajectory engine.
 | `trajectory_report.py` | PublicationTrajectoryReport synthesizing fit+risk+bibliography |
 | `submission_pack.py` | SubmissionPack preparation with readiness assessment |
 | `venue_registry.py` | Venue evidence registry: seed import, evidence pack build, conflict resolution, Markdown rendering |
+| `venue_evidence_stack.py` | Venue Evidence Stack orchestrator: depth-driven evidence collection across 8 levels |
+| `corpus_sampler.py` | Corpus sampling: PublishedArticleCorpus from fixtures with distribution analysis |
+| `corpus_analyzer.py` | Corpus analysis: method/school/citation pattern extraction |
+
+### Storage (`src/kairoskopion/storage/`)
+
+| Module | Purpose |
+|--------|---------|
+| `vault_backend.py` | VaultBackend ABC, VaultObjectKind, VaultObjectRef, content hashing |
+| `local_fs_vault.py` | LocalFsVault filesystem implementation with metadata sidecars |
+
+### Venue depth (`src/kairoskopion/`)
+
+| Module | Purpose |
+|--------|---------|
+| `venue_depth.py` | 8-level depth model, VenueDepthPolicy, VenueDepthCoverage, 4 default policies |
+
+### Venue adapters (`src/kairoskopion/adapters/venue/`)
+
+| Adapter | Status |
+|---------|--------|
+| `base.py` | VenueAdapter ABC, VenueAdapterMode, VenueAdapterResult |
+| `openalex.py` | OpenAlex venue lookup (offline_stub) |
+| `crossref.py` | Crossref journal metadata (offline_stub) |
+| `opencitations.py` | OpenCitations citation links (offline_stub) |
+| `snapshot_crawler.py` | Homepage HTML capture with vault integration |
 
 ### Pipelines
 
@@ -104,14 +131,14 @@ evidence-first article-to-venue trajectory engine.
 | `contract.py` | AgentInput/AgentOutput/AgentRole ABC |
 | `runtime_models.py` | AgentSpec, AgentTask, AgentRun, AgentResult, AgentTrace, WorkflowStepSpec, etc. |
 | `base_shell.py` | service_output(), contract_only_output(), missing_input_output() |
-| `registry.py` | 26 AgentSpec entries (7 layers), lookup, instantiation |
+| `registry.py` | 27 AgentSpec entries (7 layers), lookup, instantiation |
 | `executor.py` | Single-agent execution with task/run/trace tracking |
 | `orchestrator.py` | Sequential workflow execution with entity pool |
 | `workflows.py` | 4 workflow specs + registry |
 | `prompt_families/` | 16 prompt family modules + catalog |
 | `control/` | 4 agents: IntentClassifier, ScenarioProber, ResearchPlanner, StatusJob |
 | `article/` | 3 agents: ArticleModeler, SemanticProfiler, DisciplinaryMapper |
-| `venue/` | 5 agents: VenueProfiler, VenueIdentifier, VenueDiscovery, PublicationRegimeClassifier, VenuePublicationProfileBuilder |
+| `venue/` | 6 agents: VenueProfiler, VenueIdentifier, VenueDiscovery, PublicationRegimeClassifier, VenuePublicationProfileBuilder, CorpusSampler |
 | `fit/` | 4 agents: FitAssessor, MismatchMapper, RewritePlanner, CitationPlanner |
 | `submission/` | 3 agents: RiskOfficer, ComplianceAuditor, SubmissionPackBuilder |
 | `review/` | 6 agents (contract-only): ReviewerSimulation, ReviewOutcomeAnalyst, RevisionPlanner, RebuttalArchitect, TacitSignalStructurer, VenueMemoryKeeper |
@@ -187,6 +214,10 @@ evidence-first article-to-venue trajectory engine.
 | `kairoskopion list-workflows` | List all workflow specs |
 | `kairoskopion inspect-workflow WORKFLOW_ID` | Show workflow spec as JSON |
 | `kairoskopion run-agent-workflow WORKFLOW_ID` | Run an agentic workflow |
+| `kairoskopion inspect-venue-depth-policy --purpose PURPOSE` | Show depth policy for analysis purpose |
+| `kairoskopion build-venue-evidence-stack --venue-name NAME --purpose PURPOSE` | Build venue evidence stack |
+| `kairoskopion sample-venue-corpus --fixture FILE [--venue-id ID]` | Sample corpus from article fixtures |
+| `kairoskopion analyze-venue-corpus --fixture FILE` | Analyze corpus for method/school patterns |
 
 Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--adapter-mode mock|real`; `--llm-model`, `--llm-base-url`, `--llm-api-key-env` for LLM-backed commands.
 
@@ -222,7 +253,7 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **782 tests**, all passing (76 new in Agentic Contour v0.1)
+- **855 tests**, all passing (73 new in Venue Evidence Stack V1–V2)
 - 49+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,

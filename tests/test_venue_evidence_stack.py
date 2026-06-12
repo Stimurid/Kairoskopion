@@ -590,3 +590,304 @@ class TestCorpusAnalyzer:
         assert "method_patterns" in d
         assert "school_patterns" in d
         assert "confidence" in d
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — topic_clusters type coherence tests
+# ---------------------------------------------------------------------------
+
+
+class TestTopicClustersType:
+    def test_sampler_writes_list_of_dicts(self):
+        from kairoskopion.services.corpus_sampler import sample_venue_corpus
+
+        articles = json.loads(
+            (FIXTURES_DIR / "synthetic_corpus.json").read_text(encoding="utf-8")
+        )
+        result = sample_venue_corpus(venue_model_id="test", article_fixtures=articles)
+        for cluster in result.corpus.topic_clusters:
+            assert isinstance(cluster, dict), f"Expected dict, got {type(cluster)}"
+            assert "topic" in cluster
+            assert "count" in cluster
+
+    def test_corpus_round_trip_preserves_topic_clusters(self):
+        from kairoskopion.schema import PublishedArticleCorpus
+
+        clusters = [{"topic": "AI Ethics", "count": 3}, {"topic": "STS", "count": 2}]
+        corpus = PublishedArticleCorpus(
+            venue_model_id="test",
+            corpus_size=5,
+            topic_clusters=clusters,
+        )
+        d = corpus.to_dict()
+        restored = PublishedArticleCorpus.from_dict(d)
+        assert restored.topic_clusters == clusters
+        assert isinstance(restored.topic_clusters[0], dict)
+
+    def test_schema_type_annotation_matches_runtime(self):
+        import dataclasses as dc
+        from kairoskopion.schema import PublishedArticleCorpus
+
+        field = next(f for f in dc.fields(PublishedArticleCorpus) if f.name == "topic_clusters")
+        assert "dict" in str(field.type)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — VenueIdentifier agent upgrade tests
+# ---------------------------------------------------------------------------
+
+
+class TestVenueIdentifierAgent:
+    def _make_input(self, **kwargs):
+        from kairoskopion.agents.contract import AgentInput
+        return AgentInput(
+            operation_id="test_op",
+            agent_role_id="venue_identifier",
+            **kwargs,
+        )
+
+    def test_name_only_produces_identity(self):
+        from kairoskopion.agents.venue.venue_identifier import VenueIdentifierAgent
+
+        agent = VenueIdentifierAgent()
+        inp = self._make_input(
+            entities={"venue_reference": {"name": "Philosophy & Technology"}},
+        )
+        out = agent.execute_deterministic(inp)
+        ent = out.output_entity
+        assert ent.get("canonical_name") == "Philosophy & Technology"
+        assert ent.get("resolution_status") != "needs_sources"
+        assert out.confidence != "none"
+
+    def test_issn_input(self):
+        from kairoskopion.agents.venue.venue_identifier import VenueIdentifierAgent
+
+        agent = VenueIdentifierAgent()
+        inp = self._make_input(
+            entities={"venue_reference": {"issn": "2210-5433"}},
+        )
+        out = agent.execute_deterministic(inp)
+        ent = out.output_entity
+        assert ent.get("issn") == "2210-5433"
+        assert ent.get("resolution_status") != "needs_sources"
+
+    def test_url_input(self):
+        from kairoskopion.agents.venue.venue_identifier import VenueIdentifierAgent
+
+        agent = VenueIdentifierAgent()
+        inp = self._make_input(
+            entities={"venue_reference": {"url": "https://springer.com/journal/13347"}},
+        )
+        out = agent.execute_deterministic(inp)
+        ent = out.output_entity
+        assert ent.get("official_url") == "https://springer.com/journal/13347"
+        assert ent.get("resolution_status") != "needs_sources"
+
+    def test_empty_input_returns_needs_sources(self):
+        from kairoskopion.agents.venue.venue_identifier import VenueIdentifierAgent
+
+        agent = VenueIdentifierAgent()
+        inp = self._make_input(entities={})
+        out = agent.execute_deterministic(inp)
+        assert out.confidence == "none"
+        assert "Missing required input" in out.warnings[0] or "missing" in out.unknowns[0].lower()
+
+    def test_no_invented_fields(self):
+        from kairoskopion.agents.venue.venue_identifier import VenueIdentifierAgent
+
+        agent = VenueIdentifierAgent()
+        inp = self._make_input(
+            entities={"venue_reference": {"name": "Some Journal"}},
+        )
+        out = agent.execute_deterministic(inp)
+        ent = out.output_entity
+        assert ent.get("issn") is None
+        assert ent.get("publisher") is None
+        assert ent.get("scope") is None
+        assert ent.get("indexing") is None
+
+    def test_combined_name_and_issn(self):
+        from kairoskopion.agents.venue.venue_identifier import VenueIdentifierAgent
+
+        agent = VenueIdentifierAgent()
+        inp = self._make_input(
+            entities={"venue_reference": {
+                "name": "Phil & Tech",
+                "issn": "2210-5433",
+                "publisher": "Springer",
+            }},
+        )
+        out = agent.execute_deterministic(inp)
+        ent = out.output_entity
+        assert ent.get("canonical_name") == "Phil & Tech"
+        assert ent.get("issn") == "2210-5433"
+        assert ent.get("publisher_hint") == "Springer"
+        assert out.confidence in ("low", "medium")
+
+    def test_raw_text_name_fallback(self):
+        from kairoskopion.agents.venue.venue_identifier import VenueIdentifierAgent
+
+        agent = VenueIdentifierAgent()
+        inp = self._make_input(raw_text="Nature Communications")
+        out = agent.execute_deterministic(inp)
+        ent = out.output_entity
+        assert ent.get("canonical_name") == "Nature Communications"
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — VenuePublicationProfileBuilder agent upgrade tests
+# ---------------------------------------------------------------------------
+
+
+class TestVenuePublicationProfileBuilderAgent:
+    def _make_input(self, **kwargs):
+        from kairoskopion.agents.contract import AgentInput
+        return AgentInput(
+            operation_id="test_op",
+            agent_role_id="venue_publication_profile_builder",
+            **kwargs,
+        )
+
+    def test_low_depth_profile_has_unknowns(self):
+        from kairoskopion.agents.venue.venue_publication_profile_builder import (
+            VenuePublicationProfileBuilderAgent,
+        )
+
+        agent = VenuePublicationProfileBuilderAgent()
+        inp = self._make_input(entities={
+            "venue": {"venue_model_id": "vm_test", "canonical_name": "Test Journal"},
+            "evidence_pack": {"official_facts": ["canonical_name=Test Journal"]},
+        })
+        out = agent.execute_deterministic(inp)
+        assert out.output_entity.get("venue_model_id") == "vm_test"
+        assert len(out.unknowns) > 0
+
+    def test_with_corpus_data(self):
+        from kairoskopion.agents.venue.venue_publication_profile_builder import (
+            VenuePublicationProfileBuilderAgent,
+        )
+
+        agent = VenuePublicationProfileBuilderAgent()
+        inp = self._make_input(entities={
+            "venue": {"venue_model_id": "vm_test", "canonical_name": "Test"},
+            "evidence_pack": {},
+            "corpus": {
+                "corpus_size": 30,
+                "genre_distribution": [{"genre": "research_article", "fraction": 0.7}],
+                "method_distribution": [{"method": "empirical", "fraction": 0.5}],
+                "schools_and_traditions": [
+                    {"school": "phenomenology", "frequency": 0.3},
+                ],
+            },
+        })
+        out = agent.execute_deterministic(inp)
+        ent = out.output_entity
+        assert ent.get("corpus_size") == 30
+        assert len(ent.get("genre_move_distribution", [])) > 0
+        assert len(ent.get("method_expectations", [])) > 0
+
+    def test_missing_editorial_is_unknown_not_absent(self):
+        from kairoskopion.agents.venue.venue_publication_profile_builder import (
+            VenuePublicationProfileBuilderAgent,
+        )
+
+        agent = VenuePublicationProfileBuilderAgent()
+        inp = self._make_input(entities={
+            "venue": {"venue_model_id": "vm_test"},
+            "evidence_pack": {},
+        })
+        out = agent.execute_deterministic(inp)
+        unknown_text = " ".join(out.unknowns)
+        assert "editorial" in unknown_text.lower() or "L4" in unknown_text
+
+    def test_missing_citation_is_unknown_not_absent(self):
+        from kairoskopion.agents.venue.venue_publication_profile_builder import (
+            VenuePublicationProfileBuilderAgent,
+        )
+
+        agent = VenuePublicationProfileBuilderAgent()
+        inp = self._make_input(entities={
+            "venue": {"venue_model_id": "vm_test"},
+            "evidence_pack": {},
+        })
+        out = agent.execute_deterministic(inp)
+        unknown_text = " ".join(out.unknowns)
+        assert "citation" in unknown_text.lower() or "L6" in unknown_text
+
+    def test_missing_corpus_is_unknown_not_absent(self):
+        from kairoskopion.agents.venue.venue_publication_profile_builder import (
+            VenuePublicationProfileBuilderAgent,
+        )
+
+        agent = VenuePublicationProfileBuilderAgent()
+        inp = self._make_input(entities={
+            "venue": {"venue_model_id": "vm_test"},
+            "evidence_pack": {},
+        })
+        out = agent.execute_deterministic(inp)
+        unknown_text = " ".join(out.unknowns)
+        assert "corpus" in unknown_text.lower() or "L3" in unknown_text
+
+    def test_no_input_returns_missing(self):
+        from kairoskopion.agents.venue.venue_publication_profile_builder import (
+            VenuePublicationProfileBuilderAgent,
+        )
+
+        agent = VenuePublicationProfileBuilderAgent()
+        inp = self._make_input(entities={})
+        out = agent.execute_deterministic(inp)
+        assert out.confidence == "none"
+
+    def test_depth_coverage_consumed(self):
+        from kairoskopion.agents.venue.venue_publication_profile_builder import (
+            VenuePublicationProfileBuilderAgent,
+        )
+
+        agent = VenuePublicationProfileBuilderAgent()
+        inp = self._make_input(entities={
+            "venue": {"venue_model_id": "vm_test"},
+            "evidence_pack": {},
+            "depth_coverage": {
+                "reached_depth": "L2_PUBLICATION_MODEL",
+                "purpose": "quick_look",
+                "missing_required_sources": ["openalex_works_sample"],
+            },
+        })
+        out = agent.execute_deterministic(inp)
+        unknown_text = " ".join(out.unknowns)
+        assert "L2" in unknown_text or "quick_look" in unknown_text or "depth" in unknown_text.lower()
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — Workflow integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestWorkflowIntegration:
+    def test_venue_deep_profile_has_evidence_stack_step(self):
+        from kairoskopion.agents.workflows import get_workflow_spec
+
+        spec = get_workflow_spec("venue_deep_profile")
+        role_ids = [s["agent_role_id"] for s in spec.steps]
+        assert "venue_evidence_stack_builder" in role_ids or "venue_publication_profile_builder" in role_ids
+
+    def test_uc1_skips_fit_when_no_venue(self):
+        from kairoskopion.agents.workflows import get_workflow_spec
+
+        spec = get_workflow_spec("uc1_draft_to_venue_pool_positioning")
+        fit_step = next(s for s in spec.steps if s["agent_role_id"] == "fit_assessor")
+        assert "venue" in fit_step.get("skip_if_missing", [])
+
+    def test_direct_fit_has_venue_identifier_step(self):
+        from kairoskopion.agents.workflows import get_workflow_spec
+
+        spec = get_workflow_spec("direct_manuscript_venue_fit")
+        role_ids = [s["agent_role_id"] for s in spec.steps]
+        assert "venue_identifier" in role_ids
+
+    def test_venue_deep_profile_has_corpus_step(self):
+        from kairoskopion.agents.workflows import get_workflow_spec
+
+        spec = get_workflow_spec("venue_deep_profile")
+        role_ids = [s["agent_role_id"] for s in spec.steps]
+        assert "corpus_sampler" in role_ids or "venue_evidence_stack_builder" in role_ids

@@ -1,6 +1,6 @@
 # Spec Coverage Matrix — Kairoskopion
 
-**Last updated:** 2026-06-10
+**Last updated:** 2026-06-12
 **Spec source:** `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` (10 waves, 12665 lines)
 **Implementation:** `src/kairoskopion/` + `tests/`
 
@@ -55,7 +55,7 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 | §6.10 IssueModel/SpecialIssueModel | Time-bound containers | Planned | — | Not implemented | P3 | — |
 | §6.11 PublicationRegimeModel | How publication works | Partial | `schema.py::PublicationRegimeModel`, `enums.py::PublicationRegimeType` (13 types) | Only enum + description; no `fit_axes_modifier`, `compliance_modifier`, `risk_modifier` | P2 | — |
 | §6.12 EditorialBoardProfile | Editorial structure | Implemented | `schema.py::EditorialBoardProfile` | No population logic yet | P2 | UC-1 agents |
-| §6.13 PublishedArticleCorpus | Corpus for pattern inference | Implemented | `schema.py::PublishedArticleCorpus` | No population logic yet | P2 | UC-1 agents |
+| §6.13 PublishedArticleCorpus | Corpus for pattern inference | Implemented | `schema.py::PublishedArticleCorpus`, `services/corpus_sampler.py`, `services/corpus_analyzer.py` | Population via fixture corpus sampler; live API sampling deferred | P2 | VES V1–V2 |
 | §6.14 PublishedArticlePattern | Corpus-derived observations | Planned | — | Not implemented | P2 | Venue profile |
 | §6.15 CitationExpectationProfile | Venue citation expectations | Implemented | `schema.py::CitationExpectationProfile` | No population logic yet; partially covered by CitationEcologyReport | P2 | UC-1 agents |
 | §6.16 TacitVenueSignal | Non-formal knowledge | Planned | — | Not implemented | P3 | — |
@@ -103,7 +103,11 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 | §26.8 Semantic Scholar adapter | Full-text search, references | Planned | — | Not implemented | P3 | — |
 | §26.9 Unpaywall adapter | OA availability | Planned | — | Not implemented | P3 | — |
 | §26.10 GROBID adapter | PDF structured extraction | Planned | — | Not implemented | P2 | Doc intake |
+| §26.11 Venue adapters | Venue-specific adapter layer | Implemented | `adapters/venue/` (OpenAlex, Crossref, OpenCitations, SnapshotCrawler) | offline_stub mode only; live_api deferred | P2 | VES V1–V2 |
 | §27 Evidence bridge | Adapter → Evidence conversion | Implemented | `adapters/bridge.py` | Mock = VENDOR_CLAIM, never FACT_FROM_SOURCE | — | Done |
+| §27.1 Venue depth policy | Demand-driven depth routing | Implemented | `venue_depth.py` (8 levels, 4 policies, coverage tracking) | — | — | VES V1–V2 |
+| §27.2 Vault backend | Content-addressed evidence storage | Implemented | `storage/vault_backend.py`, `storage/local_fs_vault.py` | In-memory per run; cross-session persistence deferred | P2 | VES V1–V2 |
+| §27.3 Evidence stack orchestrator | Level-by-level evidence collection | Implemented | `services/venue_evidence_stack.py` | — | — | VES V1–V2 |
 | §28–30 Freshness/staleness | Source freshness tracking | Implemented | `freshness.py` (FreshnessPolicy, 6 statuses) | No automatic refresh | — | Done |
 
 ## Wave 5 — Operational Pipelines (§38–67)
@@ -112,7 +116,7 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 |-----------|-------------------|--------|----------|---------|----------|--------|
 | §38 Pipeline base | PipelineRun lifecycle | Implemented | `pipelines/base.py` | — | — | Done |
 | §39 Manuscript × Venue pipeline | 18-step pipeline | Implemented | `pipelines/manuscript_venue_fit.py` | — | — | Done |
-| §40 Venue deep profile pipeline | Deep venue profiling | Planned | — | Not implemented | P2 | Venue profile |
+| §40 Venue deep profile pipeline | Deep venue profiling | Partial | `agents/workflows.py::VENUE_DEEP_PROFILE` (4 steps: profiler, corpus_sampler, regime_classifier, profile_builder) | Workflow operational; corpus_sampler uses fixtures only | P2 | VES V1–V2 |
 | §41 Venue pool discovery pipeline | Multi-venue scan | Planned | — | Not implemented | P3 | — |
 | §42 Reverse design pipeline | Field → article variants | Planned | — | Not implemented | P3 | — |
 | §43 Submission pack pipeline | Pack generation | Planned | — | Not implemented | P2 | Report quality |

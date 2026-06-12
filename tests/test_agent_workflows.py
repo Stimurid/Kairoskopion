@@ -31,7 +31,7 @@ class TestWorkflowRegistry(unittest.TestCase):
     def test_get_known(self):
         wf = get_workflow_spec("venue_deep_profile")
         self.assertEqual(wf.workflow_id, "venue_deep_profile")
-        self.assertEqual(len(wf.steps), 3)
+        self.assertEqual(len(wf.steps), 4)
 
     def test_get_unknown(self):
         with self.assertRaises(KeyError):

@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — Venue Evidence Stack V1–V2 Foundation
+
+### Added
+- **8-level Venue Evidence Depth Model** (`venue_depth.py`): L0_IDENTITY through L7_USER_MEMORY_AND_OUTCOMES, VenueDepthPolicy, VenueDepthCoverage, 4 default policies (QUICK_LOOK, FIT_ASSESSMENT, VENUE_DEEP_PROFILE, SUBMISSION_READY)
+- **Vault storage** (`storage/vault_backend.py`, `storage/local_fs_vault.py`): VaultBackend ABC with content-addressed SHA-256[:16] hashing, LocalFsVault filesystem implementation, VaultObjectKind enum (8 types), metadata sidecars
+- **4 venue adapters** (`adapters/venue/`): OpenAlexVenueAdapter, CrossrefVenueAdapter, OpenCitationsVenueAdapter, VenueSnapshotCrawler — all with offline_stub mode and synthetic fixtures
+- **Venue Evidence Stack orchestrator** (`services/venue_evidence_stack.py`): `build_venue_evidence_stack()` collects evidence level-by-level up to depth policy
+- **Corpus profiler** (`services/corpus_sampler.py`, `services/corpus_analyzer.py`): `sample_venue_corpus()` builds PublishedArticleCorpus from fixtures; `analyze_venue_corpus()` extracts method/school/citation patterns
+- **VenueIdentifierAgent** upgraded from stub to functional identity resolution: ISSN normalization, resolution_status (identity_partial/identity_minimal/needs_sources), ambiguity tracking
+- **VenuePublicationProfileBuilderAgent** rewritten to consume depth_coverage, corpus, citation_profile, editorial_board with explicit L3/L4/L6/L7 unknowns
+- **CorpusSamplerAgent** — thin wrapper around corpus_sampler service for workflow integration
+- **Workflow wiring**: venue_identifier step in direct_manuscript_venue_fit (9 steps), corpus_sampler step in venue_deep_profile (4 steps)
+- **4 new CLI commands**: inspect-venue-depth-policy, build-venue-evidence-stack, sample-venue-corpus, analyze-venue-corpus
+- **New enum value**: FACT_FROM_API_METADATA in EvidenceStatus
+- 73 new tests (855 total, was 782)
+- 4 new docs: REPORT, DEPTH_POLICY, VAULT_BACKEND_ARCHITECTURE, CORPUS_PROFILER
+
+### Fixed
+- `topic_clusters` type drift: `list[str]` → `list[dict[str, Any]]` to match corpus sampler output
+
 ## [Unreleased] — Agentic Contour v0.1 (UC-1 Orchestrated Layer)
 
 ### Added

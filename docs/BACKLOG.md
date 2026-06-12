@@ -6,6 +6,30 @@ Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.m
 
 ---
 
+## Venue Evidence Stack V1–V2 Foundation ✓ DONE (2026-06-12)
+
+**Goal:** Implement the Venue Evidence Stack foundation: 8-level depth model, demand-driven depth policies, content-addressed vault storage, 4 venue adapters, corpus profiler, agent upgrades (VenueIdentifier, ProfileBuilder, CorpusSampler), workflow wiring, CLI commands, documentation.
+
+**Phases completed:**
+1. ✓ Verify state: branch `feature/venue-evidence-stack-v1-v2` at `babcbbc`, 834 tests passing
+2. ✓ Implementation map: `docs/VENUE_EVIDENCE_STACK_V1_V2_IMPLEMENTATION_MAP.md`
+3. ✓ topic_clusters type fix: `list[str]` → `list[dict[str, Any]]` in schema.py
+4. ✓ VenueIdentifierAgent upgrade: stub → functional identity resolution with ISSN normalization
+5. ✓ VenuePublicationProfileBuilderAgent rewrite: depth-aware, corpus/citation/editorial consumption
+6. ✓ Workflow wiring: venue_identifier in direct_fit (9 steps), corpus_sampler in venue_deep_profile (4 steps)
+7. ✓ CLI smoke: all 4 new commands produce valid output
+8. ✓ Documentation: 4 new docs (REPORT, DEPTH_POLICY, VAULT_BACKEND_ARCHITECTURE, CORPUS_PROFILER), 5 updated (CHANGELOG, PROJECT_STATUS, BACKLOG, SPEC_COVERAGE_MATRIX)
+9. ✓ Full validation: 855 tests passing, 0 failures
+10. ✓ Commit and push
+
+**What this is NOT:** Live API adapters, L4-L7 data collection, cross-session vault persistence, mass crawling.
+
+**Branch:** `feature/venue-evidence-stack-v1-v2`
+**Tests added:** 73 new tests (855 total, was 782)
+**Report:** `docs/VENUE_EVIDENCE_STACK_V1_V2_REPORT.md`
+
+---
+
 ## Agentic Contour v0.1 (UC-1 Orchestrated Layer) ✓ DONE (2026-06-12)
 
 **Goal:** Implement the full UC-1 orchestrated agent layer: runtime models, 26 agent shells (7 layers), registry, executor, orchestrator, 4 workflow specs, 16 prompt families, 7 CLI commands. All operational agents wrap existing deterministic services. Review layer is contract-only (6 stubs). No fabrication.
