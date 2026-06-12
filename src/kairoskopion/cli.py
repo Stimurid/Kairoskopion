@@ -857,6 +857,13 @@ def cmd_build_venue_evidence_pack(args: argparse.Namespace) -> int:
 # Agent / workflow CLI commands (Agentic Contour v0.1)
 # ---------------------------------------------------------------------------
 
+def _safe_print(text: str) -> None:
+    """Print text safely on Windows consoles (cp1251/cp1252)."""
+    sys.stdout.buffer.write(text.encode("utf-8", errors="replace"))
+    sys.stdout.buffer.write(b"\n")
+    sys.stdout.buffer.flush()
+
+
 def _print_json(data: dict) -> None:
     """Print JSON safely on Windows consoles (cp1251/cp1252)."""
     text = json.dumps(data, indent=2, ensure_ascii=False, default=str)
@@ -953,10 +960,10 @@ def cmd_run_agent_workflow(args: argparse.Namespace) -> int:
 
     provider = _resolve_llm_provider(args)
 
-    print(f"Running workflow: {spec.display_name}")
-    print(f"Steps: {len(spec.steps)}")
-    print(f"LLM provider: {'configured' if provider else 'none (deterministic only)'}")
-    print()
+    _safe_print(f"Running workflow: {spec.display_name}")
+    _safe_print(f"Steps: {len(spec.steps)}")
+    _safe_print(f"LLM provider: {'configured' if provider else 'none (deterministic only)'}")
+    _safe_print("")
 
     result = run_workflow(
         spec,
@@ -966,12 +973,12 @@ def cmd_run_agent_workflow(args: argparse.Namespace) -> int:
         prefer_deterministic=not getattr(args, "use_llm", False),
     )
 
-    print(f"Status: {result.status}")
-    print(f"Steps completed: {len([s for s in result.step_results if s.get('status') == 'completed'])}/{len(spec.steps)}")
-    print()
+    _safe_print(f"Status: {result.status}")
+    _safe_print(f"Steps completed: {len([s for s in result.step_results if s.get('status') == 'completed'])}/{len(spec.steps)}")
+    _safe_print("")
     for sr in result.step_results:
         status_mark = "OK" if sr.get("status") == "completed" else sr.get("status", "?").upper()
-        print(f"  [{status_mark}] step[{sr['step_index']}] {sr['agent_role_id']}")
+        _safe_print(f"  [{status_mark}] step[{sr['step_index']}] {sr['agent_role_id']}")
 
     if args.output:
         out = Path(args.output)
