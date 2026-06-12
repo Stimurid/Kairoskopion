@@ -11,7 +11,7 @@ The UC-1 pipeline path:
 ```
 draft_article → ArticleModel → SemanticProfile → DisciplinaryPathways
   → VenueDiscovery → FitAssessment → MismatchMap → RewritePlan
-  → CitationReport → RiskReport → [ComplianceAudit] → [EvidenceAudit]
+  → CitationReport → RiskReport → ComplianceAudit → EvidenceAudit
   → UC1_DEMO_REPORT.md
 ```
 
@@ -84,15 +84,20 @@ python -c "from kairoskopion.cli import main; main(['run-uc1-demo', '--pack-dir'
 | `rewrite_plan.json` | Rewrite plan for adaptation |
 | `citation_report.json` | Citation ecology analysis |
 | `risk_report.json` | Submission risk assessment |
+| `compliance.json` | Compliance checklist |
+| `submission_pack.json` | Submission pack with cover letter |
+| `evidence_gate.json` | Evidence audit gate result |
+| `venue.json` | Primary venue seed data |
+| `scenario.json` | Demo scenario metadata |
 | `UC1_DEMO_REPORT.md` | Human-readable demo report |
 
 ## Tests
 
-33 tests in `tests/test_uc1_demo_pack.py`:
+35 tests in `tests/test_uc1_demo_pack.py`:
 
 - **TestDemoPackDir** (6 tests) — fixture directory existence and completeness
 - **TestDemoLoader** (12 tests) — loader validation, error handling, edge cases
-- **TestDemoRunner** (8 tests) — workflow execution, entity production, output writing
+- **TestDemoRunner** (10 tests) — workflow execution, 12/12 step completion, hardened agent entities, output writing
 - **TestDemoReport** (4 tests) — report generation and content verification
 - **TestCLIRunUC1Demo** (3 tests) — CLI command integration
 

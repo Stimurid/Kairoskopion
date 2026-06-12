@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — UC-1 Demo Pack v0
+
+### Added
+- **UC-1 demo pack** (`src/kairoskopion/demo/`): offline reproducible demonstration of the full UC-1 pipeline with synthetic fixtures
+- **Demo loader** (`demo/uc1_demo_loader.py`): loads and validates demo pack from fixture directory (draft article, 5 venue seeds, guidelines, corpus)
+- **Demo runner** (`demo/uc1_runner.py`): runs UC-1 workflow with loaded pack, writes 16 artifact files to output directory
+- **Report generator** (`demo/uc1_report.py`): generates UC1_DEMO_REPORT.md with step table, entity summary, evidence gaps, trace log
+- **Synthetic demo dataset** (`tests/fixtures/uc1_demo_pack/`): Simondon/STS article on AI publication positioning, 5 venue seeds, 3 venue guidelines, 3 corpus files (9 synthetic articles)
+- **CLI command** `run-uc1-demo` with `--pack-dir` and `--output-dir` flags (28 total CLI commands)
+- 35 new tests (890 total, was 855)
+- Documentation: `docs/UC1_DEMO_PACK_V0.md`
+
+### Fixed
+- `compliance_auditor`: `article.title` → `title_current`, `article.abstract` → `abstract_current`, `article.keywords` → `core_claims`
+- `submission_pack_builder`: `pack.readiness` → `pack.ready_status`
+- `evidence_auditor`: removed `.value` on already-string status, replaced nonexistent `findings` with `warnings`/`blocking_issues`
+
 ## [Unreleased] — Venue Evidence Stack V1–V2 Foundation
 
 ### Added

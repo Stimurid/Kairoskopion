@@ -1,6 +1,6 @@
 # Spec Coverage Matrix — Kairoskopion
 
-**Last updated:** 2026-06-12
+**Last updated:** 2026-06-13
 **Spec source:** `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` (10 waves, 12665 lines)
 **Implementation:** `src/kairoskopion/` + `tests/`
 

@@ -1,13 +1,13 @@
 # Project Status — Kairoskopion
 
-**Last updated:** 2026-06-12
+**Last updated:** 2026-06-13
 
 ## Repository
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `feature/venue-evidence-stack-v1-v2` (V1–V2 foundation, pending merge) |
-| Tag | `v0.2.0-alpha-rc7` (next: `v0.2.0-alpha-rc8`) |
+| Branch | `main` |
+| Tag | `v0.2.0-alpha-rc10` |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
 | Working tree | clean |
 | Python | >=3.11 |
@@ -15,13 +15,11 @@
 ## Recent commit history (main)
 
 ```
-88ad9b1 Fix stale test/CLI counts in docs (641->673 tests, 14->16 commands)
-32a2a2e Add venue evidence registry v0
-3934f94 Prep v0.2.0-alpha-rc5 release
-f726e8e Add arbitrary manuscript x venue validation matrix
-b8a94bb Prep v0.2.0-alpha-rc4 release
-33769ad Close D12-D15: generalized venue-fit anti-overfitting repairs
-83f4028 Fix language policy extraction, close D10/D11 with evidence-pack rerun
+62ce29e Fix 3 agent attribute bugs: compliance_auditor, submission_pack_builder, evidence_auditor
+4498a74 Implement UC-1 Demo Pack v0: offline reproducible pipeline demo
+d20ff8f Audit venue evidence stack v1 v2
+4fb78f0 Complete Venue Evidence Stack V1-V2 foundation
+babcbbc Implement Venue Evidence Stack V1-V2 foundation
 ```
 
 ## Trial history
@@ -40,6 +38,7 @@ evidence-first article-to-venue trajectory engine.
 - UC-1 semantic profiling substrate: 5 agents, 5 prompt families, 7 new entities, 3 new enums, LLM config — not full Agent Runtime, but agent contract + deterministic fallback + LLM path operational
 - Agentic Contour v0.1: 26 agents (7 layers), registry, executor, orchestrator, 4 workflows, 16 prompt families, 7 new CLI commands — full UC-1 orchestrated layer
 - Venue Evidence Stack V1–V2: 8-level depth model, vault storage, 4 venue adapters, corpus profiler, 3 agent upgrades, workflow wiring, 4 new CLI commands
+- UC-1 Demo Pack v0: offline reproducible demo of full UC-1 pipeline (12/12 steps), synthetic fixtures, 3 agent bugfixes (compliance_auditor, submission_pack_builder, evidence_auditor), 16 output artifacts, report generator
 
 ## Modules implemented
 
@@ -61,7 +60,15 @@ evidence-first article-to-venue trajectory engine.
 | `traces.py` | Operation trace recording |
 | `decisions.py` | User decision tracking |
 | `cards.py` | 8 markdown card generators |
-| `cli.py` | CLI: 27 commands (23 existing + inspect-venue-depth-policy, build-venue-evidence-stack, sample-venue-corpus, analyze-venue-corpus) |
+| `cli.py` | CLI: 28 commands (27 existing + run-uc1-demo) |
+
+### Demo (`src/kairoskopion/demo/`)
+
+| Module | Purpose |
+|--------|---------|
+| `uc1_demo_loader.py` | Load + validate UC-1 demo pack from fixture directory |
+| `uc1_runner.py` | Run UC-1 workflow with loaded demo pack, write artifacts |
+| `uc1_report.py` | Generate UC1_DEMO_REPORT.md from run results |
 
 ### Services (`src/kairoskopion/services/`)
 
@@ -218,6 +225,7 @@ evidence-first article-to-venue trajectory engine.
 | `kairoskopion build-venue-evidence-stack --venue-name NAME --purpose PURPOSE` | Build venue evidence stack |
 | `kairoskopion sample-venue-corpus --fixture FILE [--venue-id ID]` | Sample corpus from article fixtures |
 | `kairoskopion analyze-venue-corpus --fixture FILE` | Analyze corpus for method/school patterns |
+| `kairoskopion run-uc1-demo [--pack-dir DIR] [--output-dir DIR]` | Run UC-1 offline demo pack (synthetic, deterministic, no LLM) |
 
 Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--adapter-mode mock|real`; `--llm-model`, `--llm-base-url`, `--llm-api-key-env` for LLM-backed commands.
 
@@ -253,8 +261,8 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **855 tests**, all passing (73 new in Venue Evidence Stack V1–V2)
-- 49+ test files covering: schema, registry, evidence, quality, cards,
+- **890 tests**, all passing (35 new in UC-1 Demo Pack v0)
+- 50+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
   source acquisition, bibliography parsing, citation ecology, adapters,
@@ -266,7 +274,8 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
   generalized venue-fit (language blocker, word limits, article types, discipline matching),
   arbitrary manuscript x venue validation matrix (6 behavioral cases, 28 tests),
   agentic runtime models, agent registry (26 agents), agent shells, executor,
-  orchestrator/workflows, agentic CLI commands
+  orchestrator/workflows, agentic CLI commands,
+  UC-1 demo pack (loader, runner, report, CLI, 12/12 steps, agent bugfix coverage)
 
 ## Fixture pipeline output
 
@@ -305,5 +314,6 @@ The system can:
 8. Export/import storage bundles as zip archives
 9. Track freshness/staleness of sources and adapter results
 10. Display results via CLI
+11. Run a full UC-1 offline demo (12-step pipeline, 16 artifact files, reproducible report)
 
 All without network access, LLM calls, or external dependencies.

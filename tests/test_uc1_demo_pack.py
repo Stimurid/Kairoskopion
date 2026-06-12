@@ -115,6 +115,18 @@ class TestDemoRunner(unittest.TestCase):
         self.assertIsInstance(result, UC1DemoResult)
         self.assertIn(result.workflow_status, ("completed", "partial"))
 
+    def test_run_all_12_steps_complete(self):
+        result = run_uc1_demo()
+        self.assertEqual(result.workflow_status, "completed")
+        completed = [s for s in result.step_results if s["status"] == "completed"]
+        self.assertEqual(len(completed), 12)
+
+    def test_hardened_agents_produce_entities(self):
+        result = run_uc1_demo()
+        self.assertIn("compliance", result.entities)
+        self.assertIn("submission_pack", result.entities)
+        self.assertIn("evidence_gate", result.entities)
+
     def test_run_produces_step_results(self):
         result = run_uc1_demo()
         self.assertGreater(len(result.step_results), 0)

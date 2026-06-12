@@ -1,8 +1,32 @@
 # Engineering Backlog — Kairoskopion
 
-**Last updated:** 2026-06-12
+**Last updated:** 2026-06-13
 
 Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.md → PROJECT_STATUS → SPEC_COVERAGE_MATRIX → this BACKLOG, picks the next sprint, implements on a feature branch, updates docs/tests/status, commits, pushes. No manual micromanagement required.
+
+---
+
+## UC-1 Demo Pack v0 ✓ DONE (2026-06-13)
+
+**Goal:** Create a fully reproducible offline UC-1 demo: synthetic fixtures, demo loader, workflow runner, report generator, CLI command, 16 output artifacts. Fix 3 agent attribute bugs exposed by the demo.
+
+**Phases completed:**
+1. ✓ Branch `feature/uc1-demo-pack-v0` from main at `d20ff8f`
+2. ✓ Synthetic demo dataset: draft article (Simondon/STS, ~1200 words), 5 venue seeds, 3 venue guidelines, 3 corpus files (9 articles), scenario.json
+3. ✓ Demo loader module: `src/kairoskopion/demo/uc1_demo_loader.py` with validation
+4. ✓ CLI command: `run-uc1-demo` with `--pack-dir` and `--output-dir` flags
+5. ✓ Artifact output: 16 files (workflow_trace.json, entity JSONs, UC1_DEMO_REPORT.md)
+6. ✓ Report generator: `src/kairoskopion/demo/uc1_report.py`
+7. ✓ Agent bugfixes: compliance_auditor (title/abstract/keywords), submission_pack_builder (readiness), evidence_auditor (status.value, findings)
+8. ✓ Tests: 35 new (890 total, was 855)
+9. ✓ Documentation: `docs/UC1_DEMO_PACK_V0.md`
+10. ✓ Commit, push, release audit
+
+**What this is NOT:** New architecture, live APIs, real venue DB, real corpus, LLM inference.
+
+**Branch:** `feature/uc1-demo-pack-v0`
+**Tests added:** 35 new tests (890 total, was 855)
+**Report:** `docs/UC1_DEMO_PACK_V0.md`
 
 ---
 
