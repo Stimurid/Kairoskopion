@@ -1,0 +1,38 @@
+[
+  {
+    "article_id": "pt_2024_01",
+    "title": "Transindividuation in AI Systems: Simondon and the Collective Dimension of Machine Learning",
+    "authors": ["D. Rossetti", "N. Yamamoto"],
+    "year": 2024,
+    "venue": "Philosophy & Technology",
+    "keywords": ["Simondon", "transindividuation", "machine learning", "collective intelligence"],
+    "word_count": 8900,
+    "methodology": "philosophical_analysis",
+    "citation_count_synthetic": 17,
+    "abstract_snippet": "We extend Simondon's concept of transindividuation to analyze how machine learning systems participate in collective processes of meaning-making and knowledge production."
+  },
+  {
+    "article_id": "pt_2023_02",
+    "title": "Epistemic Injustice in Algorithmic Decision-Making: A Framework for Audit",
+    "authors": ["C. Okafor"],
+    "year": 2023,
+    "venue": "Philosophy & Technology",
+    "keywords": ["epistemic injustice", "algorithmic audit", "Fricker", "AI ethics"],
+    "word_count": 7800,
+    "methodology": "philosophical_analysis",
+    "citation_count_synthetic": 22,
+    "abstract_snippet": "Applying Fricker's framework of epistemic injustice to algorithmic systems, this paper develops a practical audit methodology for identifying testimonial and hermeneutical injustice in automated decision pipelines."
+  },
+  {
+    "article_id": "pt_2024_03",
+    "title": "The Evidence Turn in AI Ethics: From Principles to Provenance",
+    "authors": ["H. Lindberg", "T. Nascimento"],
+    "year": 2024,
+    "venue": "Philosophy & Technology",
+    "keywords": ["AI ethics", "evidence", "provenance", "responsible innovation"],
+    "word_count": 9200,
+    "methodology": "philosophical_analysis",
+    "citation_count_synthetic": 11,
+    "abstract_snippet": "We argue that AI ethics must undergo an 'evidence turn' in which ethical claims about AI systems are grounded in traceable evidence chains rather than abstract principles, and propose a provenance-based framework for this shift."
+  }
+]

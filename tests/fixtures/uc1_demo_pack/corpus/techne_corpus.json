@@ -1,0 +1,38 @@
+[
+  {
+    "article_id": "techne_2024_01",
+    "title": "Simondon's Concretization and the Design of Autonomous Vehicles",
+    "authors": ["M. Visser", "K. Tanaka"],
+    "year": 2024,
+    "venue": "Techné: Research in Philosophy and Technology",
+    "keywords": ["Simondon", "concretization", "autonomous vehicles", "design philosophy"],
+    "word_count": 8200,
+    "methodology": "philosophical_analysis",
+    "citation_count_synthetic": 12,
+    "abstract_snippet": "This paper applies Simondon's concept of concretization to the design trajectory of autonomous vehicle systems, arguing that functional convergence in AV architectures exemplifies technical individuation."
+  },
+  {
+    "article_id": "techne_2024_02",
+    "title": "Phenomenology of Recommendation Systems: When Algorithms Suggest",
+    "authors": ["L. Chen"],
+    "year": 2024,
+    "venue": "Techné: Research in Philosophy and Technology",
+    "keywords": ["phenomenology", "recommendation systems", "algorithmic mediation"],
+    "word_count": 7100,
+    "methodology": "phenomenological_analysis",
+    "citation_count_synthetic": 8,
+    "abstract_snippet": "Drawing on Ihde's instrumental realism and Verbeek's postphenomenology, this article examines how recommendation algorithms mediate human experience of choice and preference."
+  },
+  {
+    "article_id": "techne_2023_03",
+    "title": "Infrastructure Ethics: Toward a Philosophy of Maintenance",
+    "authors": ["R. Dominguez", "P. Strand"],
+    "year": 2023,
+    "venue": "Techné: Research in Philosophy and Technology",
+    "keywords": ["infrastructure", "maintenance", "ethics of care", "philosophy of technology"],
+    "word_count": 9400,
+    "methodology": "philosophical_analysis",
+    "citation_count_synthetic": 19,
+    "abstract_snippet": "We argue for an infrastructure ethics grounded in care and maintenance rather than innovation, drawing on Star's infrastructure studies and feminist philosophy of technology."
+  }
+]

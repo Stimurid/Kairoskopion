@@ -1099,6 +1099,53 @@ def cmd_analyze_venue_corpus(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_run_uc1_demo(args: argparse.Namespace) -> int:
+    from .demo.uc1_runner import run_uc1_demo
+
+    pack_dir = Path(args.pack_dir) if args.pack_dir else None
+    output_dir = Path(args.output_dir) if args.output_dir else None
+
+    _safe_print("Running UC-1 Demo Pack (offline, deterministic, no LLM)")
+    _safe_print("")
+
+    result = run_uc1_demo(pack_dir=pack_dir, output_dir=output_dir)
+
+    _safe_print(f"Pack valid: {result.pack.is_valid}")
+    _safe_print(f"Venues: {len(result.pack.venue_seeds)}")
+    _safe_print(f"Workflow status: {result.workflow_status}")
+    _safe_print("")
+
+    completed = sum(1 for s in result.step_results if s.get("status") == "completed")
+    skipped = sum(1 for s in result.step_results if s.get("status") == "skipped")
+    failed = sum(1 for s in result.step_results if s.get("status") == "failed")
+    total = len(result.step_results)
+
+    _safe_print(f"Steps: {completed} completed, {skipped} skipped, {failed} failed / {total} total")
+    _safe_print("")
+
+    for sr in result.step_results:
+        status_mark = "OK" if sr.get("status") == "completed" else sr.get("status", "?").upper()
+        _safe_print(f"  [{status_mark}] step[{sr['step_index']}] {sr['agent_role_id']}")
+
+    if result.trace_log:
+        _safe_print("")
+        _safe_print("--- Trace ---")
+        for entry in result.trace_log:
+            _safe_print(f"  {entry}")
+
+    if output_dir:
+        _safe_print("")
+        _safe_print(f"Artifacts written to: {output_dir.resolve()}")
+
+    if result.errors:
+        _safe_print("")
+        _safe_print("Errors:")
+        for err in result.errors:
+            _safe_print(f"  - {err}")
+
+    return 0 if result.is_success else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="kairoskopion",
@@ -1325,6 +1372,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Output JSON file path (default: stdout)",
     )
 
+    uc1_demo_parser = sub.add_parser(
+        "run-uc1-demo",
+        help="Run the UC-1 demo pack (offline, deterministic, no LLM)",
+    )
+    uc1_demo_parser.add_argument(
+        "--pack-dir", default=None,
+        help="Path to demo pack directory (default: bundled fixtures)",
+    )
+    uc1_demo_parser.add_argument(
+        "--output-dir", default=None,
+        help="Directory to write demo artifacts (workflow_trace.json, entity files, UC1_DEMO_REPORT.md)",
+    )
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -1355,6 +1415,7 @@ def main(argv: list[str] | None = None) -> int:
         "build-venue-evidence-stack": cmd_build_venue_evidence_stack,
         "sample-venue-corpus": cmd_sample_venue_corpus,
         "analyze-venue-corpus": cmd_analyze_venue_corpus,
+        "run-uc1-demo": cmd_run_uc1_demo,
     }
 
     handler = commands.get(args.command)

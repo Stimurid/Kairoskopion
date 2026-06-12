@@ -1,0 +1,19 @@
+{
+  "scenario_id": "uc1_demo_simondon_publication_positioning",
+  "scenario_type": "uc1_draft_to_venue_pool_positioning",
+  "title": "Simondon-STS Article on AI Publication Positioning",
+  "description": "Demonstrate the full UC-1 pipeline: a philosophy-of-technology article on AI-assisted publication positioning is analyzed, profiled, matched to a pool of candidate venues, and assessed for fit, mismatch, risk, and evidence coverage.",
+  "author_context": {
+    "career_stage": "mid-career",
+    "disciplines": ["philosophy_of_technology", "STS", "information_science"],
+    "prior_venues": ["Social Studies of Science", "Philosophy & Technology"],
+    "goals": ["reach STS audience", "establish framework for evidence-bound AI design"]
+  },
+  "draft_source": "draft_article.md",
+  "venue_seeds_source": "venue_seeds.json",
+  "expected_workflow": "uc1_draft_to_venue_pool_positioning",
+  "demo_mode": true,
+  "offline": true,
+  "created": "2026-06-13",
+  "version": "0.1.0"
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "article_id": "sss_2024_01",
+    "title": "Algorithmic Gatekeeping in Academic Publishing: An Ethnography of Automated Screening Tools",
+    "authors": ["J. Hartley", "S. Bekele"],
+    "year": 2024,
+    "venue": "Social Studies of Science",
+    "keywords": ["algorithmic gatekeeping", "academic publishing", "ethnography", "STS"],
+    "word_count": 10500,
+    "methodology": "ethnographic",
+    "citation_count_synthetic": 25,
+    "abstract_snippet": "Based on 18 months of ethnographic fieldwork at two major publishers, we examine how automated manuscript screening tools reshape editorial labor and construct new categories of publishability."
+  },
+  {
+    "article_id": "sss_2023_02",
+    "title": "The Infrastructure of Peer Review: Material Practices and Epistemic Authority",
+    "authors": ["A. Müller"],
+    "year": 2023,
+    "venue": "Social Studies of Science",
+    "keywords": ["peer review", "infrastructure", "epistemic authority", "Star"],
+    "word_count": 11200,
+    "methodology": "historical_analysis",
+    "citation_count_synthetic": 31,
+    "abstract_snippet": "This article traces the material infrastructure of peer review from manuscript circulation in the 17th century to contemporary digital platforms, arguing that each infrastructural shift reconstitutes the epistemic authority that review confers."
+  },
+  {
+    "article_id": "sss_2024_03",
+    "title": "Citation Ecologies: How Disciplinary Fields Maintain Boundaries Through Referencing Practices",
+    "authors": ["F. Zhao", "B. Krishnamurthy"],
+    "year": 2024,
+    "venue": "Social Studies of Science",
+    "keywords": ["citation", "disciplinary boundaries", "boundary work", "bibliometrics"],
+    "word_count": 9800,
+    "methodology": "mixed_methods",
+    "citation_count_synthetic": 14,
+    "abstract_snippet": "Using bibliometric data from five STS-adjacent fields combined with interview data from journal editors, we analyze how citation practices both maintain and transgress disciplinary boundaries."
+  }
+]

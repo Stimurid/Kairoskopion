@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Techné: Research in Philosophy and Technology",
+    "issn": "1091-8264",
+    "publisher": "Philosophy Documentation Center",
+    "scope": "Philosophy of technology, ethics of technology, phenomenology of technical artifacts",
+    "disciplines": ["philosophy_of_technology", "ethics_of_technology"],
+    "typical_article_length_words": [6000, 10000],
+    "open_access": false,
+    "review_model": "double_blind",
+    "language": "en",
+    "frequency": "quarterly"
+  },
+  {
+    "name": "Social Studies of Science",
+    "issn": "0306-3127",
+    "publisher": "SAGE Publications",
+    "scope": "Social dimensions of science and technology, STS, laboratory studies, science policy",
+    "disciplines": ["STS", "sociology_of_science"],
+    "typical_article_length_words": [8000, 12000],
+    "open_access": false,
+    "review_model": "double_blind",
+    "language": "en",
+    "frequency": "bimonthly"
+  },
+  {
+    "name": "Philosophy & Technology",
+    "issn": "2210-5433",
+    "publisher": "Springer",
+    "scope": "Philosophical analysis of technology, digital culture, AI ethics, information philosophy",
+    "disciplines": ["philosophy_of_technology", "AI_ethics", "information_philosophy"],
+    "typical_article_length_words": [7000, 11000],
+    "open_access": "hybrid",
+    "review_model": "double_blind",
+    "language": "en",
+    "frequency": "quarterly"
+  },
+  {
+    "name": "AI & Society",
+    "issn": "0951-5666",
+    "publisher": "Springer",
+    "scope": "Social and cultural implications of AI, human-computer interaction, AI in professional practice",
+    "disciplines": ["AI_society", "HCI", "STS"],
+    "typical_article_length_words": [5000, 9000],
+    "open_access": "hybrid",
+    "review_model": "single_blind",
+    "language": "en",
+    "frequency": "bimonthly"
+  },
+  {
+    "name": "Synthese — Technology & Information Section",
+    "issn": "0039-7857",
+    "publisher": "Springer",
+    "scope": "Formal and applied philosophy, epistemology, philosophy of science and technology",
+    "disciplines": ["epistemology", "philosophy_of_science", "philosophy_of_technology"],
+    "typical_article_length_words": [8000, 14000],
+    "open_access": "hybrid",
+    "review_model": "double_blind",
+    "language": "en",
+    "frequency": "monthly"
+  }
+]
