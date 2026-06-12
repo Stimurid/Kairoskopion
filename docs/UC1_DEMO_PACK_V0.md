@@ -15,7 +15,7 @@ draft_article → ArticleModel → SemanticProfile → DisciplinaryPathways
   → UC1_DEMO_REPORT.md
 ```
 
-Steps in brackets are attempted but may fail due to pre-existing agent limitations — this is expected and honestly reported.
+All 12 steps complete successfully in deterministic mode.
 
 ## Demo content
 
@@ -102,4 +102,4 @@ python -c "from kairoskopion.cli import main; main(['run-uc1-demo', '--pack-dir'
 - No network access — all data from bundled fixtures
 - No external databases — venue data is synthetic
 - Evidence gaps (L5-L7) are explicitly reported, not fabricated
-- Pre-existing agent bugs (compliance_auditor, submission_pack_builder) cause 2 step failures — this is honestly reported as "partial" status
+- All 12 UC-1 workflow steps complete successfully (agent attribute bugs fixed in this pass)

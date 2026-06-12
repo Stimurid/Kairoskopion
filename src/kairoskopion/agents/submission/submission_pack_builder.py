@@ -39,5 +39,5 @@ class SubmissionPackBuilderAgent(AgentRole):
             "SubmissionPack",
             pack.to_dict(),
             confidence="medium",
-            trace_notes=[f"readiness={pack.readiness}"],
+            trace_notes=[f"readiness={pack.ready_status}"],
         )

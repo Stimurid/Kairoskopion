@@ -31,12 +31,12 @@ class ComplianceAuditorAgent(AgentRole):
             manuscript = ManuscriptModel(
                 manuscript_id="ms-from-agent",
                 article_model_id=article.article_model_id,
-                title=article.title,
-                abstract=article.abstract,
-                keywords=list(article.keywords) if article.keywords else [],
+                title=article.title_current,
+                abstract=article.abstract_current,
+                keywords=list(article.core_claims) if article.core_claims else [],
                 sections=[],
-                word_count=0,
-                language=article.language if hasattr(article, "language") else "en",
+                word_count=article.word_count or 0,
+                language=article.language or "en",
             )
 
         guidelines_text = inp.entities.get("venue_guidelines_text", "")

@@ -41,7 +41,8 @@ class EvidenceAuditorAgent(AgentRole):
             confidence="high",
             evidence_status="CORPUS",
             trace_notes=[
-                f"gate_status={result.status.value}",
-                f"findings={len(result.findings)}",
+                f"gate_status={result.status}",
+                f"warnings={len(result.warnings)}",
+                f"blocking={len(result.blocking_issues)}",
             ],
         )
