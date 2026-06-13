@@ -39,11 +39,15 @@ python -m kairoskopion.cli screen-venue-candidates [--output screening.json]
 ## Demo path
 
 ```bash
-python -m kairoskopion.cli run-uc1
+python -m kairoskopion.cli run-uc1-demo
+# Selected-venue fit mode:
+python -m kairoskopion.cli run-uc1-demo --select-candidate 0
+# Live adapter search (opt-in):
+python -m kairoskopion.cli run-uc1-demo --live
 ```
 
-In discovery mode (default), this runs steps 1-4 and produces the pool.
-Steps 5+ are skipped because `skip_if_missing=["venue"]` gates them.
+In discovery mode (default), this runs steps 0-3 and produces the pool.
+Steps 4+ are skipped because `skip_if_missing=["venue"]` gates them.
 
 ## Evidence rules
 
