@@ -187,6 +187,28 @@ body {
 .case-item-title { font-weight: 500; font-size: var(--font-size-sm); }
 .case-item-stage { font-size: var(--font-size-xs); color: var(--text-muted); }
 
+.case-list-item {
+  position: relative;
+}
+
+.case-item-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 5px;
+  border-radius: var(--radius-sm);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.case-list-item:hover .case-item-delete { opacity: 1; }
+.case-item-delete:hover { background: var(--bg-hover); color: var(--color-error); }
+
 .case-list-empty {
   padding: var(--space-lg) var(--space-md);
   color: var(--text-muted);
@@ -258,6 +280,7 @@ body {
 .stage-done { color: var(--color-success); border-color: var(--core-preserving); }
 .stage-current { color: var(--color-primary); border-color: var(--color-primary); background: rgba(91, 127, 255, 0.1); }
 .stage-empty { color: var(--text-muted); }
+.stage-disabled { opacity: 0.35; cursor: default; pointer-events: none; }
 .stage-arrow { color: var(--text-muted); font-size: var(--font-size-xs); }
 .stage-indicator { font-size: 8px; }
 
@@ -788,6 +811,29 @@ body {
 .btn-large {
   padding: var(--space-md) var(--space-xl);
   font-size: var(--font-size-lg);
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) 0;
+  margin-bottom: var(--space-sm);
+}
+
+.btn-back:hover { color: var(--text-primary); }
+
+.shallow-model-banner {
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(255, 170, 0, 0.1);
+  border: 1px solid rgba(255, 170, 0, 0.3);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-md);
 }
 
 /* --- Error banner --- */

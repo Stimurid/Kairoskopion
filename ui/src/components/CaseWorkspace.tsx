@@ -305,6 +305,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
         if (!articleModel) {
           return (
             <div className="loading-view">
+              <button className="btn btn-back" onClick={() => setActiveView('intake')}>← Back to Intake</button>
               <button className="btn btn-primary" onClick={async () => {
                 try {
                   const am = await api.getArticleModel(caseId);
@@ -321,6 +322,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
             article={articleModel}
             onConfirm={handleConfirmArticle}
             onEvidenceClick={handleEvidenceClick}
+            onBack={() => setActiveView('intake')}
           />
         );
 
@@ -354,6 +356,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
             onSubmit={handleSetScenario}
             isLoading={isLoading}
             hasArticleModel={!!articleModel || !!caseData.article_model_id}
+            onBack={() => setActiveView('article_model')}
           />
         );
 
@@ -373,6 +376,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
         if (pathways.length === 0) {
           return (
             <div className="placeholder-view">
+              <button className="btn btn-back" onClick={() => setActiveView('scenario')}>← Back</button>
               <h2>Disciplinary Pathways</h2>
               <p>Possible academic worlds for your article.</p>
               <button className="btn btn-primary" onClick={loadPathways} disabled={isLoading}>

@@ -45,6 +45,16 @@ export default function App() {
     }
   }, [loadCases, openCase]);
 
+  const deleteCase = useCallback(async (caseId: string) => {
+    try {
+      await api.deleteCase(caseId);
+      if (activeCase?.case_id === caseId) setActiveCase(null);
+      await loadCases();
+    } catch (e) {
+      console.error('Failed to delete case:', e);
+    }
+  }, [activeCase, loadCases]);
+
   const refreshActiveCase = useCallback(async () => {
     if (activeCase) {
       await openCase(activeCase.case_id);
@@ -98,13 +108,21 @@ export default function App() {
           </div>
           <ul className="case-list">
             {cases.map((c) => (
-              <li key={c.case_id}>
+              <li key={c.case_id} className="case-list-item">
                 <button
                   className={`case-item ${activeCase?.case_id === c.case_id ? 'case-item--active' : ''}`}
                   onClick={() => openCase(c.case_id)}
                 >
                   <span className="case-item-title">{c.title}</span>
                   <span className="case-item-stage">{c.stage}</span>
+                </button>
+                <button
+                  className="case-item-delete"
+                  onClick={(e) => { e.stopPropagation(); deleteCase(c.case_id); }}
+                  aria-label={`Delete ${c.title}`}
+                  title="Delete case"
+                >
+                  ✕
                 </button>
               </li>
             ))}
@@ -116,6 +134,7 @@ export default function App() {
 
         {activeCase ? (
           <CaseWorkspace
+            key={activeCase.case_id}
             caseData={activeCase}
             onCaseUpdate={refreshActiveCase}
           />

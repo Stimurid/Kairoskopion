@@ -20,11 +20,14 @@ interface Props {
 }
 
 export function StatusBar({ currentStage, objectsPresent, onStageClick }: Props) {
+  const currentIdx = STAGES.findIndex(s => s.key === currentStage);
+
   return (
     <nav className="status-bar" aria-label="Case pipeline stages">
       {STAGES.map((s, i) => {
         const present = objectsPresent[s.key] ?? false;
         const isCurrent = currentStage === s.key;
+        const isReachable = present || isCurrent || i <= currentIdx;
         let stateClass = 'stage-empty';
         if (isCurrent) stateClass = 'stage-current';
         else if (present) stateClass = 'stage-done';
@@ -33,10 +36,11 @@ export function StatusBar({ currentStage, objectsPresent, onStageClick }: Props)
           <span key={s.key}>
             {i > 0 && <span className="stage-arrow" aria-hidden="true"> → </span>}
             <button
-              className={`stage-chip ${stateClass}`}
-              onClick={() => onStageClick(s.key)}
+              className={`stage-chip ${stateClass} ${!isReachable ? 'stage-disabled' : ''}`}
+              onClick={() => isReachable && onStageClick(s.key)}
               aria-current={isCurrent ? 'step' : undefined}
-              title={present ? `${s.label}: data available` : `${s.label}: not yet`}
+              aria-disabled={!isReachable}
+              title={present ? `${s.label}: data available` : isReachable ? s.label : `${s.label}: complete earlier stages first`}
             >
               <span className="stage-indicator" aria-hidden="true">
                 {present ? '●' : '○'}

@@ -4,6 +4,7 @@ interface Props {
   onSubmit: (data: Record<string, unknown>) => void;
   isLoading: boolean;
   hasArticleModel: boolean;
+  onBack?: () => void;
 }
 
 const PRIORITY_OPTIONS = ['low', 'medium', 'high'];
@@ -11,7 +12,7 @@ const REWRITE_DEPTH_OPTIONS = ['minimal', 'medium', 'deep', 'full'];
 const RISK_TOLERANCE_OPTIONS = ['conservative', 'medium', 'aggressive'];
 const INDEXING_OPTIONS = ['Scopus', 'Web of Science', 'DOAJ', 'PubMed', 'ERIH PLUS', 'RSCI'];
 
-export function ScenarioBuilder({ onSubmit, isLoading, hasArticleModel }: Props) {
+export function ScenarioBuilder({ onSubmit, isLoading, hasArticleModel, onBack }: Props) {
   const [goal, setGoal] = useState('');
   const [prestigePriority, setPrestigePriority] = useState('medium');
   const [speedPriority, setSpeedPriority] = useState('medium');
@@ -53,6 +54,7 @@ export function ScenarioBuilder({ onSubmit, isLoading, hasArticleModel }: Props)
 
   return (
     <div className="scenario-builder">
+      {onBack && <button className="btn btn-back" onClick={onBack}>← Back</button>}
       <h2>Publication Scenario</h2>
       <p className="scenario-subtitle">
         Define your publication goal and constraints. This shapes venue discovery and fit assessment.

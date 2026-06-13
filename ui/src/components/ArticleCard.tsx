@@ -66,9 +66,10 @@ interface Props {
   article: ArticleModel;
   onConfirm: (protectedCore: string[], corrections: Record<string, string>) => void;
   onEvidenceClick: (entityType: string, fieldPath: string) => void;
+  onBack?: () => void;
 }
 
-export function ArticleCard({ article, onConfirm, onEvidenceClick }: Props) {
+export function ArticleCard({ article, onConfirm, onEvidenceClick, onBack }: Props) {
   const [editingCore, setEditingCore] = useState(false);
   const [coreItems, setCoreItems] = useState<string[]>(article.protected_core || []);
   const [newCoreItem, setNewCoreItem] = useState('');
@@ -114,14 +115,27 @@ export function ArticleCard({ article, onConfirm, onEvidenceClick }: Props) {
     { label: 'Discipline', key: 'disciplinary_register_current', value: article.disciplinary_register_current },
   ];
 
+  const isShallow = !article.title && !article.object_of_inquiry && !article.problem_statement;
+
   return (
     <div className="article-card">
+      {onBack && (
+        <button className="btn btn-back" onClick={onBack}>← Back to Intake</button>
+      )}
+
       <div className="article-card-header">
         <h2 className="article-title">{corrections.title || article.title || 'Untitled'}</h2>
         <span className={`lifecycle-badge lifecycle-${article.lifecycle_status}`}>
           {article.lifecycle_status}
         </span>
       </div>
+
+      {isShallow && !isConfirmed && (
+        <div className="shallow-model-banner" role="status">
+          Extraction produced a shallow model — key fields are missing.
+          You can edit fields manually, or go back and try a shorter/cleaner input.
+        </div>
+      )}
 
       {hasCorrections && !isConfirmed && (
         <div className="corrections-banner" role="status">
