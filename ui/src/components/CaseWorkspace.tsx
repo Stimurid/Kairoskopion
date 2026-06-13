@@ -176,19 +176,47 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
     } catch { /* not available */ }
   }, [caseId]);
 
+  // --- Mismatch map ---
+
+  const loadMismatchMap = useCallback(async () => {
+    try {
+      const result = await api.getMismatchMap(caseId);
+      if ('mismatches' in result && Array.isArray(result.mismatches) && result.mismatches.length > 0) {
+        setMismatchMap(result as MismatchMap);
+      }
+    } catch { /* not available yet */ }
+  }, [caseId]);
+
+  // --- Quality gates ---
+
+  const loadQualityGates = useCallback(async () => {
+    try {
+      const gates = await api.getQualityGates(caseId);
+      setQualityGates(gates);
+    } catch { /* not available */ }
+  }, [caseId]);
+
+  // --- Venue selection ---
+
   const handleSelectVenue = useCallback(async (venueId: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      await api.selectVenue(caseId, venueId);
-      setActiveView('fit_assessed');
+      const result = await api.selectVenue(caseId, venueId);
+      await loadMismatchMap();
+      await loadQualityGates();
+      if (result.rewrite_plan_available) {
+        setActiveView('adapting');
+      } else {
+        setActiveView('fit_assessed');
+      }
       onCaseUpdate();
     } catch (e) {
       handleError(e);
     } finally {
       setIsLoading(false);
     }
-  }, [caseId, onCaseUpdate]);
+  }, [caseId, onCaseUpdate, loadMismatchMap, loadQualityGates]);
 
   // --- Adaptation ---
 
@@ -244,26 +272,6 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
       setIsLoading(false);
     }
   }, [caseId, rewritePlan, onCaseUpdate]);
-
-  // --- Mismatch map ---
-
-  const loadMismatchMap = useCallback(async () => {
-    try {
-      const result = await api.getMismatchMap(caseId);
-      if ('mismatches' in result && Array.isArray(result.mismatches) && result.mismatches.length > 0) {
-        setMismatchMap(result as MismatchMap);
-      }
-    } catch { /* not available yet */ }
-  }, [caseId]);
-
-  // --- Quality gates ---
-
-  const loadQualityGates = useCallback(async () => {
-    try {
-      const gates = await api.getQualityGates(caseId);
-      setQualityGates(gates);
-    } catch { /* not available */ }
-  }, [caseId]);
 
   // --- Render view ---
 
@@ -365,6 +373,9 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
         );
 
       case 'venue_pool':
+        if (venueCandidates.length === 0 && venuePoolStatus === 'not_discovered') {
+          loadVenuePool();
+        }
         return (
           <VenuePoolBoard
             candidates={venueCandidates}

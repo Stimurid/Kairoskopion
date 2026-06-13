@@ -1,4 +1,4 @@
-import type { QualityGateResult, QualityGateStatus } from '../types/domain';
+import type { QualityGateResult } from '../types/domain';
 
 const STATUS_CONFIG: Record<string, { icon: string; className: string }> = {
   passed: { icon: '✓', className: 'gate-passed' },

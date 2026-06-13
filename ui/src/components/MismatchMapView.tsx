@@ -1,4 +1,4 @@
-import type { MismatchItem, MismatchMap, FieldCoreImpact } from '../types/domain';
+import type { MismatchItem, MismatchMap } from '../types/domain';
 
 const SEVERITY_ORDER: Record<string, number> = {
   blocking: 0,

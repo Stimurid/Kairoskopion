@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import type { RewritePlan, RewriteChange, FieldCoreImpact } from '../types/domain';
+import { useState } from 'react';
+import type { RewritePlan } from '../types/domain';
 import { RewriteTaskCard } from './RewriteTaskCard';
 
 const CORE_RISK_ORDER: Record<string, number> = {

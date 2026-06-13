@@ -1,4 +1,4 @@
-import type { DisciplinaryPathway, FieldCoreImpact } from '../types/domain';
+import type { DisciplinaryPathway } from '../types/domain';
 
 const FIT_CONFIG: Record<string, { label: string; className: string }> = {
   strong: { label: 'Strong', className: 'fit-strong' },

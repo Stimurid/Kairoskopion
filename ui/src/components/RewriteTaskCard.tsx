@@ -1,4 +1,4 @@
-import type { RewriteChange, FieldCoreImpact } from '../types/domain';
+import type { RewriteChange } from '../types/domain';
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   pending: { label: 'Pending', className: 'rw-pending' },

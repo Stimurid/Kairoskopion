@@ -101,7 +101,7 @@ export const api = {
 
   // Venue selection & fit
   selectVenue: (caseId: string, venueId: string) =>
-    post<{ selected_venue_id: string; stage: string }>(`/cases/${caseId}/select-venue/${venueId}`),
+    post<{ selected_venue_id: string; stage: string; fit_available?: boolean; mismatch_count?: number; rewrite_plan_available?: boolean }>(`/cases/${caseId}/select-venue/${venueId}`),
   getFit: (id: string) => get<FitAssessment | { status: string }>(`/cases/${id}/fit`),
   getMismatchMap: (id: string) => get<MismatchMap | { mismatches: []; status: string }>(`/cases/${id}/mismatch-map`),
 
