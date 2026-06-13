@@ -193,6 +193,7 @@ class Case:
             "protected_core": protected_core,
             "corrections_applied": list(corrections.keys()) if corrections else [],
         })
+        self._update_quality_gates("confirm_article")
 
         return {
             "confirmed": True,
@@ -228,6 +229,7 @@ class Case:
             "goal": data.get("goal", ""),
             "rewrite_depth": data.get("rewrite_depth_allowed", ""),
         })
+        self._update_quality_gates("set_scenario")
 
         return self.scenario.to_dict()
 
@@ -300,6 +302,7 @@ class Case:
         self._log_decision("discover_venues", {
             "candidate_count": len(self.venue_pool.candidates) if self.venue_pool else 0,
         })
+        self._update_quality_gates("discover_venues")
 
         return self.get_venue_pool()
 
@@ -311,15 +314,118 @@ class Case:
     # -- Select venue & fit --
 
     def select_venue(self, venue_id: str) -> dict[str, Any]:
+        # Resolve candidate from pool
+        candidate_dict = self._resolve_candidate(venue_id)
+        if candidate_dict:
+            self.selected_venue = self._venue_model_from_candidate(candidate_dict)
         self.stage = CaseStage.VENUE_SELECTED
-
         self._log_decision("select_venue", {"venue_id": venue_id})
+
+        # Auto-run fit → mismatch → rewrite chain
+        if self.selected_venue and self.article_model:
+            self._run_fit_chain()
+
+        self._update_quality_gates("venue_selected")
 
         return {
             "selected_venue_id": venue_id,
             "stage": self.stage.value,
             "fit_available": self.fit_assessment is not None,
+            "mismatch_count": (
+                len(self.mismatch_map.mismatches)
+                if self.mismatch_map and hasattr(self.mismatch_map, "mismatches")
+                else 0
+            ),
+            "rewrite_plan_available": self.rewrite_plan is not None,
         }
+
+    def _resolve_candidate(self, venue_id: str) -> dict[str, Any] | None:
+        if not self.venue_pool:
+            return None
+        candidates = (
+            self.venue_pool.candidates
+            if hasattr(self.venue_pool, "candidates")
+            else []
+        )
+        for c in candidates:
+            cid = c.get("venue_candidate_id", "") if isinstance(c, dict) else getattr(c, "venue_candidate_id", "")
+            if cid == venue_id:
+                return c if isinstance(c, dict) else c.to_dict()
+        # Fallback: take first candidate if ID not found
+        if candidates:
+            first = candidates[0]
+            return first if isinstance(first, dict) else first.to_dict()
+        return None
+
+    def _venue_model_from_candidate(self, candidate: dict[str, Any]) -> VenueModel:
+        raw = candidate.get("raw_adapter_data", {})
+        first_source = next(iter(raw.values()), {}) if raw else {}
+        topics = first_source.get("topics", [])
+        scope = ", ".join(topics) if topics else None
+        return VenueModel(
+            canonical_name=candidate.get("canonical_name", ""),
+            venue_type=first_source.get("type", "journal"),
+            official_urls=candidate.get("urls", []),
+            scope_summary=scope,
+            publisher_or_owner=first_source.get("publisher"),
+            confidence=candidate.get("confidence", "low"),
+            unknowns=candidate.get("unknowns", []),
+            source_refs=candidate.get("sources", []),
+        )
+
+    def _run_fit_chain(self):
+        from ..services.fit_assessment import assess_fit
+        from ..services.mismatch_mapping import build_mismatch_map
+        from ..services.rewrite_planning import build_rewrite_plan
+
+        scenario = self.scenario or SubmissionScenario(
+            article_model_id=self.article_model.article_model_id
+            if self.article_model else "",
+        )
+
+        try:
+            self.fit_assessment = assess_fit(
+                self.article_model, self.selected_venue, scenario,
+            )
+            self.stage = CaseStage.FIT_ASSESSED
+            self._log_decision("fit_assessed", {
+                "overall_label": self.fit_assessment.overall_label,
+                "axes_count": len(self.fit_assessment.axes),
+            })
+        except Exception:
+            return
+
+        try:
+            self.mismatch_map = build_mismatch_map(self.fit_assessment)
+            self._log_decision("mismatch_mapped", {
+                "mismatch_count": len(self.mismatch_map.mismatches),
+                "summary": self.mismatch_map.summary,
+            })
+        except Exception:
+            return
+
+        if self.mismatch_map.mismatches:
+            try:
+                self.rewrite_plan = build_rewrite_plan(
+                    self.mismatch_map,
+                    article_model_id=(
+                        self.article_model.article_model_id
+                        if self.article_model else None
+                    ),
+                    venue_model_id=(
+                        self.selected_venue.venue_model_id
+                        if self.selected_venue else None
+                    ),
+                )
+                self.stage = CaseStage.ADAPTING
+                self._log_decision("rewrite_planned", {
+                    "changes_count": len(self.rewrite_plan.changes),
+                    "effort": self.rewrite_plan.estimated_effort,
+                })
+            except Exception:
+                pass
+
+        self._update_quality_gates("fit_chain")
 
     def get_fit(self) -> dict[str, Any]:
         if self.fit_assessment:
@@ -445,6 +551,67 @@ class Case:
         return dossier
 
     # -- Decision log --
+
+    def _update_quality_gates(self, trigger: str = ""):
+        gates: dict[str, dict[str, Any]] = {}
+
+        if self.article_model:
+            has_core = bool(self.article_model.protected_core)
+            gates["article_model"] = {
+                "gate_name": "Article Model",
+                "status": "pass" if has_core else "warning",
+                "message": (
+                    "Confirmed with protected core"
+                    if has_core else "No protected core defined"
+                ),
+            }
+
+        if self.scenario:
+            gates["scenario"] = {
+                "gate_name": "Submission Scenario",
+                "status": "pass",
+                "message": f"Goal: {self.scenario.goal or 'set'}",
+            }
+
+        if self.venue_pool:
+            n = len(self.venue_pool.candidates) if hasattr(self.venue_pool, "candidates") else 0
+            gates["venue_pool"] = {
+                "gate_name": "Venue Pool",
+                "status": "pass" if n > 0 else "fail",
+                "message": f"{n} candidate(s) discovered",
+            }
+
+        if self.fit_assessment:
+            label = self.fit_assessment.overall_label
+            gates["fit_assessment"] = {
+                "gate_name": "Fit Assessment",
+                "status": "pass" if label != "poor" else "warning",
+                "message": f"Overall: {label}",
+            }
+
+        if self.mismatch_map:
+            n_blocking = sum(
+                1 for m in self.mismatch_map.mismatches
+                if m.get("severity") == "blocking"
+            )
+            gates["mismatch_map"] = {
+                "gate_name": "Mismatch Map",
+                "status": "fail" if n_blocking > 0 else "pass",
+                "message": (
+                    f"{n_blocking} blocking mismatch(es)"
+                    if n_blocking else "No blocking mismatches"
+                ),
+            }
+
+        if self.rewrite_plan:
+            n_changes = len(self.rewrite_plan.changes)
+            gates["rewrite_plan"] = {
+                "gate_name": "Rewrite Plan",
+                "status": "pass" if n_changes > 0 else "warning",
+                "message": f"{n_changes} change(s), effort: {self.rewrite_plan.estimated_effort}",
+            }
+
+        self.quality_gates = gates
 
     def _log_decision(self, action: str, details: dict[str, Any]):
         self.decision_log.append({
