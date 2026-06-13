@@ -1502,6 +1502,69 @@ def cmd_screen_venue_candidates(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_verify_references(args: argparse.Namespace) -> int:
+    from .demo.uc1_demo_loader import load_uc1_demo_pack
+    from .services.bibliography_parsing import build_bibliography_profile
+    from .services.reference_verification import verify_references
+
+    pack = load_uc1_demo_pack()
+    if not pack.is_valid:
+        _safe_print("ERROR: demo pack invalid")
+        return 1
+
+    bib_profile = build_bibliography_profile(pack.draft_text)
+
+    _safe_print(f"References parsed: {bib_profile.total_references}")
+    _safe_print(f"DOIs found: {bib_profile.doi_count}")
+    _safe_print("")
+
+    result = verify_references(bib_profile)
+
+    _safe_print(f"Verification result:")
+    _safe_print(f"  Total references: {result.total_references}")
+    _safe_print(f"  DOI present: {result.doi_present_count}")
+    _safe_print(f"  DOI resolved: {result.doi_resolved_count}")
+    _safe_print(f"  DOI unresolved: {result.doi_unresolved_count}")
+    _safe_print(f"  DOI absent: {result.doi_not_in_bibliography}")
+    _safe_print(f"  Padding risk flagged: {result.padding_risk_count}")
+    _safe_print("")
+
+    metrics = result.aggregate_metrics
+    if metrics:
+        _safe_print("Aggregate metrics:")
+        _safe_print(f"  DOI coverage: {metrics.get('doi_coverage', 0):.1%}")
+        _safe_print(f"  DOI resolution rate: {metrics.get('doi_resolution_rate', 0):.1%}")
+        _safe_print(f"  Retraction checked: {metrics.get('retraction_checked', False)}")
+        _safe_print(f"  PubPeer checked: {metrics.get('pubpeer_checked', False)}")
+    _safe_print("")
+
+    for check in result.checks:
+        ref_id = check.get("reference_id", "?")
+        status = check.get("status", "?")
+        doi_status = check.get("doi_resolution_status", "?")
+        padding = check.get("citation_padding_risk", "?")
+        key = check.get("citation_key", "")
+        label = key[:40] if key else ref_id[:20]
+        flag = ""
+        if padding in ("medium", "high"):
+            flag = f" [PADDING RISK: {padding}]"
+        _safe_print(f"  [{status.upper():16s}] {label} — DOI: {doi_status}{flag}")
+
+    _safe_print("")
+    _safe_print("NOTE: Retraction/PubPeer status not checked.")
+    _safe_print("citation_supports_claim requires LLM analysis.")
+
+    if args.output:
+        import json as _json
+        Path(args.output).write_text(
+            _json.dumps(result.to_dict(), indent=2, ensure_ascii=False, default=str),
+            encoding="utf-8",
+        )
+        _safe_print(f"Output: {args.output}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="kairoskopion",
@@ -1815,6 +1878,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Cache directory for HTTP responses",
     )
 
+    verify_ref_parser = sub.add_parser(
+        "verify-references",
+        help="Verify references from UC-1 demo draft: DOI resolution, padding risk",
+    )
+    verify_ref_parser.add_argument(
+        "--output", "-o", default=None,
+        help="Write JSON result to file",
+    )
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -1852,6 +1924,7 @@ def main(argv: list[str] | None = None) -> int:
         "plan-venue-discovery": cmd_plan_venue_discovery,
         "discover-venue-pool": cmd_discover_venue_pool,
         "screen-venue-candidates": cmd_screen_venue_candidates,
+        "verify-references": cmd_verify_references,
     }
 
     handler = commands.get(args.command)

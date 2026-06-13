@@ -104,8 +104,10 @@ class TestAgentLayers(unittest.TestCase):
 
     def test_evidence_layer(self):
         evidence = [s for s in list_agent_specs() if s.layer == "evidence"]
-        self.assertEqual(len(evidence), 1)
-        self.assertEqual(evidence[0].role_id, "evidence_auditor")
+        self.assertEqual(len(evidence), 2)
+        role_ids = {s.role_id for s in evidence}
+        self.assertIn("evidence_auditor", role_ids)
+        self.assertIn("reference_verifier", role_ids)
 
 
 if __name__ == "__main__":
