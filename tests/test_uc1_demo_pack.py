@@ -116,13 +116,13 @@ class TestDemoRunner(unittest.TestCase):
         self.assertIn(result.workflow_status, ("completed", "partial"))
 
     def test_run_all_12_steps_complete(self):
-        result = run_uc1_demo()
+        result = run_uc1_demo(select_candidate_index=0)
         self.assertEqual(result.workflow_status, "completed")
         completed = [s for s in result.step_results if s["status"] == "completed"]
         self.assertEqual(len(completed), 12)
 
     def test_hardened_agents_produce_entities(self):
-        result = run_uc1_demo()
+        result = run_uc1_demo(select_candidate_index=0)
         self.assertIn("compliance", result.entities)
         self.assertIn("submission_pack", result.entities)
         self.assertIn("evidence_gate", result.entities)
@@ -225,6 +225,113 @@ class TestCLIRunUC1Demo(unittest.TestCase):
         from kairoskopion.cli import main
         rc = main(["run-uc1-demo", "--pack-dir", "/nonexistent/pack"])
         self.assertEqual(rc, 1)
+
+
+# ---------------------------------------------------------------------------
+# 13. Selected-venue fit mode
+# ---------------------------------------------------------------------------
+
+class TestSelectedVenueFitMode(unittest.TestCase):
+    """Tests for run_uc1_demo(select_candidate_index=N)."""
+
+    def test_select_candidate_runs_full_pipeline(self):
+        result = run_uc1_demo(select_candidate_index=0)
+        self.assertEqual(result.mode, "selected_venue")
+        self.assertIn(result.workflow_status, ("completed", "partial"))
+        self.assertIsNotNone(result.selected_candidate)
+        self.assertIn("venue", result.entities)
+
+    def test_select_candidate_preserves_discovery(self):
+        result = run_uc1_demo(select_candidate_index=0)
+        self.assertIn("_discovery", result.entities)
+        disc = result.entities["_discovery"]
+        self.assertIn("venue_pool", disc)
+
+    def test_select_candidate_out_of_range(self):
+        result = run_uc1_demo(select_candidate_index=9999)
+        self.assertEqual(result.workflow_status, "invalid_selection")
+        self.assertTrue(len(result.errors) > 0)
+        self.assertIn("out of range", result.errors[0])
+
+    def test_select_candidate_negative_index(self):
+        result = run_uc1_demo(select_candidate_index=-1)
+        self.assertEqual(result.workflow_status, "invalid_selection")
+
+    def test_discovery_mode_default(self):
+        result = run_uc1_demo()
+        self.assertEqual(result.mode, "discovery")
+        self.assertIsNone(result.selected_candidate)
+
+    def test_selected_candidate_in_to_dict(self):
+        result = run_uc1_demo(select_candidate_index=0)
+        d = result.to_dict()
+        self.assertEqual(d["mode"], "selected_venue")
+        self.assertIn("selected_candidate", d)
+
+    def test_candidate_to_venue_entity_structure(self):
+        from kairoskopion.demo.uc1_runner import _candidate_to_venue_entity
+        candidate = {
+            "canonical_name": "Test Journal",
+            "issn": "1234-5678",
+            "issn_l": "1234-5678",
+            "venue_candidate_id": "vc_test_001",
+            "urls": ["https://example.com"],
+            "aliases": ["TJ"],
+            "sources": ["openalex"],
+            "confidence": "medium",
+            "raw_adapter_data": {
+                "openalex": {
+                    "publisher": "Test Publisher",
+                    "type": "journal",
+                    "homepage_url": "https://test.example.com",
+                },
+            },
+        }
+        venue = _candidate_to_venue_entity(candidate)
+        self.assertEqual(venue["name"], "Test Journal")
+        self.assertEqual(venue["canonical_name"], "Test Journal")
+        self.assertEqual(venue["issn"], "1234-5678")
+        self.assertEqual(venue["_promoted_from_candidate"], "vc_test_001")
+        self.assertEqual(venue["_candidate_confidence"], "medium")
+        self.assertEqual(venue["publisher"], "Test Publisher")
+        self.assertEqual(venue["venue_type"], "journal")
+
+    def test_candidate_with_blocking_conflict(self):
+        from kairoskopion.demo.uc1_runner import _candidate_to_venue_entity
+
+        result = run_uc1_demo(select_candidate_index=0)
+        if result.workflow_status == "blocked_by_conflict":
+            self.assertTrue(len(result.errors) > 0)
+            self.assertIn("blocking", result.errors[0])
+            return
+
+        self.assertIn(result.workflow_status, ("completed", "partial"))
+
+    def test_cli_select_candidate_flag(self):
+        from kairoskopion.cli import main
+        with tempfile.TemporaryDirectory() as td:
+            output_dir = Path(td) / "fit_output"
+            rc = main(["run-uc1-demo", "--output-dir", str(output_dir),
+                        "--select-candidate", "0"])
+            self.assertIn(rc, (0, 1))
+            if output_dir.exists():
+                self.assertTrue((output_dir / "workflow_trace.json").exists())
+
+    def test_cli_select_candidate_bad_index(self):
+        from kairoskopion.cli import main
+        rc = main(["run-uc1-demo", "--select-candidate", "9999"])
+        self.assertEqual(rc, 1)
+
+    def test_output_artifacts_in_fit_mode(self):
+        with tempfile.TemporaryDirectory() as td:
+            output_dir = Path(td) / "fit_artifacts"
+            result = run_uc1_demo(
+                output_dir=output_dir, select_candidate_index=0,
+            )
+            if result.is_success:
+                self.assertTrue(output_dir.exists())
+                self.assertTrue((output_dir / "workflow_trace.json").exists())
+                self.assertTrue((output_dir / "UC1_DEMO_REPORT.md").exists())
 
 
 if __name__ == "__main__":

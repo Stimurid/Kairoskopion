@@ -7,6 +7,7 @@ No broad crawling. No fake recommendations.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from ..enums import (
@@ -21,6 +22,8 @@ from ..schema import (
     VenueDiscoveryQuery,
 )
 from .venue_discovery_planner import plan_venue_discovery
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +135,7 @@ def discover_venue_pool(
     fixtures: dict[str, list[dict[str, Any]]] | None = None,
     live_enabled: bool = False,
     enabled_sources: list[str] | None = None,
+    cache_dir: str | None = None,
 ) -> VenueCandidatePool:
     """Discover venue candidates from adapters and seed venues.
 
@@ -160,6 +164,7 @@ def discover_venue_pool(
             src_candidates = _discover_from_source(
                 src, queries, all_fixtures, constraints,
                 live_enabled=live_enabled,
+                cache_dir=cache_dir,
             )
             raw_candidates.extend(src_candidates)
         except Exception as exc:
@@ -203,9 +208,10 @@ def _discover_from_source(
     constraints: dict[str, Any],
     *,
     live_enabled: bool = False,
+    cache_dir: str | None = None,
 ) -> list[dict[str, Any]]:
-    if live_enabled:
-        return []
+    if live_enabled and source in ("openalex", "doaj"):
+        return _discover_live(source, queries, constraints, cache_dir=cache_dir)
 
     fixture_data = fixtures.get(source, [])
     if not fixture_data:
@@ -234,6 +240,140 @@ def _discover_from_source(
         candidates.append(candidate)
 
     return candidates
+
+
+def _discover_live(
+    source: str,
+    queries: list[VenueDiscoveryQuery],
+    constraints: dict[str, Any],
+    *,
+    cache_dir: str | None = None,
+) -> list[dict[str, Any]]:
+    """Call real adapters in LIVE_API mode for discovery search."""
+    from ..adapters.venue.base import VenueAdapterMode
+
+    adapter = _build_discovery_adapter(source, cache_dir=cache_dir)
+    if adapter is None:
+        return []
+
+    seen_issns: set[str] = set()
+    candidates: list[dict[str, Any]] = []
+
+    for query in queries:
+        search_terms = [t.strip() for t in query.query_text.split("|") if t.strip()]
+        primary_term = search_terms[0] if search_terms else query.query_text
+
+        try:
+            results = adapter.search_venues(primary_term, per_page=10)
+        except Exception as exc:
+            logger.warning("Live search failed for %s/%s: %s", source, primary_term, exc)
+            continue
+
+        for result in results:
+            if result.status != "success" or not result.claims:
+                continue
+
+            raw = result.raw_data or {}
+            name = _claim_value(result, "canonical_name") or raw.get("display_name", "")
+            issn = _claim_value(result, "issn") or raw.get("issn_l")
+
+            if issn and issn in seen_issns:
+                continue
+            if issn:
+                seen_issns.add(issn)
+
+            reasons = _match_reasons_from_adapter(raw, search_terms, constraints)
+            if not reasons:
+                reasons = [VenueCandidateReason.KEYWORD_MATCH.value]
+
+            authority = result.authority_assessment
+            candidate = {
+                "canonical_name": name,
+                "issn": issn,
+                "issn_l": raw.get("issn_l") or issn,
+                "aliases": [],
+                "urls": [raw.get("homepage_url")] if raw.get("homepage_url") else [],
+                "sources": [source],
+                "discovery_reasons": reasons,
+                "authority_assessments": [authority] if authority else [],
+                "adapter_result_refs": [result.adapter_id],
+                "status": VenueCandidateStatus.DISCOVERED.value,
+                "confidence": "medium" if authority else "low",
+                "unknowns": result.unknowns,
+                "raw_adapter_data": {source: raw},
+            }
+            candidates.append(candidate)
+
+    return candidates
+
+
+def _build_discovery_adapter(
+    source: str,
+    *,
+    cache_dir: str | None = None,
+) -> Any | None:
+    from ..adapters.venue.base import VenueAdapterMode
+
+    if source == "openalex":
+        from ..adapters.venue.openalex import OpenAlexVenueAdapter
+        return OpenAlexVenueAdapter(
+            VenueAdapterMode.LIVE_API,
+            cache_dir=cache_dir,
+        )
+    elif source == "doaj":
+        from ..adapters.venue.doaj import DOAJVenueAdapter
+        return DOAJVenueAdapter(
+            VenueAdapterMode.LIVE_API,
+            cache_dir=cache_dir,
+        )
+    return None
+
+
+def _claim_value(result: Any, claim_path: str) -> Any | None:
+    for claim in result.claims:
+        if claim.claim_path == claim_path:
+            return claim.claim_value
+    return None
+
+
+def _match_reasons_from_adapter(
+    raw: dict[str, Any],
+    search_terms: list[str],
+    constraints: dict[str, Any],
+) -> list[str]:
+    """Derive discovery reasons from adapter raw data against search terms."""
+    reasons: list[str] = []
+
+    topics = []
+    for t in raw.get("topics", []):
+        if isinstance(t, str):
+            topics.append(t.lower())
+        elif isinstance(t, dict):
+            topics.append(t.get("display_name", "").lower())
+    subjects = [s.lower() for s in raw.get("subjects", [])]
+    bib = raw.get("bibjson", {})
+    if bib:
+        for s in bib.get("subject", []):
+            if s.get("term"):
+                subjects.append(s["term"].lower())
+    all_terms = topics + subjects
+
+    for qt in search_terms:
+        qt_lower = qt.lower()
+        qt_words = qt_lower.split()
+        for term in all_terms:
+            if qt_lower in term or term in qt_lower:
+                reasons.append(VenueCandidateReason.DISCIPLINE_MATCH.value)
+                break
+            if any(w in term for w in qt_words if len(w) > 3):
+                reasons.append(VenueCandidateReason.KEYWORD_MATCH.value)
+                break
+
+    if raw.get("oa_status") and constraints.get("open_access"):
+        reasons.append(VenueCandidateReason.OA_POLICY_MATCH.value)
+
+    seen: set[str] = set()
+    return [r for r in reasons if r not in seen and not seen.add(r)]  # type: ignore[func-returns-value]
 
 
 def _match_reasons(

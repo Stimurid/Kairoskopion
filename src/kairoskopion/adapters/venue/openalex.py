@@ -130,6 +130,51 @@ class OpenAlexVenueAdapter(VenueAdapter):
             result.cached_at = result.fetched_at
         return result
 
+    def search_venues(
+        self,
+        query_text: str,
+        *,
+        per_page: int = 10,
+    ) -> list[VenueAdapterResult]:
+        """Search OpenAlex for multiple venue sources matching query_text.
+
+        Returns up to per_page results. Only works in LIVE_API mode;
+        in FIXTURE/OFFLINE modes returns empty list (use lookup_venue instead).
+        """
+        if self._mode in (VenueAdapterMode.OFFLINE_STUB, VenueAdapterMode.FIXTURE):
+            return []
+
+        if self._mode != VenueAdapterMode.LIVE_API:
+            return []
+
+        from pathlib import Path
+        from urllib.parse import quote
+
+        safe_q = quote(query_text, safe="")
+        api_url = (
+            f"https://api.openalex.org/sources"
+            f"?search={safe_q}&per_page={per_page}&type=journal"
+        )
+        cache_path = Path(self._cache_dir) if self._cache_dir else None
+
+        http_result = fetch_json_safe(
+            api_url, timeout=self._timeout, cache_dir=cache_path,
+        )
+
+        if not http_result.ok:
+            return []
+
+        body = http_result.body or {}
+        results_list = body.get("results", [])
+        out: list[VenueAdapterResult] = []
+        for item in results_list:
+            result = self._parse_response(item, {"search": query_text})
+            result.fetched_at = _now_iso()
+            if http_result.from_cache:
+                result.cached_at = result.fetched_at
+            out.append(result)
+        return out
+
     def _cached_lookup(
         self, query: dict[str, Any], *, name: str | None, issn: str | None,
     ) -> VenueAdapterResult:

@@ -1179,16 +1179,33 @@ def cmd_run_uc1_demo(args: argparse.Namespace) -> int:
 
     pack_dir = Path(args.pack_dir) if args.pack_dir else None
     output_dir = Path(args.output_dir) if args.output_dir else None
+    select_idx = getattr(args, "select_candidate", None)
+    live = getattr(args, "live", False)
+    cache_dir = getattr(args, "cache_dir", None)
 
-    _safe_print("Running UC-1 Demo Pack (offline, deterministic, no LLM)")
+    mode_label = "SELECTED-VENUE FIT" if select_idx is not None else "DISCOVERY"
+    live_label = " [LIVE]" if live else ""
+    _safe_print(f"Running UC-1 Demo Pack — {mode_label}{live_label}")
     _safe_print("")
 
-    result = run_uc1_demo(pack_dir=pack_dir, output_dir=output_dir)
+    result = run_uc1_demo(
+        pack_dir=pack_dir,
+        output_dir=output_dir,
+        select_candidate_index=select_idx,
+        live_enabled=live,
+        cache_dir=cache_dir,
+    )
 
     _safe_print(f"Pack valid: {result.pack.is_valid}")
     _safe_print(f"Venues: {len(result.pack.venue_seeds)}")
+    _safe_print(f"Mode: {result.mode}")
     _safe_print(f"Workflow status: {result.workflow_status}")
     _safe_print("")
+
+    if result.selected_candidate:
+        cand = result.selected_candidate
+        _safe_print(f"Selected candidate: {cand.get('canonical_name')} (ISSN: {cand.get('issn', '?')})")
+        _safe_print("")
 
     completed = sum(1 for s in result.step_results if s.get("status") == "completed")
     skipped = sum(1 for s in result.step_results if s.get("status") == "skipped")
@@ -1318,18 +1335,24 @@ def cmd_discover_venue_pool(args: argparse.Namespace) -> int:
     pathways_entity = paths_out.output_entity
     pathways = pathways_entity.get("pathways", []) if isinstance(pathways_entity, dict) else []
 
+    live = getattr(args, "live", False)
+    cache_dir = getattr(args, "cache_dir", None)
+
     pool = discover_venue_pool(
         semantic_profile=semantic_profile,
         pathways=pathways,
         scenario=scenario,
         seed_venues=pack.venue_seeds,
+        live_enabled=live,
+        cache_dir=cache_dir,
     )
 
     pool_dict = pool.to_dict()
     candidates = pool_dict.get("candidates", [])
     deduped, dedupe_notes, conflicts = dedupe_candidates(candidates)
 
-    _safe_print(f"Candidates discovered: {len(deduped)}")
+    mode_label = "LIVE" if live else "FIXTURE"
+    _safe_print(f"Candidates discovered: {len(deduped)} [{mode_label}]")
     _safe_print(f"Queries planned: {len(pool_dict.get('queries', []))}")
     _safe_print(f"Dedupe notes: {len(dedupe_notes)}")
     _safe_print(f"Conflicts: {len(conflicts)}")
@@ -1411,11 +1434,16 @@ def cmd_screen_venue_candidates(args: argparse.Namespace) -> int:
     pathways_entity = paths_out.output_entity
     pathways = pathways_entity.get("pathways", []) if isinstance(pathways_entity, dict) else []
 
+    live = getattr(args, "live", False)
+    cache_dir = getattr(args, "cache_dir", None)
+
     pool = discover_venue_pool(
         semantic_profile=semantic_profile,
         pathways=pathways,
         scenario=scenario,
         seed_venues=pack.venue_seeds,
+        live_enabled=live,
+        cache_dir=cache_dir,
     )
 
     pool_dict = pool.to_dict()
@@ -1734,6 +1762,18 @@ def main(argv: list[str] | None = None) -> int:
         "--output-dir", default=None,
         help="Directory to write demo artifacts (workflow_trace.json, entity files, UC1_DEMO_REPORT.md)",
     )
+    uc1_demo_parser.add_argument(
+        "--select-candidate", type=int, default=None,
+        help="0-based index of discovered candidate to promote to venue entity for fit pipeline",
+    )
+    uc1_demo_parser.add_argument(
+        "--live", action="store_true", default=False,
+        help="Enable live API queries for venue discovery (OpenAlex, DOAJ)",
+    )
+    uc1_demo_parser.add_argument(
+        "--cache-dir", default=None,
+        help="HTTP cache directory for live adapter queries",
+    )
 
     # --- Venue Discovery CLI commands ---
     sub.add_parser(
@@ -1743,20 +1783,36 @@ def main(argv: list[str] | None = None) -> int:
 
     discover_pool_parser = sub.add_parser(
         "discover-venue-pool",
-        help="Discover venue candidate pool from UC-1 demo (offline)",
+        help="Discover venue candidate pool from UC-1 demo",
     )
     discover_pool_parser.add_argument(
         "--output", default=None,
         help="Output JSON file path",
     )
+    discover_pool_parser.add_argument(
+        "--live", action="store_true", default=False,
+        help="Enable live API queries (OpenAlex, DOAJ). Requires network.",
+    )
+    discover_pool_parser.add_argument(
+        "--cache-dir", default=None,
+        help="Cache directory for HTTP responses",
+    )
 
     screen_parser = sub.add_parser(
         "screen-venue-candidates",
-        help="Screen venue candidates from UC-1 demo (offline)",
+        help="Screen venue candidates from UC-1 demo",
     )
     screen_parser.add_argument(
         "--output", default=None,
         help="Output JSON file path",
+    )
+    screen_parser.add_argument(
+        "--live", action="store_true", default=False,
+        help="Enable live API queries (OpenAlex, DOAJ). Requires network.",
+    )
+    screen_parser.add_argument(
+        "--cache-dir", default=None,
+        help="Cache directory for HTTP responses",
     )
 
     args = parser.parse_args(argv)

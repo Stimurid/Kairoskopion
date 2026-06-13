@@ -146,6 +146,50 @@ class DOAJVenueAdapter(VenueAdapter):
             result.cached_at = result.fetched_at
         return result
 
+    def search_venues(
+        self,
+        query_text: str,
+        *,
+        per_page: int = 10,
+    ) -> list[VenueAdapterResult]:
+        """Search DOAJ for multiple journals matching query_text.
+
+        Returns up to per_page results. Only works in LIVE_API mode.
+        """
+        if self._mode in (VenueAdapterMode.OFFLINE_STUB, VenueAdapterMode.FIXTURE):
+            return []
+
+        if self._mode != VenueAdapterMode.LIVE_API:
+            return []
+
+        from pathlib import Path
+        from urllib.parse import quote
+
+        safe_q = quote(query_text, safe="")
+        api_url = (
+            f"https://doaj.org/api/search/journals/{safe_q}"
+            f"?pageSize={per_page}"
+        )
+        cache_path = Path(self._cache_dir) if self._cache_dir else None
+
+        http_result = fetch_json_safe(
+            api_url, timeout=self._timeout, cache_dir=cache_path,
+        )
+
+        if not http_result.ok:
+            return []
+
+        body = http_result.body or {}
+        results_list = body.get("results", [])
+        out: list[VenueAdapterResult] = []
+        for item in results_list:
+            result = self._parse_response(item, {"search": query_text})
+            result.fetched_at = _now_iso()
+            if http_result.from_cache:
+                result.cached_at = result.fetched_at
+            out.append(result)
+        return out
+
     def _cached_lookup(
         self, query: dict[str, Any], *, issn: str | None,
     ) -> VenueAdapterResult:
