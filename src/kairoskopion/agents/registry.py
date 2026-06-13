@@ -347,6 +347,19 @@ _SPECS: list[AgentSpec] = [
         mvp_phase="v0.1",
         first_workflows=["uc1_draft_to_venue_pool_positioning"],
     ),
+    AgentSpec(
+        role_id="reference_verifier",
+        display_name="Reference Verifier",
+        layer="evidence",
+        implementation_status="operational_now",
+        execution_mode="deterministic",
+        input_contract={
+            "entities.bibliography_profile": "BibliographyProfile (or raw_text fallback)",
+        },
+        output_contract={"ReferenceVerificationResult": "per-ref integrity checks + aggregates"},
+        mvp_phase="v0.2",
+        first_workflows=["uc1_draft_to_venue_pool_positioning"],
+    ),
 ]
 
 
@@ -383,7 +396,7 @@ def _build_agent_class_map() -> dict[str, type]:
         RevisionPlannerAgent, RebuttalArchitectAgent,
         TacitSignalStructurerAgent, VenueMemoryKeeperAgent,
     )
-    from .evidence import EvidenceAuditorAgent
+    from .evidence import EvidenceAuditorAgent, ReferenceVerifierAgent
 
     return {
         "intent_classifier": IntentClassifierAgent,
@@ -413,6 +426,7 @@ def _build_agent_class_map() -> dict[str, type]:
         "tacit_signal_structurer": TacitSignalStructurerAgent,
         "venue_memory_keeper": VenueMemoryKeeperAgent,
         "evidence_auditor": EvidenceAuditorAgent,
+        "reference_verifier": ReferenceVerifierAgent,
     }
 
 

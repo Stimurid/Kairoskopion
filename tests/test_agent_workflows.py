@@ -47,7 +47,7 @@ class TestWorkflowRegistry(unittest.TestCase):
 
     def test_uc1_step_count(self):
         wf = UC1_DRAFT_TO_VENUE_POOL_POSITIONING
-        self.assertEqual(len(wf.steps), 12)
+        self.assertEqual(len(wf.steps), 13)
 
     def test_review_loop_skeleton(self):
         self.assertEqual(REVIEW_LOOP.implementation_status, "skeleton")
