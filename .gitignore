@@ -45,3 +45,7 @@ kairoskopion_demo_bundle.zip
 *.zip
 
 private_inputs/
+
+# UI
+ui/node_modules/
+ui/dist/
