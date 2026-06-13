@@ -17,6 +17,7 @@ extract = [
 api = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
+    "python-multipart>=0.0.9",
 ]
 dev = [
     "pytest>=7.0",
