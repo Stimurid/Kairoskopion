@@ -1,15 +1,17 @@
 # Project Status — Kairoskopion
 
-**Last updated:** 2026-06-13
+**Last updated:** 2026-06-14 (state-audit pass)
 
 ## Repository
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `main` (merge target: `feature/ui-cockpit-v0`) |
-| Tag | `v0.2.0-alpha-rc15` (pending) |
+| Branch | `main` |
+| Latest pushed tag | `v0.2.0-alpha-rc16` (`458e1ff`) — last staging deploy |
+| `main` HEAD | `2aaa8ae` — **8 commits ahead of rc16** (file upload + multipart + LLM wiring + nav fix + web enrichment + FPM library). Staging is NOT running `main`. |
+| `pyproject.version` | `0.2.0a15` — **stale**, lags behind tag (rc16) and HEAD |
+| Active feature branches (local-only) | `feature/reference-verification-v0` (`5f198c9`, incident tracking), `feature/ui-cockpit-v0` (`7bf7fb7`, doc audit). Pushed: `feature/wire-fpm-pipeline` (`cb464f8`), `feature/sprint-alpha-evidence-policy` (`1a59812`). |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
-| Working tree | clean |
 | Python | >=3.11 |
 | Node.js | >=18 (for UI build) |
 
@@ -21,15 +23,16 @@
 > Staging deployment must be protected (IP-restricted or auth-gated).
 > No public prod claim.
 
-- FastAPI backend: 19 REST endpoints covering full Case pipeline
-- React + TypeScript frontend: 17 components, dark theme, responsive layout
+- FastAPI backend: **30 REST endpoints** (verified 2026-06-14 via app.routes) covering full Case pipeline + agent map + SPA static serve
+- React + TypeScript frontend: **18 components** (App.tsx + 17 under `ui/src/components/`) — dark theme, responsive layout
 - Pipeline continuity: select_venue triggers fit → mismatch → rewrite chain
 - Quality gates populated after stage transitions
 - Evidence badge system (FACT, CLAIM, CORPUS, INFERRED, USER, UNKNOWN, STALE, CONFLICT)
 - API smoke test: 18/18 PASS, 1 SKIP (expected)
 - Browser smoke: all views render, zero console errors, mobile responsive at 375px
 - Frontend build: `tsc --noEmit` clean, `vite build` clean
-- Backend: 1275 pytest tests passing (4 deselected = network)
+- Backend: **1307 pytest tests passing on main** (4 deselected = network). Branch `feature/wire-fpm-pipeline` adds +8, `feature/sprint-alpha-evidence-policy` adds +15 on top of that (= 1330).
+- File upload: PDF/DOCX/TXT/MD/HTML extension allowlist enforced; **NO size limit, NO content-type check, full file read into RAM via `await file.read()`** — staging-only acceptable, public-prod blocker.
 
 ## Recent commit history (main)
 
@@ -172,7 +175,7 @@ evidence-first article-to-venue trajectory engine.
 | `contract.py` | AgentInput/AgentOutput/AgentRole ABC |
 | `runtime_models.py` | AgentSpec, AgentTask, AgentRun, AgentResult, AgentTrace, WorkflowStepSpec, etc. |
 | `base_shell.py` | service_output(), contract_only_output(), missing_input_output() |
-| `registry.py` | 27 AgentSpec entries (7 layers), lookup, instantiation |
+| `registry.py` | **28 AgentSpec entries** (7 layers), lookup, instantiation |
 | `executor.py` | Single-agent execution with task/run/trace tracking |
 | `orchestrator.py` | Sequential workflow execution with entity pool |
 | `workflows.py` | 4 workflow specs + registry |
@@ -298,7 +301,7 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **1275 tests**, all passing (188 new in UI Cockpit v0, 58 in venue pool discovery v0, 67 in real source acquisition v0, 53 in source authority model v0, 35 in UC-1 Demo Pack v0)
+- **1307 tests on main**, all passing (4 deselected = network). Feature branches add more: +8 on `feature/wire-fpm-pipeline` (FPM integration tests), +15 on `feature/sprint-alpha-evidence-policy` (PIM v1 substrate). Historical batches: 188 new in UI Cockpit v0, 58 in venue pool discovery v0, 67 in real source acquisition v0, 53 in source authority model v0, 35 in UC-1 Demo Pack v0.
 - 50+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
@@ -310,7 +313,7 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
   rewrite planning (conditional actions), language policy extraction,
   generalized venue-fit (language blocker, word limits, article types, discipline matching),
   arbitrary manuscript x venue validation matrix (6 behavioral cases, 28 tests),
-  agentic runtime models, agent registry (26 agents), agent shells, executor,
+  agentic runtime models, agent registry (28 agents), agent shells, executor,
   orchestrator/workflows, agentic CLI commands,
   UC-1 demo pack (loader, runner, report, CLI, 12/12 steps, agent bugfix coverage)
 
