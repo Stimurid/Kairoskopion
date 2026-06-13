@@ -9,6 +9,7 @@ import type {
   PublicationRegimeModel,
   MismatchMap,
   QualityGateResult,
+  RewritePlan,
 } from '../types/domain';
 import { api } from '../api/client';
 import { StatusBar } from './StatusBar';
@@ -21,6 +22,7 @@ import { MismatchMapView } from './MismatchMapView';
 import { QualityGateBar } from './QualityGateBar';
 import { PathwayMap } from './PathwayMap';
 import { VenuePoolBoard } from './VenuePoolBoard';
+import { AdaptationStudio } from './AdaptationStudio';
 
 interface Props {
   caseData: CaseDetail;
@@ -38,6 +40,8 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
   const [venuePoolStatus, setVenuePoolStatus] = useState<string>('not_discovered');
   const [mismatchMap, setMismatchMap] = useState<MismatchMap | null>(null);
   const [qualityGates, setQualityGates] = useState<Record<string, QualityGateResult>>({});
+  const [rewritePlan, setRewritePlan] = useState<RewritePlan | null>(null);
+  const [protectedCore, setProtectedCore] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -184,6 +188,61 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
     }
   }, [caseId, onCaseUpdate]);
 
+  // --- Adaptation ---
+
+  const loadAdaptationPlan = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await api.getAdaptationPlan(caseId);
+      if (result.rewrite_plan) {
+        setRewritePlan(result.rewrite_plan as RewritePlan);
+      }
+      if (articleModel?.protected_core) {
+        setProtectedCore(articleModel.protected_core);
+      }
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [caseId, articleModel]);
+
+  const handleAdaptDecision = useCallback(async (changeId: string, action: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await api.applyDecisions(caseId, [{ change_id: changeId, action }]);
+      const result = await api.getAdaptationPlan(caseId);
+      if (result.rewrite_plan) {
+        setRewritePlan(result.rewrite_plan as RewritePlan);
+      }
+      onCaseUpdate();
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [caseId, onCaseUpdate]);
+
+  const handleApplyAll = useCallback(async () => {
+    if (!rewritePlan) return;
+    const accepted = rewritePlan.changes
+      .filter(c => c.status === 'accepted')
+      .map(c => ({ change_id: c.change_id, action: 'apply' }));
+    if (accepted.length === 0) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await api.applyDecisions(caseId, accepted);
+      onCaseUpdate();
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [caseId, rewritePlan, onCaseUpdate]);
+
   // --- Mismatch map ---
 
   const loadMismatchMap = useCallback(async () => {
@@ -311,6 +370,28 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
             onDiscover={discoverVenues}
             isLoading={isLoading}
             poolStatus={venuePoolStatus}
+          />
+        );
+
+      case 'adapting':
+        if (!rewritePlan) {
+          return (
+            <div className="placeholder-view">
+              <h2>Adaptation Studio</h2>
+              <p>Review and decide on proposed changes to your manuscript.</p>
+              <button className="btn btn-primary" onClick={loadAdaptationPlan} disabled={isLoading}>
+                {isLoading ? 'Loading...' : 'Load Adaptation Plan'}
+              </button>
+            </div>
+          );
+        }
+        return (
+          <AdaptationStudio
+            rewritePlan={rewritePlan}
+            protectedCore={protectedCore}
+            onDecision={handleAdaptDecision}
+            onApplyAll={handleApplyAll}
+            isLoading={isLoading}
           />
         );
 
