@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kairoskopion"
-version = "0.1.0"
+version = "0.2.0a15"
 description = "Evidence-first publication-positioning system"
 requires-python = ">=3.11"
 dependencies = []

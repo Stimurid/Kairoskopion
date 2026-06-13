@@ -8,6 +8,7 @@ serializes inputs/outputs and manages case state.
 from __future__ import annotations
 
 import json
+import os
 import traceback
 from pathlib import Path
 from typing import Any
@@ -19,15 +20,21 @@ from pydantic import BaseModel, Field
 
 from .cases import CaseStore, Case, CaseStage
 
+_VERSION = "0.2.0-alpha"
+
 app = FastAPI(
     title="Kairoskopion",
-    version="0.1.0",
+    version=_VERSION,
     description="Publication positioning cockpit API",
 )
 
+_default_origins = ["http://localhost:5173", "http://localhost:3000"]
+_env_origins = os.environ.get("KAIROSKOPION_ALLOWED_ORIGINS", "")
+_origins = [o.strip() for o in _env_origins.split(",") if o.strip()] if _env_origins else _default_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,7 +49,7 @@ store = CaseStore()
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": _VERSION}
 
 
 # ---------------------------------------------------------------------------
