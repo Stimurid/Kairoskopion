@@ -23,6 +23,8 @@ import { QualityGateBar } from './QualityGateBar';
 import { PathwayMap } from './PathwayMap';
 import { VenuePoolBoard } from './VenuePoolBoard';
 import { AdaptationStudio } from './AdaptationStudio';
+import { DecisionLog } from './DecisionLog';
+import { DossierView } from './DossierView';
 
 interface Props {
   caseData: CaseDetail;
@@ -394,6 +396,18 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
             isLoading={isLoading}
           />
         );
+
+      case 'submission_pack':
+        return (
+          <div className="placeholder-view">
+            <h2>Submission Pack</h2>
+            <p>Final submission package assembly — coming in a future phase.</p>
+            <DecisionLog caseId={caseId} />
+          </div>
+        );
+
+      case 'dossier':
+        return <DossierView caseId={caseId} />;
 
       default:
         return (

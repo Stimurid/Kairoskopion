@@ -2151,3 +2151,304 @@ body {
   color: var(--text-primary);
   font-size: var(--font-size-sm);
 }
+
+
+/* =========================================================================
+   Phase 5-6 — Decision Log + Dossier View
+   ========================================================================= */
+
+/* --- Decision Log --- */
+
+.decision-log-empty {
+  text-align: center;
+  padding: var(--space-2xl) var(--space-lg);
+  color: var(--text-muted);
+}
+
+.decision-log-empty h2 {
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+}
+
+.decision-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.dlog-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+}
+
+.dlog-header h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  color: var(--text-primary);
+}
+
+.dlog-count {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.dlog-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--space-sm);
+  border-left: 2px solid var(--border);
+}
+
+.dlog-entry {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  margin-left: calc(-1 * var(--space-sm) - 1px);
+}
+
+.dlog-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-muted);
+}
+
+.dlog-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.dlog-action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: var(--text-primary);
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.dlog-action-btn:hover {
+  background: var(--bg-hover);
+}
+
+.dlog-action {
+  font-weight: 500;
+  font-size: var(--font-size-sm);
+}
+
+.dlog-time {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.dlog-expand-icon {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.dlog-details {
+  padding: var(--space-sm) var(--space-md);
+  margin-top: 2px;
+  background: var(--bg-raised);
+  border-radius: var(--radius-sm);
+}
+
+.dlog-detail-row {
+  display: flex;
+  gap: var(--space-sm);
+  padding: 2px 0;
+  font-size: var(--font-size-xs);
+}
+
+.dlog-detail-key {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  min-width: 100px;
+}
+
+.dlog-detail-val {
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+/* --- Dossier View --- */
+
+.dossier-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.dossier-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.dossier-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+}
+
+.dossier-header-left h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  color: var(--text-primary);
+}
+
+.dossier-stage-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.dossier-generated {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.dossier-tabs {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.dossier-overview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.dossier-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.dossier-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-raised);
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: var(--text-primary);
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.dossier-section-header:hover {
+  background: var(--bg-hover);
+}
+
+.dossier-section-title {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+.dossier-section-toggle {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.dossier-section-body {
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.dossier-kv {
+  display: flex;
+  gap: var(--space-md);
+  padding: 2px 0;
+  font-size: var(--font-size-sm);
+}
+
+.dossier-kv-label {
+  color: var(--text-muted);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.dossier-kv-value {
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.dossier-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dossier-pathway-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+}
+
+.dossier-pathway-rank {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  min-width: 24px;
+}
+
+.dossier-pathway-name {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.dossier-text-sm {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.dossier-mismatch-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.dossier-gate-row {
+  padding: var(--space-xs) 0;
+}
+
+.error-text {
+  color: var(--color-danger);
+}
