@@ -10,8 +10,8 @@ interface IntakeResult {
 }
 
 interface Props {
-  onSubmit: (text: string, inputType: string) => Promise<IntakeResult | void>;
-  onFileSubmit?: (file: File, inputType: string) => Promise<IntakeResult | void>;
+  onSubmit: (text: string, inputType: string, searchDepth: string) => Promise<IntakeResult | void>;
+  onFileSubmit?: (file: File, inputType: string, searchDepth: string) => Promise<IntakeResult | void>;
   isLoading: boolean;
 }
 
@@ -33,9 +33,16 @@ const TYPE_ICONS: Record<string, string> = {
   review_letter: 'Review letter detected',
 };
 
+const SEARCH_DEPTH_LABELS: Record<string, { label: string; desc: string }> = {
+  none: { label: 'No search', desc: 'LLM only, no web queries' },
+  light: { label: 'Light search', desc: '3-5 queries for top unknowns' },
+  deep: { label: 'Deep search', desc: 'Multiple rounds, verification' },
+};
+
 export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
   const [text, setText] = useState('');
   const [inputType, setInputType] = useState('auto');
+  const [searchDepth, setSearchDepth] = useState('none');
   const [lastResult, setLastResult] = useState<IntakeResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -44,14 +51,14 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
   const handleSubmit = async () => {
     if (selectedFile && onFileSubmit) {
       setLastResult(null);
-      const result = await onFileSubmit(selectedFile, inputType);
+      const result = await onFileSubmit(selectedFile, inputType, searchDepth);
       if (result) setLastResult(result);
       setSelectedFile(null);
       return;
     }
     if (!text.trim()) return;
     setLastResult(null);
-    const result = await onSubmit(text.trim(), inputType);
+    const result = await onSubmit(text.trim(), inputType, searchDepth);
     if (result) setLastResult(result);
   };
 
@@ -97,6 +104,22 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
             aria-checked={inputType === t}
           >
             {TYPE_LABELS[t]}
+          </button>
+        ))}
+      </div>
+
+      <div className="intake-search-depth" role="radiogroup" aria-label="Web search depth">
+        <span className="intake-search-label">Web enrichment:</span>
+        {(['none', 'light', 'deep'] as const).map((d) => (
+          <button
+            key={d}
+            className={`search-chip ${searchDepth === d ? 'search-chip--active' : ''} ${d === 'deep' ? 'search-chip--deep' : ''}`}
+            onClick={() => setSearchDepth(d)}
+            role="radio"
+            aria-checked={searchDepth === d}
+            title={SEARCH_DEPTH_LABELS[d].desc}
+          >
+            {SEARCH_DEPTH_LABELS[d].label}
           </button>
         ))}
       </div>

@@ -121,6 +121,7 @@ def delete_case(case_id: str):
 class IntakeTextRequest(BaseModel):
     text: str
     input_type: str = "auto"  # auto | article | venue | review_letter
+    search_depth: str = "none"  # none | light | deep
 
 
 @app.post("/cases/{case_id}/intake/text")
@@ -128,7 +129,7 @@ def intake_text(case_id: str, req: IntakeTextRequest):
     case = store.get(case_id)
     if not case:
         raise HTTPException(404, f"Case {case_id} not found")
-    result = case.intake_text(req.text, req.input_type)
+    result = case.intake_text(req.text, req.input_type, req.search_depth)
     store.save(case)
     return result
 
@@ -141,6 +142,7 @@ async def intake_file(
     case_id: str,
     file: UploadFile = File(...),
     input_type: str = Form("auto"),
+    search_depth: str = Form("none"),
 ):
     case = store.get(case_id)
     if not case:
@@ -172,7 +174,7 @@ async def intake_file(
                 + "; ".join(errors or ["unknown error"]),
             )
 
-        result = case.intake_text(text, input_type)
+        result = case.intake_text(text, input_type, search_depth)
         result["filename"] = filename
         result["extraction_status"] = extraction_status
         store.save(case)

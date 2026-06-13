@@ -132,26 +132,39 @@ class Case:
 
     # -- Intake --
 
-    def intake_text(self, text: str, input_type: str = "auto") -> dict[str, Any]:
+    def intake_text(
+        self,
+        text: str,
+        input_type: str = "auto",
+        search_depth: str = "none",
+    ) -> dict[str, Any]:
         self.input_text = text
         self.input_type = input_type if input_type != "auto" else _classify_input(text)
         self.stage = CaseStage.INTAKE
 
+        enrichment_result: dict[str, Any] = {}
+
         if self.input_type in ("article", "abstract", "manuscript"):
             self._build_article_model()
+            # Web enrichment pass
+            if search_depth != "none" and self.article_model is not None:
+                enrichment_result = self._enrich_article(search_depth)
         elif self.input_type == "venue":
             try:
                 self.investigate_venue(text)
             except Exception:
                 pass
 
-        return {
+        result: dict[str, Any] = {
             "input_type": self.input_type,
             "text_length": len(text),
             "article_model_built": self.article_model is not None,
             "venue_investigated": self.investigated_venue is not None,
             "stage": self.stage.value,
         }
+        if enrichment_result:
+            result["enrichment"] = enrichment_result
+        return result
 
     def _build_article_model(self):
         import logging
@@ -209,6 +222,53 @@ class Case:
         if self.semantic_profile is None:
             from ..services.article_enrichment import build_article_semantic_profile
             self.semantic_profile = build_article_semantic_profile(self.article_model)
+
+    def _enrich_article(self, search_depth: str) -> dict[str, Any]:
+        """Run web enrichment on article_model. Returns enrichment metadata."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        from ..search.provider import SearchDepth
+        try:
+            depth = SearchDepth(search_depth)
+        except ValueError:
+            logger.warning("Invalid search_depth '%s', skipping enrichment", search_depth)
+            return {}
+
+        if depth == SearchDepth.NONE:
+            return {}
+
+        provider = _get_llm_provider()
+        if provider is None:
+            logger.warning("Web enrichment requires LLM provider, skipping")
+            return {"status": "skipped", "reason": "no_llm_provider"}
+
+        from ..search.duckduckgo import get_search_provider
+        from ..services.web_enrichment import enrich_article_model
+
+        search = get_search_provider()
+        article_dict = self.article_model.to_dict()
+
+        try:
+            enriched = enrich_article_model(article_dict, search, provider, depth)
+        except Exception as exc:
+            logger.warning("Web enrichment failed: %s", exc)
+            return {"status": "failed", "reason": str(exc)}
+
+        # Apply enrichment back to ArticleModel
+        enrichment_meta = enriched.pop("_enrichment", {})
+        updated_fields = enrichment_meta.get("fields_updated", [])
+        if updated_fields:
+            self.article_model = ArticleModel.from_dict(enriched)
+            logger.info("Article enriched via web search: %s", updated_fields)
+
+        return {
+            "status": "done",
+            "depth": search_depth,
+            "fields_updated": updated_fields,
+            "unknowns_resolved": enrichment_meta.get("unknowns_resolved", []),
+            "verification_notes": enrichment_meta.get("verification_notes", []),
+        }
 
     # -- Venue investigation --
 

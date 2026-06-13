@@ -451,6 +451,31 @@ body {
 .type-chip:hover { background: var(--bg-hover); }
 .type-chip--active { color: var(--color-primary); border-color: var(--color-primary); background: rgba(91, 127, 255, 0.1); }
 
+.intake-search-depth {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+.intake-search-label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin-right: var(--space-xs);
+}
+.search-chip {
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.search-chip:hover { background: var(--bg-hover); }
+.search-chip--active { color: var(--color-accent); border-color: var(--color-accent); background: rgba(255, 179, 71, 0.1); }
+.search-chip--deep.search-chip--active { color: var(--color-warning, #ff6b35); border-color: var(--color-warning, #ff6b35); background: rgba(255, 107, 53, 0.1); }
+
 .intake-textarea {
   width: 100%;
   padding: var(--space-md);

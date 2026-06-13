@@ -61,10 +61,10 @@ export const api = {
   deleteCase: (id: string) => del<{ deleted: string }>(`/cases/${id}`),
 
   // Intake
-  intakeText: (id: string, text: string, inputType = 'auto') =>
-    post<{ input_type: string; text_length: number; article_model_built: boolean; venue_investigated: boolean; stage: string }>(
+  intakeText: (id: string, text: string, inputType = 'auto', searchDepth = 'none') =>
+    post<{ input_type: string; text_length: number; article_model_built: boolean; venue_investigated: boolean; stage: string; enrichment?: { status: string; fields_updated?: string[]; unknowns_resolved?: string[] } }>(
       `/cases/${id}/intake/text`,
-      { text, input_type: inputType },
+      { text, input_type: inputType, search_depth: searchDepth },
     ),
 
   intakeFile: async (id: string, file: File, inputType = 'auto') => {

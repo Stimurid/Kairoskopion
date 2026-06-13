@@ -73,11 +73,11 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
     onCaseUpdate();
   }, [caseId, onCaseUpdate]);
 
-  const handleIntakeSubmit = useCallback(async (text: string, inputType: string) => {
+  const handleIntakeSubmit = useCallback(async (text: string, inputType: string, searchDepth: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await api.intakeText(caseId, text, inputType);
+      const result = await api.intakeText(caseId, text, inputType, searchDepth);
       await handleIntakeResult(result);
       return result;
     } catch (e) {
@@ -87,7 +87,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
     }
   }, [caseId, handleIntakeResult]);
 
-  const handleIntakeFile = useCallback(async (file: File, inputType: string) => {
+  const handleIntakeFile = useCallback(async (file: File, inputType: string, searchDepth: string) => {
     setIsLoading(true);
     setError(null);
     try {
