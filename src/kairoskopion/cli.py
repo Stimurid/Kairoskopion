@@ -1045,6 +1045,7 @@ def cmd_build_venue_evidence_stack(args: argparse.Namespace) -> int:
         venue_issn=args.issn,
         purpose=args.purpose,
         offline=True,
+        use_source_adapters=getattr(args, "use_source_adapters", False),
     )
     output = json.dumps(result.to_dict(), indent=2, ensure_ascii=False, default=str)
     if args.output:
@@ -1096,6 +1097,80 @@ def cmd_analyze_venue_corpus(args: argparse.Namespace) -> int:
         print(f"Written to {args.output}")
     else:
         print(output)
+    return 0
+
+
+def cmd_acquire_venue_sources(args: argparse.Namespace) -> int:
+    from .services.real_source_acquisition import acquire_venue_sources
+
+    result = acquire_venue_sources(
+        venue_name=args.venue_name,
+        venue_issn=args.issn,
+        venue_url=args.url,
+        article_doi=args.doi,
+    )
+
+    _safe_print(f"Adapters run: {len(result.adapter_results)}")
+    _safe_print(f"Successful: {result.successful_adapters}")
+    _safe_print(f"Failed: {result.failed_adapters}")
+    _safe_print(f"Claims: {len(result.all_claims)}")
+    _safe_print(f"Conflicts: {len(result.evidence_conflicts)}")
+    _safe_print(f"Authority assessments: {len(result.authority_assessments)}")
+    _safe_print(f"Unknowns: {len(result.unknowns)}")
+    _safe_print("")
+
+    for ar in result.adapter_results:
+        status = ar.get("status", "?")
+        aid = ar.get("adapter_id", "?")
+        nclaims = len(ar.get("claims", []))
+        mode = ar.get("mode", "?")
+        _safe_print(f"  [{status.upper()}] {aid} ({mode}) — {nclaims} claims")
+
+    if result.degradation_notes:
+        _safe_print("")
+        _safe_print("Degradation:")
+        for note in result.degradation_notes:
+            _safe_print(f"  - {note}")
+
+    if result.evidence_conflicts:
+        _safe_print("")
+        _safe_print("Conflicts:")
+        for cf in result.evidence_conflicts:
+            _safe_print(f"  - {cf.get('field_name', '?')}: {cf.get('conflict_type', '?')} ({cf.get('severity', '?')})")
+
+    if args.output:
+        import json
+        output = json.dumps(result.to_dict(), indent=2, ensure_ascii=False, default=str)
+        Path(args.output).write_text(output, encoding="utf-8")
+        _safe_print(f"\nWritten to {args.output}")
+
+    return 0
+
+
+def cmd_list_source_adapters(args: argparse.Namespace) -> int:
+    from .services.real_source_acquisition import list_available_adapters
+
+    adapters = list_available_adapters()
+    _safe_print(f"Available source adapters ({len(adapters)}):")
+    _safe_print("")
+    for a in adapters:
+        _safe_print(f"  {a['adapter_id']}")
+        _safe_print(f"    access mode: {a['source_access_mode']}")
+        _safe_print(f"    {a['description']}")
+        _safe_print("")
+    return 0
+
+
+def cmd_inspect_adapter(args: argparse.Namespace) -> int:
+    from .services.real_source_acquisition import inspect_adapter
+
+    info = inspect_adapter(args.adapter_id)
+    if info is None:
+        _safe_print(f"Unknown adapter: {args.adapter_id}")
+        return 1
+
+    import json
+    _safe_print(json.dumps(info, indent=2, ensure_ascii=False))
     return 0
 
 
@@ -1337,6 +1412,28 @@ def main(argv: list[str] | None = None) -> int:
         "--output", default=None,
         help="Output JSON file path (default: stdout)",
     )
+    build_stack_parser.add_argument(
+        "--use-source-adapters", action="store_true", default=False,
+        help="Enable source adapters (DOAJ at L5) in evidence stack",
+    )
+
+    # --- Source Acquisition CLI commands ---
+    acquire_parser = sub.add_parser(
+        "acquire-venue-sources",
+        help="Run source adapters to acquire venue evidence",
+    )
+    acquire_parser.add_argument("--venue-name", default=None, help="Venue name")
+    acquire_parser.add_argument("--issn", default=None, help="Venue ISSN")
+    acquire_parser.add_argument("--url", default=None, help="Venue URL (for snapshot)")
+    acquire_parser.add_argument("--doi", default=None, help="Article DOI (for Unpaywall)")
+    acquire_parser.add_argument("--output", default=None, help="Output JSON file path")
+
+    sub.add_parser("list-source-adapters", help="List all available source adapters")
+
+    inspect_adapter_parser = sub.add_parser(
+        "inspect-adapter", help="Show details for a source adapter",
+    )
+    inspect_adapter_parser.add_argument("adapter_id", help="Adapter ID")
 
     sample_corpus_parser = sub.add_parser(
         "sample-venue-corpus",
@@ -1416,6 +1513,9 @@ def main(argv: list[str] | None = None) -> int:
         "sample-venue-corpus": cmd_sample_venue_corpus,
         "analyze-venue-corpus": cmd_analyze_venue_corpus,
         "run-uc1-demo": cmd_run_uc1_demo,
+        "acquire-venue-sources": cmd_acquire_venue_sources,
+        "list-source-adapters": cmd_list_source_adapters,
+        "inspect-adapter": cmd_inspect_adapter,
     }
 
     handler = commands.get(args.command)

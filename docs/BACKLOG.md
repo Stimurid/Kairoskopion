@@ -6,6 +6,46 @@ Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.m
 
 ---
 
+## Real Source Acquisition v0 + Adapter Authority Enforcement ✓ DONE (2026-06-13)
+
+**Goal:** Make the venue evidence stack capable of using real external source adapters in opt-in live/cached mode, while enforcing the Source Authority Model at the adapter boundary.
+
+**Phases completed:**
+1. ✓ Branch `feature/real-source-acquisition-v0` from `b34ddd7` (v0.2.0-alpha-rc11)
+2. ✓ Implementation map doc
+3. ✓ Adapter config/mode model (5 modes, SourceAcquisitionConfig)
+4. ✓ HTTP client extended (HttpResult, fetch_json_safe, fetch_text_safe)
+5. ✓ OpenAlex adapter: fixture + live + cached + authority
+6. ✓ Crossref adapter: fixture + live + cached + authority
+7. ✓ DOAJ adapter (new): fixture + live + cached + authority
+8. ✓ Unpaywall adapter (new): fixture + live (DOI-only) + authority
+9. ✓ OpenCitations adapter: upgraded with authority
+10. ✓ Snapshot crawler: upgraded with authority + content hash
+11. ✓ Aggregation service: cross-adapter conflict detection
+12. ✓ VenueEvidenceStack integration with authority/conflict pass-through
+13. ✓ CLI: 3 new commands + --use-source-adapters flag
+14. ✓ Fixtures: synthetic inline constants per adapter
+15. ✓ Tests: 67 new (1010 total)
+16. ✓ Documentation: 3 new docs, 5 updated
+
+**What this is NOT:** UI, broad crawling, real all-journal database, live network tests required, retraction/PubPeer lookup.
+
+**Branch:** `feature/real-source-acquisition-v0`
+**Tests added:** 67 new tests (1010 total, was 943)
+**Report:** `docs/REAL_SOURCE_ACQUISITION_V0.md`
+
+---
+
+## Source Authority Model v0 ✓ DONE (2026-06-13)
+
+**Goal:** Implement Source Authority Model: access modes, authority scopes, authority matrix, claim validation, conflict detection, evidence reconciliation, EvidenceAuditor integration.
+
+**Branch:** `feature/source-authority-integrity-v0`
+**Tests added:** 53 new tests (943 total, was 890)
+**Report:** `docs/SOURCE_AUTHORITY_MODEL_V0.md`
+
+---
+
 ## UC-1 Demo Pack v0 ✓ DONE (2026-06-13)
 
 **Goal:** Create a fully reproducible offline UC-1 demo: synthetic fixtures, demo loader, workflow runner, report generator, CLI command, 16 output artifacts. Fix 3 agent attribute bugs exposed by the demo.
@@ -498,6 +538,7 @@ that are in the spec but were missing from the backlog.
 - Authority checker service with deterministic matrix
 - EvidenceAuditor integration (optional authority/conflict params)
 - 53 tests
+- **Adapter-level enforcement:** DONE in Real Source Acquisition v0 — all 6 venue adapters call `_attach_authority()` at parse time
 
 ### Sprint GP-2: Evidence Conflict and Reconciliation (P0)
 
@@ -565,9 +606,11 @@ that are in the spec but were missing from the backlog.
 
 ### Sprint GP-12: Failure-as-State Enforcement (P0)
 
-**Status:** AdapterResult has status values; enforcement FUTURE
-- Future: audit that no adapter silently drops failures
-- Integration test: inaccessible source → INACCESSIBLE status preserved through pipeline
+**Status:** Partially DONE in Real Source Acquisition v0
+- All 6 venue adapters return structured VenueAdapterResult on any error (never exceptions)
+- Aggregation service catches unexpected exceptions at adapter boundary
+- VenueAdapterStatus enum: success, partial, no_results, unavailable, error, rate_limited
+- Future: integration test that inaccessible source → INACCESSIBLE status preserved end-to-end through pipeline
 
 ## Later (only when explicitly requested)
 

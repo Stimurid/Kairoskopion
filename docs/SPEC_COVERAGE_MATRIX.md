@@ -98,12 +98,12 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 | §26.3 OpenAlex adapter | Work search, author lookup | Implemented | `adapters/openalex.py` (mock + real mode with HTTP caching) | Work search functional | No author lookup | — | Done |
 | §26.4 Crossref adapter | DOI lookup, work search | Implemented | `adapters/crossref.py` (mock + real mode with HTTP caching) | DOI lookup + search functional | — | — | Done |
 | §26.5 OpenCitations adapter | Citation links | Implemented | `adapters/opencitations.py` (mock + real mode with HTTP caching) | Citation query functional | — | — | Done |
-| §26.6 DOAJ adapter | Directory of OA journals | Planned | — | Not implemented | P2 | Real adapters |
+| §26.6 DOAJ adapter | Directory of OA journals | Implemented | `adapters/venue/doaj.py` (fixture + live + cached, authority enforcement) | — | — | RSA v0 |
 | §26.7 Sherpa/RoMEO adapter | OA policy lookup | Planned | — | Not implemented | P3 | — |
 | §26.8 Semantic Scholar adapter | Full-text search, references | Planned | — | Not implemented | P3 | — |
-| §26.9 Unpaywall adapter | OA availability | Planned | — | Not implemented | P3 | — |
+| §26.9 Unpaywall adapter | OA availability | Implemented | `adapters/venue/unpaywall.py` (fixture + live, DOI-only, authority enforcement) | Venue-level lookup degrades (DOI required) | — | RSA v0 |
 | §26.10 GROBID adapter | PDF structured extraction | Planned | — | Not implemented | P2 | Doc intake |
-| §26.11 Venue adapters | Venue-specific adapter layer | Implemented | `adapters/venue/` (OpenAlex, Crossref, OpenCitations, SnapshotCrawler) | offline_stub mode only; live_api deferred | P2 | VES V1–V2 |
+| §26.11 Venue adapters | Venue-specific adapter layer | Implemented | `adapters/venue/` (6 adapters: OpenAlex, Crossref, DOAJ, Unpaywall, OpenCitations, SnapshotCrawler) | 5 modes: offline_stub, fixture, live_api, cached, cached_snapshot; authority enforcement at adapter boundary | — | RSA v0 |
 | §27 Evidence bridge | Adapter → Evidence conversion | Implemented | `adapters/bridge.py` | Mock = VENDOR_CLAIM, never FACT_FROM_SOURCE | — | Done |
 | §27.1 Venue depth policy | Demand-driven depth routing | Implemented | `venue_depth.py` (8 levels, 4 policies, coverage tracking) | — | — | VES V1–V2 |
 | §27.2 Vault backend | Content-addressed evidence storage | Implemented | `storage/vault_backend.py`, `storage/local_fs_vault.py` | In-memory per run; cross-session persistence deferred | P2 | VES V1–V2 |
@@ -147,7 +147,7 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 |-----------|-------------------|--------|----------|---------|----------|--------|
 | §116 Quality gates | Fit gate, submission gate | Implemented | `quality.py` (fit_quality_gate, submission_quality_gate) | — | — | Done |
 | §117 Evidence audit | Evidence coverage check | Implemented | `services/evidence_audit.py` (+ optional authority/conflict params) | — | — | Done |
-| §117.1 Source authority separation | Access mode ≠ authority scope | Implemented | `source_authority.py`, `services/source_authority.py`, `enums.py` (SourceAccessMode, SourceAuthorityScope, AuthorityStrength) | Authority matrix deterministic; no adapter-level enforcement yet | — | GP-1 |
+| §117.1 Source authority separation | Access mode ≠ authority scope | Implemented | `source_authority.py`, `services/source_authority.py`, `enums.py` (SourceAccessMode, SourceAuthorityScope, AuthorityStrength); all 6 venue adapters enforce via `_attach_authority()` | — | — | GP-1 + RSA v0 |
 | §117.2 Evidence conflict/reconciliation | Cross-source conflict detection | Implemented | `source_authority.py` (EvidenceConflict, EvidenceReconciliationResult), `services/source_authority.py` (detect_conflicts, reconcile_evidence) | No agent-driven reconciliation flow | P1 | GP-2 |
 | §117.3 Citation integrity gate | Retraction/PubPeer/DOI checks | Partial | `source_authority.py::CitationIntegrityCheck` model, `enums.py::RetractionStatus` | Model only; no live integration | P1 | GP-3 |
 | §117.4 Publication history | Prior versions/preprint/thesis tracking | Partial | `source_authority.py::PublicationHistoryModel`, `PriorVersion` | Model only; requires user/source input | P1 | GP-4 |
@@ -178,10 +178,10 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 
 | Status | Count | % of spec areas |
 |--------|-------|-----------------|
-| Implemented | 46 | 60% |
+| Implemented | 48 | 62% |
 | Partial | 14 | 18% |
 | Stub | 2 | 3% |
-| Planned | 12 | 16% |
+| Planned | 10 | 13% |
 | Deferred | 2 | 3% |
 | Rejected | 0 | 0% |
 | **Total tracked** | **77** | — |

@@ -1,10 +1,19 @@
-"""OpenAlex venue adapter — offline/live modes for venue identity and metadata."""
+"""OpenAlex venue adapter — offline/fixture/cached/live modes for venue metadata."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from .base import VenueAdapter, VenueAdapterClaim, VenueAdapterMode, VenueAdapterResult
+from ...enums import SourceAccessMode
+from ..http_client import fetch_json_safe
+from .base import (
+    VenueAdapter,
+    VenueAdapterClaim,
+    VenueAdapterMode,
+    VenueAdapterResult,
+    VenueAdapterStatus,
+    _now_iso,
+)
 
 
 OPENALEX_FIXTURE = {
@@ -32,6 +41,18 @@ OPENALEX_FIXTURE = {
 class OpenAlexVenueAdapter(VenueAdapter):
     adapter_id = "openalex_venue"
     source_role = "openalex_source"
+    source_access_mode = SourceAccessMode.METADATA_API.value
+
+    def __init__(
+        self,
+        mode: VenueAdapterMode = VenueAdapterMode.OFFLINE_STUB,
+        *,
+        cache_dir: str | None = None,
+        timeout: int = 30,
+    ) -> None:
+        super().__init__(mode)
+        self._cache_dir = cache_dir
+        self._timeout = timeout
 
     def lookup_venue(
         self,
@@ -42,18 +63,120 @@ class OpenAlexVenueAdapter(VenueAdapter):
     ) -> VenueAdapterResult:
         query = {"name": name, "issn": issn, "url": url}
 
-        if self._mode == VenueAdapterMode.OFFLINE_STUB:
-            return self._parse_fixture(OPENALEX_FIXTURE, query)
+        if self._mode in (VenueAdapterMode.OFFLINE_STUB, VenueAdapterMode.FIXTURE):
+            return self._parse_response(OPENALEX_FIXTURE, query)
 
         if self._mode == VenueAdapterMode.LIVE_API:
-            return self.degrade_gracefully(query, "live_api mode not yet implemented")
+            return self._live_lookup(query, name=name, issn=issn)
+
+        if self._mode in (VenueAdapterMode.CACHED, VenueAdapterMode.CACHED_SNAPSHOT):
+            return self._cached_lookup(query, name=name, issn=issn)
 
         return self.degrade_gracefully(query, f"unsupported mode: {self._mode.value}")
 
     def parse_response(self, data: dict[str, Any], query: dict[str, Any] | None = None) -> VenueAdapterResult:
-        return self._parse_fixture(data, query or {})
+        return self._parse_response(data, query or {})
 
-    def _parse_fixture(self, data: dict[str, Any], query: dict[str, Any]) -> VenueAdapterResult:
+    def _live_lookup(
+        self, query: dict[str, Any], *, name: str | None, issn: str | None,
+    ) -> VenueAdapterResult:
+        from pathlib import Path
+
+        search_term = issn or name
+        if not search_term:
+            return self.degrade_gracefully(query, "name or ISSN required")
+
+        api_url = f"https://api.openalex.org/sources?search={search_term}&per_page=1"
+        cache_path = Path(self._cache_dir) if self._cache_dir else None
+
+        http_result = fetch_json_safe(
+            api_url, timeout=self._timeout, cache_dir=cache_path,
+        )
+
+        if not http_result.ok:
+            return VenueAdapterResult(
+                adapter_id=self.adapter_id,
+                mode=self._mode.value,
+                query=query,
+                status=VenueAdapterStatus.ERROR.value,
+                source_access_mode=self.source_access_mode,
+                evidence_status="UNKNOWN",
+                source_role=self.source_role,
+                error=http_result.error,
+                unknowns=[f"OpenAlex API error: {http_result.error}"],
+                provenance=self.adapter_id,
+                fetched_at=_now_iso(),
+            )
+
+        body = http_result.body or {}
+        results_list = body.get("results", [])
+        if not results_list:
+            return VenueAdapterResult(
+                adapter_id=self.adapter_id,
+                mode=self._mode.value,
+                query=query,
+                status=VenueAdapterStatus.NO_RESULTS.value,
+                source_access_mode=self.source_access_mode,
+                evidence_status="UNKNOWN",
+                source_role=self.source_role,
+                unknowns=["No results from OpenAlex API"],
+                provenance=self.adapter_id,
+                fetched_at=_now_iso(),
+            )
+
+        result = self._parse_response(results_list[0], query)
+        result.fetched_at = _now_iso()
+        if http_result.from_cache:
+            result.cached_at = result.fetched_at
+        return result
+
+    def _cached_lookup(
+        self, query: dict[str, Any], *, name: str | None, issn: str | None,
+    ) -> VenueAdapterResult:
+        from pathlib import Path
+        from ..http_client import read_cache
+
+        search_term = issn or name
+        if not search_term:
+            return self.degrade_gracefully(query, "name or ISSN required")
+
+        api_url = f"https://api.openalex.org/sources?search={search_term}&per_page=1"
+        cache_path = Path(self._cache_dir) if self._cache_dir else None
+        cached = read_cache(api_url, cache_dir=cache_path)
+
+        if cached is None:
+            return VenueAdapterResult(
+                adapter_id=self.adapter_id,
+                mode=self._mode.value,
+                query=query,
+                status=VenueAdapterStatus.UNAVAILABLE.value,
+                source_access_mode=self.source_access_mode,
+                evidence_status="UNKNOWN",
+                source_role=self.source_role,
+                error="no_cache_hit",
+                unknowns=["No cached OpenAlex data available"],
+                provenance=self.adapter_id,
+            )
+
+        results_list = cached.get("results", []) if isinstance(cached, dict) else []
+        if not results_list:
+            return VenueAdapterResult(
+                adapter_id=self.adapter_id,
+                mode=self._mode.value,
+                query=query,
+                status=VenueAdapterStatus.NO_RESULTS.value,
+                source_access_mode=self.source_access_mode,
+                evidence_status="UNKNOWN",
+                source_role=self.source_role,
+                unknowns=["Cached OpenAlex data has no results"],
+                provenance=self.adapter_id,
+            )
+
+        result = self._parse_response(results_list[0], query)
+        result.cached_at = _now_iso()
+        return result
+
+    def _parse_response(self, data: dict[str, Any], query: dict[str, Any]) -> VenueAdapterResult:
         claims: list[VenueAdapterClaim] = []
         es = "FACT_FROM_API_METADATA"
 
@@ -84,6 +207,10 @@ class OpenAlexVenueAdapter(VenueAdapter):
                 for c in data["x_concepts"]
             ]
             claims.append(VenueAdapterClaim("concepts", concepts, es, "medium"))
+        if data.get("id"):
+            claims.append(VenueAdapterClaim("openalex_id", data["id"], es, "high"))
+        if data.get("country_code"):
+            claims.append(VenueAdapterClaim("country", data["country_code"], es, "medium"))
 
         unknowns = []
         if not data.get("display_name"):
@@ -91,14 +218,17 @@ class OpenAlexVenueAdapter(VenueAdapter):
         if not data.get("issn_l"):
             unknowns.append("ISSN not found in OpenAlex")
 
-        return VenueAdapterResult(
+        result = VenueAdapterResult(
             adapter_id=self.adapter_id,
             mode=self._mode.value,
             query=query,
-            status="success" if claims else "no_results",
+            status=VenueAdapterStatus.SUCCESS.value if claims else VenueAdapterStatus.NO_RESULTS.value,
+            source_access_mode=self.source_access_mode,
             evidence_status=es,
             source_role=self.source_role,
             claims=claims,
             raw_data=data,
             unknowns=unknowns,
+            provenance=self.adapter_id,
         )
+        return self._attach_authority(result)

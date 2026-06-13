@@ -1,4 +1,4 @@
-"""Crossref venue adapter — offline/fixture/cached/live modes for journal metadata."""
+"""Unpaywall adapter — article-level OA access lookup by DOI."""
 
 from __future__ import annotations
 
@@ -16,38 +16,40 @@ from .base import (
 )
 
 
-CROSSREF_FIXTURE = {
-    "ISSN": ["2210-5433", "2210-5441"],
-    "title": "Philosophy & Technology",
-    "publisher": "Springer Science and Business Media LLC",
-    "subjects": [
-        {"name": "Philosophy", "ASJC": 1211},
-        {"name": "Computer Science (miscellaneous)", "ASJC": 1701},
-    ],
-    "counts": {"total-dois": 980, "current-dois": 120},
-    "coverage": {
-        "references-backfile": 0.92,
-        "orcids-backfile": 0.45,
-        "abstracts-backfile": 0.88,
+UNPAYWALL_FIXTURE = {
+    "doi": "10.1007/s13347-023-00001-x",
+    "is_oa": True,
+    "best_oa_location": {
+        "url": "https://link.springer.com/article/10.1007/s13347-023-00001-x",
+        "url_for_pdf": "https://link.springer.com/content/pdf/10.1007/s13347-023-00001-x.pdf",
+        "host_type": "publisher",
+        "license": "cc-by",
+        "version": "publishedVersion",
     },
-    "last-status-check-time": "2026-05-15",
-    "flags": {"deposits-articles": True},
+    "oa_status": "gold",
+    "journal_is_oa": False,
+    "journal_issns": "2210-5433,2210-5441",
+    "journal_name": "Philosophy & Technology",
+    "publisher": "Springer Nature",
+    "title": "Synthetic article on technology mediation and AI ethics",
 }
 
 
-class CrossrefVenueAdapter(VenueAdapter):
-    adapter_id = "crossref_venue"
-    source_role = "crossref_journal"
+class UnpaywallAdapter(VenueAdapter):
+    adapter_id = "unpaywall"
+    source_role = "unpaywall_oa"
     source_access_mode = SourceAccessMode.METADATA_API.value
 
     def __init__(
         self,
         mode: VenueAdapterMode = VenueAdapterMode.OFFLINE_STUB,
         *,
+        email: str = "kairoskopion@proton.me",
         cache_dir: str | None = None,
         timeout: int = 30,
     ) -> None:
         super().__init__(mode)
+        self._email = email
         self._cache_dir = cache_dir
         self._timeout = timeout
 
@@ -58,31 +60,32 @@ class CrossrefVenueAdapter(VenueAdapter):
         issn: str | None = None,
         url: str | None = None,
     ) -> VenueAdapterResult:
+        # Unpaywall works by DOI, not venue lookup
+        # This method exists for interface compatibility but returns limited data
         query = {"name": name, "issn": issn, "url": url}
+        return self.degrade_gracefully(query, "Unpaywall requires DOI; use lookup_by_doi()")
+
+    def lookup_by_doi(self, doi: str) -> VenueAdapterResult:
+        query = {"doi": doi}
 
         if self._mode in (VenueAdapterMode.OFFLINE_STUB, VenueAdapterMode.FIXTURE):
-            return self._parse_response(CROSSREF_FIXTURE, query)
+            return self._parse_response(UNPAYWALL_FIXTURE, query)
 
         if self._mode == VenueAdapterMode.LIVE_API:
-            return self._live_lookup(query, issn=issn, name=name)
+            return self._live_lookup(query, doi=doi)
 
         if self._mode in (VenueAdapterMode.CACHED, VenueAdapterMode.CACHED_SNAPSHOT):
-            return self._cached_lookup(query, issn=issn)
+            return self._cached_lookup(query, doi=doi)
 
         return self.degrade_gracefully(query, f"unsupported mode: {self._mode.value}")
 
     def parse_response(self, data: dict[str, Any], query: dict[str, Any] | None = None) -> VenueAdapterResult:
         return self._parse_response(data, query or {})
 
-    def _live_lookup(
-        self, query: dict[str, Any], *, issn: str | None, name: str | None,
-    ) -> VenueAdapterResult:
+    def _live_lookup(self, query: dict[str, Any], *, doi: str) -> VenueAdapterResult:
         from pathlib import Path
 
-        if not issn:
-            return self.degrade_gracefully(query, "ISSN required for Crossref journal lookup")
-
-        api_url = f"https://api.crossref.org/journals/{issn}"
+        api_url = f"https://api.unpaywall.org/v2/{doi}?email={self._email}"
         cache_path = Path(self._cache_dir) if self._cache_dir else None
 
         http_result = fetch_json_safe(api_url, timeout=self._timeout, cache_dir=cache_path)
@@ -97,30 +100,22 @@ class CrossrefVenueAdapter(VenueAdapter):
                 evidence_status="UNKNOWN",
                 source_role=self.source_role,
                 error=http_result.error,
-                unknowns=[f"Crossref API error: {http_result.error}"],
+                unknowns=[f"Unpaywall API error: {http_result.error}"],
                 provenance=self.adapter_id,
                 fetched_at=_now_iso(),
             )
 
-        body = http_result.body or {}
-        message = body.get("message", body)
-
-        result = self._parse_response(message, query)
+        result = self._parse_response(http_result.body or {}, query)
         result.fetched_at = _now_iso()
         if http_result.from_cache:
             result.cached_at = result.fetched_at
         return result
 
-    def _cached_lookup(
-        self, query: dict[str, Any], *, issn: str | None,
-    ) -> VenueAdapterResult:
+    def _cached_lookup(self, query: dict[str, Any], *, doi: str) -> VenueAdapterResult:
         from pathlib import Path
         from ..http_client import read_cache
 
-        if not issn:
-            return self.degrade_gracefully(query, "ISSN required for Crossref lookup")
-
-        api_url = f"https://api.crossref.org/journals/{issn}"
+        api_url = f"https://api.unpaywall.org/v2/{doi}?email={self._email}"
         cache_path = Path(self._cache_dir) if self._cache_dir else None
         cached = read_cache(api_url, cache_dir=cache_path)
 
@@ -134,12 +129,11 @@ class CrossrefVenueAdapter(VenueAdapter):
                 evidence_status="UNKNOWN",
                 source_role=self.source_role,
                 error="no_cache_hit",
-                unknowns=["No cached Crossref data available"],
+                unknowns=["No cached Unpaywall data available"],
                 provenance=self.adapter_id,
             )
 
-        message = cached.get("message", cached) if isinstance(cached, dict) else cached
-        result = self._parse_response(message, query)
+        result = self._parse_response(cached, query)
         result.cached_at = _now_iso()
         return result
 
@@ -147,30 +141,34 @@ class CrossrefVenueAdapter(VenueAdapter):
         claims: list[VenueAdapterClaim] = []
         es = "FACT_FROM_API_METADATA"
 
-        if data.get("title"):
-            claims.append(VenueAdapterClaim("canonical_name", data["title"], es, "high"))
-        if data.get("ISSN"):
-            for issn_val in data["ISSN"]:
-                claims.append(VenueAdapterClaim("issn", issn_val, es, "high"))
+        if "is_oa" in data:
+            claims.append(VenueAdapterClaim("is_oa", data["is_oa"], es, "high"))
+        if data.get("oa_status"):
+            claims.append(VenueAdapterClaim("oa_status", data["oa_status"], es, "high"))
+
+        best_loc = data.get("best_oa_location", {})
+        if best_loc:
+            if best_loc.get("url"):
+                claims.append(VenueAdapterClaim("best_oa_url", best_loc["url"], es, "high"))
+            if best_loc.get("host_type"):
+                claims.append(VenueAdapterClaim("host_type", best_loc["host_type"], es, "medium"))
+            if best_loc.get("license"):
+                claims.append(VenueAdapterClaim("oa_license", best_loc["license"], es, "medium"))
+            if best_loc.get("version"):
+                claims.append(VenueAdapterClaim("oa_version", best_loc["version"], es, "medium"))
+
+        if "journal_is_oa" in data:
+            claims.append(VenueAdapterClaim("journal_is_oa", data["journal_is_oa"], es, "medium"))
+        if data.get("journal_name"):
+            claims.append(VenueAdapterClaim("journal_name", data["journal_name"], es, "medium"))
         if data.get("publisher"):
-            claims.append(VenueAdapterClaim("publisher_or_owner", data["publisher"], es, "high"))
-        if data.get("subjects"):
-            subj_names = [s["name"] for s in data["subjects"]]
-            claims.append(VenueAdapterClaim("subjects", subj_names, es, "medium"))
-        if data.get("counts"):
-            claims.append(VenueAdapterClaim("doi_count", data["counts"].get("total-dois"), es, "high"))
-        if data.get("coverage"):
-            claims.append(VenueAdapterClaim("metadata_coverage", data["coverage"], es, "medium"))
-        if data.get("flags"):
-            claims.append(VenueAdapterClaim("crossref_flags", data["flags"], es, "medium"))
-        if data.get("license"):
-            claims.append(VenueAdapterClaim("license", data["license"], es, "medium"))
+            claims.append(VenueAdapterClaim("publisher", data["publisher"], es, "medium"))
 
         unknowns = []
-        if not data.get("title"):
-            unknowns.append("journal title not found in Crossref")
-        if not data.get("ISSN"):
-            unknowns.append("ISSN not found in Crossref")
+        if "is_oa" not in data:
+            unknowns.append("OA status unknown from Unpaywall")
+        if not best_loc:
+            unknowns.append("no OA location found")
 
         result = VenueAdapterResult(
             adapter_id=self.adapter_id,

@@ -7,7 +7,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from .base import VenueAdapter, VenueAdapterClaim, VenueAdapterMode, VenueAdapterResult
+from ...enums import SourceAccessMode
+from ..http_client import fetch_text_safe
+from .base import (
+    VenueAdapter,
+    VenueAdapterClaim,
+    VenueAdapterMode,
+    VenueAdapterResult,
+    VenueAdapterStatus,
+    _now_iso,
+)
 
 SNAPSHOT_FIXTURE_HTML = """\
 <html>
@@ -37,14 +46,22 @@ philosophy of technology, ethics of AI, and science and technology studies.</p>
 class VenueSnapshotCrawler(VenueAdapter):
     adapter_id = "venue_snapshot_crawler"
     source_role = "official_homepage"
+    source_access_mode = SourceAccessMode.OFFICIAL_WEBPAGE.value
 
     def __init__(
         self,
         mode: VenueAdapterMode = VenueAdapterMode.OFFLINE_STUB,
         vault: Any | None = None,
+        *,
+        is_official: bool = True,
+        timeout: int = 30,
     ) -> None:
         super().__init__(mode)
         self._vault = vault
+        self._is_official = is_official
+        self._timeout = timeout
+        if not is_official:
+            self.source_access_mode = SourceAccessMode.MANUAL_NOTE.value
 
     def lookup_venue(
         self,
@@ -55,15 +72,37 @@ class VenueSnapshotCrawler(VenueAdapter):
     ) -> VenueAdapterResult:
         query = {"name": name, "issn": issn, "url": url}
 
-        if self._mode == VenueAdapterMode.OFFLINE_STUB:
+        if self._mode in (VenueAdapterMode.OFFLINE_STUB, VenueAdapterMode.FIXTURE):
             return self.store_html(SNAPSHOT_FIXTURE_HTML, url=url or "https://example.com/guidelines", query=query)
 
         if self._mode == VenueAdapterMode.LIVE_API:
             if not url:
                 return self.degrade_gracefully(query, "URL required for live snapshot crawl")
-            return self.degrade_gracefully(query, "live_api mode not yet implemented")
+            return self._live_fetch(query, url)
 
         return self.degrade_gracefully(query, f"unsupported mode: {self._mode.value}")
+
+    def _live_fetch(self, query: dict[str, Any], url: str) -> VenueAdapterResult:
+        http_result = fetch_text_safe(url, timeout=self._timeout)
+
+        if not http_result.ok:
+            return VenueAdapterResult(
+                adapter_id=self.adapter_id,
+                mode=self._mode.value,
+                query=query,
+                status=VenueAdapterStatus.ERROR.value,
+                source_access_mode=self.source_access_mode,
+                evidence_status="UNKNOWN",
+                source_role=self.source_role,
+                error=http_result.error,
+                unknowns=[f"Snapshot fetch failed: {http_result.error}"],
+                provenance=self.adapter_id,
+                fetched_at=_now_iso(),
+            )
+
+        result = self.store_html(http_result.text, url=url, query=query)
+        result.fetched_at = _now_iso()
+        return result
 
     def store_html(
         self,
@@ -73,6 +112,7 @@ class VenueSnapshotCrawler(VenueAdapter):
     ) -> VenueAdapterResult:
         claims: list[VenueAdapterClaim] = []
         vault_ref = None
+        es = "FACT_FROM_SOURCE" if self._is_official else "VENDOR_CLAIM"
 
         if self._vault is not None:
             from ...storage.vault_backend import VaultObjectKind
@@ -84,21 +124,28 @@ class VenueSnapshotCrawler(VenueAdapter):
             )
             vault_ref = ref.vault_path
 
-        claims.append(VenueAdapterClaim("snapshot_stored", True, "FACT_FROM_SOURCE", "high"))
-        claims.append(VenueAdapterClaim("snapshot_url", url, "FACT_FROM_SOURCE", "high"))
-        claims.append(VenueAdapterClaim("snapshot_size_chars", len(html), "FACT_FROM_SOURCE", "high"))
+        import hashlib
+        content_hash = hashlib.sha256(html.encode("utf-8")).hexdigest()[:16]
 
-        return VenueAdapterResult(
+        claims.append(VenueAdapterClaim("snapshot_stored", True, es, "high"))
+        claims.append(VenueAdapterClaim("snapshot_url", url, es, "high"))
+        claims.append(VenueAdapterClaim("snapshot_size_chars", len(html), es, "high"))
+        claims.append(VenueAdapterClaim("content_hash", content_hash, es, "high"))
+
+        result = VenueAdapterResult(
             adapter_id=self.adapter_id,
             mode=self._mode.value,
             query=query or {},
-            status="success",
-            evidence_status="FACT_FROM_SOURCE",
+            status=VenueAdapterStatus.SUCCESS.value,
+            source_access_mode=self.source_access_mode,
+            evidence_status=es,
             source_role=self.source_role,
             claims=claims,
             vault_ref=vault_ref,
             unknowns=[],
+            provenance=self.adapter_id,
         )
+        return self._attach_authority(result)
 
     def store_provided_html(self, html: str, url: str) -> VenueAdapterResult:
         return self.store_html(html, url)

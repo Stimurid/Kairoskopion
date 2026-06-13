@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from .base import VenueAdapter, VenueAdapterClaim, VenueAdapterMode, VenueAdapterResult
+from ...enums import SourceAccessMode
+from ..http_client import fetch_json_safe
+from .base import (
+    VenueAdapter,
+    VenueAdapterClaim,
+    VenueAdapterMode,
+    VenueAdapterResult,
+    VenueAdapterStatus,
+    _now_iso,
+)
 
 
 OPENCITATIONS_FIXTURE = {
@@ -28,6 +37,18 @@ OPENCITATIONS_FIXTURE = {
 class OpenCitationsVenueAdapter(VenueAdapter):
     adapter_id = "opencitations_venue"
     source_role = "opencitations_graph"
+    source_access_mode = SourceAccessMode.CITATION_GRAPH.value
+
+    def __init__(
+        self,
+        mode: VenueAdapterMode = VenueAdapterMode.OFFLINE_STUB,
+        *,
+        cache_dir: str | None = None,
+        timeout: int = 30,
+    ) -> None:
+        super().__init__(mode)
+        self._cache_dir = cache_dir
+        self._timeout = timeout
 
     def lookup_venue(
         self,
@@ -38,18 +59,33 @@ class OpenCitationsVenueAdapter(VenueAdapter):
     ) -> VenueAdapterResult:
         query = {"name": name, "issn": issn, "url": url}
 
-        if self._mode == VenueAdapterMode.OFFLINE_STUB:
-            return self._parse_fixture(OPENCITATIONS_FIXTURE, query)
+        if self._mode in (VenueAdapterMode.OFFLINE_STUB, VenueAdapterMode.FIXTURE):
+            return self._parse_response(OPENCITATIONS_FIXTURE, query)
 
         if self._mode == VenueAdapterMode.LIVE_API:
-            return self.degrade_gracefully(query, "live_api mode not yet implemented")
+            return self._live_lookup(query, issn=issn)
+
+        if self._mode in (VenueAdapterMode.CACHED, VenueAdapterMode.CACHED_SNAPSHOT):
+            return self.degrade_gracefully(query, "cached mode not implemented for OpenCitations")
 
         return self.degrade_gracefully(query, f"unsupported mode: {self._mode.value}")
 
     def parse_response(self, data: dict[str, Any], query: dict[str, Any] | None = None) -> VenueAdapterResult:
-        return self._parse_fixture(data, query or {})
+        return self._parse_response(data, query or {})
 
-    def _parse_fixture(self, data: dict[str, Any], query: dict[str, Any]) -> VenueAdapterResult:
+    def _live_lookup(
+        self, query: dict[str, Any], *, issn: str | None,
+    ) -> VenueAdapterResult:
+        if not issn:
+            return self.degrade_gracefully(query, "ISSN or DOI required for OpenCitations lookup")
+
+        # OpenCitations COCI API uses DOIs, not ISSNs directly
+        # For venue-level citation ecology, we'd need to aggregate article DOIs
+        return self.degrade_gracefully(
+            query, "live_api: venue-level citation ecology requires article DOI aggregation (future)",
+        )
+
+    def _parse_response(self, data: dict[str, Any], query: dict[str, Any]) -> VenueAdapterResult:
         claims: list[VenueAdapterClaim] = []
         es = "FACT_FROM_API_METADATA"
 
@@ -85,14 +121,17 @@ class OpenCitationsVenueAdapter(VenueAdapter):
         if not stats:
             unknowns.append("citation statistics unavailable from OpenCitations")
 
-        return VenueAdapterResult(
+        result = VenueAdapterResult(
             adapter_id=self.adapter_id,
             mode=self._mode.value,
             query=query,
-            status="success" if claims else "no_results",
+            status=VenueAdapterStatus.SUCCESS.value if claims else VenueAdapterStatus.NO_RESULTS.value,
+            source_access_mode=self.source_access_mode,
             evidence_status=es,
             source_role=self.source_role,
             claims=claims,
             raw_data=data,
             unknowns=unknowns,
+            provenance=self.adapter_id,
         )
+        return self._attach_authority(result)

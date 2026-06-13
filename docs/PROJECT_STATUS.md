@@ -7,7 +7,7 @@
 | Parameter | Value |
 |-----------|-------|
 | Branch | `main` |
-| Tag | `v0.2.0-alpha-rc10` |
+| Tag | `v0.2.0-alpha-rc11` |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
 | Working tree | clean |
 | Python | >=3.11 |
@@ -39,6 +39,8 @@ evidence-first article-to-venue trajectory engine.
 - Agentic Contour v0.1: 26 agents (7 layers), registry, executor, orchestrator, 4 workflows, 16 prompt families, 7 new CLI commands — full UC-1 orchestrated layer
 - Venue Evidence Stack V1–V2: 8-level depth model, vault storage, 4 venue adapters, corpus profiler, 3 agent upgrades, workflow wiring, 4 new CLI commands
 - UC-1 Demo Pack v0: offline reproducible demo of full UC-1 pipeline (12/12 steps), synthetic fixtures, 3 agent bugfixes (compliance_auditor, submission_pack_builder, evidence_auditor), 16 output artifacts, report generator
+- Source Authority Model v0: SourceAccessMode/SourceAuthorityScope enums, SourceAuthorityClaim/SourceAuthorityAssessment models, authority checker service, EvidenceAuditor integration, 53 tests
+- Real Source Acquisition v0: 6 venue adapters (OpenAlex, Crossref, DOAJ, Unpaywall, OpenCitations, Snapshot) with authority enforcement at adapter boundary, cross-adapter conflict detection, aggregation service, 3 new CLI commands, 67 tests
 
 ## Modules implemented
 
@@ -61,7 +63,7 @@ evidence-first article-to-venue trajectory engine.
 | `traces.py` | Operation trace recording |
 | `decisions.py` | User decision tracking |
 | `cards.py` | 8 markdown card generators |
-| `cli.py` | CLI: 28 commands (27 existing + run-uc1-demo) |
+| `cli.py` | CLI: 31 commands (28 existing + acquire-venue-sources, list-source-adapters, inspect-adapter) |
 
 ### Demo (`src/kairoskopion/demo/`)
 
@@ -94,6 +96,7 @@ evidence-first article-to-venue trajectory engine.
 | `corpus_sampler.py` | Corpus sampling: PublishedArticleCorpus from fixtures with distribution analysis |
 | `corpus_analyzer.py` | Corpus analysis: method/school/citation pattern extraction |
 | `source_authority.py` | Source authority checker: authority matrix, claim validation, conflict detection, evidence reconciliation |
+| `real_source_acquisition.py` | Real source acquisition: orchestrates 6 adapters, cross-adapter conflict detection, AcquisitionResult |
 
 ### Storage (`src/kairoskopion/storage/`)
 
@@ -112,11 +115,13 @@ evidence-first article-to-venue trajectory engine.
 
 | Adapter | Status |
 |---------|--------|
-| `base.py` | VenueAdapter ABC, VenueAdapterMode, VenueAdapterResult |
-| `openalex.py` | OpenAlex venue lookup (offline_stub) |
-| `crossref.py` | Crossref journal metadata (offline_stub) |
-| `opencitations.py` | OpenCitations citation links (offline_stub) |
-| `snapshot_crawler.py` | Homepage HTML capture with vault integration |
+| `base.py` | VenueAdapter ABC, VenueAdapterMode (5 modes), VenueAdapterResult (with authority), SourceAcquisitionConfig |
+| `openalex.py` | OpenAlex venue lookup (fixture + live + cached) |
+| `crossref.py` | Crossref journal metadata (fixture + live + cached) |
+| `doaj.py` | DOAJ journal OA/indexing (fixture + live + cached) |
+| `unpaywall.py` | Unpaywall article OA by DOI (fixture + live) |
+| `opencitations.py` | OpenCitations citation ecology (fixture + live) |
+| `snapshot_crawler.py` | Official webpage HTML capture with vault integration (fixture + live) |
 
 ### Pipelines
 
@@ -181,7 +186,7 @@ evidence-first article-to-venue trajectory engine.
 | `base.py` | Adapter contracts: AdapterResult, AdapterRecord, AdapterConfig, AdapterError |
 | `source_intake.py` | Local file/text registration with PDF/DOCX extraction, 14 source roles |
 | `url_snapshot.py` | URL placeholder (no real fetch) |
-| `http_client.py` | Shared HTTP client (stdlib urllib) with caching and rate limiting |
+| `http_client.py` | Shared HTTP client (stdlib urllib) with caching, rate limiting, HttpResult, fetch_json_safe/fetch_text_safe |
 | `openalex.py` | Mock + real adapter — work search |
 | `crossref.py` | Mock + real adapter — DOI lookup + search |
 | `opencitations.py` | Mock + real adapter — citation link query |
@@ -228,6 +233,9 @@ evidence-first article-to-venue trajectory engine.
 | `kairoskopion sample-venue-corpus --fixture FILE [--venue-id ID]` | Sample corpus from article fixtures |
 | `kairoskopion analyze-venue-corpus --fixture FILE` | Analyze corpus for method/school patterns |
 | `kairoskopion run-uc1-demo [--pack-dir DIR] [--output-dir DIR]` | Run UC-1 offline demo pack (synthetic, deterministic, no LLM) |
+| `kairoskopion acquire-venue-sources --venue-name NAME [--issn ISSN] [--url URL] [--doi DOI] [--output FILE]` | Run all enabled source adapters for a venue |
+| `kairoskopion list-source-adapters` | List available source adapters with access modes |
+| `kairoskopion inspect-adapter ADAPTER_ID` | Show adapter details |
 
 Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--adapter-mode mock|real`; `--llm-model`, `--llm-base-url`, `--llm-api-key-env` for LLM-backed commands.
 
@@ -263,7 +271,7 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **943 tests**, all passing (53 new in source authority model v0, 35 in UC-1 Demo Pack v0)
+- **1010 tests**, all passing (67 new in real source acquisition v0, 53 in source authority model v0, 35 in UC-1 Demo Pack v0)
 - 50+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
@@ -293,9 +301,11 @@ Running `kairoskopion run-fixture` produces:
 - ~~No SubmissionPack~~ → implemented with readiness assessment
 - ~~No Litops/WhiteCrow integration~~ → implemented as JSONL export bridges
 - No LLM-assisted extraction (all heuristic regex)
-- No real HTTP fetch for URL adapter (placeholder only)
+- ~~No real HTTP fetch for URL adapter (placeholder only)~~ → implemented in venue snapshot crawler
 - Mock adapters do not verify references (verification_status stays "not_verified")
 - Mock evidence is VENDOR_CLAIM, never FACT_FROM_SOURCE
+- No Sherpa/RoMEO, Semantic Scholar, GROBID adapters (future)
+- No retraction/PubPeer live lookup (prohibited by constraint)
 - No title-based fuzzy matching for reference linking (DOI only)
 - Freshness is local metadata only — no real source refresh
 - No OCR for scanned PDFs

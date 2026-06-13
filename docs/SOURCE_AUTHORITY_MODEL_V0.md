@@ -80,7 +80,7 @@ Backward-compatible: existing callers without these parameters behave identicall
 
 - Authority matrix is deterministic; no confidence scoring
 - No live retraction/PubPeer integration
-- No adapter-level enforcement (adapters don't attach authority assessments yet)
+- ~~No adapter-level enforcement~~ → implemented in Real Source Acquisition v0: all 6 venue adapters call `_attach_authority()` at parse time
 - PublicationHistoryModel requires user or source input
 - CitationIntegrityCheck is a model, not a live service
 - ReportingGuidelineSelection has no selection logic yet

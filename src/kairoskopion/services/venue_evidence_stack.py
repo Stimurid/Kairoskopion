@@ -5,18 +5,21 @@ Orchestrates depth-driven venue evidence collection:
 - runs adapters at appropriate levels
 - assembles VenueEvidencePack + VenueDepthCoverage
 - reports unknowns and degradation honestly
+- passes authority assessments and evidence conflicts through
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from ..adapters.venue.base import VenueAdapterMode, VenueAdapterResult
+from ..adapters.venue.base import VenueAdapterMode, VenueAdapterResult, VenueAdapterStatus
 from ..adapters.venue.crossref import CrossrefVenueAdapter
+from ..adapters.venue.doaj import DOAJVenueAdapter
 from ..adapters.venue.openalex import OpenAlexVenueAdapter
 from ..adapters.venue.opencitations import OpenCitationsVenueAdapter
 from ..adapters.venue.snapshot_crawler import VenueSnapshotCrawler
 from ..schema import VenueEvidencePack, VenueModel, VenueRecord
+from ..source_authority import EvidenceConflict, SourceAuthorityAssessment
 from ..venue_depth import (
     DEPTH_LEVEL_ORDER,
     LevelCoverage,
@@ -46,10 +49,12 @@ def build_venue_evidence_stack(
     offline: bool = True,
     vault: Any | None = None,
     adapter_fixtures: dict[str, dict] | None = None,
+    use_source_adapters: bool = False,
 ) -> VenueEvidenceStackResult:
     """Build venue evidence stack to the depth required by purpose.
 
     Returns a result with evidence pack, depth coverage, and degradation notes.
+    When use_source_adapters=True, DOAJ adapter is added at L5.
     """
     policy = get_depth_policy(purpose)
     mode = _adapter_mode_from_flag(offline)
@@ -87,6 +92,8 @@ def build_venue_evidence_stack(
     missing_required: list[str] = []
     unavailable: list[str] = []
     build_log: list[str] = []
+    authority_assessments: list[SourceAuthorityAssessment] = []
+    evidence_conflicts: list[EvidenceConflict] = []
 
     target_levels = levels_in_range(policy.min_depth, policy.target_depth)
 
@@ -94,6 +101,7 @@ def build_venue_evidence_stack(
         results = _collect_level(
             level, mode, effective_name, effective_issn, effective_url,
             vault, adapter_fixtures, policy,
+            use_source_adapters=use_source_adapters,
         )
         level_results[level.value] = results
 
@@ -104,6 +112,14 @@ def build_venue_evidence_stack(
             unknowns.extend(r.unknowns)
             for c in r.claims:
                 all_claims.append(c.to_dict())
+
+            # Collect authority assessments from adapters
+            if r.authority_assessment:
+                try:
+                    assessment = SourceAuthorityAssessment.from_dict(r.authority_assessment)
+                    authority_assessments.append(assessment)
+                except Exception:
+                    pass
 
         # Check required source roles for this level
         from ..venue_depth import LEVEL_SOURCE_ROLES
@@ -192,6 +208,9 @@ def build_venue_evidence_stack(
     pack.unknowns = list(set(pack.unknowns + all_unknowns))
     pack.build_log.extend(build_log)
 
+    # Detect cross-adapter conflicts for overlapping claims
+    _detect_stack_conflicts(level_results, evidence_conflicts)
+
     return VenueEvidenceStackResult(
         venue_id=venue_id,
         purpose=purpose,
@@ -200,7 +219,45 @@ def build_venue_evidence_stack(
         depth_coverage=coverage,
         adapter_results={k: [r.to_dict() for r in v] for k, v in level_results.items()},
         build_log=build_log,
+        authority_assessments=authority_assessments,
+        evidence_conflicts=evidence_conflicts,
     )
+
+
+def _detect_stack_conflicts(
+    level_results: dict[str, list[VenueAdapterResult]],
+    conflicts: list[EvidenceConflict],
+) -> None:
+    """Detect conflicts across adapters within the stack."""
+    from ..services.source_authority import detect_conflicts as _detect
+    from ..source_authority import SourceAuthorityClaim
+    from ..enums import AuthorityStrength
+
+    claims_by_path: dict[str, list[SourceAuthorityClaim]] = {}
+    for level, results in level_results.items():
+        for result in results:
+            if not result.is_available:
+                continue
+            for claim in result.claims:
+                sa_claim = SourceAuthorityClaim(
+                    source_ref=result.adapter_id,
+                    access_mode=result.source_access_mode,
+                    claim_key=claim.claim_path,
+                    claim_value=claim.claim_value,
+                    authority_strength=(
+                        AuthorityStrength.AUTHORITATIVE.value if claim.confidence == "high"
+                        else AuthorityStrength.SUPPORTED.value if claim.confidence == "medium"
+                        else AuthorityStrength.WEAK.value
+                    ),
+                )
+                claims_by_path.setdefault(claim.claim_path, []).append(sa_claim)
+
+    for path, claims in claims_by_path.items():
+        if len(claims) < 2:
+            continue
+        conflict = _detect(entity_id="venue", field_name=path, claims=claims)
+        if conflict is not None:
+            conflicts.append(conflict)
 
 
 def _collect_level(
@@ -212,6 +269,8 @@ def _collect_level(
     vault: Any | None,
     fixtures: dict[str, dict] | None,
     policy: VenueDepthPolicy,
+    *,
+    use_source_adapters: bool = False,
 ) -> list[VenueAdapterResult]:
     results: list[VenueAdapterResult] = []
     fixtures = fixtures or {}
@@ -237,8 +296,6 @@ def _collect_level(
             results.append(crawler.lookup_venue(name=name, url=url))
 
     elif level == VenueEvidenceDepthLevel.L2_PUBLICATION_MODEL:
-        # Reuse L0 OpenAlex data if available — no extra adapter call needed
-        # In real mode, would query works metadata, DOAJ, etc.
         results.append(VenueAdapterResult(
             adapter_id="publication_model_aggregator",
             mode=mode.value,
@@ -284,10 +341,22 @@ def _collect_level(
             unknowns=["L4 editorial intelligence not available"],
         ))
 
-    elif level in (
-        VenueEvidenceDepthLevel.L5_POLICY_AND_INDEXING,
-        VenueEvidenceDepthLevel.L6_EXTERNAL_GRAPH,
-    ):
+    elif level == VenueEvidenceDepthLevel.L5_POLICY_AND_INDEXING:
+        oc = OpenCitationsVenueAdapter(mode)
+        if "opencitations" in fixtures:
+            results.append(oc.parse_response(fixtures["opencitations"]))
+        else:
+            results.append(oc.lookup_venue(issn=issn))
+
+        # Add DOAJ at L5 when source adapters are enabled
+        if use_source_adapters:
+            doaj = DOAJVenueAdapter(mode)
+            if "doaj" in fixtures:
+                results.append(doaj.parse_response(fixtures["doaj"]))
+            else:
+                results.append(doaj.lookup_venue(name=name, issn=issn))
+
+    elif level == VenueEvidenceDepthLevel.L6_EXTERNAL_GRAPH:
         oc = OpenCitationsVenueAdapter(mode)
         if "opencitations" in fixtures:
             results.append(oc.parse_response(fixtures["opencitations"]))
@@ -321,6 +390,8 @@ class VenueEvidenceStackResult:
         depth_coverage: VenueDepthCoverage,
         adapter_results: dict[str, list[dict]],
         build_log: list[str],
+        authority_assessments: list[SourceAuthorityAssessment] | None = None,
+        evidence_conflicts: list[EvidenceConflict] | None = None,
     ) -> None:
         self.venue_id = venue_id
         self.purpose = purpose
@@ -329,6 +400,8 @@ class VenueEvidenceStackResult:
         self.depth_coverage = depth_coverage
         self.adapter_results = adapter_results
         self.build_log = build_log
+        self.authority_assessments = authority_assessments or []
+        self.evidence_conflicts = evidence_conflicts or []
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -338,6 +411,8 @@ class VenueEvidenceStackResult:
             "evidence_pack": self.evidence_pack.to_dict(),
             "depth_coverage": self.depth_coverage.to_dict(),
             "build_log": self.build_log,
+            "authority_assessments": [a.to_dict() for a in self.authority_assessments],
+            "evidence_conflicts": [c.to_dict() for c in self.evidence_conflicts],
         }
 
     @property

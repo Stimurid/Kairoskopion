@@ -7,6 +7,7 @@ Rate limiter uses a simple per-host token-bucket approach.
 
 from __future__ import annotations
 
+import dataclasses as dc
 import hashlib
 import json
 import os
@@ -77,7 +78,27 @@ def write_cache(url: str, body: Any, *, cache_dir: Path | None = None) -> None:
 
 
 # ---------------------------------------------------------------------------
-# HTTP fetch
+# Structured HTTP result
+# ---------------------------------------------------------------------------
+
+@dc.dataclass
+class HttpResult:
+    """Structured HTTP response or error."""
+
+    ok: bool
+    status_code: int = 200
+    body: Any = None
+    text: str = ""
+    error: str = ""
+    url: str = ""
+    from_cache: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return dc.asdict(self)
+
+
+# ---------------------------------------------------------------------------
+# HTTP errors
 # ---------------------------------------------------------------------------
 
 class HttpError(Exception):
@@ -88,6 +109,23 @@ class HttpError(Exception):
         self.url = url
 
 
+# ---------------------------------------------------------------------------
+# HTTP fetch functions
+# ---------------------------------------------------------------------------
+
+def _build_request(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    user_agent: str = "Kairoskopion/0.2 (https://github.com/Stimurid/Kairoskopion; mailto:kairoskopion@proton.me)",
+    accept: str = "application/json",
+) -> urllib.request.Request:
+    hdrs = {"User-Agent": user_agent, "Accept": accept}
+    if headers:
+        hdrs.update(headers)
+    return urllib.request.Request(url, headers=hdrs)
+
+
 def fetch_json(
     url: str,
     *,
@@ -96,29 +134,22 @@ def fetch_json(
     cache_dir: Path | None = None,
     max_cache_age: int = 86400,
     rate_limit: bool = True,
-    user_agent: str = "Kairoskopion/0.1 (https://github.com/Stimurid/Kairoskopion; mailto:kairoskopion@proton.me)",
+    user_agent: str = "Kairoskopion/0.2 (https://github.com/Stimurid/Kairoskopion; mailto:kairoskopion@proton.me)",
 ) -> dict[str, Any]:
     """Fetch JSON from URL with caching and rate limiting.
 
     Returns parsed JSON body. Raises HttpError on non-200 responses.
     """
-    # Check cache first
     cached = read_cache(url, cache_dir=cache_dir, max_age_seconds=max_cache_age)
     if cached is not None:
         return cached
 
-    # Rate limit
     if rate_limit:
         from urllib.parse import urlparse
         host = urlparse(url).hostname or "unknown"
         _rate_limit(host)
 
-    # Build request
-    hdrs = {"User-Agent": user_agent, "Accept": "application/json"}
-    if headers:
-        hdrs.update(headers)
-
-    req = urllib.request.Request(url, headers=hdrs)
+    req = _build_request(url, headers=headers, user_agent=user_agent)
 
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -129,7 +160,99 @@ def fetch_json(
     except urllib.error.URLError as exc:
         raise HttpError(0, str(exc.reason), url) from exc
 
-    # Cache successful response
     write_cache(url, body, cache_dir=cache_dir)
-
     return body
+
+
+def fetch_json_safe(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    timeout: int = 30,
+    cache_dir: Path | None = None,
+    max_cache_age: int = 86400,
+    rate_limit: bool = True,
+    user_agent: str = "Kairoskopion/0.2 (https://github.com/Stimurid/Kairoskopion; mailto:kairoskopion@proton.me)",
+    retry_count: int = 2,
+) -> HttpResult:
+    """Fetch JSON without raising — returns HttpResult with ok/error."""
+    cached = read_cache(url, cache_dir=cache_dir, max_age_seconds=max_cache_age)
+    if cached is not None:
+        return HttpResult(ok=True, body=cached, url=url, from_cache=True)
+
+    if rate_limit:
+        from urllib.parse import urlparse
+        host = urlparse(url).hostname or "unknown"
+        _rate_limit(host)
+
+    last_error = ""
+    for attempt in range(max(1, retry_count)):
+        try:
+            req = _build_request(url, headers=headers, user_agent=user_agent)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode("utf-8")
+                body = json.loads(raw)
+                write_cache(url, body, cache_dir=cache_dir)
+                return HttpResult(ok=True, body=body, url=url)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429:
+                return HttpResult(
+                    ok=False, status_code=429,
+                    error="rate_limited", url=url,
+                )
+            if exc.code == 404:
+                return HttpResult(
+                    ok=False, status_code=404,
+                    error="not_found", url=url,
+                )
+            last_error = f"HTTP {exc.code}: {exc.reason}"
+        except urllib.error.URLError as exc:
+            last_error = f"network: {exc.reason}"
+        except json.JSONDecodeError as exc:
+            return HttpResult(
+                ok=False, status_code=200,
+                error="invalid_response", url=url,
+            )
+        except OSError as exc:
+            last_error = f"timeout_or_io: {exc}"
+
+    return HttpResult(ok=False, error=last_error, url=url)
+
+
+def fetch_text_safe(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    timeout: int = 30,
+    rate_limit: bool = True,
+    user_agent: str = "Kairoskopion/0.2 (https://github.com/Stimurid/Kairoskopion; mailto:kairoskopion@proton.me)",
+    retry_count: int = 2,
+) -> HttpResult:
+    """Fetch text/HTML without raising — returns HttpResult."""
+    if rate_limit:
+        from urllib.parse import urlparse
+        host = urlparse(url).hostname or "unknown"
+        _rate_limit(host)
+
+    last_error = ""
+    for attempt in range(max(1, retry_count)):
+        try:
+            req = _build_request(
+                url, headers=headers, user_agent=user_agent,
+                accept="text/html,application/xhtml+xml,*/*",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                text = resp.read().decode("utf-8", errors="replace")
+                return HttpResult(ok=True, text=text, url=url)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 429:
+                return HttpResult(ok=False, status_code=429, error="rate_limited", url=url)
+            if exc.code == 404:
+                return HttpResult(ok=False, status_code=404, error="not_found", url=url)
+            last_error = f"HTTP {exc.code}: {exc.reason}"
+        except urllib.error.URLError as exc:
+            last_error = f"network: {exc.reason}"
+        except OSError as exc:
+            last_error = f"timeout_or_io: {exc}"
+
+    return HttpResult(ok=False, error=last_error, url=url)

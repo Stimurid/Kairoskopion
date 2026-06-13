@@ -152,11 +152,12 @@ For deep spec questions, read:
 | `src/kairoskopion/cli.py` | CLI entry point |
 | `src/kairoskopion/pipelines/manuscript_venue_fit.py` | Main pipeline |
 | `src/kairoskopion/services/` | 13 domain services |
-| `src/kairoskopion/adapters/` | Source intake (PDF/DOCX), URL snapshot, OpenAlex/Crossref/OpenCitations (mock+real), HTTP client, bridge |
+| `src/kairoskopion/adapters/` | Source intake (PDF/DOCX), URL snapshot, OpenAlex/Crossref/OpenCitations (mock+real), HTTP client (fetch_json_safe/fetch_text_safe), bridge |
+| `src/kairoskopion/adapters/venue/` | 6 venue adapters: OpenAlex, Crossref, DOAJ, Unpaywall, OpenCitations, SnapshotCrawler (fixture+live+cached, authority enforcement) |
 | `src/kairoskopion/integrations/` | Litops bridge, WhiteCrow bridge, stubs |
 | `src/kairoskopion/vault.py` | Vault indexes, manifest, cross-linking, link validation |
 | `src/kairoskopion/exchange.py` | Export/import storage bundles (zip) |
 | `src/kairoskopion/freshness.py` | Freshness/staleness tracking |
-| `tests/` | 673+ tests |
+| `tests/` | 1010+ tests |
 | `tests/fixtures/` | Synthetic manuscript, venue, scenario |
 | `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` | Master spec |

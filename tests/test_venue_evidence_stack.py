@@ -332,11 +332,15 @@ class TestVenueAdapters:
         from kairoskopion.adapters.venue.base import VenueAdapterMode
         from kairoskopion.adapters.venue.openalex import OpenAlexVenueAdapter
 
-        adapter = OpenAlexVenueAdapter(VenueAdapterMode.LIVE_API)
-        result = adapter.lookup_venue(name="test")
-        assert not result.is_available
-        assert result.status == "unavailable"
-        assert result.error
+        # Test degradation with cached mode and empty cache dir
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as td:
+            empty_cache = os.path.join(td, "no_cache_here")
+            adapter = OpenAlexVenueAdapter(VenueAdapterMode.CACHED, cache_dir=empty_cache)
+            result = adapter.lookup_venue(name="test")
+            assert not result.is_available
+            assert result.status == "unavailable"
+            assert result.error
 
     def test_adapter_result_to_dict(self):
         from kairoskopion.adapters.venue.openalex import OpenAlexVenueAdapter
