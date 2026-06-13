@@ -29,9 +29,16 @@ logger = logging.getLogger(__name__)
 
 _STRENGTH_MAP = {
     "strong": DisciplinaryFitStrength.STRONG.value,
+    "very_high": DisciplinaryFitStrength.STRONG.value,
+    "high": DisciplinaryFitStrength.STRONG.value,
+    "medium_strong": DisciplinaryFitStrength.STRONG.value,
     "medium": DisciplinaryFitStrength.MEDIUM.value,
+    "moderate": DisciplinaryFitStrength.MEDIUM.value,
+    "weak_medium": DisciplinaryFitStrength.WEAK.value,
     "weak": DisciplinaryFitStrength.WEAK.value,
+    "low": DisciplinaryFitStrength.WEAK.value,
     "incompatible": DisciplinaryFitStrength.INCOMPATIBLE.value,
+    "very_low": DisciplinaryFitStrength.INCOMPATIBLE.value,
     "unknown": DisciplinaryFitStrength.UNKNOWN.value,
 }
 
@@ -138,23 +145,51 @@ def _build_pathways(
     article_model_id: str | None,
 ) -> list[DisciplinaryPathway]:
     pathways = []
-    for i, pw in enumerate(parsed.get("pathways", []), start=1):
-        strength = _STRENGTH_MAP.get(pw.get("fit_strength", "unknown"),
-                                     DisciplinaryFitStrength.UNKNOWN.value)
+    raw_list = (
+        parsed.get("pathways")
+        or parsed.get("ranked_pathways")
+        or parsed.get("disciplinary_pathways")
+        or []
+    )
+    for i, pw in enumerate(raw_list, start=1):
+        if not isinstance(pw, dict):
+            continue
+        discipline_name = (
+            pw.get("discipline_name")
+            or pw.get("discipline")
+            or pw.get("pathway_name")
+            or pw.get("name")
+            or "unknown"
+        )
+        fit_raw = (pw.get("fit_strength") or pw.get("strength") or "unknown")
+        if isinstance(fit_raw, str):
+            fit_raw = fit_raw.lower().strip()
+        strength = _STRENGTH_MAP.get(fit_raw, DisciplinaryFitStrength.UNKNOWN.value)
+        reasoning = (
+            pw.get("reasoning")
+            or pw.get("rationale")
+            or pw.get("why_this_pathway")
+            or ""
+        )
+        if isinstance(reasoning, list):
+            reasoning = "; ".join(str(x) for x in reasoning)
+        adaptations = pw.get("required_adaptations") or pw.get("adaptations") or []
+        if isinstance(adaptations, str):
+            adaptations = [adaptations]
         pathways.append(DisciplinaryPathway(
             article_model_id=article_model_id,
-            discipline_name=pw.get("discipline_name", "unknown"),
+            discipline_name=str(discipline_name),
             fit_strength=strength,
-            reasoning=pw.get("reasoning", ""),
-            required_adaptations=pw.get("required_adaptations", []),
-            field_core_risk=pw.get("field_core_risk"),
-            venue_type_hints=pw.get("venue_type_hints", []),
-            example_venue_names=pw.get("example_venue_names", []),
-            language_options=pw.get("language_options", []),
-            indexing_options=pw.get("indexing_options", []),
-            rank=pw.get("rank", i),
-            strategic_value_notes=pw.get("strategic_value_notes"),
-            unknowns=pw.get("unknowns", []),
+            reasoning=str(reasoning),
+            required_adaptations=list(adaptations),
+            field_core_risk=pw.get("field_core_risk") or pw.get("core_risk"),
+            venue_type_hints=pw.get("venue_type_hints", []) or [],
+            example_venue_names=pw.get("example_venue_names", []) or pw.get("example_venues", []) or [],
+            language_options=pw.get("language_options", []) or [],
+            indexing_options=pw.get("indexing_options", []) or [],
+            rank=pw.get("rank", i) or i,
+            strategic_value_notes=pw.get("strategic_value_notes") or pw.get("strategic_value"),
+            unknowns=pw.get("unknowns", []) or [],
             confidence=pw.get("confidence"),
         ))
     return pathways

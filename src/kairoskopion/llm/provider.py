@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 from .response import LLMResponse
 
 
+@runtime_checkable
 class LLMProvider(Protocol):
     """Abstract interface for LLM backends.
 
