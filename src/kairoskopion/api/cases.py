@@ -30,6 +30,8 @@ from ..enums import (
     EvidenceStatus,
     LifecycleStatus,
 )
+from ..llm.config import LLMConfig
+from ..llm.openai_compat import OpenAICompatProvider
 
 
 class CaseStage(str, enum.Enum):
@@ -44,6 +46,15 @@ class CaseStage(str, enum.Enum):
     ADAPTING = "adapting"
     SUBMISSION_PACK = "submission_pack"
     DOSSIER = "dossier"
+
+
+def _get_llm_provider() -> OpenAICompatProvider | None:
+    cfg = LLMConfig.from_env()
+    if cfg is None:
+        return None
+    if not cfg.api_key:
+        return None
+    return OpenAICompatProvider(cfg)
 
 
 class Case:
@@ -143,12 +154,37 @@ class Case:
         }
 
     def _build_article_model(self):
-        from ..services.article_modeling import (
-            build_manuscript_model,
-            build_article_model,
-        )
-        manuscript = build_manuscript_model(self.input_text)
-        self.article_model = build_article_model(manuscript, self.input_text)
+        import logging
+        logger = logging.getLogger(__name__)
+
+        provider = _get_llm_provider()
+        if provider is not None:
+            from ..agents.article_modeler import ArticleModelerAgent
+            from ..agents.contract import AgentInput
+            agent = ArticleModelerAgent()
+            inp = AgentInput(
+                operation_id="intake_article",
+                agent_role_id="article_modeler",
+                raw_text=self.input_text,
+            )
+            try:
+                output = agent.execute(inp, provider)
+                if output.output_entity:
+                    self.article_model = ArticleModel.from_dict(output.output_entity)
+                    logger.info("Article model built via LLM (%s)", output.confidence)
+            except Exception as exc:
+                logger.warning("LLM article modeling failed, falling back: %s", exc)
+                provider = None
+
+        if self.article_model is None:
+            from ..services.article_modeling import (
+                build_manuscript_model,
+                build_article_model,
+            )
+            manuscript = build_manuscript_model(self.input_text)
+            self.article_model = build_article_model(manuscript, self.input_text)
+            logger.info("Article model built via deterministic fallback")
+
         self.stage = CaseStage.ARTICLE_MODEL
 
         from ..services.article_enrichment import build_article_semantic_profile
@@ -157,8 +193,38 @@ class Case:
     # -- Venue investigation --
 
     def investigate_venue(self, text: str) -> dict[str, Any]:
-        from ..services.venue_profiling import build_venue_model
-        venue, regime = build_venue_model(text)
+        import logging
+        logger = logging.getLogger(__name__)
+
+        provider = _get_llm_provider()
+        venue = None
+        regime = None
+
+        if provider is not None:
+            from ..agents.venue_profiler import VenueProfilerAgent
+            from ..agents.contract import AgentInput
+            agent = VenueProfilerAgent()
+            inp = AgentInput(
+                operation_id="investigate_venue",
+                agent_role_id="venue_profiler",
+                raw_text=text,
+            )
+            try:
+                output = agent.execute(inp, provider)
+                if output.output_entity:
+                    entity = output.output_entity
+                    regime_dict = entity.pop("_regime", None)
+                    venue = VenueModel.from_dict(entity)
+                    if regime_dict:
+                        regime = PublicationRegimeModel.from_dict(regime_dict)
+                    logger.info("Venue profiled via LLM")
+            except Exception as exc:
+                logger.warning("LLM venue profiling failed, falling back: %s", exc)
+
+        if venue is None:
+            from ..services.venue_profiling import build_venue_model
+            venue, regime = build_venue_model(text)
+
         self.investigated_venue = venue
         self.publication_regime = regime
         self._log_decision("investigate_venue", {
@@ -237,6 +303,8 @@ class Case:
 
     def get_pathways(self) -> list[dict[str, Any]]:
         if not self.pathways and self.semantic_profile:
+            import logging
+            logger = logging.getLogger(__name__)
             from ..agents.disciplinary_mapper import DisciplinaryPathwayMapperAgent
             from ..agents.contract import AgentInput
             agent = DisciplinaryPathwayMapperAgent()
@@ -249,7 +317,16 @@ class Case:
                     "semantic_profile": self.semantic_profile.to_dict(),
                 },
             )
-            output = agent.execute_deterministic(inp)
+            provider = _get_llm_provider()
+            if provider is not None:
+                try:
+                    output = agent.execute(inp, provider)
+                    logger.info("Pathways mapped via LLM")
+                except Exception as exc:
+                    logger.warning("LLM pathway mapping failed, falling back: %s", exc)
+                    output = agent.execute_deterministic(inp)
+            else:
+                output = agent.execute_deterministic(inp)
             if output.output_entity:
                 raw = output.output_entity.get("pathways", [])
                 self.pathways = [
@@ -287,7 +364,18 @@ class Case:
                 "seed_venues": seed_venues,
             },
         )
-        output = agent.execute_deterministic(inp)
+        provider = _get_llm_provider()
+        if provider is not None:
+            import logging
+            logger = logging.getLogger(__name__)
+            try:
+                output = agent.execute(inp, provider)
+                logger.info("Venues discovered via LLM")
+            except Exception:
+                logger.warning("LLM venue discovery failed, falling back")
+                output = agent.execute_deterministic(inp)
+        else:
+            output = agent.execute_deterministic(inp)
         if output.output_entity:
             raw = output.output_entity
             pool_data = raw.get("pool", raw) if isinstance(raw, dict) else raw
@@ -374,6 +462,8 @@ class Case:
         )
 
     def _run_fit_chain(self):
+        import logging
+        logger = logging.getLogger(__name__)
         from ..services.fit_assessment import assess_fit
         from ..services.mismatch_mapping import build_mismatch_map
         from ..services.rewrite_planning import build_rewrite_plan
@@ -383,17 +473,44 @@ class Case:
             if self.article_model else "",
         )
 
-        try:
-            self.fit_assessment = assess_fit(
-                self.article_model, self.selected_venue, scenario,
+        provider = _get_llm_provider()
+        fit_via_llm = False
+
+        if provider is not None:
+            from ..agents.fit_assessor import FitAssessorAgent
+            from ..agents.contract import AgentInput
+            agent = FitAssessorAgent()
+            inp = AgentInput(
+                operation_id="fit_assess",
+                agent_role_id="fit_assessor",
+                entities={
+                    "article": self.article_model.to_dict(),
+                    "venue": self.selected_venue.to_dict(),
+                    "scenario": scenario.to_dict(),
+                },
             )
-            self.stage = CaseStage.FIT_ASSESSED
-            self._log_decision("fit_assessed", {
-                "overall_label": self.fit_assessment.overall_label,
-                "axes_count": len(self.fit_assessment.axes),
-            })
-        except Exception:
-            return
+            try:
+                output = agent.execute(inp, provider)
+                if output.output_entity:
+                    self.fit_assessment = FitAssessment.from_dict(output.output_entity)
+                    fit_via_llm = True
+                    logger.info("Fit assessed via LLM")
+            except Exception as exc:
+                logger.warning("LLM fit assessment failed, falling back: %s", exc)
+
+        if not fit_via_llm:
+            try:
+                self.fit_assessment = assess_fit(
+                    self.article_model, self.selected_venue, scenario,
+                )
+            except Exception:
+                return
+
+        self.stage = CaseStage.FIT_ASSESSED
+        self._log_decision("fit_assessed", {
+            "overall_label": self.fit_assessment.overall_label,
+            "axes_count": len(self.fit_assessment.axes),
+        })
 
         try:
             self.mismatch_map = build_mismatch_map(self.fit_assessment)

@@ -49,7 +49,9 @@ store = CaseStore()
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": _VERSION}
+    from ..llm.config import provider_status
+    llm = provider_status()
+    return {"status": "ok", "version": _VERSION, "llm": llm}
 
 
 # ---------------------------------------------------------------------------
