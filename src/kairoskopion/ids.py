@@ -200,3 +200,15 @@ def candidate_evidence_matrix_id() -> str:
 
 def field_position_id() -> str:
     return generate_id("fpos")
+
+
+def source_evidence_packet_id() -> str:
+    return generate_id("sep")
+
+
+def protected_core_policy_id() -> str:
+    return generate_id("pcp")
+
+
+def evidence_policy_id() -> str:
+    return generate_id("ep")

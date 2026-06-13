@@ -70,6 +70,9 @@ from .ids import (
     editorial_board_profile_id,
     field_position_id,
     published_article_corpus_id,
+    source_evidence_packet_id,
+    protected_core_policy_id,
+    evidence_policy_id,
 )
 
 
@@ -1114,4 +1117,82 @@ class CitationExpectationProfile(_DictMixin):
     unknowns: list[str] = _list()
     confidence: str | None = _field()
     evidence_refs: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+# ---------------------------------------------------------------------------
+# Publication Integrability Model v1 — Sprint α substrate (B1, B3)
+# ---------------------------------------------------------------------------
+
+@dc.dataclass
+class SourceEvidenceEntry(_DictMixin):
+    """One item inside a SourceEvidencePacket."""
+    source_id: str | None = _field()
+    source_type: str | None = _field()
+    provenance: str | None = _field()
+    access_status: str | None = _field()
+    extraction_status: str | None = _field()
+    granularity: str | None = _field()
+    evidence_ref_id: str | None = _field()
+    snapshot_ref_id: str | None = _field()
+    note: str | None = _field()
+
+
+@dc.dataclass
+class SourceEvidencePacket(_DictMixin):
+    """Per-case packet aggregating all sources, their access status, and
+    evidence granularity classification (PIM v1 §2).
+
+    The packet records *where the data came from* and *what status it has*.
+    UNKNOWN must never be silently promoted to absent.
+    """
+    source_evidence_packet_id: str = dc.field(default_factory=source_evidence_packet_id)
+    case_id: str | None = _field()
+    input_sources: list[dict[str, Any]] = _list()
+    evidence_refs: list[str] = _list()
+    granularity_summary: dict[str, int] = _dict()
+    unknowns: list[str] = _list()
+    notes: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+    updated_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class ProtectedCorePolicy(_DictMixin):
+    """Typed policy guarding the article's protected core (PIM v1 §10).
+
+    Used by the rewrite planner / core gate to refuse actions whose
+    semantics match `forbidden_moves`, and to surface
+    `acceptable_loss` / `unacceptable_loss` / `questions_for_author`
+    to the operator.
+    """
+    protected_core_policy_id: str = dc.field(default_factory=protected_core_policy_id)
+    article_model_id: str | None = _field()
+    protected_core: list[str] = _list()
+    mutable_zones: list[str] = _list()
+    forbidden_moves: list[str] = _list()
+    allowed_moves: list[str] = _list()
+    forbidden_reframes: list[str] = _list()
+    allowed_reframes: list[str] = _list()
+    acceptable_loss: list[str] = _list()
+    unacceptable_loss: list[str] = _list()
+    questions_for_author: list[str] = _list()
+    notes: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class EvidencePolicy(_DictMixin):
+    """Typed policy describing required evidence levels and how UNKNOWN /
+    INACCESSIBLE / CONFLICT must be surfaced (PIM v1 §2 evidence_policy).
+    """
+    evidence_policy_id: str = dc.field(default_factory=evidence_policy_id)
+    case_id: str | None = _field()
+    required_evidence_min_status: str | None = _field()
+    unknown_handling: str = "preserve"
+    inaccessible_handling: str = "mark_blocking"
+    conflict_handling: str = "surface_both"
+    require_evidence_for_claims: bool = True
+    allow_inference_when_no_source: bool = True
+    notes: list[str] = _list()
     created_at: str = dc.field(default_factory=_now)

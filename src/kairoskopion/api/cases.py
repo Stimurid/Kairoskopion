@@ -15,13 +15,16 @@ from ..schema import (
     ArticleModel,
     ArticleSemanticProfile,
     DisciplinaryPathway,
+    EvidencePolicy,
     FieldPositionModel,
     FitAssessment,
     MismatchMap,
+    ProtectedCorePolicy,
     PublicationRegimeModel,
     RewritePlan,
     CitationPlan,
     RiskReport,
+    SourceEvidencePacket,
     SubmissionScenario,
     VenueCandidatePool,
     VenueModel,
@@ -85,6 +88,10 @@ class Case:
         self.article_field_position: FieldPositionModel | None = None
         self.venue_field_position: FieldPositionModel | None = None
         self.field_position_fit: dict[str, Any] | None = None
+        self.source_evidence_packet: SourceEvidencePacket | None = None
+        self.protected_core_policy: ProtectedCorePolicy | None = None
+        self.evidence_policy: EvidencePolicy | None = None
+        self.policy_blocked_changes: list[dict[str, Any]] = []
 
         self.decision_log: list[dict[str, Any]] = []
         self.quality_gates: dict[str, dict[str, Any]] = {}
@@ -727,6 +734,21 @@ class Case:
                     "changes_count": len(self.rewrite_plan.changes),
                     "effort": self.rewrite_plan.estimated_effort,
                 })
+                # Sprint α B3: pass the plan through the policy gate
+                try:
+                    from ..services.protected_core import apply_policy_gate
+                    policy = self.ensure_protected_core_policy()
+                    if policy.forbidden_moves:
+                        gated, blocked = apply_policy_gate(self.rewrite_plan, policy)
+                        self.rewrite_plan = gated
+                        self.policy_blocked_changes = blocked
+                        if blocked:
+                            self._log_decision("policy_gate_blocked", {
+                                "blocked_count": len(blocked),
+                                "moves": sorted({m for b in blocked for m in b.get("matched_moves", [])}),
+                            })
+                except Exception as exc:
+                    logger.warning("Policy gate failed (non-fatal): %s", exc)
             except Exception:
                 pass
 
@@ -739,6 +761,44 @@ class Case:
                 result["field_position_fit"] = self.field_position_fit
             return result
         return {"status": "not_assessed"}
+
+    def get_source_evidence_packet(self) -> dict[str, Any]:
+        """Build (or rebuild) the SourceEvidencePacket from current case state.
+
+        Lazy: rebuilds every call so the packet always reflects the latest
+        input_text / investigated_venue / selected_venue. Deterministic, no LLM.
+        """
+        from ..services.source_evidence_packet import build_packet_from_case
+        self.source_evidence_packet = build_packet_from_case(self)
+        return self.source_evidence_packet.to_dict()
+
+    def ensure_protected_core_policy(self) -> ProtectedCorePolicy:
+        """Return a ProtectedCorePolicy, deriving one from ArticleModel if missing."""
+        if self.protected_core_policy is not None:
+            return self.protected_core_policy
+        from ..services.protected_core import policy_from_article
+        article = self.article_model
+        self.protected_core_policy = policy_from_article(
+            article_model_id=article.article_model_id if article else None,
+            protected_core=article.protected_core if article else [],
+            mutable_zones=article.mutable_zones if article else [],
+        )
+        return self.protected_core_policy
+
+    def get_protected_core_policy(self) -> dict[str, Any]:
+        return self.ensure_protected_core_policy().to_dict()
+
+    def set_protected_core_policy(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Author or update the ProtectedCorePolicy from operator input."""
+        existing = self.ensure_protected_core_policy().to_dict()
+        existing.update({k: v for k, v in data.items() if v is not None})
+        self.protected_core_policy = ProtectedCorePolicy.from_dict(existing)
+        return self.protected_core_policy.to_dict()
+
+    def get_evidence_policy(self) -> dict[str, Any]:
+        if self.evidence_policy is None:
+            self.evidence_policy = EvidencePolicy(case_id=self.case_id)
+        return self.evidence_policy.to_dict()
 
     def get_field_positions(self) -> dict[str, Any]:
         return {
@@ -1042,6 +1102,9 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         ("investigated_venue", "investigated_venue"),
         ("article_field_position", "article_field_position"),
         ("venue_field_position", "venue_field_position"),
+        ("source_evidence_packet", "source_evidence_packet"),
+        ("protected_core_policy", "protected_core_policy"),
+        ("evidence_policy", "evidence_policy"),
     ]:
         obj = getattr(case, attr, None)
         if obj is not None:
@@ -1055,6 +1118,9 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
 
     if case.field_position_fit is not None:
         snap["field_position_fit"] = case.field_position_fit
+
+    if case.policy_blocked_changes:
+        snap["policy_blocked_changes"] = case.policy_blocked_changes
 
     return snap
 
@@ -1088,6 +1154,9 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
         "investigated_venue": VenueModel,
         "article_field_position": FieldPositionModel,
         "venue_field_position": FieldPositionModel,
+        "source_evidence_packet": SourceEvidencePacket,
+        "protected_core_policy": ProtectedCorePolicy,
+        "evidence_policy": EvidencePolicy,
     }
     for key, cls in model_map.items():
         raw = data.get(key)
@@ -1100,6 +1169,10 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
     fpm_fit = data.get("field_position_fit")
     if isinstance(fpm_fit, dict):
         case.field_position_fit = fpm_fit
+
+    pbc = data.get("policy_blocked_changes")
+    if isinstance(pbc, list):
+        case.policy_blocked_changes = pbc
 
     raw_pathways = data.get("pathways", [])
     for p in raw_pathways:

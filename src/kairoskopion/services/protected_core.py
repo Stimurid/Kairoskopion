@@ -16,7 +16,14 @@ from typing import Any
 
 from ..enums import FieldCoreImpact
 from ..ids import generate_id
-from ..schema import RewritePlan, _DictMixin, _field, _list, _now
+from ..schema import (
+    ProtectedCorePolicy,
+    RewritePlan,
+    _DictMixin,
+    _field,
+    _list,
+    _now,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -271,3 +278,118 @@ def apply_core_gate(
         requires_user_acceptance=True,
         lifecycle_status=plan.lifecycle_status,
     )
+
+
+# ---------------------------------------------------------------------------
+# Policy-driven gate (PIM v1 §10 / Sprint α B3)
+# ---------------------------------------------------------------------------
+
+def policy_from_article(
+    article_model_id: str | None,
+    protected_core: list[str],
+    mutable_zones: list[str] | None = None,
+) -> ProtectedCorePolicy:
+    """Derive a minimal ProtectedCorePolicy from existing ArticleModel fields.
+
+    Used when the user has not authored an explicit policy. The policy
+    starts empty for moves/reframes/loss — these are filled by a future
+    `TransformationPolicyAuthor` agent.
+    """
+    return ProtectedCorePolicy(
+        article_model_id=article_model_id,
+        protected_core=list(protected_core or []),
+        mutable_zones=list(mutable_zones or []),
+        notes=[
+            "Policy derived from ArticleModel.protected_core + mutable_zones; "
+            "forbidden_moves / allowed_moves / acceptable_loss must be authored.",
+        ],
+    )
+
+
+def _change_text(change: dict[str, Any]) -> str:
+    parts = [
+        change.get("target_block", ""),
+        change.get("desired_state", ""),
+        change.get("action_type", ""),
+        change.get("reason", ""),
+        change.get("summary", ""),
+    ]
+    return _normalize(" ".join(str(p) for p in parts if p))
+
+
+def _move_matches(move: str, change_text: str) -> bool:
+    move_norm = _normalize(move)
+    if not move_norm:
+        return False
+    if move_norm in change_text:
+        return True
+    move_words = {
+        w for w in move_norm.split()
+        if w not in {
+            "the", "a", "an", "of", "in", "to", "for", "and", "or", "is",
+            "are", "be", "not", "with", "from", "at", "by", "on", "as",
+            "this", "that",
+        }
+    }
+    change_words = set(change_text.split())
+    overlap = move_words & change_words
+    return len(overlap) >= 2 and len(move_words) > 0
+
+
+def apply_policy_gate(
+    plan: RewritePlan,
+    policy: ProtectedCorePolicy,
+) -> tuple[RewritePlan, list[dict[str, Any]]]:
+    """Block any change whose semantics match policy.forbidden_moves.
+
+    Returns (gated_plan, blocked_change_records). The list contains one
+    record per blocked change with the matched forbidden_move(s) and the
+    original change_id, so the caller can surface them to the user.
+
+    Does NOT touch changes already blocked by the protected-core gate
+    (those keep their existing status). Does NOT mutate the input plan.
+    """
+    if not plan.changes:
+        return plan, []
+    forbidden = list(policy.forbidden_moves or [])
+    if not forbidden:
+        return plan, []
+
+    blocked_records: list[dict[str, Any]] = []
+    gated_changes: list[dict[str, Any]] = []
+
+    for change in plan.changes:
+        change_copy = dict(change)
+        if change.get("status") == "blocked_pending_consent":
+            gated_changes.append(change_copy)
+            continue
+        change_text = _change_text(change)
+        matched = [m for m in forbidden if _move_matches(m, change_text)]
+        if matched:
+            change_copy["status"] = "blocked_by_policy"
+            change_copy["_blocked_by_policy_moves"] = matched
+            change_copy["_blocked_reason"] = (
+                f"Matches forbidden_moves in ProtectedCorePolicy: {', '.join(matched)}"
+            )
+            blocked_records.append({
+                "change_id": change.get("change_id", ""),
+                "target_block": change.get("target_block", ""),
+                "matched_moves": matched,
+            })
+        gated_changes.append(change_copy)
+
+    suffix = " [POLICY GATE: forbidden moves]" if blocked_records else ""
+    gated_plan = RewritePlan(
+        rewrite_plan_id=plan.rewrite_plan_id,
+        article_model_id=plan.article_model_id,
+        manuscript_id=plan.manuscript_id,
+        fit_assessment_id=plan.fit_assessment_id,
+        target_venue_id=plan.target_venue_id,
+        changes=gated_changes,
+        summary=(plan.summary or "") + suffix,
+        estimated_effort=plan.estimated_effort,
+        field_core_risk=plan.field_core_risk,
+        requires_user_acceptance=plan.requires_user_acceptance or bool(blocked_records),
+        lifecycle_status=plan.lifecycle_status,
+    )
+    return gated_plan, blocked_records
