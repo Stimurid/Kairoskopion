@@ -235,11 +235,19 @@ class Case:
 
     def get_pathways(self) -> list[dict[str, Any]]:
         if not self.pathways and self.semantic_profile:
-            from ..agents.article.pathway_mapper import DisciplinaryPathwayMapperAgent
+            from ..agents.disciplinary_mapper import DisciplinaryPathwayMapperAgent
+            from ..agents.contract import AgentInput
             agent = DisciplinaryPathwayMapperAgent()
-            output = agent.execute_deterministic(
-                entities={"article_semantic_profile": self.semantic_profile.to_dict()},
+            am_dict = self.article_model.to_dict() if self.article_model else {}
+            inp = AgentInput(
+                operation_id="pathway_map",
+                agent_role_id="disciplinary_pathway_mapper",
+                entities={
+                    "article": am_dict,
+                    "semantic_profile": self.semantic_profile.to_dict(),
+                },
             )
+            output = agent.execute_deterministic(inp)
             if output.output_entity:
                 raw = output.output_entity.get("pathways", [])
                 self.pathways = [
@@ -253,6 +261,47 @@ class Case:
         ]
 
     # -- Venue pool --
+
+    def discover_venues(self) -> dict[str, Any]:
+        if not self.pathways:
+            return {"candidates": [], "status": "no_pathways"}
+
+        from ..agents.venue.venue_discovery import VenueDiscoveryAgent
+        from ..agents.contract import AgentInput
+
+        seed_venues: list[str] = []
+        scenario_dict = self.scenario.to_dict() if self.scenario else {}
+
+        agent = VenueDiscoveryAgent()
+        inp = AgentInput(
+            operation_id="discover_venues",
+            agent_role_id="venue_discovery",
+            entities={
+                "disciplinary_pathways": [
+                    p.to_dict() if hasattr(p, "to_dict") else p
+                    for p in self.pathways
+                ],
+                "scenario": scenario_dict,
+                "seed_venues": seed_venues,
+            },
+        )
+        output = agent.execute_deterministic(inp)
+        if output.output_entity:
+            raw = output.output_entity
+            pool_data = raw.get("pool", raw) if isinstance(raw, dict) else raw
+            if isinstance(pool_data, dict):
+                known_keys = {f.name for f in __import__("dataclasses").fields(VenueCandidatePool)}
+                filtered = {k: v for k, v in pool_data.items() if k in known_keys}
+                self.venue_pool = VenueCandidatePool(**filtered)
+            else:
+                self.venue_pool = pool_data
+
+        self.stage = CaseStage.VENUE_POOL
+        self._log_decision("discover_venues", {
+            "candidate_count": len(self.venue_pool.candidates) if self.venue_pool else 0,
+        })
+
+        return self.get_venue_pool()
 
     def get_venue_pool(self) -> dict[str, Any]:
         if self.venue_pool:

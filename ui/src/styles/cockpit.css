@@ -1421,3 +1421,425 @@ body {
   list-style: disc;
   padding-left: var(--space-lg);
 }
+
+
+/* =========================================================================
+   Phase 3 — Pathway Map + Venue Pool Board
+   ========================================================================= */
+
+/* --- Pathway Map --- */
+
+.pathway-map {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.pathway-map-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+}
+
+.pathway-map-header h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  color: var(--text-primary);
+}
+
+.pathway-count {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.pathway-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-md);
+}
+
+.pathway-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+  color: var(--text-primary);
+  font: inherit;
+  width: 100%;
+}
+
+.pathway-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-primary);
+}
+
+.pathway-card--selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.pathway-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.pathway-rank {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-weight: 600;
+  min-width: 24px;
+}
+
+.pathway-name {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.pathway-badges {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.pathway-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.pathway-badge.fit-strong { background: var(--badge-fact-bg); color: var(--badge-fact); }
+.pathway-badge.fit-moderate { background: #2a2a1a; color: var(--color-warning); }
+.pathway-badge.fit-weak { background: #2a1a1a; color: var(--color-danger); }
+.pathway-badge.fit-unknown { background: var(--bg-raised); color: var(--text-muted); }
+.pathway-badge.core-preserving { background: var(--badge-fact-bg); color: var(--badge-fact); }
+.pathway-badge.core-touching { background: #2a2a1a; color: var(--color-warning); }
+.pathway-badge.core-transforming { background: #2a1a1a; color: var(--color-danger); }
+.pathway-badge.core-destroying { background: #3a1a1a; color: #ff6b6b; }
+.pathway-badge.core-unknown { background: var(--bg-raised); color: var(--text-muted); }
+
+.pathway-adaptations {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.pathway-adaptations ul {
+  list-style: disc;
+  padding-left: var(--space-lg);
+  margin: var(--space-xs) 0 0;
+}
+
+.pathway-section-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pathway-strategic {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-style: italic;
+  margin: 0;
+}
+
+.pathway-venues {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.pathway-venue-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.venue-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.pathway-type-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: var(--space-xs);
+}
+
+.type-hint-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+
+/* --- Venue Pool Board --- */
+
+.venue-pool-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-2xl) var(--space-lg);
+  text-align: center;
+}
+
+.venue-pool-empty h2 {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.venue-pool-empty p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.pool-hint {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.venue-pool-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.pool-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.pool-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+}
+
+.pool-header-left h2 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  color: var(--text-primary);
+}
+
+.pool-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.pool-total {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.pool-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.pool-badge.conf-high { background: var(--badge-fact-bg); color: var(--badge-fact); }
+.pool-badge.conf-medium { background: #2a2a1a; color: var(--color-warning); }
+
+.pool-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.sort-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.pool-sort-select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  font-size: var(--font-size-sm);
+}
+
+.pool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-md);
+}
+
+.pool-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-raised);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+}
+
+.pool-action-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+
+/* --- Venue Candidate Card --- */
+
+.venue-candidate-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+  color: var(--text-primary);
+  font: inherit;
+  width: 100%;
+}
+
+.venue-candidate-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-info);
+}
+
+.venue-candidate-card--selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.vc-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.vc-name {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.vc-status {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.vc-status.status-discovered { background: var(--bg-raised); color: var(--text-muted); }
+.vc-status.status-screened { background: #1a2a3a; color: var(--color-info); }
+.vc-status.status-profiled { background: var(--badge-fact-bg); color: var(--badge-fact); }
+.vc-status.status-selected { background: #1a2a4a; color: var(--color-primary); }
+.vc-status.status-rejected { background: #2a1a1a; color: var(--color-danger); }
+
+.vc-issn {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.vc-badges {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.vc-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.vc-badge.conf-high { background: var(--badge-fact-bg); color: var(--badge-fact); }
+.vc-badge.conf-medium { background: #2a2a1a; color: var(--color-warning); }
+.vc-badge.conf-low { background: var(--bg-raised); color: var(--text-muted); }
+
+.vc-reasons {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.vc-reasons ul {
+  list-style: disc;
+  padding-left: var(--space-lg);
+  margin: var(--space-xs) 0 0;
+}
+
+.vc-section-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.vc-authority {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.vc-authority-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.vc-authority-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: var(--font-size-sm);
+}
+
+.btn-secondary {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+}

@@ -213,6 +213,16 @@ def get_pathways(case_id: str):
 # Venue Pool
 # ---------------------------------------------------------------------------
 
+@app.post("/cases/{case_id}/discover-venues")
+def discover_venues(case_id: str):
+    case = store.get(case_id)
+    if not case:
+        raise HTTPException(404, f"Case {case_id} not found")
+    result = case.discover_venues()
+    store.save(case)
+    return result
+
+
 @app.get("/cases/{case_id}/venue-pool")
 def get_venue_pool(case_id: str):
     case = store.get(case_id)

@@ -94,6 +94,8 @@ export const api = {
   getPathways: (id: string) => get<DisciplinaryPathway[]>(`/cases/${id}/pathways`),
 
   // Venue pool
+  discoverVenues: (id: string) =>
+    post<{ candidates: unknown[]; status?: string }>(`/cases/${id}/discover-venues`),
   getVenuePool: (id: string) =>
     get<{ candidates: unknown[]; status?: string }>(`/cases/${id}/venue-pool`),
 

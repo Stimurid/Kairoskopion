@@ -5,6 +5,7 @@ import type {
   EvidenceDetail,
   DisciplinaryPathway,
   VenueModel,
+  VenueCandidate,
   PublicationRegimeModel,
   MismatchMap,
   QualityGateResult,
@@ -18,6 +19,8 @@ import { VenueProfile } from './VenueProfile';
 import { ScenarioBuilder } from './ScenarioBuilder';
 import { MismatchMapView } from './MismatchMapView';
 import { QualityGateBar } from './QualityGateBar';
+import { PathwayMap } from './PathwayMap';
+import { VenuePoolBoard } from './VenuePoolBoard';
 
 interface Props {
   caseData: CaseDetail;
@@ -31,6 +34,8 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
   const [pathways, setPathways] = useState<DisciplinaryPathway[]>([]);
   const [venueModel, setVenueModel] = useState<VenueModel | null>(null);
   const [pubRegime, setPubRegime] = useState<PublicationRegimeModel | undefined>(undefined);
+  const [venueCandidates, setVenueCandidates] = useState<VenueCandidate[]>([]);
+  const [venuePoolStatus, setVenuePoolStatus] = useState<string>('not_discovered');
   const [mismatchMap, setMismatchMap] = useState<MismatchMap | null>(null);
   const [qualityGates, setQualityGates] = useState<Record<string, QualityGateResult>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -127,6 +132,50 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
     try {
       await api.setScenario(caseId, data);
       setActiveView('pathways');
+      onCaseUpdate();
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [caseId, onCaseUpdate]);
+
+  // --- Venue pool ---
+
+  const discoverVenues = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await api.discoverVenues(caseId);
+      const candidates = (result.candidates ?? []) as VenueCandidate[];
+      setVenueCandidates(candidates);
+      setVenuePoolStatus(result.status ?? 'discovered');
+      if (candidates.length > 0) {
+        setActiveView('venue_pool');
+      }
+      onCaseUpdate();
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [caseId, onCaseUpdate]);
+
+  const loadVenuePool = useCallback(async () => {
+    try {
+      const result = await api.getVenuePool(caseId);
+      const candidates = (result.candidates ?? []) as VenueCandidate[];
+      setVenueCandidates(candidates);
+      setVenuePoolStatus(result.status ?? 'not_discovered');
+    } catch { /* not available */ }
+  }, [caseId]);
+
+  const handleSelectVenue = useCallback(async (venueId: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await api.selectVenue(caseId, venueId);
+      setActiveView('fit_assessed');
       onCaseUpdate();
     } catch (e) {
       handleError(e);
@@ -246,40 +295,23 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
           );
         }
         return (
-          <div className="pathways-view">
-            <h2>Disciplinary Pathways</h2>
-            <div className="pathway-cards">
-              {pathways.map((p) => (
-                <div key={p.disciplinary_pathway_id} className="pathway-card">
-                  <h3>{p.discipline_name}</h3>
-                  <div className="pathway-meta">
-                    <span className={`fit-strength fit-${p.fit_strength}`}>
-                      Fit: {p.fit_strength}
-                    </span>
-                    <span className={`core-risk core-${p.field_core_risk}`}>
-                      Core: {p.field_core_risk}
-                    </span>
-                  </div>
-                  {p.required_adaptations.length > 0 && (
-                    <ul className="pathway-adaptations">
-                      {p.required_adaptations.map((a, i) => (
-                        <li key={i}>{a}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {p.strategic_value_notes && (
-                    <p className="pathway-notes">{p.strategic_value_notes}</p>
-                  )}
-                  {p.example_venue_names.length > 0 && (
-                    <div className="pathway-venues">
-                      <span className="pathway-venues-label">Venues: </span>
-                      {p.example_venue_names.join(', ')}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          <PathwayMap
+            pathways={pathways}
+            onSelectPathway={() => {
+              discoverVenues();
+            }}
+          />
+        );
+
+      case 'venue_pool':
+        return (
+          <VenuePoolBoard
+            candidates={venueCandidates}
+            onSelectVenue={handleSelectVenue}
+            onDiscover={discoverVenues}
+            isLoading={isLoading}
+            poolStatus={venuePoolStatus}
+          />
         );
 
       default:
