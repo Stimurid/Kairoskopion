@@ -67,6 +67,24 @@ export const api = {
       { text, input_type: inputType },
     ),
 
+  intakeFile: async (id: string, file: File, inputType = 'auto') => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('input_type', inputType);
+    const res = await fetch(`${BASE}/cases/${id}/intake/file`, {
+      method: 'POST',
+      body: form,
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`API ${res.status}: ${body}`);
+    }
+    return res.json() as Promise<{
+      input_type: string; text_length: number; article_model_built: boolean;
+      venue_investigated: boolean; stage: string; filename: string; extraction_status: string;
+    }>;
+  },
+
   // Venue investigation
   investigateVenue: (id: string, text: string) =>
     post<VenueInvestigationResult>(`/cases/${id}/investigate-venue`, { text }),

@@ -59,29 +59,47 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
 
   // --- Intake ---
 
+  const handleIntakeResult = useCallback(async (result: { article_model_built: boolean; venue_investigated?: boolean }) => {
+    if (result.article_model_built) {
+      const am = await api.getArticleModel(caseId);
+      setArticleModel(am);
+      setActiveView('article_model');
+    } else if (result.venue_investigated) {
+      const venueResult = await api.getInvestigatedVenue(caseId);
+      setVenueModel(venueResult.venue);
+      setPubRegime(venueResult.publication_regime);
+      setActiveView('venue_investigation');
+    }
+    onCaseUpdate();
+  }, [caseId, onCaseUpdate]);
+
   const handleIntakeSubmit = useCallback(async (text: string, inputType: string) => {
     setIsLoading(true);
     setError(null);
     try {
       const result = await api.intakeText(caseId, text, inputType);
-      if (result.article_model_built) {
-        const am = await api.getArticleModel(caseId);
-        setArticleModel(am);
-        setActiveView('article_model');
-      } else if (result.venue_investigated) {
-        const venueResult = await api.getInvestigatedVenue(caseId);
-        setVenueModel(venueResult.venue);
-        setPubRegime(venueResult.publication_regime);
-        setActiveView('venue_investigation');
-      }
-      onCaseUpdate();
+      await handleIntakeResult(result);
       return result;
     } catch (e) {
       handleError(e);
     } finally {
       setIsLoading(false);
     }
-  }, [caseId, onCaseUpdate]);
+  }, [caseId, handleIntakeResult]);
+
+  const handleIntakeFile = useCallback(async (file: File, inputType: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await api.intakeFile(caseId, file, inputType);
+      await handleIntakeResult(result);
+      return result;
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [caseId, handleIntakeResult]);
 
   // --- Article confirm ---
 
@@ -280,7 +298,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
       case 'empty':
       case 'intake':
         return (
-          <IntakeSurface onSubmit={handleIntakeSubmit} isLoading={isLoading} />
+          <IntakeSurface onSubmit={handleIntakeSubmit} onFileSubmit={handleIntakeFile} isLoading={isLoading} />
         );
 
       case 'article_model':

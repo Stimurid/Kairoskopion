@@ -1,16 +1,22 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 interface IntakeResult {
   input_type: string;
   text_length: number;
   article_model_built: boolean;
   venue_investigated?: boolean;
+  filename?: string;
+  extraction_status?: string;
 }
 
 interface Props {
   onSubmit: (text: string, inputType: string) => Promise<IntakeResult | void>;
+  onFileSubmit?: (file: File, inputType: string) => Promise<IntakeResult | void>;
   isLoading: boolean;
 }
+
+const ACCEPTED_EXTENSIONS = '.pdf,.docx,.txt,.md,.html,.htm';
+const FORMAT_LABEL = 'PDF, DOCX, TXT, MD, HTML';
 
 const TYPE_LABELS: Record<string, string> = {
   auto: 'Auto-detect',
@@ -27,12 +33,22 @@ const TYPE_ICONS: Record<string, string> = {
   review_letter: 'Review letter detected',
 };
 
-export function IntakeSurface({ onSubmit, isLoading }: Props) {
+export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
   const [text, setText] = useState('');
   const [inputType, setInputType] = useState('auto');
   const [lastResult, setLastResult] = useState<IntakeResult | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async () => {
+    if (selectedFile && onFileSubmit) {
+      setLastResult(null);
+      const result = await onFileSubmit(selectedFile, inputType);
+      if (result) setLastResult(result);
+      setSelectedFile(null);
+      return;
+    }
     if (!text.trim()) return;
     setLastResult(null);
     const result = await onSubmit(text.trim(), inputType);
@@ -45,11 +61,29 @@ export function IntakeSurface({ onSubmit, isLoading }: Props) {
     }
   };
 
+  const handleFileSelect = (file: File | undefined) => {
+    if (!file) return;
+    setSelectedFile(file);
+    setText('');
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    handleFileSelect(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(true);
+  };
+
   return (
     <div className="intake-surface">
       <h2 className="intake-title">What are you working on?</h2>
       <p className="intake-subtitle">
-        Paste an abstract, manuscript text, journal name/URL, or review letter.
+        Paste text or upload a file ({FORMAT_LABEL}).
         The system will classify what you provide and build the right model.
       </p>
 
@@ -67,25 +101,73 @@ export function IntakeSurface({ onSubmit, isLoading }: Props) {
         ))}
       </div>
 
-      <textarea
-        className="intake-textarea"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Paste your text here..."
-        rows={12}
-        disabled={isLoading}
-        aria-label="Input text"
-      />
+      {selectedFile ? (
+        <div className="intake-file-preview">
+          <span className="intake-file-icon">📄</span>
+          <span className="intake-file-name">{selectedFile.name}</span>
+          <span className="intake-file-size">
+            {(selectedFile.size / 1024).toFixed(0)} KB
+          </span>
+          <button
+            className="intake-file-remove"
+            onClick={() => setSelectedFile(null)}
+            aria-label="Remove file"
+          >
+            ✕
+          </button>
+        </div>
+      ) : (
+        <div
+          className={`intake-input-area ${dragOver ? 'intake-input-area--dragover' : ''}`}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={() => setDragOver(false)}
+        >
+          <textarea
+            className="intake-textarea"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Paste your text here..."
+            rows={10}
+            disabled={isLoading}
+            aria-label="Input text"
+          />
+          <div className="intake-file-upload-row">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED_EXTENSIONS}
+              className="intake-file-input-hidden"
+              onChange={(e) => handleFileSelect(e.target.files?.[0])}
+            />
+            <button
+              className="btn btn-secondary intake-upload-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading}
+              type="button"
+            >
+              Upload file
+            </button>
+            <span className="intake-file-formats">
+              or drag & drop — {FORMAT_LABEL}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="intake-actions">
         <span className="intake-hint">
-          {text.length > 0 ? `${text.length} characters` : 'Ctrl+Enter to submit'}
+          {selectedFile
+            ? selectedFile.name
+            : text.length > 0
+              ? `${text.length} characters`
+              : 'Ctrl+Enter to submit'}
         </span>
         <button
           className="btn btn-primary"
           onClick={handleSubmit}
-          disabled={!text.trim() || isLoading}
+          disabled={(!text.trim() && !selectedFile) || isLoading}
         >
           {isLoading ? 'Analyzing...' : 'Analyze'}
         </button>
@@ -97,6 +179,11 @@ export function IntakeSurface({ onSubmit, isLoading }: Props) {
             {TYPE_ICONS[lastResult.input_type] || `Detected: ${lastResult.input_type}`}
           </span>
           <span className="intake-result-length">{lastResult.text_length} chars</span>
+          {lastResult.filename && (
+            <span className="intake-result-badge">
+              {lastResult.filename}
+            </span>
+          )}
           {lastResult.article_model_built && (
             <span className="intake-result-badge intake-result-badge--success">
               Article model built

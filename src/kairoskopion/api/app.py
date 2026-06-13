@@ -105,6 +105,54 @@ def intake_text(case_id: str, req: IntakeTextRequest):
     return result
 
 
+_SUPPORTED_UPLOAD_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".html", ".htm"}
+
+
+@app.post("/cases/{case_id}/intake/file")
+async def intake_file(
+    case_id: str,
+    file: UploadFile = File(...),
+    input_type: str = Form("auto"),
+):
+    case = store.get(case_id)
+    if not case:
+        raise HTTPException(404, f"Case {case_id} not found")
+
+    filename = file.filename or "upload"
+    suffix = Path(filename).suffix.lower()
+    if suffix not in _SUPPORTED_UPLOAD_EXTENSIONS:
+        raise HTTPException(
+            400,
+            f"Unsupported file type: {suffix}. "
+            f"Supported: {', '.join(sorted(_SUPPORTED_UPLOAD_EXTENSIONS))}",
+        )
+
+    import tempfile
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = Path(tmp.name)
+
+    try:
+        from .source_intake_util import extract_text_from_file
+
+        text, extraction_status, errors = extract_text_from_file(tmp_path)
+        if not text:
+            raise HTTPException(
+                400,
+                f"Could not extract text from {filename}: "
+                + "; ".join(errors or ["unknown error"]),
+            )
+
+        result = case.intake_text(text, input_type)
+        result["filename"] = filename
+        result["extraction_status"] = extraction_status
+        store.save(case)
+        return result
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
 # ---------------------------------------------------------------------------
 # Venue Investigation
 # ---------------------------------------------------------------------------
