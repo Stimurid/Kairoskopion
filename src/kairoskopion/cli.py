@@ -886,7 +886,7 @@ def cmd_list_agents(args: argparse.Namespace) -> int:
 
 
 def cmd_inspect_agent(args: argparse.Namespace) -> int:
-    from .agents.registry import get_agent_spec
+    from .agents.registry import instantiate_agent_spec
     try:
         spec = get_agent_spec(args.role_id)
     except KeyError:
@@ -1221,6 +1221,259 @@ def cmd_run_uc1_demo(args: argparse.Namespace) -> int:
     return 0 if result.is_success else 1
 
 
+def cmd_plan_venue_discovery(args: argparse.Namespace) -> int:
+    from .demo.uc1_demo_loader import load_uc1_demo_pack
+    from .services.venue_discovery_planner import plan_venue_discovery
+
+    pack = load_uc1_demo_pack()
+    scenario = pack.scenario or {}
+
+    from .agents.orchestrator import execute_agent
+    from .agents.contract import AgentInput
+
+    inp_model = AgentInput(
+        operation_id="cli_plan_discovery",
+        agent_role_id="article_modeler",
+        raw_text=pack.draft_text,
+        entities={},
+    )
+    from .agents.registry import instantiate_agent
+    modeler = instantiate_agent("article_modeler")
+    model_out = modeler.run(inp_model)
+    article = model_out.output_entity
+
+    inp_profile = AgentInput(
+        operation_id="cli_plan_discovery",
+        agent_role_id="article_semantic_profiler",
+        entities={"article": article},
+    )
+    profiler = instantiate_agent("article_semantic_profiler")
+    profile_out = profiler.run(inp_profile)
+    semantic_profile = profile_out.output_entity
+
+    inp_paths = AgentInput(
+        operation_id="cli_plan_discovery",
+        agent_role_id="disciplinary_pathway_mapper",
+        entities={"semantic_profile": semantic_profile},
+    )
+    mapper = instantiate_agent("disciplinary_pathway_mapper")
+    paths_out = mapper.run(inp_paths)
+    pathways_entity = paths_out.output_entity
+    pathways = pathways_entity.get("pathways", []) if isinstance(pathways_entity, dict) else []
+
+    queries = plan_venue_discovery(
+        semantic_profile=semantic_profile,
+        pathways=pathways,
+        scenario=scenario,
+    )
+
+    _safe_print(f"Discovery queries: {len(queries)}")
+    _safe_print("")
+    for i, q in enumerate(queries):
+        qd = q.to_dict()
+        _safe_print(f"  Query {i+1}:")
+        _safe_print(f"    text: {qd['query_text']}")
+        _safe_print(f"    source: {qd['source']}")
+        _safe_print(f"    pathway: {qd.get('pathway_id', 'none')}")
+        if qd.get("constraints"):
+            _safe_print(f"    constraints: {json.dumps(qd['constraints'], ensure_ascii=False)}")
+        if qd.get("unknowns"):
+            for u in qd["unknowns"]:
+                _safe_print(f"    [!] {u}")
+        _safe_print("")
+
+    return 0
+
+
+def cmd_discover_venue_pool(args: argparse.Namespace) -> int:
+    from .demo.uc1_demo_loader import load_uc1_demo_pack
+    from .services.venue_pool_discovery import discover_venue_pool
+    from .services.venue_candidate_identity import dedupe_candidates
+
+    pack = load_uc1_demo_pack()
+    scenario = pack.scenario or {}
+
+    from .agents.registry import instantiate_agent
+    from .agents.contract import AgentInput
+
+    modeler = instantiate_agent("article_modeler")
+    model_out = modeler.run(AgentInput(
+        operation_id="cli_discover", agent_role_id="article_modeler",
+        raw_text=pack.draft_text, entities={},
+    ))
+    article = model_out.output_entity
+
+    profiler = instantiate_agent("article_semantic_profiler")
+    profile_out = profiler.run(AgentInput(
+        operation_id="cli_discover", agent_role_id="article_semantic_profiler",
+        entities={"article": article},
+    ))
+    semantic_profile = profile_out.output_entity
+
+    mapper = instantiate_agent("disciplinary_pathway_mapper")
+    paths_out = mapper.run(AgentInput(
+        operation_id="cli_discover", agent_role_id="disciplinary_pathway_mapper",
+        entities={"semantic_profile": semantic_profile},
+    ))
+    pathways_entity = paths_out.output_entity
+    pathways = pathways_entity.get("pathways", []) if isinstance(pathways_entity, dict) else []
+
+    pool = discover_venue_pool(
+        semantic_profile=semantic_profile,
+        pathways=pathways,
+        scenario=scenario,
+        seed_venues=pack.venue_seeds,
+    )
+
+    pool_dict = pool.to_dict()
+    candidates = pool_dict.get("candidates", [])
+    deduped, dedupe_notes, conflicts = dedupe_candidates(candidates)
+
+    _safe_print(f"Candidates discovered: {len(deduped)}")
+    _safe_print(f"Queries planned: {len(pool_dict.get('queries', []))}")
+    _safe_print(f"Dedupe notes: {len(dedupe_notes)}")
+    _safe_print(f"Conflicts: {len(conflicts)}")
+    _safe_print("")
+
+    for c in deduped:
+        _safe_print(f"  [{c.get('status', '?').upper()}] {c.get('canonical_name', '?')}")
+        _safe_print(f"    ISSN: {c.get('issn', '?')} | Sources: {', '.join(c.get('sources', []))}")
+        _safe_print(f"    Reasons: {', '.join(c.get('discovery_reasons', []))}")
+        _safe_print(f"    Confidence: {c.get('confidence', '?')}")
+        if c.get("unknowns"):
+            for u in c["unknowns"]:
+                _safe_print(f"    [!] {u}")
+        _safe_print("")
+
+    if dedupe_notes:
+        _safe_print("Dedupe notes:")
+        for n in dedupe_notes:
+            _safe_print(f"  - {n}")
+
+    if conflicts:
+        _safe_print("Conflicts:")
+        for cf in conflicts:
+            _safe_print(f"  - {cf.get('type', '?')}: {cf.get('severity', '?')}")
+
+    if pool_dict.get("unknowns"):
+        _safe_print("")
+        _safe_print("Unknowns:")
+        for u in pool_dict["unknowns"]:
+            _safe_print(f"  - {u}")
+
+    _safe_print("")
+    _safe_print("NOTE: Candidates are NOT recommendations. Evidence gaps remain visible.")
+
+    if args.output:
+        import json as _json
+        Path(args.output).write_text(
+            _json.dumps(pool_dict, indent=2, ensure_ascii=False, default=str),
+            encoding="utf-8",
+        )
+        _safe_print(f"Output: {args.output}")
+
+    return 0
+
+
+def cmd_screen_venue_candidates(args: argparse.Namespace) -> int:
+    from .demo.uc1_demo_loader import load_uc1_demo_pack
+    from .services.venue_pool_discovery import discover_venue_pool
+    from .services.venue_candidate_identity import dedupe_candidates
+    from .services.venue_candidate_screening import (
+        screen_candidates, build_candidate_evidence_matrix,
+    )
+
+    pack = load_uc1_demo_pack()
+    scenario = pack.scenario or {}
+
+    from .agents.registry import instantiate_agent
+    from .agents.contract import AgentInput
+
+    modeler = instantiate_agent("article_modeler")
+    model_out = modeler.run(AgentInput(
+        operation_id="cli_screen", agent_role_id="article_modeler",
+        raw_text=pack.draft_text, entities={},
+    ))
+    article = model_out.output_entity
+
+    profiler = instantiate_agent("article_semantic_profiler")
+    profile_out = profiler.run(AgentInput(
+        operation_id="cli_screen", agent_role_id="article_semantic_profiler",
+        entities={"article": article},
+    ))
+    semantic_profile = profile_out.output_entity
+
+    mapper = instantiate_agent("disciplinary_pathway_mapper")
+    paths_out = mapper.run(AgentInput(
+        operation_id="cli_screen", agent_role_id="disciplinary_pathway_mapper",
+        entities={"semantic_profile": semantic_profile},
+    ))
+    pathways_entity = paths_out.output_entity
+    pathways = pathways_entity.get("pathways", []) if isinstance(pathways_entity, dict) else []
+
+    pool = discover_venue_pool(
+        semantic_profile=semantic_profile,
+        pathways=pathways,
+        scenario=scenario,
+        seed_venues=pack.venue_seeds,
+    )
+
+    pool_dict = pool.to_dict()
+    candidates = pool_dict.get("candidates", [])
+    deduped, _, _ = dedupe_candidates(candidates)
+
+    results = screen_candidates(
+        candidates=deduped,
+        semantic_profile=semantic_profile,
+        pathways=pathways,
+        scenario=scenario,
+    )
+
+    matrix = build_candidate_evidence_matrix(
+        pool={"candidates": deduped, "venue_candidate_pool_id": pool_dict.get("venue_candidate_pool_id", "")},
+        screening_results=results,
+    )
+
+    _safe_print(f"Candidates screened: {len(results)}")
+    _safe_print(f"Screened in: {sum(1 for r in results if r.status == 'screened_in')}")
+    _safe_print(f"Insufficient evidence: {sum(1 for r in results if r.status == 'insufficient_evidence')}")
+    _safe_print(f"Screened out: {sum(1 for r in results if r.status == 'screened_out')}")
+    _safe_print("")
+
+    _safe_print("--- Screening Table ---")
+    for sr in results:
+        cand = next((c for c in deduped if c.get("venue_candidate_id") == sr.candidate_id), None)
+        name = cand.get("canonical_name", sr.candidate_id) if cand else sr.candidate_id
+        _safe_print(f"  [{sr.status.upper()}] {name}")
+        _safe_print(f"    Fit: {sr.preliminary_fit} | Confidence: evidence-bound")
+        if sr.blocking_gaps:
+            _safe_print(f"    Blocking: {', '.join(sr.blocking_gaps)}")
+        if sr.evidence_gaps:
+            _safe_print(f"    Evidence gaps: {', '.join(sr.evidence_gaps[:3])}")
+        if sr.authority_warnings:
+            _safe_print(f"    Authority: {', '.join(sr.authority_warnings[:2])}")
+        _safe_print("")
+
+    if matrix.unknowns:
+        _safe_print("Matrix unknowns:")
+        for u in matrix.unknowns:
+            _safe_print(f"  - {u}")
+
+    _safe_print("")
+    _safe_print("NOTE: Screening is preliminary and evidence-bound.")
+    _safe_print("Candidates are NOT recommendations.")
+
+    if args.output:
+        import json as _json
+        Path(args.output).write_text(
+            _json.dumps(matrix.to_dict(), indent=2, ensure_ascii=False, default=str),
+            encoding="utf-8",
+        )
+        _safe_print(f"Output: {args.output}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="kairoskopion",
@@ -1482,6 +1735,30 @@ def main(argv: list[str] | None = None) -> int:
         help="Directory to write demo artifacts (workflow_trace.json, entity files, UC1_DEMO_REPORT.md)",
     )
 
+    # --- Venue Discovery CLI commands ---
+    sub.add_parser(
+        "plan-venue-discovery",
+        help="Plan venue discovery queries from UC-1 demo profile (offline)",
+    )
+
+    discover_pool_parser = sub.add_parser(
+        "discover-venue-pool",
+        help="Discover venue candidate pool from UC-1 demo (offline)",
+    )
+    discover_pool_parser.add_argument(
+        "--output", default=None,
+        help="Output JSON file path",
+    )
+
+    screen_parser = sub.add_parser(
+        "screen-venue-candidates",
+        help="Screen venue candidates from UC-1 demo (offline)",
+    )
+    screen_parser.add_argument(
+        "--output", default=None,
+        help="Output JSON file path",
+    )
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -1516,6 +1793,9 @@ def main(argv: list[str] | None = None) -> int:
         "acquire-venue-sources": cmd_acquire_venue_sources,
         "list-source-adapters": cmd_list_source_adapters,
         "inspect-adapter": cmd_inspect_adapter,
+        "plan-venue-discovery": cmd_plan_venue_discovery,
+        "discover-venue-pool": cmd_discover_venue_pool,
+        "screen-venue-candidates": cmd_screen_venue_candidates,
     }
 
     handler = commands.get(args.command)

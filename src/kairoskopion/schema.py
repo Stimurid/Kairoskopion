@@ -36,6 +36,7 @@ from .enums import (
 from .ids import (
     article_model_id,
     bibliography_profile_id,
+    candidate_evidence_matrix_id,
     citation_ecology_report_id,
     citation_plan_id,
     compliance_checklist_id,
@@ -52,7 +53,11 @@ from .ids import (
     submission_pack_id,
     submission_scenario_id,
     trajectory_report_id,
+    venue_candidate_id,
+    venue_candidate_pool_id,
+    venue_candidate_screening_id,
     venue_claim_id,
+    venue_discovery_query_id,
     venue_evidence_pack_id,
     venue_model_id,
     venue_publication_profile_id,
@@ -786,6 +791,91 @@ class EditorialBoardProfile(_DictMixin):
     unknowns: list[str] = _list()
     confidence: str | None = _field()
     evidence_refs: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+# ---------------------------------------------------------------------------
+# Venue Discovery (Pool Discovery v0)
+# ---------------------------------------------------------------------------
+
+@dc.dataclass
+class VenueDiscoveryQuery(_DictMixin):
+    """A search plan for discovering venue candidates via a specific pathway."""
+    venue_discovery_query_id: str = dc.field(default_factory=venue_discovery_query_id)
+    article_model_id: str | None = _field()
+    semantic_profile_id: str | None = _field()
+    pathway_id: str | None = _field()
+    query_text: str = ""
+    source: str = ""
+    constraints: dict[str, Any] = _dict()
+    expected_authority_scopes: list[str] = _list()
+    unknowns: list[str] = _list()
+
+
+@dc.dataclass
+class VenueCandidate(_DictMixin):
+    """A discovered venue candidate with traceable evidence and authority."""
+    venue_candidate_id: str = dc.field(default_factory=venue_candidate_id)
+    canonical_name: str = ""
+    aliases: list[str] = _list()
+    issn: str | None = _field()
+    issn_l: str | None = _field()
+    urls: list[str] = _list()
+    sources: list[str] = _list()
+    discovery_reasons: list[str] = _list()
+    authority_assessments: list[dict[str, Any]] = _list()
+    adapter_result_refs: list[str] = _list()
+    evidence_refs: list[str] = _list()
+    conflicts: list[dict[str, Any]] = _list()
+    status: str = "discovered"
+    confidence: str = "low"
+    unknowns: list[str] = _list()
+    raw_adapter_data: dict[str, Any] = _dict()
+
+
+@dc.dataclass
+class VenueCandidatePool(_DictMixin):
+    """Complete pool of discovered venue candidates for an article."""
+    venue_candidate_pool_id: str = dc.field(default_factory=venue_candidate_pool_id)
+    article_model_id: str | None = _field()
+    scenario_id: str | None = _field()
+    pathway_ids: list[str] = _list()
+    queries: list[dict[str, Any]] = _list()
+    candidates: list[dict[str, Any]] = _list()
+    dedupe_notes: list[str] = _list()
+    rejected_candidates: list[dict[str, Any]] = _list()
+    unknowns: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class VenueCandidateScreeningResult(_DictMixin):
+    """Preliminary fit screening result for a single candidate."""
+    venue_candidate_screening_id: str = dc.field(default_factory=venue_candidate_screening_id)
+    candidate_id: str = ""
+    article_model_id: str | None = _field()
+    semantic_profile_id: str | None = _field()
+    pathway_id: str | None = _field()
+    preliminary_fit: str = "unknown"
+    fit_axes: dict[str, str] = _dict()
+    blocking_gaps: list[str] = _list()
+    evidence_gaps: list[str] = _list()
+    authority_warnings: list[str] = _list()
+    recommended_next_actions: list[str] = _list()
+    status: str = "pending"
+    unknowns: list[str] = _list()
+
+
+@dc.dataclass
+class CandidateEvidenceMatrix(_DictMixin):
+    """Cross-candidate evidence/gap/conflict summary."""
+    candidate_evidence_matrix_id: str = dc.field(default_factory=candidate_evidence_matrix_id)
+    pool_id: str = ""
+    rows: list[dict[str, Any]] = _list()
+    missing_evidence_by_candidate: dict[str, list[str]] = _dict()
+    conflicts_by_candidate: dict[str, list[dict[str, Any]]] = _dict()
+    authority_warnings_by_candidate: dict[str, list[str]] = _dict()
+    unknowns: list[str] = _list()
     created_at: str = dc.field(default_factory=_now)
 
 

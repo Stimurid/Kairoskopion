@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — Real Venue Pool Discovery v0
+
+### Added
+- **Venue discovery pipeline**: ArticleSemanticProfile + DisciplinaryPathways → VenueDiscoveryQuery plans → adapter queries → VenueCandidate objects → identity normalization + dedupe → VenueCandidatePool
+- **Venue discovery enums** (`enums.py`): VenueDiscoverySource (7), VenueCandidateStatus (8), VenueCandidateReason (11)
+- **5 new schema models** (`schema.py`): VenueDiscoveryQuery, VenueCandidate, VenueCandidatePool, VenueCandidateScreeningResult, CandidateEvidenceMatrix
+- **5 new ID factories** (`ids.py`): venue_discovery_query_id, venue_candidate_id, venue_candidate_pool_id, venue_candidate_screening_id, candidate_evidence_matrix_id
+- **Query planner service** (`services/venue_discovery_planner.py`): per-pathway query plan generation with scenario constraints
+- **Pool discovery service** (`services/venue_pool_discovery.py`): fixture-based discovery with built-in DISCOVERY_FIXTURES for openalex (5), doaj (3), crossref (2)
+- **Identity normalization service** (`services/venue_candidate_identity.py`): ISSN/name normalization, strong/weak merge, conflict detection (same-name-different-ISSN, publisher mismatch)
+- **Candidate screening service** (`services/venue_candidate_screening.py`): 7-axis screening (discipline, article_type, language, publication_regime, indexing, corpus_evidence, authority_confidence), evidence matrix builder
+- **VenueDiscoveryAgent rewrite** (`agents/venue/venue_discovery.py`): full pipeline integration, deterministic fallback
+- **3 CLI commands**: `plan-venue-discovery`, `discover-venue-pool`, `screen-venue-candidates`
+- **UC-1 workflow update**: step 3 now runs venue discovery with expanded input_keys
+- 58 new tests (1068 total, was 1010)
+- Documentation: REAL_VENUE_POOL_DISCOVERY_V0.md, VENUE_CANDIDATE_SCREENING_V0.md, UC1_DISCOVERY_MODE.md, REAL_VENUE_POOL_DISCOVERY_V0_IMPLEMENTATION_MAP.md
+
+### Fixed
+- `discover_venue_pool`: `fixtures={}` now correctly means "no fixtures" (was falling through to defaults)
+
 ## [Unreleased] — Source Authority and Integrity Model v0
 
 ### Added

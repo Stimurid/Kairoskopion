@@ -178,3 +178,21 @@ def citation_integrity_check_id() -> str:
 
 def reporting_guideline_selection_id() -> str:
     return generate_id("rgsel")
+
+
+# --- Venue discovery IDs ---
+
+def venue_discovery_query_id() -> str:
+    return generate_id("vdq")
+
+def venue_candidate_id() -> str:
+    return generate_id("vcand")
+
+def venue_candidate_pool_id() -> str:
+    return generate_id("vpool")
+
+def venue_candidate_screening_id() -> str:
+    return generate_id("vscr")
+
+def candidate_evidence_matrix_id() -> str:
+    return generate_id("cmat")

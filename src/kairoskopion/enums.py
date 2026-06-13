@@ -523,3 +523,40 @@ class PriorVersionType(str, Enum):
     PREVIOUS_SUBMISSION = "previous_submission"
     LANGUAGE_VERSION = "language_version"
     OTHER = "other"
+
+
+# --- Venue discovery (Pool Discovery v0) ---
+
+class VenueDiscoverySource(str, Enum):
+    OPENALEX = "openalex"
+    DOAJ = "doaj"
+    CROSSREF = "crossref"
+    USER_SEED = "user_seed"
+    LOCAL_FIXTURE = "local_fixture"
+    PRIOR_MEMORY = "prior_memory"
+    MANUAL_CANDIDATE = "manual_candidate"
+
+
+class VenueCandidateStatus(str, Enum):
+    DISCOVERED = "discovered"
+    IDENTITY_UNCERTAIN = "identity_uncertain"
+    DUPLICATE_CANDIDATE = "duplicate_candidate"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    SCREENED_IN = "screened_in"
+    SCREENED_OUT = "screened_out"
+    NEEDS_USER_SELECTION = "needs_user_selection"
+    REJECTED_BY_CONSTRAINTS = "rejected_by_constraints"
+
+
+class VenueCandidateReason(str, Enum):
+    DISCIPLINE_MATCH = "discipline_match"
+    PATHWAY_MATCH = "pathway_match"
+    KEYWORD_MATCH = "keyword_match"
+    SCOPE_MATCH = "scope_match"
+    ARTICLE_TYPE_MATCH = "article_type_match"
+    LANGUAGE_MATCH = "language_match"
+    GEOGRAPHY_MATCH = "geography_match"
+    INDEXING_MATCH = "indexing_match"
+    OA_POLICY_MATCH = "oa_policy_match"
+    USER_SEED = "user_seed"
+    WEAK_SIGNAL = "weak_signal"

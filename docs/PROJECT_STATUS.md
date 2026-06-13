@@ -41,6 +41,7 @@ evidence-first article-to-venue trajectory engine.
 - UC-1 Demo Pack v0: offline reproducible demo of full UC-1 pipeline (12/12 steps), synthetic fixtures, 3 agent bugfixes (compliance_auditor, submission_pack_builder, evidence_auditor), 16 output artifacts, report generator
 - Source Authority Model v0: SourceAccessMode/SourceAuthorityScope enums, SourceAuthorityClaim/SourceAuthorityAssessment models, authority checker service, EvidenceAuditor integration, 53 tests
 - Real Source Acquisition v0: 6 venue adapters (OpenAlex, Crossref, DOAJ, Unpaywall, OpenCitations, Snapshot) with authority enforcement at adapter boundary, cross-adapter conflict detection, aggregation service, 3 new CLI commands, 67 tests
+- Real Venue Pool Discovery v0: discovery pipeline (query planner, fixture pool discovery, identity normalization/dedupe, candidate screening), 3 new enums, 5 new schema models, 4 new services, VenueDiscoveryAgent rewrite, 3 new CLI commands, UC-1 workflow update, 58 tests
 
 ## Modules implemented
 
@@ -48,9 +49,9 @@ evidence-first article-to-venue trajectory engine.
 
 | Module | Contents |
 |--------|----------|
-| `ids.py` | UUID-based ID generation with 31 prefixes |
-| `enums.py` | 37 domain enums (28 original + 9 source authority/integrity) |
-| `schema.py` | 29+ dataclass models with `to_dict`/`from_dict` |
+| `ids.py` | UUID-based ID generation with 36 prefixes |
+| `enums.py` | 40 domain enums (28 original + 9 source authority/integrity + 3 venue discovery) |
+| `schema.py` | 34+ dataclass models with `to_dict`/`from_dict` |
 | `source_authority.py` | Source authority domain models: SourceAuthorityClaim, SourceAuthorityAssessment, EvidenceConflict, EvidenceReconciliationResult, PublicationHistoryModel, PriorVersion, CitationIntegrityCheck, ReportingGuidelineSelection |
 | `registry.py` | JSONL append/read/list/find |
 | `persistence.py` | Storage root management, pipeline + adapter result persistence |
@@ -63,7 +64,7 @@ evidence-first article-to-venue trajectory engine.
 | `traces.py` | Operation trace recording |
 | `decisions.py` | User decision tracking |
 | `cards.py` | 8 markdown card generators |
-| `cli.py` | CLI: 31 commands (28 existing + acquire-venue-sources, list-source-adapters, inspect-adapter) |
+| `cli.py` | CLI: 34 commands (31 existing + plan-venue-discovery, discover-venue-pool, screen-venue-candidates) |
 
 ### Demo (`src/kairoskopion/demo/`)
 
@@ -97,6 +98,10 @@ evidence-first article-to-venue trajectory engine.
 | `corpus_analyzer.py` | Corpus analysis: method/school/citation pattern extraction |
 | `source_authority.py` | Source authority checker: authority matrix, claim validation, conflict detection, evidence reconciliation |
 | `real_source_acquisition.py` | Real source acquisition: orchestrates 6 adapters, cross-adapter conflict detection, AcquisitionResult |
+| `venue_discovery_planner.py` | Query plan generation: per-pathway search terms + scenario constraints |
+| `venue_pool_discovery.py` | Pool discovery: fixture + live adapters → VenueCandidatePool |
+| `venue_candidate_identity.py` | Identity normalization, ISSN/name dedupe, conflict detection |
+| `venue_candidate_screening.py` | 7-axis candidate screening, evidence matrix builder |
 
 ### Storage (`src/kairoskopion/storage/`)
 
