@@ -6,6 +6,8 @@ import type {
   DisciplinaryPathway,
   VenueModel,
   PublicationRegimeModel,
+  MismatchMap,
+  QualityGateResult,
 } from '../types/domain';
 import { api } from '../api/client';
 import { StatusBar } from './StatusBar';
@@ -13,6 +15,9 @@ import { EvidenceDrawer } from './EvidenceDrawer';
 import { IntakeSurface } from './IntakeSurface';
 import { ArticleCard } from './ArticleCard';
 import { VenueProfile } from './VenueProfile';
+import { ScenarioBuilder } from './ScenarioBuilder';
+import { MismatchMapView } from './MismatchMapView';
+import { QualityGateBar } from './QualityGateBar';
 
 interface Props {
   caseData: CaseDetail;
@@ -26,6 +31,8 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
   const [pathways, setPathways] = useState<DisciplinaryPathway[]>([]);
   const [venueModel, setVenueModel] = useState<VenueModel | null>(null);
   const [pubRegime, setPubRegime] = useState<PublicationRegimeModel | undefined>(undefined);
+  const [mismatchMap, setMismatchMap] = useState<MismatchMap | null>(null);
+  const [qualityGates, setQualityGates] = useState<Record<string, QualityGateResult>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -112,6 +119,42 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
     }
   }, [caseId, onCaseUpdate]);
 
+  // --- Scenario ---
+
+  const handleSetScenario = useCallback(async (data: Record<string, unknown>) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await api.setScenario(caseId, data);
+      setActiveView('pathways');
+      onCaseUpdate();
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [caseId, onCaseUpdate]);
+
+  // --- Mismatch map ---
+
+  const loadMismatchMap = useCallback(async () => {
+    try {
+      const result = await api.getMismatchMap(caseId);
+      if ('mismatches' in result && Array.isArray(result.mismatches) && result.mismatches.length > 0) {
+        setMismatchMap(result as MismatchMap);
+      }
+    } catch { /* not available yet */ }
+  }, [caseId]);
+
+  // --- Quality gates ---
+
+  const loadQualityGates = useCallback(async () => {
+    try {
+      const gates = await api.getQualityGates(caseId);
+      setQualityGates(gates);
+    } catch { /* not available */ }
+  }, [caseId]);
+
   // --- Render view ---
 
   const renderView = () => {
@@ -171,12 +214,24 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
 
       case 'scenario':
         return (
-          <div className="placeholder-view">
-            <h2>Scenario Builder</h2>
-            <p>Publication goal, constraints, and trajectory settings.</p>
-            <p className="placeholder-note">Phase 2</p>
-          </div>
+          <ScenarioBuilder
+            onSubmit={handleSetScenario}
+            isLoading={isLoading}
+            hasArticleModel={!!articleModel || !!caseData.article_model_id}
+          />
         );
+
+      case 'fit_assessed':
+        if (!mismatchMap) {
+          return (
+            <div className="loading-view">
+              <button className="btn btn-primary" onClick={loadMismatchMap}>
+                Load Mismatch Map
+              </button>
+            </div>
+          );
+        }
+        return <MismatchMapView mismatchMap={mismatchMap} />;
 
       case 'pathways':
         if (pathways.length === 0) {
@@ -250,6 +305,10 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
           <span>{error}</span>
           <button onClick={() => setError(null)} aria-label="Dismiss error">&times;</button>
         </div>
+      )}
+
+      {Object.keys(qualityGates).length > 0 && (
+        <QualityGateBar gates={qualityGates} />
       )}
 
       <div className="workspace-body">
