@@ -1,16 +1,18 @@
 import { useState, useCallback } from 'react';
 import type {
   CaseDetail,
-  CaseStage,
   ArticleModel,
   EvidenceDetail,
   DisciplinaryPathway,
+  VenueModel,
+  PublicationRegimeModel,
 } from '../types/domain';
 import { api } from '../api/client';
 import { StatusBar } from './StatusBar';
 import { EvidenceDrawer } from './EvidenceDrawer';
 import { IntakeSurface } from './IntakeSurface';
 import { ArticleCard } from './ArticleCard';
+import { VenueProfile } from './VenueProfile';
 
 interface Props {
   caseData: CaseDetail;
@@ -22,6 +24,8 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const [articleModel, setArticleModel] = useState<ArticleModel | null>(null);
   const [pathways, setPathways] = useState<DisciplinaryPathway[]>([]);
+  const [venueModel, setVenueModel] = useState<VenueModel | null>(null);
+  const [pubRegime, setPubRegime] = useState<PublicationRegimeModel | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,8 +50,14 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
         const am = await api.getArticleModel(caseId);
         setArticleModel(am);
         setActiveView('article_model');
+      } else if (result.venue_investigated) {
+        const venueResult = await api.getInvestigatedVenue(caseId);
+        setVenueModel(venueResult.venue);
+        setPubRegime(venueResult.publication_regime);
+        setActiveView('venue_investigation');
       }
       onCaseUpdate();
+      return result;
     } catch (e) {
       handleError(e);
     } finally {
@@ -135,12 +145,36 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
           />
         );
 
+      case 'venue_investigation':
+        if (!venueModel) {
+          return (
+            <div className="loading-view">
+              <button className="btn btn-primary" onClick={async () => {
+                try {
+                  const result = await api.getInvestigatedVenue(caseId);
+                  setVenueModel(result.venue);
+                  setPubRegime(result.publication_regime);
+                } catch { setActiveView('intake'); }
+              }}>
+                Load Venue Profile
+              </button>
+            </div>
+          );
+        }
+        return (
+          <VenueProfile
+            venue={venueModel}
+            regime={pubRegime}
+            onEvidenceClick={handleEvidenceClick}
+          />
+        );
+
       case 'scenario':
         return (
           <div className="placeholder-view">
             <h2>Scenario Builder</h2>
             <p>Publication goal, constraints, and trajectory settings.</p>
-            <p className="placeholder-note">Phase 2 — coming next.</p>
+            <p className="placeholder-note">Phase 2</p>
           </div>
         );
 
@@ -205,22 +239,19 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
 
   return (
     <div className="case-workspace">
-      {/* Status bar */}
       <StatusBar
         currentStage={caseData.stage}
         objectsPresent={caseData.objects_present}
         onStageClick={handleStageClick}
       />
 
-      {/* Error banner */}
       {error && (
         <div className="error-banner" role="alert">
           <span>{error}</span>
-          <button onClick={() => setError(null)} aria-label="Dismiss error">×</button>
+          <button onClick={() => setError(null)} aria-label="Dismiss error">&times;</button>
         </div>
       )}
 
-      {/* Main layout: center + evidence drawer */}
       <div className="workspace-body">
         <main className="workspace-center">
           {renderView()}

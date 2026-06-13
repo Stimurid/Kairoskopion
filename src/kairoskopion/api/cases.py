@@ -17,6 +17,7 @@ from ..schema import (
     DisciplinaryPathway,
     FitAssessment,
     MismatchMap,
+    PublicationRegimeModel,
     RewritePlan,
     CitationPlan,
     RiskReport,
@@ -67,6 +68,8 @@ class Case:
         self.rewrite_plan: RewritePlan | None = None
         self.citation_plan: CitationPlan | None = None
         self.risk_report: RiskReport | None = None
+        self.publication_regime: PublicationRegimeModel | None = None
+        self.investigated_venue: VenueModel | None = None
 
         self.decision_log: list[dict[str, Any]] = []
         self.quality_gates: dict[str, dict[str, Any]] = {}
@@ -125,11 +128,17 @@ class Case:
 
         if self.input_type in ("article", "abstract", "manuscript"):
             self._build_article_model()
+        elif self.input_type == "venue":
+            try:
+                self.investigate_venue(text)
+            except Exception:
+                pass
 
         return {
             "input_type": self.input_type,
             "text_length": len(text),
             "article_model_built": self.article_model is not None,
+            "venue_investigated": self.investigated_venue is not None,
             "stage": self.stage.value,
         }
 
@@ -144,6 +153,21 @@ class Case:
 
         from ..services.article_enrichment import build_article_semantic_profile
         self.semantic_profile = build_article_semantic_profile(self.article_model)
+
+    # -- Venue investigation --
+
+    def investigate_venue(self, text: str) -> dict[str, Any]:
+        from ..services.venue_profiling import build_venue_model
+        venue, regime = build_venue_model(text)
+        self.investigated_venue = venue
+        self.publication_regime = regime
+        self._log_decision("investigate_venue", {
+            "venue_name": venue.canonical_name,
+        })
+        return {
+            "venue": venue.to_dict(),
+            "publication_regime": regime.to_dict(),
+        }
 
     # -- Confirm article model --
 

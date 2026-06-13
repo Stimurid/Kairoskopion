@@ -156,6 +156,27 @@ class TestCaseDossier(unittest.TestCase):
         self.assertIn("semantic_profile", d)
 
 
+class TestCaseVenueInvestigation(unittest.TestCase):
+    def test_investigate_venue_text(self):
+        case = Case(title="Venue test")
+        result = case.investigate_venue(
+            "# Venue Seed Profile: Philosophy & Technology\n"
+            "- **ISSN:** 1234-5678\n"
+            "- **Scope:** Philosophy of technology and engineering\n"
+            "- **Review type:** Double-blind peer review\n"
+        )
+        self.assertIn("venue", result)
+        self.assertIsNotNone(case.investigated_venue)
+        self.assertEqual(len(case.decision_log), 1)
+        self.assertEqual(case.decision_log[0]["action"], "investigate_venue")
+
+    def test_intake_venue_auto_investigates(self):
+        case = Case()
+        result = case.intake_text("ISSN 1234-5678 author guidelines for this journal")
+        self.assertEqual(result["input_type"], "venue")
+        self.assertIn("venue_investigated", result)
+
+
 class TestCaseEvidence(unittest.TestCase):
     def test_evidence_returns_unknown_by_default(self):
         case = Case()

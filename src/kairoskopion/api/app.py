@@ -99,6 +99,35 @@ def intake_text(case_id: str, req: IntakeTextRequest):
 
 
 # ---------------------------------------------------------------------------
+# Venue Investigation
+# ---------------------------------------------------------------------------
+
+class InvestigateVenueRequest(BaseModel):
+    text: str
+
+
+@app.post("/cases/{case_id}/investigate-venue")
+def investigate_venue(case_id: str, req: InvestigateVenueRequest):
+    case = store.get(case_id)
+    if not case:
+        raise HTTPException(404, f"Case {case_id} not found")
+    return case.investigate_venue(req.text)
+
+
+@app.get("/cases/{case_id}/investigated-venue")
+def get_investigated_venue(case_id: str):
+    case = store.get(case_id)
+    if not case:
+        raise HTTPException(404, f"Case {case_id} not found")
+    if not case.investigated_venue:
+        raise HTTPException(404, "No venue investigated yet")
+    result: dict = {"venue": case.investigated_venue.to_dict()}
+    if case.publication_regime:
+        result["publication_regime"] = case.publication_regime.to_dict()
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Article Model
 # ---------------------------------------------------------------------------
 

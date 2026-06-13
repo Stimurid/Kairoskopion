@@ -1,17 +1,42 @@
 import { useState } from 'react';
 
+interface IntakeResult {
+  input_type: string;
+  text_length: number;
+  article_model_built: boolean;
+  venue_investigated?: boolean;
+}
+
 interface Props {
-  onSubmit: (text: string, inputType: string) => void;
+  onSubmit: (text: string, inputType: string) => Promise<IntakeResult | void>;
   isLoading: boolean;
 }
+
+const TYPE_LABELS: Record<string, string> = {
+  auto: 'Auto-detect',
+  article: 'Article / Abstract',
+  venue: 'Journal / Venue',
+  review_letter: 'Review Letter',
+};
+
+const TYPE_ICONS: Record<string, string> = {
+  abstract: 'Abstract detected',
+  manuscript: 'Manuscript detected',
+  article: 'Article text detected',
+  venue: 'Venue / journal text detected',
+  review_letter: 'Review letter detected',
+};
 
 export function IntakeSurface({ onSubmit, isLoading }: Props) {
   const [text, setText] = useState('');
   const [inputType, setInputType] = useState('auto');
+  const [lastResult, setLastResult] = useState<IntakeResult | null>(null);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!text.trim()) return;
-    onSubmit(text.trim(), inputType);
+    setLastResult(null);
+    const result = await onSubmit(text.trim(), inputType);
+    if (result) setLastResult(result);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -37,10 +62,7 @@ export function IntakeSurface({ onSubmit, isLoading }: Props) {
             role="radio"
             aria-checked={inputType === t}
           >
-            {t === 'auto' ? 'Auto-detect' :
-             t === 'article' ? 'Article / Abstract' :
-             t === 'venue' ? 'Journal / Venue' :
-             'Review Letter'}
+            {TYPE_LABELS[t]}
           </button>
         ))}
       </div>
@@ -68,6 +90,25 @@ export function IntakeSurface({ onSubmit, isLoading }: Props) {
           {isLoading ? 'Analyzing...' : 'Analyze'}
         </button>
       </div>
+
+      {lastResult && (
+        <div className="intake-result" role="status">
+          <span className="intake-result-type">
+            {TYPE_ICONS[lastResult.input_type] || `Detected: ${lastResult.input_type}`}
+          </span>
+          <span className="intake-result-length">{lastResult.text_length} chars</span>
+          {lastResult.article_model_built && (
+            <span className="intake-result-badge intake-result-badge--success">
+              Article model built
+            </span>
+          )}
+          {lastResult.venue_investigated && (
+            <span className="intake-result-badge intake-result-badge--success">
+              Venue profile built
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

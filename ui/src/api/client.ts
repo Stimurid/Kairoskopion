@@ -48,6 +48,7 @@ import type {
   EvidenceDetail,
   DecisionLogEntry,
   Dossier,
+  VenueInvestigationResult,
 } from '../types/domain';
 
 export const api = {
@@ -61,10 +62,16 @@ export const api = {
 
   // Intake
   intakeText: (id: string, text: string, inputType = 'auto') =>
-    post<{ input_type: string; text_length: number; article_model_built: boolean; stage: string }>(
+    post<{ input_type: string; text_length: number; article_model_built: boolean; venue_investigated: boolean; stage: string }>(
       `/cases/${id}/intake/text`,
       { text, input_type: inputType },
     ),
+
+  // Venue investigation
+  investigateVenue: (id: string, text: string) =>
+    post<VenueInvestigationResult>(`/cases/${id}/investigate-venue`, { text }),
+  getInvestigatedVenue: (id: string) =>
+    get<VenueInvestigationResult>(`/cases/${id}/investigated-venue`),
 
   // Article
   getArticleModel: (id: string) => get<ArticleModel>(`/cases/${id}/article-model`),

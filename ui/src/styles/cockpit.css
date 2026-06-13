@@ -812,3 +812,260 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ==========================================================================
+   Phase 1 — Intake result, Editable fields, Venue Profile, Evidence Drawer
+   ========================================================================== */
+
+/* --- Intake result feedback --- */
+
+.intake-result {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+}
+
+.intake-result-type {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.intake-result-length {
+  color: var(--text-muted);
+}
+
+.intake-result-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+.intake-result-badge--success {
+  color: var(--color-success);
+  background: rgba(52, 199, 123, 0.15);
+}
+
+/* --- Editable field rows --- */
+
+.field-value--editable {
+  cursor: pointer;
+  border-bottom: 1px dashed var(--text-muted);
+  transition: border-color 0.15s;
+}
+
+.field-value--editable:hover {
+  border-bottom-color: var(--color-primary);
+  color: var(--text-primary);
+}
+
+.field-edit-input {
+  flex: 1;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-input);
+  border: 1px solid var(--border-focus);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  outline: none;
+}
+
+.field-edit-input:focus {
+  box-shadow: 0 0 0 2px rgba(91, 127, 255, 0.3);
+}
+
+/* --- Corrections banner --- */
+
+.corrections-banner {
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(91, 127, 255, 0.1);
+  border: 1px solid rgba(91, 127, 255, 0.3);
+  border-radius: var(--radius);
+  color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-md);
+}
+
+/* --- Venue Profile --- */
+
+.venue-profile {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-lg);
+}
+
+.venue-profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border);
+}
+
+.venue-name {
+  font-size: var(--font-size-xl);
+}
+
+.venue-section {
+  margin-bottom: var(--space-lg);
+}
+
+.venue-section h3 {
+  font-size: var(--font-size-md);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+.venue-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.indexing-claims {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.indexing-claim {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-raised);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+.claim-db {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.venue-unknowns {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-md);
+}
+
+.venue-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+/* --- Enhanced Evidence Drawer --- */
+
+.drawer-field-path {
+  padding: var(--space-sm) 0;
+  margin-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.drawer-entity {
+  color: var(--color-info);
+}
+
+.drawer-sep {
+  color: var(--text-muted);
+}
+
+.drawer-field-name {
+  color: var(--text-primary);
+}
+
+.drawer-status-section {
+  margin-bottom: var(--space-md);
+}
+
+.drawer-explanation {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  margin-top: var(--space-xs);
+  line-height: 1.5;
+}
+
+.drawer-confidence {
+  font-weight: 500;
+}
+
+.drawer-source-section {
+  margin: var(--space-md) 0;
+}
+
+.drawer-source-preview {
+  margin-top: var(--space-xs);
+  padding: var(--space-sm);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.drawer-conflict-section {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--badge-conflict-bg);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+}
+
+.drawer-conflict-section h4 {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.drawer-conflict-text {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+/* --- Badge legend (empty evidence drawer) --- */
+
+.drawer-legend {
+  margin-top: var(--space-xl);
+}
+
+.drawer-legend h4 {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-sm);
+}
+
+.legend-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}

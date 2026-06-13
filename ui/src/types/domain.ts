@@ -267,6 +267,31 @@ export interface DecisionLogEntry {
   timestamp: string;
 }
 
+// --- Publication Regime ---
+
+export interface PublicationRegimeModel {
+  publication_regime_id: string;
+  venue_model_id: string;
+  regime_type: string;
+  review_type: string;
+  typical_review_rounds: number;
+  typical_turnaround_weeks: string;
+  article_types_supported: string[];
+  special_issues_active: boolean;
+  submission_system: string;
+  formatting_strictness: string;
+  unknowns: string[];
+  confidence: string;
+  lifecycle_status: LifecycleStatus;
+}
+
+// --- Venue Investigation Result ---
+
+export interface VenueInvestigationResult {
+  venue: VenueModel;
+  publication_regime?: PublicationRegimeModel;
+}
+
 // --- Dossier ---
 
 export interface Dossier {
