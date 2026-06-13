@@ -68,6 +68,7 @@ from .ids import (
     citation_expectation_profile_id,
     disciplinary_pathway_id,
     editorial_board_profile_id,
+    field_position_id,
     published_article_corpus_id,
 )
 
@@ -892,6 +893,206 @@ class PublishedArticleCorpus(_DictMixin):
     average_word_count: int | None = _field()
     average_reference_count: int | None = _field()
     language_distribution: list[dict[str, Any]] = _list()
+    unknowns: list[str] = _list()
+    confidence: str | None = _field()
+    evidence_refs: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+# ---------------------------------------------------------------------------
+# FieldPositionModel — unified coordinate system (articles + venues)
+# ---------------------------------------------------------------------------
+
+@dc.dataclass
+class DisciplineVector(_DictMixin):
+    """Weighted vector of disciplinary membership (0.0–1.0 per dimension)."""
+    components: dict[str, float] = _dict()
+
+@dc.dataclass
+class DisciplineEnvelope(_DictMixin):
+    """Range [min, max] per discipline dimension — venue's accepted region."""
+    ranges: dict[str, list[float]] = _dict()
+
+@dc.dataclass
+class SchoolAffiliationVector(_DictMixin):
+    """Weighted vector of school/tradition membership."""
+    components: dict[str, float] = _dict()
+
+@dc.dataclass
+class SchoolEnvelope(_DictMixin):
+    """Range [min, max] per school dimension — venue's published range."""
+    ranges: dict[str, list[float]] = _dict()
+
+@dc.dataclass
+class CitationNetworkSignature(_DictMixin):
+    """Citation topology: who is cited, who is absent, who is avoided."""
+    must_cite: list[str] = _list()
+    typically_cite: list[str] = _list()
+    never_cite: list[str] = _list()
+    conspicuous_absence: list[str] = _list()
+    bridge_traditions: list[str] = _list()
+    self_citation_norm: str | None = _field()
+
+@dc.dataclass
+class OpponentsAndFoils(_DictMixin):
+    """Intellectual opponents — explicit and implicit."""
+    explicit_opponents: list[str] = _list()
+    implicit_foils: list[str] = _list()
+    published_polemics: list[str] = _list()
+    avoided_polemics: list[str] = _list()
+
+@dc.dataclass
+class ArgumentMoveVector(_DictMixin):
+    """Weighted vector of argument move types (12 types, 0.0–1.0 each)."""
+    components: dict[str, float] = _dict()
+
+@dc.dataclass
+class ArgumentMoveEnvelope(_DictMixin):
+    """Range [min, max] per argument move type — venue's accepted range."""
+    ranges: dict[str, list[float]] = _dict()
+
+@dc.dataclass
+class NoveltyProfile(_DictMixin):
+    """How the entity positions novelty."""
+    mode: str | None = _field()
+    novelty_claim_strength: float | None = _field()
+    builds_on_or_opposes: str | None = _field()
+
+@dc.dataclass
+class EvidenceTypeProfile(_DictMixin):
+    """Weighted distribution of evidence/data types used."""
+    components: dict[str, float] = _dict()
+
+@dc.dataclass
+class MethodStance(_DictMixin):
+    """Methodological positioning."""
+    explicit_method: bool | None = _field()
+    method_family: str | None = _field()
+    method_specificity: str | None = _field()
+    empirical_component: bool | None = _field()
+    requires_explicit_method: bool | None = _field()
+    accepted_method_families: list[str] = _list()
+    rejected_method_families: list[str] = _list()
+
+@dc.dataclass
+class AudienceLevel(_DictMixin):
+    """Audience expertise and accessibility."""
+    expertise_required: str | None = _field()
+    presupposed_knowledge: list[str] = _list()
+    accessibility_index: float | None = _field()
+
+@dc.dataclass
+class LanguageRegister(_DictMixin):
+    """Language, register, jargon density, expected length."""
+    language: str | None = _field()
+    register: str | None = _field()
+    jargon_density: float | None = _field()
+    expected_word_count_min: int | None = _field()
+    expected_word_count_max: int | None = _field()
+
+@dc.dataclass
+class GenrePosition(_DictMixin):
+    """Genre classification and formality."""
+    genre: str | None = _field()
+    genre_formality: float | None = _field()
+    sections_expected: list[str] = _list()
+
+@dc.dataclass
+class GeographicAffinity(_DictMixin):
+    """Geographic and regional positioning."""
+    author_region: str | None = _field()
+    intellectual_tradition_region: str | None = _field()
+    target_audience_region: str | None = _field()
+    language_of_publication: str | None = _field()
+    editorial_board_regions: dict[str, float] = _dict()
+    author_regions_published: dict[str, float] = _dict()
+    anglophone_hegemony_index: float | None = _field()
+
+@dc.dataclass
+class InstitutionalSignals(_DictMixin):
+    """Institutional context: prestige, indexing, access model."""
+    prestige_tier: str | None = _field()
+    indexing: list[str] = _list()
+    open_access: str | None = _field()
+    apc_range_usd_min: int | None = _field()
+    apc_range_usd_max: int | None = _field()
+    review_model: str | None = _field()
+    typical_decision_weeks: int | None = _field()
+
+@dc.dataclass
+class TemporalPosition(_DictMixin):
+    """Temporal characteristics of reference base and field."""
+    recency_of_core_references: str | None = _field()
+    median_reference_year: int | None = _field()
+    reference_time_depth_years: int | None = _field()
+    field_maturity: str | None = _field()
+
+@dc.dataclass
+class ArticleReadiness(_DictMixin):
+    """Article-specific: manuscript stage and completeness."""
+    manuscript_stage: str | None = _field()
+    completeness: float | None = _field()
+    word_count: int | None = _field()
+    has_abstract: bool | None = _field()
+    has_bibliography: bool | None = _field()
+    has_methods_section: bool | None = _field()
+    formal_compliance_score: float | None = _field()
+
+@dc.dataclass
+class SubdisciplineAddress(_DictMixin):
+    """Hierarchical address within the primary discipline."""
+    primary: str | None = _field()
+    niche: str | None = _field()
+    working_area: str | None = _field()
+
+
+@dc.dataclass
+class FieldPositionModel(_DictMixin):
+    """Unified coordinate model for articles AND venues in the same space.
+
+    An article is a point (or compact region) in this space.
+    A venue is an extended region (envelope) in the same space.
+    Fit = containment / distance of article point within venue envelope.
+    """
+    field_position_id: str = dc.field(default_factory=field_position_id)
+    entity_type: str = "article"
+    entity_id: str | None = _field()
+
+    # Group 1: Disciplinary positioning
+    discipline_vector: dict[str, float] = _dict()
+    discipline_envelope: dict[str, list[float]] | None = _field()
+    subdiscipline_address: dict[str, str] = _dict()
+
+    # Group 2: Camp/Tribe positioning
+    school_affiliation_vector: dict[str, float] = _dict()
+    school_envelope: dict[str, list[float]] | None = _field()
+    citation_network_signature: dict[str, Any] = _dict()
+    opponents_and_foils: dict[str, Any] = _dict()
+
+    # Group 3: Argument profile
+    argument_move_vector: dict[str, float] = _dict()
+    argument_move_envelope: dict[str, list[float]] | None = _field()
+    novelty_mode: dict[str, Any] = _dict()
+    evidence_type_profile: dict[str, float] = _dict()
+
+    # Group 4: Method
+    method_stance: dict[str, Any] = _dict()
+    formalization_level: float | None = _field()
+
+    # Group 5: Audience & Register
+    audience_level: dict[str, Any] = _dict()
+    language_register: dict[str, Any] = _dict()
+    genre_position: dict[str, Any] = _dict()
+
+    # Group 6: Geo & Institutional
+    geographic_affinity: dict[str, Any] = _dict()
+    institutional_signals: dict[str, Any] = _dict()
+
+    # Group 7: Temporal & Readiness
+    temporal_position: dict[str, Any] = _dict()
+    article_readiness: dict[str, Any] | None = _field()
+
+    # Meta
     unknowns: list[str] = _list()
     confidence: str | None = _field()
     evidence_refs: list[str] = _list()

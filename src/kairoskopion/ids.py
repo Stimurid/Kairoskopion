@@ -196,3 +196,7 @@ def venue_candidate_screening_id() -> str:
 
 def candidate_evidence_matrix_id() -> str:
     return generate_id("cmat")
+
+
+def field_position_id() -> str:
+    return generate_id("fpos")
