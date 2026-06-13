@@ -6,11 +6,30 @@
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `main` |
-| Tag | `v0.2.0-alpha-rc12` |
+| Branch | `main` (merge target: `feature/ui-cockpit-v0`) |
+| Tag | `v0.2.0-alpha-rc15` (pending) |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
 | Working tree | clean |
 | Python | >=3.11 |
+| Node.js | >=18 (for UI build) |
+
+## UI Cockpit v0 (Operator/Staging Preview)
+
+> **This is an internal operator/staging preview, NOT a public product release.**
+> Deterministic backend fallbacks are still in use. Persistence is in-memory only.
+> Auth, job queue, and production hardening are NOT implemented.
+> Staging deployment must be protected (IP-restricted or auth-gated).
+> No public prod claim.
+
+- FastAPI backend: 19 REST endpoints covering full Case pipeline
+- React + TypeScript frontend: 17 components, dark theme, responsive layout
+- Pipeline continuity: select_venue triggers fit → mismatch → rewrite chain
+- Quality gates populated after stage transitions
+- Evidence badge system (FACT, CLAIM, CORPUS, INFERRED, USER, UNKNOWN, STALE, CONFLICT)
+- API smoke test: 18/18 PASS, 1 SKIP (expected)
+- Browser smoke: all views render, zero console errors, mobile responsive at 375px
+- Frontend build: `tsc --noEmit` clean, `vite build` clean
+- Backend: 1275 pytest tests passing (4 deselected = network)
 
 ## Recent commit history (main)
 
@@ -42,6 +61,7 @@ evidence-first article-to-venue trajectory engine.
 - Source Authority Model v0: SourceAccessMode/SourceAuthorityScope enums, SourceAuthorityClaim/SourceAuthorityAssessment models, authority checker service, EvidenceAuditor integration, 53 tests
 - Real Source Acquisition v0: 6 venue adapters (OpenAlex, Crossref, DOAJ, Unpaywall, OpenCitations, Snapshot) with authority enforcement at adapter boundary, cross-adapter conflict detection, aggregation service, 3 new CLI commands, 67 tests
 - Real Venue Pool Discovery v0: discovery pipeline (query planner, fixture pool discovery, identity normalization/dedupe, candidate screening), 3 new enums, 5 new schema models, 4 new services, VenueDiscoveryAgent rewrite, 3 new CLI commands, UC-1 workflow update, 58 tests
+- UI Cockpit v0: FastAPI REST API (19 endpoints), React+TypeScript frontend (17 components), pipeline continuity (select_venue → fit chain), quality gates, evidence badges, responsive dark theme, API smoke test, 188 backend tests — operator/staging preview only, not public product
 
 ## Modules implemented
 
@@ -65,6 +85,8 @@ evidence-first article-to-venue trajectory engine.
 | `decisions.py` | User decision tracking |
 | `cards.py` | 8 markdown card generators |
 | `cli.py` | CLI: 34 commands (31 existing + plan-venue-discovery, discover-venue-pool, screen-venue-candidates) |
+| `api/app.py` | FastAPI app: CORS, health, case CRUD, pipeline endpoints (operator/staging preview) |
+| `api/cases.py` | Case orchestrator: in-memory pipeline state, 19 REST routes |
 
 ### Demo (`src/kairoskopion/demo/`)
 
@@ -276,7 +298,7 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **1068 tests**, all passing (58 new in venue pool discovery v0, 67 in real source acquisition v0, 53 in source authority model v0, 35 in UC-1 Demo Pack v0)
+- **1275 tests**, all passing (188 new in UI Cockpit v0, 58 in venue pool discovery v0, 67 in real source acquisition v0, 53 in source authority model v0, 35 in UC-1 Demo Pack v0)
 - 50+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,
@@ -333,4 +355,6 @@ The system can:
 10. Display results via CLI
 11. Run a full UC-1 offline demo (12-step pipeline, 16 artifact files, reproducible report)
 
-All without network access, LLM calls, or external dependencies.
+11. Expose all of the above through a REST API and operator-facing web cockpit (staging preview only)
+
+All without network access, LLM calls, or external dependencies (UI requires Node.js for build).

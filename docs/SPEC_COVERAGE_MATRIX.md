@@ -139,7 +139,10 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 
 | Spec area | Required capability | Status | Evidence | Missing | Priority | Sprint |
 |-----------|-------------------|--------|----------|---------|----------|--------|
-| §94–115 UI surfaces | Telegram, Web, evidence panels, human decisions | Deferred | CLI only | No Telegram, no Web UI | P3 | Much later |
+| §94–96 Web cockpit | Operator-facing web UI for Case pipeline | Partial | `ui/` (17 React components), `src/kairoskopion/api/` (FastAPI, 19 endpoints) | Staging preview only; no auth, no persistence, no job queue | P1 | UI Cockpit v0 |
+| §97–100 Evidence panels | Evidence badges, drawer, per-field provenance | Partial | `EvidenceBadge.tsx`, `EvidenceDrawer.tsx` (8 badge types: FACT, CLAIM, CORPUS, INFERRED, USER, UNKNOWN, STALE, CONFLICT) | Per-field evidence not wired to all views | P2 | — |
+| §101–105 Human decisions | Accept/reject/defer in AdaptationStudio | Partial | `AdaptationStudio.tsx`, `RewriteTaskCard.tsx`, `DecisionLog.tsx` | No persistent decision storage; in-memory only | P2 | — |
+| §106–115 Telegram, advanced UI | Telegram bot, reviewer simulation UI | Deferred | — | Not implemented | P3 | Much later |
 
 ## Wave 8 — Evaluation & Quality Gates (§116–130)
 
@@ -178,17 +181,17 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 
 | Status | Count | % of spec areas |
 |--------|-------|-----------------|
-| Implemented | 48 | 62% |
-| Partial | 14 | 18% |
+| Implemented | 48 | 60% |
+| Partial | 17 | 21% |
 | Stub | 2 | 3% |
 | Planned | 10 | 13% |
 | Deferred | 2 | 3% |
 | Rejected | 0 | 0% |
-| **Total tracked** | **77** | — |
+| **Total tracked** | **80** | — |
 
 ### What is solid
 
-- Core formula pipeline (18 steps, 782 tests)
+- Core formula pipeline (18 steps, 1275 tests)
 - Evidence status taxonomy (11 statuses)
 - Multi-axis fit (12 axes, no single score)
 - Risk report (18 risk types)
@@ -203,7 +206,9 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 - JSONL persistence (17+ registries)
 - Vault markdown cards with cross-links, indexes, manifest
 - Export/import bundles, freshness tracking, quality gates
-- CLI (23 commands)
+- CLI (34 commands)
+- FastAPI REST API (19 endpoints, operator/staging preview)
+- React+TypeScript web cockpit (17 components, dark theme, responsive)
 - Agent contract with dual execution (deterministic + LLM)
 - Agent registry (26 specs, 7 layers)
 - Workflow orchestrator with 4 workflow specs
@@ -215,7 +220,7 @@ Priority: P0 = blocking next milestone, P1 = next sprint candidate, P2 = mid-ter
 - **Review layer agents** are contract-only stubs (6 agents, LLM required): P2
 - **No LLM execution paths exercised in tests**: P2
 - **No parallel workflow orchestration**: P2
-- **No UI beyond CLI**: P3, explicitly deferred
+- **UI Cockpit is staging preview only**: no auth, no persistent storage, no job queue, no production hardening — P1 for production readiness
 - **No ReviewLoop** entities (ReviewOutcome, RevisionPlan, VenueMemory): P3
 - **No JournalModel/SectionModel/IssueModel** sub-entities: P2
 - **No live Litops/WhiteCrow API** — export bridges only: P3

@@ -133,13 +133,28 @@ For deep spec questions, read:
 - Stop on true blockers (auth failure, conflict, missing spec, broken env).
 - Do not stop on ordinary engineering decisions within the given frame.
 
+## UI Cockpit v0 (Operator/Staging Preview)
+
+> **This is an internal operator/staging preview, NOT a public product release.**
+> Deterministic backend fallbacks are still in use. Persistence is in-memory only.
+> Auth, job queue, and production hardening are NOT implemented.
+> Staging deployment must be protected (IP-restricted or auth-gated).
+> No public prod claim.
+
+- **Backend:** FastAPI (`src/kairoskopion/api/`), 19 REST endpoints, in-memory Case orchestrator
+- **Frontend:** React + TypeScript (`ui/`), Vite build, 17 components, dark theme, responsive
+- **Run:** `uvicorn kairoskopion.api.app:app --reload` (port 8000) + `cd ui && npm run dev` (port 5173)
+- **Build:** `cd ui && npx tsc --noEmit && npx vite build`
+- **Env:** `VITE_API_URL` for frontend API base (defaults to `http://localhost:8000`)
+
 ## Tech stack
 
 - Python >=3.11, setuptools
-- No external runtime dependencies (dev: pytest, pytest-cov)
+- FastAPI + uvicorn (API layer, staging preview)
+- React + TypeScript + Vite (UI cockpit, staging preview)
+- No external runtime dependencies beyond above (dev: pytest, pytest-cov)
 - Console script: `kairoskopion`
-- No database — JSONL files + markdown vault
-- No web framework
+- No database — JSONL files + markdown vault (API uses in-memory state)
 - No LLM SDK (yet)
 
 ## Key file locations
@@ -158,6 +173,11 @@ For deep spec questions, read:
 | `src/kairoskopion/vault.py` | Vault indexes, manifest, cross-linking, link validation |
 | `src/kairoskopion/exchange.py` | Export/import storage bundles (zip) |
 | `src/kairoskopion/freshness.py` | Freshness/staleness tracking |
-| `tests/` | 1010+ tests |
+| `src/kairoskopion/api/app.py` | FastAPI app (staging preview) |
+| `src/kairoskopion/api/cases.py` | Case orchestrator (19 routes) |
+| `ui/` | React+TypeScript cockpit (17 components) |
+| `ui/src/api/client.ts` | Typed API client |
+| `ui/src/styles/cockpit.css` | Dark theme CSS |
+| `tests/` | 1275+ tests |
 | `tests/fixtures/` | Synthetic manuscript, venue, scenario |
 | `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` | Master spec |

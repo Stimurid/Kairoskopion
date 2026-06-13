@@ -6,6 +6,43 @@ Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.m
 
 ---
 
+## UI Cockpit v0 (Operator/Staging Preview) ✓ DONE (2026-06-13)
+
+**Goal:** Build an operator-facing web cockpit exposing the full Case pipeline through a REST API + React frontend. Wire pipeline continuity (select_venue → fit → mismatch → rewrite chain). This is an internal staging preview, NOT a public product.
+
+**Phases completed:**
+1. ✓ Branch `feature/ui-cockpit-v0` from main at `33ca31a` (rc14)
+2. ✓ FastAPI backend: app.py + cases.py (19 endpoints, in-memory Case orchestrator)
+3. ✓ React+TypeScript frontend scaffold (Vite, 17 components, dark theme)
+4. ✓ Phase 0: API layer + scaffold
+5. ✓ Phase 1: IntakeSurface, ArticleCard, VenueProfile, EvidenceDrawer
+6. ✓ Phase 2: ScenarioBuilder, MismatchMapView, QualityGateBar
+7. ✓ Phase 3: PathwayMap, VenuePoolBoard, VenueCandidateCard
+8. ✓ Phase 4: AdaptationStudio, RewriteTaskCard, decision flow
+9. ✓ Phase 5-6: DecisionLog, DossierView
+10. ✓ Phase 7: responsive breakpoints, Escape key, focus styles
+11. ✓ Pipeline continuity: select_venue triggers fit/mismatch/rewrite chain
+12. ✓ Quality gates populated after stage transitions
+13. ✓ TypeScript build clean (tsc --noEmit + vite build)
+14. ✓ API smoke test: 18/18 PASS, 1 SKIP (expected)
+15. ✓ Browser smoke: all views render, zero console errors, mobile responsive
+16. ✓ Backend tests: 188 new (1275 total)
+
+**What this is NOT:** Public product, production deployment, database persistence, authentication, job queue, WebSocket progress, production CORS policy.
+
+**What docs must state:**
+- UI Cockpit v0 is operator/staging preview, not public product
+- Deterministic backend fallbacks still exist
+- Persistence/auth/job queue are not production-ready
+- Staging deployment must be protected
+- No public prod claim yet
+
+**Branch:** `feature/ui-cockpit-v0`
+**Tests added:** 188 new tests (1275 total, was 1068 + 19 from venue pool discovery on main)
+**Files:** 35 files, ~9700 lines added
+
+---
+
 ## Real Source Acquisition v0 + Adapter Authority Enforcement ✓ DONE (2026-06-13)
 
 **Goal:** Make the venue evidence stack capable of using real external source adapters in opt-in live/cached mode, while enforcing the Source Authority Model at the adapter boundary.

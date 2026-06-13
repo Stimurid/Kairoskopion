@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — UI Cockpit v0 (Operator/Staging Preview)
+
+> **This is an internal operator/staging preview, NOT a public product release.**
+> Deterministic backend fallbacks are still in use. Persistence is in-memory
+> (no database). Auth, job queue, and production hardening are NOT implemented.
+> Staging deployment must be protected (IP-restricted or auth-gated).
+
+### Added
+- **FastAPI backend** (`src/kairoskopion/api/`): REST API exposing the full Case pipeline
+  - `api/app.py` — FastAPI app with CORS, health endpoint, case CRUD, all pipeline routes
+  - `api/cases.py` — Case class: in-memory orchestrator for intake → article_model → scenario → pathways → venue_pool → select_venue → fit → mismatch → rewrite → adaptation → dossier
+  - 19 API endpoints: health, create/list/get/delete case, intake/text, article-model, article-model/confirm, scenario, pathways, discover-venues, venue-pool, select-venue/{id}, fit, mismatch-map, quality-gates, adaptation-plan, decisions, decision-log, dossier, evidence/{entity}/{field}
+- **React + TypeScript frontend** (`ui/`): Vite-based single-page cockpit
+  - 17 components: App, CaseWorkspace, StatusBar, IntakeSurface, ArticleCard, VenueProfile, ScenarioBuilder, PathwayMap, VenuePoolBoard, VenueCandidateCard, MismatchMapView, QualityGateBar, AdaptationStudio, RewriteTaskCard, DecisionLog, DossierView, EvidenceDrawer, EvidenceBadge
+  - API client (`ui/src/api/client.ts`): typed fetch wrapper, env-configurable VITE_API_URL
+  - Domain types (`ui/src/types/domain.ts`): 314 lines of TypeScript interfaces matching backend schema
+  - Evidence badge system: FACT, CLAIM, CORPUS, INFERRED, USER, UNKNOWN, STALE, CONFLICT
+  - Responsive layout: mobile breakpoint at 600px, Escape key handling, focus styles
+  - Dark theme CSS (`ui/src/styles/cockpit.css`): 2631 lines
+- **Pipeline continuity** (`api/cases.py`):
+  - `select_venue()` triggers full fit chain: assess_fit → build_mismatch_map → build_rewrite_plan
+  - VenueCandidate → VenueModel conversion for fit assessment
+  - Quality gates populated after each stage transition (confirm_article, set_scenario, discover_venues, select_venue)
+- **API smoke test** (`tests/smoke_api.py`): 19-endpoint test script
+- **Backend tests** (`tests/test_api_cases.py`): 188 new tests for Case API
+- `pyproject.toml`: added `fastapi`, `uvicorn[standard]` dependencies
+
+### Known limitations (UI Cockpit v0)
+- In-memory persistence only (no database, no cross-restart state)
+- No authentication or authorization
+- No job queue (all operations synchronous)
+- No WebSocket/SSE for progress updates
+- No production WSGI/ASGI hardening
+- CORS allows all origins (dev mode)
+- select_venue may skip fit chain if discovery fixtures don't match abstract topic
+
 ## [Unreleased] — Real Venue Pool Discovery v0
 
 ### Added
