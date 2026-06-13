@@ -342,3 +342,23 @@ def get_decision_log(case_id: str):
     if not case:
         raise HTTPException(404, f"Case {case_id} not found")
     return case.decision_log
+
+
+# ---------------------------------------------------------------------------
+# Static frontend (SPA) — serves built UI if dist/ exists
+# ---------------------------------------------------------------------------
+
+_frontend_dir = Path(__file__).resolve().parent.parent.parent.parent / "ui" / "dist"
+
+if _frontend_dir.is_dir():
+    from starlette.responses import FileResponse
+    from starlette.staticfiles import StaticFiles
+
+    app.mount("/assets", StaticFiles(directory=_frontend_dir / "assets"), name="static-assets")
+
+    @app.get("/{path:path}")
+    async def serve_spa(path: str):
+        file_path = _frontend_dir / path
+        if file_path.is_file() and ".." not in path:
+            return FileResponse(file_path)
+        return FileResponse(_frontend_dir / "index.html")
