@@ -142,4 +142,63 @@ export const api = {
 
   // Decision log
   getDecisionLog: (id: string) => get<DecisionLogEntry[]>(`/cases/${id}/decision-log`),
+
+  // Agent map
+  getAgentMap: () => get<AgentMapData>('/agents/map'),
 };
+
+// --- Agent Map types ---
+
+export interface AgentMapAgent {
+  role_id: string;
+  display_name: string;
+  layer: string;
+  implementation_status: string;
+  execution_mode: string;
+  prompt_family_ids: string[];
+  input_contract: Record<string, string>;
+  output_contract: Record<string, string>;
+  mvp_phase: string;
+  first_workflows: string[];
+  has_real_llm: boolean;
+  has_orphaned_prompt: boolean;
+}
+
+export interface AgentMapWorkflowStep {
+  step_index: number;
+  agent_role_id: string;
+  output_key: string;
+  input_keys: string[];
+  skip_if_missing: string[];
+  required: boolean;
+  description: string;
+}
+
+export interface AgentMapWorkflow {
+  workflow_id: string;
+  display_name: string;
+  description: string;
+  implementation_status: string;
+  steps: AgentMapWorkflowStep[];
+}
+
+export interface AgentMapPrompt {
+  family_id: string;
+  agent_role_id: string;
+  version: string;
+  system_prompt: string;
+  user_prompt_template: string;
+  system_prompt_lines: number;
+  user_prompt_lines: number;
+  output_schema_fields: string[];
+  purpose: string;
+  forbidden_behaviors?: string[];
+  evidence_requirements?: string[];
+}
+
+export interface AgentMapData {
+  agents: AgentMapAgent[];
+  workflows: AgentMapWorkflow[];
+  prompts: Record<string, AgentMapPrompt>;
+  llm: Record<string, unknown>;
+}

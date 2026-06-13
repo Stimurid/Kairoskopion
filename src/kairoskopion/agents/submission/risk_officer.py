@@ -1,9 +1,12 @@
-"""Risk Officer — wraps services/risk_reporting.py."""
+"""Risk Officer — LLM-backed risk analysis with deterministic fallback."""
 
 from __future__ import annotations
 
-from ..base_shell import missing_input_output, service_output
+import json
+
+from ..base_shell import llm_agent_output, missing_input_output, service_output, try_llm_call
 from ..contract import AgentInput, AgentOutput, AgentRole
+from ..prompt_families.risk_reporting import RISK_REPORTING_FAMILY
 from ...llm.provider import LLMProvider
 from ...schema import (
     ArticleModel, FitAssessment, MismatchMap,
@@ -16,7 +19,26 @@ class RiskOfficerAgent(AgentRole):
     role_id = "risk_officer"
 
     def execute(self, inp: AgentInput, provider: LLMProvider) -> AgentOutput:
-        return self.execute_deterministic(inp)
+        article_data = inp.entities.get("article")
+        venue_data = inp.entities.get("venue")
+        fit_data = inp.entities.get("fit_assessment")
+        mm_data = inp.entities.get("mismatch_map")
+
+        if not article_data or not venue_data:
+            return missing_input_output("RiskReport", "article, venue, and scenario")
+
+        result = try_llm_call(provider, RISK_REPORTING_FAMILY, {
+            "article_json": json.dumps(article_data, ensure_ascii=False, indent=2),
+            "venue_json": json.dumps(venue_data, ensure_ascii=False, indent=2),
+            "fit_json": json.dumps(fit_data or {}, ensure_ascii=False, indent=2),
+            "mismatch_json": json.dumps(mm_data or {}, ensure_ascii=False, indent=2),
+        })
+        if result is None:
+            return self.execute_deterministic(inp)
+
+        parsed, meta = result
+        warnings = RISK_REPORTING_FAMILY["validator"](parsed)
+        return llm_agent_output("RiskReport", parsed, meta, warnings)
 
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
         article_data = inp.entities.get("article")

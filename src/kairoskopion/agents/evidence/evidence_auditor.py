@@ -1,9 +1,12 @@
-"""Evidence Auditor — wraps services/evidence_audit.py."""
+"""Evidence Auditor — LLM-backed evidence audit with deterministic fallback."""
 
 from __future__ import annotations
 
-from ..base_shell import missing_input_output, service_output
+import json
+
+from ..base_shell import llm_agent_output, missing_input_output, service_output, try_llm_call
 from ..contract import AgentInput, AgentOutput, AgentRole
+from ..prompt_families.evidence_audit import EVIDENCE_AUDIT_FAMILY
 from ...llm.provider import LLMProvider
 from ...schema import (
     ArticleModel, ComplianceChecklist, FitAssessment,
@@ -16,7 +19,29 @@ class EvidenceAuditorAgent(AgentRole):
     role_id = "evidence_auditor"
 
     def execute(self, inp: AgentInput, provider: LLMProvider) -> AgentOutput:
-        return self.execute_deterministic(inp)
+        e = inp.entities
+        required = ["article", "venue", "fit_assessment", "mismatch_map",
+                     "risk_report", "compliance"]
+        missing = [k for k in required if not e.get(k)]
+        if missing:
+            return missing_input_output("QualityGateResult", ", ".join(missing))
+
+        entities_bundle = {k: e[k] for k in required}
+        sources = []
+        for key in required:
+            refs = e[key].get("evidence_refs", []) if isinstance(e[key], dict) else []
+            sources.extend(refs)
+
+        result = try_llm_call(provider, EVIDENCE_AUDIT_FAMILY, {
+            "entities_json": json.dumps(entities_bundle, ensure_ascii=False, indent=2),
+            "sources_json": json.dumps(list(set(sources)), ensure_ascii=False, indent=2),
+        })
+        if result is None:
+            return self.execute_deterministic(inp)
+
+        parsed, meta = result
+        warnings = EVIDENCE_AUDIT_FAMILY["validator"](parsed)
+        return llm_agent_output("QualityGateResult", parsed, meta, warnings)
 
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
         e = inp.entities

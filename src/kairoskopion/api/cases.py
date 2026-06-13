@@ -187,8 +187,28 @@ class Case:
 
         self.stage = CaseStage.ARTICLE_MODEL
 
-        from ..services.article_enrichment import build_article_semantic_profile
-        self.semantic_profile = build_article_semantic_profile(self.article_model)
+        # Semantic profile: try LLM agent, fall back to deterministic
+        provider = _get_llm_provider()
+        if provider is not None:
+            from ..agents.semantic_profiler import ArticleSemanticProfilerAgent
+            from ..agents.contract import AgentInput as _AI
+            sp_agent = ArticleSemanticProfilerAgent()
+            sp_inp = _AI(
+                operation_id="semantic_profile",
+                agent_role_id="article_semantic_profiler",
+                entities={"article": self.article_model.to_dict()},
+            )
+            try:
+                sp_out = sp_agent.execute(sp_inp, provider)
+                if sp_out.output_entity:
+                    self.semantic_profile = ArticleSemanticProfile.from_dict(sp_out.output_entity)
+                    logger.info("Semantic profile built via LLM")
+            except Exception as exc:
+                logger.warning("LLM semantic profiling failed, falling back: %s", exc)
+
+        if self.semantic_profile is None:
+            from ..services.article_enrichment import build_article_semantic_profile
+            self.semantic_profile = build_article_semantic_profile(self.article_model)
 
     # -- Venue investigation --
 
@@ -739,14 +759,36 @@ class Case:
 
 
 class CaseStore:
-    """In-memory case store.  Will migrate to file-based persistence later."""
+    """File-backed case store.  Each case is a JSON file under data_dir/cases/."""
 
-    def __init__(self):
+    def __init__(self, data_dir: str | None = None):
+        import os
+        from pathlib import Path
+        raw = data_dir or os.environ.get("KAIROSKOPION_DATA_DIR") or ".kairoskopion"
+        self._dir = Path(raw) / "cases"
+        self._dir.mkdir(parents=True, exist_ok=True)
         self._cases: dict[str, Case] = {}
+        self._load_all()
+
+    def _case_path(self, case_id: str):
+        from pathlib import Path
+        return self._dir / f"{case_id}.json"
+
+    def _load_all(self):
+        import json, logging
+        logger = logging.getLogger(__name__)
+        for p in sorted(self._dir.glob("*.json")):
+            try:
+                data = json.loads(p.read_text(encoding="utf-8"))
+                case = _case_from_snapshot(data)
+                self._cases[case.case_id] = case
+            except Exception as exc:
+                logger.warning("Failed to load case %s: %s", p.name, exc)
 
     def create(self, title: str = "") -> Case:
         case = Case(title=title)
         self._cases[case.case_id] = case
+        self._persist(case)
         return case
 
     def get(self, case_id: str) -> Case | None:
@@ -756,10 +798,119 @@ class CaseStore:
         return list(self._cases.values())
 
     def delete(self, case_id: str) -> bool:
-        return self._cases.pop(case_id, None) is not None
+        removed = self._cases.pop(case_id, None)
+        if removed is not None:
+            path = self._case_path(case_id)
+            path.unlink(missing_ok=True)
+            return True
+        return False
 
     def save(self, case: Case):
         self._cases[case.case_id] = case
+        self._persist(case)
+
+    def _persist(self, case: Case):
+        import json, logging
+        logger = logging.getLogger(__name__)
+        path = self._case_path(case.case_id)
+        snapshot = _case_to_snapshot(case)
+        try:
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(
+                json.dumps(snapshot, ensure_ascii=False, default=str, indent=2),
+                encoding="utf-8",
+            )
+            tmp.replace(path)
+        except Exception as exc:
+            logger.error("Failed to persist case %s: %s", case.case_id, exc)
+
+
+def _case_to_snapshot(case: Case) -> dict[str, Any]:
+    """Serialize full Case state to a JSON-safe dict."""
+    snap: dict[str, Any] = {
+        "case_id": case.case_id,
+        "title": case.title,
+        "created_at": case.created_at,
+        "stage": case.stage.value if isinstance(case.stage, CaseStage) else case.stage,
+        "input_text": case.input_text,
+        "input_type": case.input_type,
+        "decision_log": case.decision_log,
+        "quality_gates": case.quality_gates,
+    }
+    for attr, key in [
+        ("article_model", "article_model"),
+        ("semantic_profile", "semantic_profile"),
+        ("scenario", "scenario"),
+        ("venue_pool", "venue_pool"),
+        ("selected_venue", "selected_venue"),
+        ("fit_assessment", "fit_assessment"),
+        ("mismatch_map", "mismatch_map"),
+        ("rewrite_plan", "rewrite_plan"),
+        ("citation_plan", "citation_plan"),
+        ("risk_report", "risk_report"),
+        ("publication_regime", "publication_regime"),
+        ("investigated_venue", "investigated_venue"),
+    ]:
+        obj = getattr(case, attr, None)
+        if obj is not None:
+            snap[key] = obj.to_dict() if hasattr(obj, "to_dict") else obj
+
+    if case.pathways:
+        snap["pathways"] = [
+            p.to_dict() if hasattr(p, "to_dict") else p
+            for p in case.pathways
+        ]
+
+    return snap
+
+
+def _case_from_snapshot(data: dict[str, Any]) -> Case:
+    """Deserialize a snapshot dict back into a Case object."""
+    case = Case(case_id=data["case_id"], title=data.get("title", ""))
+    case.created_at = data.get("created_at", case.created_at)
+    stage_val = data.get("stage", "empty")
+    try:
+        case.stage = CaseStage(stage_val)
+    except ValueError:
+        case.stage = CaseStage.EMPTY
+    case.input_text = data.get("input_text", "")
+    case.input_type = data.get("input_type", "")
+    case.decision_log = data.get("decision_log", [])
+    case.quality_gates = data.get("quality_gates", {})
+
+    model_map = {
+        "article_model": ArticleModel,
+        "semantic_profile": ArticleSemanticProfile,
+        "scenario": SubmissionScenario,
+        "venue_pool": VenueCandidatePool,
+        "selected_venue": VenueModel,
+        "fit_assessment": FitAssessment,
+        "mismatch_map": MismatchMap,
+        "rewrite_plan": RewritePlan,
+        "citation_plan": CitationPlan,
+        "risk_report": RiskReport,
+        "publication_regime": PublicationRegimeModel,
+        "investigated_venue": VenueModel,
+    }
+    for key, cls in model_map.items():
+        raw = data.get(key)
+        if raw is not None and isinstance(raw, dict):
+            try:
+                setattr(case, key, cls.from_dict(raw))
+            except Exception:
+                pass
+
+    raw_pathways = data.get("pathways", [])
+    for p in raw_pathways:
+        if isinstance(p, dict):
+            try:
+                case.pathways.append(DisciplinaryPathway(**p))
+            except Exception:
+                case.pathways.append(p)
+        else:
+            case.pathways.append(p)
+
+    return case
 
 
 def _classify_input(text: str) -> str:

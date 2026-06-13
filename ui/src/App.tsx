@@ -2,12 +2,16 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CaseSummary, CaseDetail } from './types/domain';
 import { api } from './api/client';
 import { CaseWorkspace } from './components/CaseWorkspace';
+import { AgentMap } from './components/AgentMap';
 import './styles/cockpit.css';
+
+type AppView = 'cases' | 'agents';
 
 export default function App() {
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [activeCase, setActiveCase] = useState<CaseDetail | null>(null);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [appView, setAppView] = useState<AppView>('cases');
 
   useEffect(() => {
     api.health()
@@ -98,54 +102,74 @@ export default function App() {
       <header className="top-bar">
         <h1 className="app-title">Kairoskopion</h1>
         <span className="app-subtitle">Publication Positioning Cockpit</span>
+        <nav className="top-bar-nav">
+          <button
+            className={`top-bar-link ${appView === 'cases' ? 'top-bar-link--active' : ''}`}
+            onClick={() => setAppView('cases')}
+          >
+            Cases
+          </button>
+          <button
+            className={`top-bar-link ${appView === 'agents' ? 'top-bar-link--active' : ''}`}
+            onClick={() => setAppView('agents')}
+          >
+            System / Agents
+          </button>
+        </nav>
       </header>
 
       <div className="app-body">
-        <nav className="case-sidebar" aria-label="Cases">
-          <div className="sidebar-header">
-            <h2>Cases</h2>
-            <button className="btn btn-small" onClick={createCase}>+ New</button>
-          </div>
-          <ul className="case-list">
-            {cases.map((c) => (
-              <li key={c.case_id} className="case-list-item">
-                <button
-                  className={`case-item ${activeCase?.case_id === c.case_id ? 'case-item--active' : ''}`}
-                  onClick={() => openCase(c.case_id)}
-                >
-                  <span className="case-item-title">{c.title}</span>
-                  <span className="case-item-stage">{c.stage}</span>
-                </button>
-                <button
-                  className="case-item-delete"
-                  onClick={(e) => { e.stopPropagation(); deleteCase(c.case_id); }}
-                  aria-label={`Delete ${c.title}`}
-                  title="Delete case"
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
-            {cases.length === 0 && (
-              <li className="case-list-empty">No cases yet</li>
-            )}
-          </ul>
-        </nav>
-
-        {activeCase ? (
-          <CaseWorkspace
-            key={activeCase.case_id}
-            caseData={activeCase}
-            onCaseUpdate={refreshActiveCase}
-          />
+        {appView === 'agents' ? (
+          <AgentMap />
         ) : (
-          <div className="workspace-empty">
-            <h2>Publication Positioning Cockpit</h2>
-            <p>Create a new case or select an existing one to begin.</p>
-            <button className="btn btn-primary btn-large" onClick={createCase}>
-              + New Case
-            </button>
-          </div>
+          <>
+            <nav className="case-sidebar" aria-label="Cases">
+              <div className="sidebar-header">
+                <h2>Cases</h2>
+                <button className="btn btn-small" onClick={createCase}>+ New</button>
+              </div>
+              <ul className="case-list">
+                {cases.map((c) => (
+                  <li key={c.case_id} className="case-list-item">
+                    <button
+                      className={`case-item ${activeCase?.case_id === c.case_id ? 'case-item--active' : ''}`}
+                      onClick={() => openCase(c.case_id)}
+                    >
+                      <span className="case-item-title">{c.title}</span>
+                      <span className="case-item-stage">{c.stage}</span>
+                    </button>
+                    <button
+                      className="case-item-delete"
+                      onClick={(e) => { e.stopPropagation(); deleteCase(c.case_id); }}
+                      aria-label={`Delete ${c.title}`}
+                      title="Delete case"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+                {cases.length === 0 && (
+                  <li className="case-list-empty">No cases yet</li>
+                )}
+              </ul>
+            </nav>
+
+            {activeCase ? (
+              <CaseWorkspace
+                key={activeCase.case_id}
+                caseData={activeCase}
+                onCaseUpdate={refreshActiveCase}
+              />
+            ) : (
+              <div className="workspace-empty">
+                <h2>Publication Positioning Cockpit</h2>
+                <p>Create a new case or select an existing one to begin.</p>
+                <button className="btn btn-primary btn-large" onClick={createCase}>
+                  + New Case
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

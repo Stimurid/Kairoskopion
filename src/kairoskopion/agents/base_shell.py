@@ -7,9 +7,13 @@ propagation, and contract-only stub generation.
 
 from __future__ import annotations
 
+import json
+import logging
 from typing import Any
 
 from .contract import AgentInput, AgentOutput
+
+logger = logging.getLogger(__name__)
 
 
 def service_output(
@@ -70,4 +74,79 @@ def missing_input_output(
         warnings=[f"Agent failed: missing required input '{missing_field}'"],
         quality_gate_status="failed",
         trace_notes=[f"missing_input: {missing_field}"],
+    )
+
+
+def try_llm_call(
+    provider: Any,
+    family: dict[str, Any],
+    template_vars: dict[str, str],
+    *,
+    temperature: float = 0.2,
+    max_tokens: int = 4096,
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    """Try an LLM call using a prompt family. Returns (parsed, meta) or None."""
+    from ..llm.provider import LLMProvider
+
+    if not isinstance(provider, LLMProvider):
+        return None
+
+    user_prompt = family["user_prompt_template"].format(**template_vars)
+    messages = [
+        {"role": "system", "content": family["system_prompt"]},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    try:
+        response = provider.complete(
+            messages,
+            response_schema=family.get("output_schema"),
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+    except Exception as exc:
+        logger.warning("LLM call failed for %s: %s", family.get("agent_role_id", "?"), exc)
+        return None
+
+    parsed = response.parsed
+    if not parsed:
+        try:
+            parsed = json.loads(response.content)
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("LLM returned non-JSON for %s, falling back", family.get("agent_role_id", "?"))
+            return None
+
+    meta = {
+        "model": response.model,
+        "input_tokens": response.input_tokens,
+        "output_tokens": response.output_tokens,
+        "latency_ms": response.latency_ms,
+    }
+    return parsed, meta
+
+
+def llm_agent_output(
+    entity_type: str,
+    parsed: dict[str, Any],
+    meta: dict[str, Any],
+    validation_warnings: list[str] | None = None,
+) -> AgentOutput:
+    """Build AgentOutput from a successful LLM call."""
+    return AgentOutput(
+        output_entity_type=entity_type,
+        output_entity=parsed,
+        evidence_refs=[],
+        unknowns=parsed.get("unknowns", []),
+        assumptions=parsed.get("assumptions", []),
+        confidence=parsed.get("confidence", "medium"),
+        warnings=(validation_warnings or []) + parsed.get("warnings", []),
+        questions_for_user=parsed.get("questions_for_user", []),
+        quality_gate_status="preliminary",
+        trace_notes=[
+            f"LLM model: {meta.get('model', '?')}",
+            f"Tokens: {meta.get('input_tokens', 0)}+{meta.get('output_tokens', 0)}",
+            f"Latency: {meta.get('latency_ms', 0):.0f}ms",
+        ],
+        evidence_status="INFERENCE",
+        llm_usage=meta,
     )

@@ -8,6 +8,8 @@ serializes inputs/outputs and manages case state.
 from __future__ import annotations
 
 import json
+import logging
+import logging.handlers
 import os
 import traceback
 from pathlib import Path
@@ -21,6 +23,30 @@ from pydantic import BaseModel, Field
 from .cases import CaseStore, Case, CaseStage
 
 _VERSION = "0.2.0-alpha"
+
+# --- Logging setup ---
+_log_dir = os.environ.get("KAIROSKOPION_LOG_DIR")
+if _log_dir:
+    _log_path = Path(_log_dir)
+    _log_path.mkdir(parents=True, exist_ok=True)
+    _file_handler = logging.handlers.RotatingFileHandler(
+        _log_path / "kairoskopion.log",
+        maxBytes=10 * 1024 * 1024,
+        backupCount=5,
+        encoding="utf-8",
+    )
+    _file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    logging.getLogger("kairoskopion").addHandler(_file_handler)
+    logging.getLogger("kairoskopion").setLevel(logging.INFO)
+else:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
 app = FastAPI(
     title="Kairoskopion",
@@ -392,6 +418,117 @@ def get_decision_log(case_id: str):
     if not case:
         raise HTTPException(404, f"Case {case_id} not found")
     return case.decision_log
+
+
+# ---------------------------------------------------------------------------
+# Agent Map — technical introspection endpoint
+# ---------------------------------------------------------------------------
+
+@app.get("/agents/map")
+def get_agent_map():
+    """Return full agent registry, workflows, and prompt metadata for the UI map."""
+    from ..agents.registry import list_agent_specs
+    from ..agents.workflows import WORKFLOW_REGISTRY
+    from ..agents.prompt_families.catalog import PROMPT_FAMILY_CATALOG
+    from ..llm.config import provider_status
+
+    agents = []
+    for spec in list_agent_specs():
+        d = spec.to_dict() if hasattr(spec, "to_dict") else {
+            "role_id": spec.role_id,
+            "display_name": spec.display_name,
+            "layer": spec.layer,
+            "implementation_status": spec.implementation_status,
+            "execution_mode": spec.execution_mode,
+            "prompt_family_ids": spec.prompt_family_ids,
+            "input_contract": spec.input_contract,
+            "output_contract": spec.output_contract,
+            "mvp_phase": spec.mvp_phase,
+            "first_workflows": spec.first_workflows,
+        }
+        # Check if execute() actually calls LLM
+        has_real_llm = spec.role_id in {
+            "article_modeler", "article_semantic_profiler",
+            "disciplinary_pathway_mapper", "venue_profiler", "fit_assessor",
+        }
+        d["has_real_llm"] = has_real_llm
+        d["has_orphaned_prompt"] = (
+            bool(spec.prompt_family_ids)
+            and not has_real_llm
+            and spec.implementation_status != "contract_only"
+        )
+        agents.append(d)
+
+    workflows = []
+    for wf in WORKFLOW_REGISTRY.values():
+        steps = []
+        for s in wf.steps:
+            sd = s if isinstance(s, dict) else s.to_dict() if hasattr(s, "to_dict") else {}
+            steps.append(sd)
+        workflows.append({
+            "workflow_id": wf.workflow_id,
+            "display_name": wf.display_name,
+            "description": wf.description,
+            "implementation_status": wf.implementation_status,
+            "steps": steps,
+        })
+
+    prompts = {}
+    for fam_id, fam in PROMPT_FAMILY_CATALOG.items():
+        sp = fam.get("system_prompt", "")
+        up = fam.get("user_prompt_template", "")
+        schema = fam.get("output_schema", {})
+        schema_fields = list(schema.get("properties", {}).keys()) if schema else []
+        prompts[fam_id] = {
+            "family_id": fam_id,
+            "agent_role_id": fam.get("agent_role_id", ""),
+            "version": fam.get("version", ""),
+            "system_prompt": sp,
+            "user_prompt_template": up,
+            "system_prompt_lines": sp.count("\n") + 1 if sp else 0,
+            "user_prompt_lines": up.count("\n") + 1 if up else 0,
+            "output_schema_fields": schema_fields,
+            "purpose": fam.get("purpose", ""),
+            "forbidden_behaviors": fam.get("forbidden_behaviors", []),
+            "evidence_requirements": fam.get("evidence_requirements", []),
+        }
+
+    # Also include Gen-1 prompts from src/kairoskopion/prompts/
+    try:
+        from ..prompts.article_modeling import ARTICLE_MODELING_FAMILY
+        from ..prompts.venue_fact_extraction import VENUE_FACT_EXTRACTION_FAMILY
+        from ..prompts.fit_assessment import FIT_ASSESSMENT_FAMILY
+        from ..prompts.semantic_profiling import SEMANTIC_PROFILING_FAMILY
+        from ..prompts.disciplinary_mapping import DISCIPLINARY_MAPPING_FAMILY
+        for fam in [ARTICLE_MODELING_FAMILY, VENUE_FACT_EXTRACTION_FAMILY,
+                     FIT_ASSESSMENT_FAMILY, SEMANTIC_PROFILING_FAMILY,
+                     DISCIPLINARY_MAPPING_FAMILY]:
+            fid = fam.get("family_id", "")
+            if fid and fid not in prompts:
+                sp = fam.get("system_prompt", "")
+                up = fam.get("user_prompt_template", "")
+                schema = fam.get("output_schema", {})
+                schema_fields = list(schema.get("properties", {}).keys()) if schema else []
+                prompts[fid] = {
+                    "family_id": fid,
+                    "agent_role_id": fam.get("agent_role_id", ""),
+                    "version": fam.get("version", ""),
+                    "system_prompt": sp,
+                    "user_prompt_template": up,
+                    "system_prompt_lines": sp.count("\n") + 1 if sp else 0,
+                    "user_prompt_lines": up.count("\n") + 1 if up else 0,
+                    "output_schema_fields": schema_fields,
+                    "purpose": fam.get("purpose", ""),
+                }
+    except Exception:
+        pass
+
+    return {
+        "agents": agents,
+        "workflows": workflows,
+        "prompts": prompts,
+        "llm": provider_status(),
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,12 @@
-"""Rewrite Planner — wraps services/rewrite_planning.py + protected core gate."""
+"""Rewrite Planner — LLM-backed rewrite planning with deterministic fallback + protected core gate."""
 
 from __future__ import annotations
 
-from ..base_shell import missing_input_output, service_output
+import json
+
+from ..base_shell import llm_agent_output, missing_input_output, service_output, try_llm_call
 from ..contract import AgentInput, AgentOutput, AgentRole
+from ..prompt_families.rewrite_planning import REWRITE_PLANNING_FAMILY
 from ...llm.provider import LLMProvider
 from ...schema import MismatchMap
 from ...services.protected_core import apply_core_gate, validate_rewrite_plan
@@ -14,7 +17,24 @@ class RewritePlannerAgent(AgentRole):
     role_id = "rewrite_planner"
 
     def execute(self, inp: AgentInput, provider: LLMProvider) -> AgentOutput:
-        return self.execute_deterministic(inp)
+        mm_data = inp.entities.get("mismatch_map")
+        if not mm_data:
+            return missing_input_output("RewritePlan", "mismatch_map")
+
+        article_data = inp.entities.get("article", {})
+        venue_data = inp.entities.get("venue", {})
+
+        result = try_llm_call(provider, REWRITE_PLANNING_FAMILY, {
+            "mismatch_json": json.dumps(mm_data, ensure_ascii=False, indent=2),
+            "article_json": json.dumps(article_data, ensure_ascii=False, indent=2),
+            "venue_json": json.dumps(venue_data, ensure_ascii=False, indent=2),
+        })
+        if result is None:
+            return self.execute_deterministic(inp)
+
+        parsed, meta = result
+        warnings = REWRITE_PLANNING_FAMILY["validator"](parsed)
+        return llm_agent_output("RewritePlan", parsed, meta, warnings)
 
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
         mm_data = inp.entities.get("mismatch_map")

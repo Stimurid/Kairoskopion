@@ -27,7 +27,13 @@ class TestClassifyInput(unittest.TestCase):
 
 class TestCaseStore(unittest.TestCase):
     def setUp(self):
-        self.store = CaseStore()
+        import tempfile
+        self._tmpdir = tempfile.mkdtemp()
+        self.store = CaseStore(data_dir=self._tmpdir)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
 
     def test_create_case(self):
         case = self.store.create(title="Test case")
