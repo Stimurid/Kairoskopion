@@ -60,6 +60,7 @@
   --space-md: 16px;
   --space-lg: 24px;
   --space-xl: 32px;
+  --space-2xl: 48px;
 
   /* Layout */
   --sidebar-width: 220px;
@@ -78,6 +79,8 @@
 
   --radius: 6px;
   --radius-sm: 4px;
+  --radius-lg: 8px;
+  --radius-md: 6px;
 }
 
 /* --- Reset --- */
@@ -2451,4 +2454,178 @@ body {
 
 .error-text {
   color: var(--color-danger);
+}
+
+
+/* =========================================================================
+   Phase 7 — Polish & Responsive
+   ========================================================================= */
+
+/* --- Loading spinner --- */
+
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-2xl);
+  min-height: 200px;
+}
+
+/* --- Focus styles --- */
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* --- Smooth transitions --- */
+
+.stage-chip,
+.type-chip,
+.btn,
+.case-item {
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+/* --- Active stage in StatusBar --- */
+
+.stage-chip.stage-active {
+  background: var(--color-primary);
+  color: var(--text-inverse);
+}
+
+/* --- Skip to content --- */
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: var(--space-md);
+  z-index: 1000;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-primary);
+  color: var(--text-inverse);
+  border-radius: var(--radius);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: var(--space-sm);
+}
+
+/* --- Responsive: narrow screens --- */
+
+@media (max-width: 900px) {
+  .app-body {
+    flex-direction: column;
+  }
+
+  .case-sidebar {
+    width: 100%;
+    max-height: 180px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .workspace-body {
+    flex-direction: column;
+  }
+
+  .evidence-drawer,
+  .evidence-drawer--empty {
+    width: 100%;
+    max-height: 250px;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .status-bar {
+    padding: 0 var(--space-sm);
+    gap: 2px;
+  }
+
+  .stage-arrow {
+    display: none;
+  }
+
+  .stage-chip {
+    font-size: var(--font-size-xs);
+    padding: 2px 6px;
+  }
+
+  .pathway-grid,
+  .pool-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .top-bar {
+    padding: 0 var(--space-sm);
+  }
+
+  .app-subtitle {
+    display: none;
+  }
+
+  .workspace-center {
+    padding: var(--space-sm);
+  }
+
+  .adapt-header,
+  .pool-header,
+  .dossier-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dossier-kv {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .dossier-kv-label {
+    min-width: auto;
+  }
+}
+
+/* --- Scrollbar --- */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }

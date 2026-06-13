@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { EvidenceDetail } from '../types/domain';
 import { EvidenceBadge } from './EvidenceBadge';
 
@@ -29,6 +30,15 @@ interface Props {
 }
 
 export function EvidenceDrawer({ evidence, onClose }: Props) {
+  useEffect(() => {
+    if (!evidence) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [evidence, onClose]);
+
   if (!evidence) {
     return (
       <aside className="evidence-drawer evidence-drawer--empty" aria-label="Evidence panel">
