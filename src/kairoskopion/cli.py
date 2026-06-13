@@ -886,7 +886,7 @@ def cmd_list_agents(args: argparse.Namespace) -> int:
 
 
 def cmd_inspect_agent(args: argparse.Namespace) -> int:
-    from .agents.registry import instantiate_agent_spec
+    from .agents.registry import get_agent_spec
     try:
         spec = get_agent_spec(args.role_id)
     except KeyError:

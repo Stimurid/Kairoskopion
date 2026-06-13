@@ -7,7 +7,7 @@
 | Parameter | Value |
 |-----------|-------|
 | Branch | `main` |
-| Tag | `v0.2.0-alpha-rc11` |
+| Tag | `v0.2.0-alpha-rc12` |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
 | Working tree | clean |
 | Python | >=3.11 |
@@ -15,11 +15,11 @@
 ## Recent commit history (main)
 
 ```
+14d34d1 Add real source acquisition v0 with adapter authority enforcement
+b34ddd7 Add source authority and integrity model
+10164e5 Audit UC-1 demo pack
 62ce29e Fix 3 agent attribute bugs: compliance_auditor, submission_pack_builder, evidence_auditor
 4498a74 Implement UC-1 Demo Pack v0: offline reproducible pipeline demo
-d20ff8f Audit venue evidence stack v1 v2
-4fb78f0 Complete Venue Evidence Stack V1-V2 foundation
-babcbbc Implement Venue Evidence Stack V1-V2 foundation
 ```
 
 ## Trial history
@@ -276,7 +276,7 @@ Global options: `--storage-root PATH` or env `KAIROSKOPION_STORAGE_ROOT`; `--ada
 
 ## Tests
 
-- **1010 tests**, all passing (67 new in real source acquisition v0, 53 in source authority model v0, 35 in UC-1 Demo Pack v0)
+- **1068 tests**, all passing (58 new in venue pool discovery v0, 67 in real source acquisition v0, 53 in source authority model v0, 35 in UC-1 Demo Pack v0)
 - 50+ test files covering: schema, registry, evidence, quality, cards,
   invariants, fixtures, pipeline, article modeling, venue profiling,
   fit assessment, evidence audit, persistence, artifacts, CLI,

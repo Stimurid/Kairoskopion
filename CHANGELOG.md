@@ -21,6 +21,13 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - `discover_venue_pool`: `fixtures={}` now correctly means "no fixtures" (was falling through to defaults)
+- `cmd_inspect_agent`: restored correct import `get_agent_spec` (was broken by typo `instantiate_agent_spec` during CLI additions)
+
+### Known limitations
+- Deterministic pathway mapper produces weak/unknown pathways offline — fixture venues may not match
+- Fixture discovery is synthetic (DISCOVERY_FIXTURES); live mode placeholder returns empty
+- Live adapter mode not tested by default (no network required)
+- No broad crawler, no all-journal database
 
 ## [Unreleased] — Source Authority and Integrity Model v0
 
