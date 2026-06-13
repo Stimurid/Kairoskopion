@@ -1565,6 +1565,66 @@ def cmd_verify_references(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_review_loop_demo(args: argparse.Namespace) -> int:
+    """Demo review loop: run UC1 with protected core, show blocked changes, simulate decisions."""
+    from .demo.uc1_runner import run_uc1_demo
+    from .services.review_loop import (
+        UserDecision, apply_user_decisions, extract_blocked_changes,
+    )
+
+    _safe_print("Running UC-1 demo (selected-venue mode) to get rewrite plan...")
+    result = run_uc1_demo(select_candidate_index=0)
+    rewrite_data = result.entities.get("rewrite_plan", {})
+
+    from .schema import RewritePlan
+    plan = RewritePlan.from_dict(rewrite_data)
+
+    blocked = extract_blocked_changes(plan)
+    _safe_print(f"\nRewrite plan: {len(plan.changes)} changes")
+    _safe_print(f"Blocked (need consent): {len(blocked)}")
+    _safe_print(f"Requires user acceptance: {plan.requires_user_acceptance}")
+
+    if blocked:
+        _safe_print("\nBlocked changes:")
+        for b in blocked:
+            _safe_print(f"  [{b['change_id']}] {b['target_block']}: {b['desired_state'][:60]}")
+            _safe_print(f"    Risk: {b['field_core_risk']}, Reason: {b['blocked_reason']}")
+
+        # Simulate: accept first blocked, reject rest
+        decisions = []
+        for i, b in enumerate(blocked):
+            if i == 0:
+                decisions.append(UserDecision(b["change_id"], "accept", "author approves"))
+            else:
+                decisions.append(UserDecision(b["change_id"], "reject", "author declines"))
+
+        protected_core = rewrite_data.get("_core_validation", {}).get("protected_core_elements", [])
+        updated_plan, iteration = apply_user_decisions(plan, decisions, protected_core)
+
+        _safe_print(f"\nAfter applying {iteration.decisions_applied} decisions:")
+        _safe_print(f"  Accepted: {iteration.changes_accepted}")
+        _safe_print(f"  Rejected: {iteration.changes_rejected}")
+        _safe_print(f"  Remaining blocked: {iteration.remaining_blocked}")
+        _safe_print(f"  Plan status: {iteration.plan_status}")
+    else:
+        _safe_print("\nNo blocked changes — plan passes protected core gate.")
+
+    if args.output:
+        import json as _json
+        out_data = {
+            "blocked_changes": blocked,
+            "plan_changes": len(plan.changes),
+            "requires_user_acceptance": plan.requires_user_acceptance,
+        }
+        Path(args.output).write_text(
+            _json.dumps(out_data, indent=2, ensure_ascii=False, default=str),
+            encoding="utf-8",
+        )
+        _safe_print(f"Output: {args.output}")
+
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="kairoskopion",
@@ -1887,6 +1947,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Write JSON result to file",
     )
 
+    review_loop_parser = sub.add_parser(
+        "review-loop-demo",
+        help="Demo review loop: show blocked changes, simulate accept/reject decisions",
+    )
+    review_loop_parser.add_argument(
+        "--output", "-o", default=None,
+        help="Write JSON result to file",
+    )
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -1925,6 +1994,7 @@ def main(argv: list[str] | None = None) -> int:
         "discover-venue-pool": cmd_discover_venue_pool,
         "screen-venue-candidates": cmd_screen_venue_candidates,
         "verify-references": cmd_verify_references,
+        "review-loop-demo": cmd_review_loop_demo,
     }
 
     handler = commands.get(args.command)
