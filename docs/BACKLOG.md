@@ -649,6 +649,231 @@ that are in the spec but were missing from the backlog.
 - VenueAdapterStatus enum: success, partial, no_results, unavailable, error, rate_limited
 - Future: integration test that inaccessible source → INACCESSIBLE status preserved end-to-end through pipeline
 
+## Venue Funnel v1 — Code Alignment (C1–C9)
+
+**Goal:** Bring the schema, services, agents, and benchmark up to the
+canonical model in
+[VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md](VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md)
+(ADR-16). The canon and the operational rubric at
+`benchmarks/golden/venue_source_layer_map.md` are normative; code follows.
+
+**Status:** PENDING. Spec landed on `feature/venue-funnel-v1-canon` (this
+branch, commits `8d7751b` canon + ADR-16 + v0 supersession headers and
+`126f8a9` operational rubric). No code change yet.
+
+**Top-level principle:** hot path is deterministic composition from the
+registry. LLM fires only on cache-miss (`absent` / `stale` /
+`weak_evidence`); `fresh_sufficient` never spends a key. See canon §7.
+
+### Sprint VF-C1: VenueFunnelLayer enum + source category enum
+
+**Scope:**
+- `enums.py::VenueFunnelLayer` — 8 values: `universe`, `disciplinary_regime`,
+  `tribe_school`, `venue_class`, `journal_envelope`, `section_special_issue`,
+  `editorial_board_cloud`, `published_corpus_hull`.
+- `enums.py::VenueSourceCategory` — 10 values: `A_journal_site`,
+  `B_publisher`, `C_indexer_registry`, `D_corpus`, `E_editorial_board`,
+  `F_corpus_authors`, `G_metadata_api`, `H_full_text_resolver`,
+  `I_cfp_society_channel`, `J_tacit_signal`.
+- `enums.py::CacheMissCategory` — 4 values: `absent`, `stale`,
+  `weak_evidence`, `fresh_sufficient`.
+- Tests: enum-coverage tests + serialization roundtrip.
+
+**Depends on:** none — pure enum work.
+**Acceptance:** `pytest tests/test_enums.py` covers all three new enums;
+each value round-trips through `to_dict`/`from_dict` of an entity using it.
+
+---
+
+### Sprint VF-C2: VenueProfilePackage dataclass
+
+**Scope:**
+- `schema.py::VenueProfilePackage` aggregating the 24 sub-objects listed
+  in canon §2. References `VenueRecord` by ID; does NOT duplicate venue
+  identity storage.
+- `to_dict` / `from_dict` round-trip.
+- Persistence: `registry.py::venue_profile_package_registry`
+  (JSONL append-only per ADR-09).
+- Vault projection: `vault.py::write_venue_profile_package_card`
+  (markdown card per ADR-11).
+- Tests: construction, registry persistence, vault card round-trip,
+  unknowns/conflicts preservation.
+
+**Depends on:** VF-C1.
+**Acceptance:** `kairoskopion build-venue-profile-package <venue-id>`
+emits a populated package from existing `VenueEvidencePack` claims.
+
+---
+
+### Sprint VF-C3: Missing sub-models
+
+**Scope (new dataclasses in `schema.py`):**
+- `MethodExpectationProfile` (currently absent — spec §6 sub-field)
+- `GenreMoveProfile` (currently absent)
+- `StyleRegisterProfile` (currently absent)
+- `AuthorEligibilityProfile` (currently absent — covers §6.15 sibling axis)
+- `TimeReviewProfile` (decision time, special-issue cadence, desk-rejection rate)
+- `APCAccessProfile` (APC range, OA model, waiver policy, deposit terms)
+- `TacitVenueSignal` (§6.16, currently Planned in SPEC_COVERAGE)
+- `JournalModel`, `SectionModel`, `SpecialIssueModel` (§6.8–§6.10,
+  currently Planned)
+
+Each gets: explicit `evidence_refs`, `unknowns`, `confidence`, `source_category`
+field (uses `VenueSourceCategory` from VF-C1).
+
+**Depends on:** VF-C1, VF-C2.
+**Acceptance:** SPEC_COVERAGE_MATRIX §6.8 / §6.9 / §6.10 / §6.14 / §6.16
+move from `Planned` → `Implemented`.
+
+---
+
+### Sprint VF-C4: venue_profile_package_builder service
+
+**Scope:**
+- `services/venue_profile_package_builder.py` — deterministic builder
+  that takes a `VenueRecord` + its claims and emits a populated
+  `VenueProfilePackage`. Per canon §2 it MUST:
+  - keep authority-tagged sources separate (official_fact, vendor_claim,
+    corpus_observation, inference, tacit_signal);
+  - never upgrade `corpus_observation` to `official_fact`;
+  - never merge `vendor_claim` and `formal_page` into single field;
+  - surface `unknowns_and_conflicts` explicitly;
+  - respect the source-layer-map rubric in
+    `benchmarks/golden/venue_source_layer_map.md` §1
+    (one authoritative source per axis).
+- 4 anti-pattern tests from the rubric §3:
+  AP1 aims_scope → FACT,
+  AP2 indexing_claim → fit,
+  AP3 board as psychology,
+  AP4 full-text source = metadata source.
+  Each anti-pattern is a `pytest.raises` / `assertEqual(status, INFERENCE)` test.
+
+**Depends on:** VF-C2, VF-C3.
+**Acceptance:** all 4 anti-pattern tests pass; rubric §1 matrix is
+mechanically respected.
+
+---
+
+### Sprint VF-C5: venue_funnel_navigator service
+
+**Scope:**
+- `services/venue_funnel_navigator.py` — given `ArticleModel +
+  FieldPositionModel(article) + SubmissionScenario`, walks the 8 layers
+  top-down and emits an ordered list of `(layer, layer_state,
+  candidates_added, candidates_dropped, evidence_refs)`.
+- Activation rule per rubric §2 enforced: a subobject at layer N must NOT
+  be populated from source categories beyond the allowlist of N.
+- Stopping rules: stop when `FitAssessment.verdict` for top-N candidates
+  reaches `strong_candidate` AND `core_risk` low for current pathway,
+  or when explicit `funnel_floor=N` is passed.
+
+**Depends on:** VF-C2, VF-C4.
+**Acceptance:** integration test on Mavrinsky article walks 8 layers,
+respects the activation rule, surfaces continental-philtech cluster
+shapes from rubric §6.
+
+---
+
+### Sprint VF-C6: VenueDiscoveryFunnel agent
+
+**Scope:**
+- `agents/venue_discovery_funnel.py` — LLM agent with deterministic
+  fallback (per existing project agent pattern). Uses
+  `venue_funnel_navigator` as its deterministic spine. LLM is consulted
+  ONLY at fit-time interpretation, per rubric §4 (no LLM calls inside
+  refresh paths).
+- Prompt family `prompts/venue_discovery_funnel.py` with JSON schema
+  validator.
+- Extends existing `VenueProfiler` (does NOT replace).
+
+**Depends on:** VF-C5.
+**Acceptance:** offline run produces the same funnel walk as
+deterministic navigator (LLM unused for navigation); LLM differentiates
+only at envelope-vs-point judgments.
+
+---
+
+### Sprint VF-C7: Cache-miss policy hook
+
+**Scope:**
+- Cache-miss classification (canon §7 + rubric §4):
+  `absent` → full network build via allowlist;
+  `stale` → targeted refresh of claims whose source `freshness_window`
+  expired;
+  `weak_evidence` → dotyanut only axes that the current fit-question
+  requires;
+  `fresh_sufficient` → no network, no LLM.
+- `services/venue_cache_policy.py` — decides which category applies per
+  request and which adapter calls fire.
+- Budget control: per cache-miss category, max-axes-per-LLM-call config
+  in `RunProfileCore` (see [Agentum integration]).
+
+**Depends on:** VF-C2, VF-C4, VF-C6.
+**Acceptance:** integration test on cached Mavrinsky venues —
+`fresh_sufficient` makes zero adapter calls; `weak_evidence` makes only
+the calls needed for missing axes; `absent` makes the full layer-5 batch.
+
+---
+
+### Sprint VF-C8: Backlog adapters H / I / J
+
+**Scope:**
+- `adapters/venue/full_text_resolver.py` — category H. Resolves DOIs and
+  paper IDs to full text from OA, repositories, and (gate-flagged)
+  shadow libraries. Authority: `corpus_observation`, NEVER
+  `formal_page`. Used only by corpus mining, never for venue identity.
+- `adapters/venue/cfp_society_channel.py` — category I. Reads CFPs from
+  society pages, PhilEvents, association sites, opt-in Telegram feeds.
+  Produces `SpecialIssueModel` / CFP records. Authority: `external_claim`.
+- `adapters/venue/tacit_signal_importer.py` — category J. CLI-driven
+  import of user-supplied tacit signals (`TacitVenueSignal`). Authority:
+  `tacit_signal`. Required fields: source, date, scope, confidence.
+
+**Depends on:** VF-C2, VF-C3.
+**Acceptance:** each adapter has fixture + cached + live (gated) modes
+matching the existing adapter pattern; all return structured
+`VenueAdapterResult` per GP-12.
+
+---
+
+### Sprint VF-C9: Mirror gold + bench harness
+
+**Scope:**
+- `tests/fixtures/venue_gold/` — 3–5 fixture venues per canon §8:
+  one continental philosophy, one STS, one HCI/design, one analytic
+  philosophy of technology, one media studies. Each = frozen snapshot
+  of sources by category (A–J) + hand-signed
+  `VenueProfilePackage` ground truth.
+- `scripts/run_venue_funnel_benchmark.py` — `--require-llm` flag,
+  mirrors `run_mavrinsky_benchmark.py` shape. Outputs per-axis diff
+  vs gold.
+- `scripts/score_venue_against_gold.py` — implements rubric §7
+  (scorer consumption) and §5 (hard-FAIL gates on forbidden source uses).
+- CI integration: bench drift blocks merge unless gold is updated with
+  user sign-off (same policy as Mavrinsky article gold).
+
+**Depends on:** VF-C2 … VF-C7.
+**Acceptance:** baseline run scored against gold; report committed to
+`docs/benchmarks/VENUE_FUNNEL_GOLDEN_RUN_REPORT.md`; gold-update flow
+documented as in `docs/benchmarks/MAVRINSKY_MERGE_PLAN.md`.
+
+---
+
+**Sprint ordering rationale:**
+C1 → C2 → C3 unlock schema. C4 unlocks deterministic building. C5
+unlocks navigation. C6 wires LLM. C7 makes the two-stage cache-miss
+real. C8 fills source coverage. C9 locks regression. No sprint may
+ship without its acceptance test passing.
+
+**What VF-C1 … VF-C9 are NOT:**
+- Not Web UI for the funnel (UI cockpit v0 already exposes most of it).
+- Not Agentum policy work (RunProfileCore lives there, see ADR-X handoff).
+- Not Litops integration changes (already covered by bridges).
+- Not closed-source adapter additions (Scopus/WoS/JCR stay deferred).
+- Not auto-submission anything.
+
+---
+
 ## Later (only when explicitly requested)
 
 - Telegram intake bot

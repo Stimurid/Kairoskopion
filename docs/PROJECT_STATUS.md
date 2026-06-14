@@ -1,6 +1,34 @@
 # Project Status — Kairoskopion
 
-**Last updated:** 2026-06-13
+**Last updated:** 2026-06-14 (Venue Funnel v1 canon pass)
+
+## Latest doctrine pass (2026-06-14)
+
+**Branch:** `feature/venue-funnel-v1-canon` (stacked on `main` at `2aaa8ae`)
+
+Spec / doctrine landing — no code change:
+
+- `docs/VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md` — canonical reference for
+  venue discovery / profiling / database building (8-layer funnel,
+  `VenueProfilePackage` of 24 sub-models, source allowlist A–J,
+  two-stage DB→network search with cache-miss taxonomy, mirror gold).
+- `docs/DECISIONS.md` ADR-16 — supersedes v0 discovery scope constraints
+  (no-all-journal-DB, no-Google-Scholar, SnapshotCrawler-explicit-URL-only
+  lifted; user-seed-only / DOAJ≠Scopus / UNKNOWN≠absent NOT lifted).
+- `docs/REAL_VENUE_POOL_DISCOVERY_V0_IMPLEMENTATION_MAP.md`,
+  `docs/VENUE_CANDIDATE_SCREENING_V0.md` — supersession headers added;
+  v0 docs retained as MVP historical record.
+- `benchmarks/golden/venue_source_layer_map.md` — operational rubric:
+  authoritative-source matrix per FPM axis, anti-patterns (AP1–AP4),
+  per-axis Mavrinsky golden expectations.
+- `docs/BACKLOG.md` — new package **Venue Funnel v1 — Code Alignment
+  (VF-C1 … VF-C9)** for downstream code work.
+- `docs/SPEC_COVERAGE_MATRIX.md` — §6.7–§6.16 venue-side rows rerouted
+  to VF-C2/C3/C4/C8.
+
+Handoff target: a neighbouring branch reviews this canon + rubric stack
+before any code lands. No further changes on this branch until handoff
+returns sign-off.
 
 ## Repository
 
