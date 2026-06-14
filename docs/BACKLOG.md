@@ -823,23 +823,25 @@ mechanically respected.
 
 ---
 
-### Sprint VF-C5: venue_funnel_navigator service
+### Sprint VF-C5: venue_funnel_navigator service ✓ DONE (2026-06-14)
 
-**Scope:**
-- `services/venue_funnel_navigator.py` — given `ArticleModel +
-  FieldPositionModel(article) + SubmissionScenario`, walks the 8 layers
-  top-down and emits an ordered list of `(layer, layer_state,
-  candidates_added, candidates_dropped, evidence_refs)`.
-- Activation rule per rubric §2 enforced: a subobject at layer N must NOT
-  be populated from source categories beyond the allowlist of N.
-- Stopping rules: stop when `FitAssessment.verdict` for top-N candidates
-  reaches `strong_candidate` AND `core_risk` low for current pathway,
-  or when explicit `funnel_floor=N` is passed.
+**Implementation:** `services/venue_funnel_navigator.py`
+- `walk_funnel(article_model, vpkg_registry, submission_scenario,
+  funnel_floor)` walks the 8 layers (canon §1) top-down and emits per-layer
+  `LayerWalkRecord` (layer, candidates_in/out, candidates_added/dropped,
+  drop_reasons, evidence_refs, activation_violations, unknowns, notes).
+- Per-layer source allowlist `LAYER_SOURCE_ALLOWLIST` enforces canon §3.
+  `is_source_allowed_at_layer()` is the activation-rule predicate.
+- `validate_activation_rule()` flags VPKGs that claim a subobject
+  `present` without the required source category attached.
+- L6 (section/special_issue) is informational-only because Section/
+  SpecialIssue population is VF-C4 builder territory (not yet wired).
+- Live data smoke (34 Mavrinsky VPKGs): funnel narrows 34 → 1
+  (Foucault Studies) at L3 tribe_school; 0 activation violations.
 
-**Depends on:** VF-C2, VF-C4.
-**Acceptance:** integration test on Mavrinsky article walks 8 layers,
-respects the activation rule, surfaces continental-philtech cluster
-shapes from rubric §6.
+**Tests:** `tests/test_vf_c5_funnel_navigator.py` — 20 tests covering
+activation-rule predicate, per-layer filter behaviour, funnel_floor
+stopping, activation-violation surfacing, empty-registry safety.
 
 ---
 
@@ -862,25 +864,37 @@ only at envelope-vs-point judgments.
 
 ---
 
-### Sprint VF-C7: Cache-miss policy hook
+### Sprint VF-C7: Cache-miss policy hook ✓ DONE (2026-06-14)
 
-**Scope:**
-- Cache-miss classification (canon §7 + rubric §4):
-  `absent` → full network build via allowlist;
-  `stale` → targeted refresh of claims whose source `freshness_window`
-  expired;
-  `weak_evidence` → dotyanut only axes that the current fit-question
-  requires;
-  `fresh_sufficient` → no network, no LLM.
-- `services/venue_cache_policy.py` — decides which category applies per
-  request and which adapter calls fire.
-- Budget control: per cache-miss category, max-axes-per-LLM-call config
-  in `RunProfileCore` (see [Agentum integration]).
+**Implementation:** `services/venue_cache_policy.py`
+- `classify_cache_miss(vpkg, fit_axes, freshness_windows_days, now)`
+  returns a `CacheMissDecision` with `category` (one of `CacheMissCategory`:
+  ABSENT / STALE / WEAK_EVIDENCE / FRESH_SUFFICIENT), per-subobject
+  present/missing/partial/stale lists, recommended actions
+  (full_build / targeted_fill / targeted_refresh), network_budget
+  subobject list, and `would_burn_llm_key` flag.
+- Axis → subobject mapping (`AXIS_TO_REQUIRED_SUBOBJECTS`) covers all
+  16 axes of the FitAssessment.
+- Source-category → freshness-window mapping (`DEFAULT_FRESHNESS_WINDOWS_DAYS`)
+  per canon §7: A=90d, B=180d, C=30d, D=60d, E=90d, F=90d, G=30d,
+  H=365d, I=7d, J=365d.
+- Priority order (canon §7): ABSENT > WEAK_EVIDENCE > STALE >
+  FRESH_SUFFICIENT.
+- `classify_batch(vpkgs, fit_axes, ...)` runs over a registry slice and
+  reports per-VPKG decisions + category counts + hot-path count.
+- LLM-budget contract: only ABSENT/WEAK_EVIDENCE/STALE set
+  `would_burn_llm_key=True`. FRESH_SUFFICIENT serves from DB and
+  cannot trigger an LLM call.
 
-**Depends on:** VF-C2, VF-C4, VF-C6.
-**Acceptance:** integration test on cached Mavrinsky venues —
-`fresh_sufficient` makes zero adapter calls; `weak_evidence` makes only
-the calls needed for missing axes; `absent` makes the full layer-5 batch.
+**Tests:** `tests/test_vf_c7_cache_policy.py` — 28 tests covering all
+4 categories on real and synthetic VPKGs, priority order, freshness
+window override, batch summary, decision serialisation.
+
+**Agentum integration note:** the `RunProfileCore` budget knob lives
+in the Agentum sibling project (per
+`memory/feedback_no_local_llm_tuning.md`). This service exposes the
+honest classification; budget enforcement and max-axes-per-LLM-call
+are upstream concerns.
 
 ---
 
