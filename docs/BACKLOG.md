@@ -674,6 +674,38 @@ that are in the spec but were missing from the backlog.
 - VenueAdapterStatus enum: success, partial, no_results, unavailable, error, rate_limited
 - Future: integration test that inaccessible source → INACCESSIBLE status preserved end-to-end through pipeline
 
+## Venue-side golden baseline v1 — DONE on `feature/venue-side-golden-baseline`
+
+**Status:** complete on `feature/venue-side-golden-baseline` (stacked on
+`feature/venue-funnel-v1-canon`). Awaits review for merge.
+
+**What landed:**
+- Three rubric files under `benchmarks/golden/`:
+  `venue_source_layer_map.md` (v2 — seven minimal subobjects, primary
+  computation layer language, six caveats),
+  `mavrinsky_venue_side_gold.md` (v2 — five envelope clusters with
+  expected shapes and VAP1–VAP7),
+  `source_acquisition_funnel.md` (pool / shortlist / deep mapped to
+  V1–V8, deferred adapters listed).
+- `services/corpus_hull_builder.py` — deterministic D-corpus → venue FPM
+  envelope builder. No LLM, no network.
+- `tests/test_corpus_hull_builder.py` — 15 tests covering all six caveats
+  and FPM-shape compatibility.
+- `scripts/run_venue_side_benchmark.py` — three-stage harness skeleton
+  with fixture-pool fallback and scorecard against the five-cluster gold.
+- `docs/benchmarks/VENUE_SIDE_GOLDEN_BASELINE.md` — pass report.
+
+**Deferred (deliberate non-goals of this pass):**
+- `EditorialBoardAdapter` live HTTP scraping. Contract is defined; sprint
+  scheduled as the next venue-side milestone.
+- ВАК / РИНЦ / КиберЛенинка adapters for cluster 5 (Russian philosophy).
+  Currently `UNKNOWN_NOT_VERIFIED`.
+- Shadow / full-text resolvers (OA repos, Sci-Hub-likes, ResearchGate,
+  Academia, personal libraries, user-uploaded ZIPs). H layer is corpus
+  material only, never metadata authority.
+- 50–80 venue live discovery. Pool stage is fixture-only.
+- The remaining 17 `VenueProfilePackage` subobjects.
+
 ## Venue Funnel v1 — Code Alignment (C1–C9)
 
 **Goal:** Bring the schema, services, agents, and benchmark up to the
@@ -684,7 +716,8 @@ canonical model in
 
 **Status:** PENDING. Spec landed on `feature/venue-funnel-v1-canon` (this
 branch, commits `8d7751b` canon + ADR-16 + v0 supersession headers and
-`126f8a9` operational rubric). No code change yet.
+`126f8a9` operational rubric). No code change yet beyond
+`feature/venue-side-golden-baseline`'s `corpus_hull_builder` (above).
 
 **Top-level principle:** hot path is deterministic composition from the
 registry. LLM fires only on cache-miss (`absent` / `stale` /

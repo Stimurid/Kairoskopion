@@ -49,6 +49,42 @@ all benchmark-relevant work into one coherent tag.
   because it would have prevented FF of the article-side stack. Lands
   as a follow-up doc patch.
 
+## Venue-side golden baseline (2026-06-14)
+
+**Branch:** `feature/venue-side-golden-baseline` (stacked on
+`feature/venue-funnel-v1-canon`).
+
+First deterministic venue-side baseline. NOT full journal intelligence.
+NOT a journal recommender. NOT a live editorial board scraper. NOT a
+Russian-regime adapter. NOT a 50–80 venue crawl.
+
+What this baseline IS:
+
+- Structural rubric (3 files under `benchmarks/golden/`) saying which
+  source layer is the primary computation per FPM envelope axis, what
+  the five Mavrinsky-side envelope clusters must look like, and how the
+  three-stage funnel (pool / shortlist / deep) maps to V1–V8 depth.
+- One deterministic service: `services/corpus_hull_builder.py` — turns
+  a `CorpusAnalysisResult` into a venue `FieldPositionModel`. No LLM,
+  no network. 15 unit tests enforcing the six fundamental caveats
+  (official scope ≠ corpus fact, indexing ≠ fit, full text ≠ metadata
+  authority, editorial board = inference, unknown ≠ absent, incomplete
+  graph ≠ absence of tradition) plus FPM-shape compatibility.
+- One harness skeleton: `scripts/run_venue_side_benchmark.py` — three
+  stages (pool / shortlist / deep) against a fixture pool with
+  synthetic per-venue corpus annotations. Writes to
+  `private_inputs/runs/<id>/venue/` (gitignored). Fails loudly when
+  no fixture is supplied and live discovery is not implemented.
+- One report: `docs/benchmarks/VENUE_SIDE_GOLDEN_BASELINE.md`.
+
+Deferred (documented as next backlog items):
+
+- `EditorialBoardAdapter` live HTTP scraping.
+- Russian-regime adapters (ВАК / РИНЦ / КиберЛенинка).
+- Shadow / full-text resolvers (OA / Sci-Hub-likes / ResearchGate / etc).
+- 50–80 venue live discovery.
+- Other 17 `VenueProfilePackage` subobjects beyond the 7 minimal.
+
 ## Repository
 
 | Parameter | Value |
