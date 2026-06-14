@@ -651,6 +651,83 @@ def select_shortlist(
     return buckets
 
 
+_BUCKET_ORDER = {
+    "good_fit": 0,
+    "possible_but_costly": 1,
+    "sibling_manuscript": 2,
+    "poor_fit": 3,
+    "insufficient_data": 4,
+}
+_AXIS_RANK = {"strong": 3, "medium": 2, "weak": 1, "bad": 0, "unknown": 0}
+# For field_core_risk only: at the top-of-funnel ranking stage we
+# prefer LOWER risk, so invert.
+_FCR_PREFERENCE = {"strong": 4, "medium": 3, "weak": 1, "bad": 0, "unknown": 2}
+
+
+def _rank_key(entry: dict[str, Any], fit: dict[str, Any]) -> tuple:
+    """Sort key: bucket order FIRST, then within-bucket signals.
+
+    Returns a tuple suitable for ascending sort (lower = better).
+
+    Tier 0: bucket order (good_fit < possible_but_costly < sibling <
+            poor_fit < insufficient_data).
+    Tier 1: -evidence_confidence rank (strong first).
+    Tier 2: corpus available (1 if has_corpus else 0, inverted).
+    Tier 3: formal profile available (inverted).
+    Tier 4: -strategic_value rank.
+    Tier 5: -field_core_risk preference (LOWER actual risk preferred —
+            i.e., 'strong' preservation preferred over 'bad').
+    Tier 6: canonical_name (stable tiebreaker).
+    """
+    bucket_rank = _BUCKET_ORDER.get(entry["bucket"], 9)
+    axes = fit["axes"]
+    sig = fit.get("_signals_used", {}) or {}
+    conf = _AXIS_RANK.get(axes["evidence_confidence"]["value"], 0)
+    has_corpus = 1 if sig.get("has_corpus") else 0
+    has_formal = 1 if sig.get("has_formal_profile") else 0
+    sv = _AXIS_RANK.get(axes["strategic_value"]["value"], 0)
+    fcr_pref = _FCR_PREFERENCE.get(axes["field_core_risk"]["value"], 2)
+    name = (entry.get("canonical_name") or "").lower()
+    return (
+        bucket_rank,
+        -conf,
+        -has_corpus,
+        -has_formal,
+        -sv,
+        -fcr_pref,
+        name,
+    )
+
+
+def rank_top_candidates(
+    fits: list[dict[str, Any]],
+    buckets: dict[str, list[dict[str, Any]]],
+    *,
+    n: int = 5,
+) -> list[dict[str, Any]]:
+    """Bucket-first ranking. Top-n across buckets in bucket order.
+
+    Guarantees:
+      - a `good_fit` venue NEVER outranked by `possible_but_costly`;
+      - within bucket, evidence_confidence dominates, then corpus
+        availability, then formal profile, then strategic_value, then
+        field_core_risk (lower is better).
+      - canonical_name is the stable tiebreaker (no random sort under
+        ties).
+    """
+    fits_by_id = {f["venue_profile_package_id"]: f for f in fits}
+    flat: list[tuple[tuple, dict[str, Any]]] = []
+    for bk in ("good_fit", "possible_but_costly",
+               "sibling_manuscript", "poor_fit", "insufficient_data"):
+        for entry in buckets.get(bk, []):
+            fit = fits_by_id.get(entry["venue_profile_package_id"])
+            if not fit:
+                continue
+            flat.append((_rank_key(entry, fit), entry))
+    flat.sort(key=lambda kv: kv[0])
+    return [entry for _, entry in flat[:n]]
+
+
 def build_mismatch_map(
     article_model: dict[str, Any], fit: dict[str, Any]
 ) -> dict[str, Any]:
@@ -912,15 +989,7 @@ def run_selection_over_registry(
 
     buckets = select_shortlist(fits)
 
-    # Top candidates: union of good_fit + possible_but_costly, ranked
-    # by strategic_value and field_core_risk
-    top: list[dict[str, Any]] = []
-    for bk in ("good_fit", "possible_but_costly"):
-        top.extend(buckets[bk])
-    # rank: prefer strong field_core_risk and strong evidence_confidence
-    val = {"strong": 3, "medium": 2, "weak": 1, "bad": 0, "unknown": 0}
-    top.sort(key=lambda r: -(val[r["field_core_risk"]] + val[r["evidence_confidence"]]))
-    top_5 = top[:5]
+    top_5 = rank_top_candidates(fits, buckets, n=5)
 
     mismatch_maps: list[dict[str, Any]] = []
     rewrite_plans: list[dict[str, Any]] = []

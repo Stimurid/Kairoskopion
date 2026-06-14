@@ -170,8 +170,38 @@ class VenueProfileRegistry:
                             seen.add(key)
                             out.append(item)
                     merged_dict[k] = out
+                elif isinstance(v, dict) and isinstance(merged_dict.get(k), dict):
+                    # Per-key merge for dict fields (notably `completeness`
+                    # and `confidence`).
+                    # For `completeness` specifically: never DOWNGRADE an
+                    # existing 'present' or 'partial' subobject status to
+                    # 'missing' just because the new VPKG didn't carry it.
+                    # This is the v2 -> v2.1 EditorialBoardCloud 1->0 fix.
+                    merged_sub = dict(merged_dict.get(k) or {})
+                    rank = {"missing": 0, "partial": 1, "present": 2}
+                    for sk, sv in v.items():
+                        old = merged_sub.get(sk)
+                        if k == "completeness" and old in ("present", "partial"):
+                            if rank.get(sv, 0) >= rank.get(old, 0):
+                                merged_sub[sk] = sv
+                            # else: keep the better existing status
+                        else:
+                            merged_sub[sk] = sv
+                    merged_dict[k] = merged_sub
                 else:
                     merged_dict[k] = v
+            # Subobject id fields: never erase a real id with None.
+            for id_key in (
+                "venue_field_position_id",
+                "published_corpus_hull_id",
+                "editorial_board_cloud_id",
+                "publication_regime_id",
+                "citation_expectation_profile_id",
+                "source_evidence_packet_id",
+            ):
+                existing_id = (existing.to_dict() or {}).get(id_key)
+                if existing_id and not merged_dict.get(id_key):
+                    merged_dict[id_key] = existing_id
             merged_dict["venue_profile_package_id"] = new_id
             merged_dict["updated_at"] = _now()
             vpkg = VenueProfilePackage.from_dict(merged_dict)
