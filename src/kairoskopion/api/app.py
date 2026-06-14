@@ -62,7 +62,10 @@ app = FastAPI(
     description="Publication positioning cockpit API",
 )
 
-_default_origins = ["http://localhost:5173", "http://localhost:3000"]
+_default_origins = [
+    "http://localhost:5173", "http://localhost:3000",
+    "http://127.0.0.1:5173", "http://127.0.0.1:3000",
+]
 _env_origins = os.environ.get("KAIROSKOPION_ALLOWED_ORIGINS", "")
 _origins = [o.strip() for o in _env_origins.split(",") if o.strip()] if _env_origins else _default_origins
 

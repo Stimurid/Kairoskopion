@@ -1,6 +1,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Smoke-test storage root (auth + persistence smokes)
+.kairoskopion_smoke/
 *.egg-info/
 dist/
 build/
