@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 OPENALEX_WORKS = "https://api.openalex.org/works"
+OPENALEX_SOURCES = "https://api.openalex.org/sources"
 DEFAULT_UA = (
     "Kairoskopion/0.2 "
     "(https://github.com/Stimurid/Kairoskopion; "
@@ -64,6 +65,29 @@ def ensure_oa_source_id(raw: str) -> str:
     if raw.startswith("http"):
         return raw.rstrip("/").rsplit("/", 1)[-1]
     return raw
+
+
+def lookup_source_by_issn(issn: str, timeout: int = 12) -> dict | None:
+    """OpenAlex Sources lookup by ISSN. Returns the source record or None."""
+    if not issn:
+        return None
+    issn_norm = issn.strip().upper()
+    url = f"{OPENALEX_SOURCES}/issn:{issn_norm}"
+    return _http_json(url, timeout=timeout)
+
+
+def search_source_by_title(
+    title: str, *, timeout: int = 12, max_results: int = 5,
+) -> list[dict]:
+    """OpenAlex Sources search by title. Returns up to `max_results`."""
+    if not title:
+        return []
+    q = urllib.parse.quote(title.strip())
+    url = f"{OPENALEX_SOURCES}?search={q}&per_page={max_results}"
+    resp = _http_json(url, timeout=timeout)
+    if not resp:
+        return []
+    return resp.get("results", []) or []
 
 
 def fetch_works_for_venue(

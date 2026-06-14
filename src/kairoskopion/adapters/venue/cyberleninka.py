@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import urllib.error
 import urllib.request
 from collections import Counter
@@ -136,6 +137,108 @@ def search_journals(
         })
     out.sort(key=lambda x: -x["article_sample_count"])
     return out
+
+
+def mine_journal_articles(
+    journal_name: str,
+    *,
+    size: int = 30,
+    timeout: int = 25,
+    mode: str = "live",
+) -> dict[str, Any]:
+    """Fetch and aggregate article-level hits FOR ONE JOURNAL.
+
+    Strategy: query CyberLeninka with the journal name as `q`; keep only
+    hits whose `journal` field equals the queried name (case-insensitive,
+    whitespace-normalized).
+
+    Returns a dict with `articles` (list of {title, year, link}),
+    `years` (set), `unique_titles` count, `topic_terms` (extracted from
+    titles), `evidence_status`, `unknowns`.
+
+    NOT a full corpus_analyzer-compatible blob: CyberLeninka does not
+    expose abstracts or references via the search API. Marked
+    explicitly as `CYBERLENINKA_SEARCH_DERIVED`.
+    """
+    if mode == "fixture":
+        body = CYBERLENINKA_FIXTURE
+    else:
+        body = _post_json(CYBERLENINKA_API, {
+            "mode": "articles",
+            "q": journal_name,
+            "size": size,
+            "from": 0,
+        }, timeout=timeout) or {}
+
+    raw_articles = body.get("articles") or []
+    name_norm = re.sub(r"\s+", " ", journal_name.strip().lower())
+    matched: list[dict[str, Any]] = []
+    for a in raw_articles:
+        jname = a.get("journal") or ""
+        if re.sub(r"\s+", " ", jname.strip().lower()) == name_norm:
+            matched.append(a)
+
+    titles = [a.get("name") for a in matched if a.get("name")]
+    years_raw = [a.get("year") for a in matched if a.get("year")]
+    years: list[int] = []
+    for y in years_raw:
+        try:
+            years.append(int(y))
+        except (TypeError, ValueError):
+            pass
+
+    # Lightweight topic term extraction from titles
+    topic_counter: dict[str, int] = {}
+    for t in titles:
+        for tok in re.findall(r"[A-Za-zА-Яа-яЁё]{4,}", t or ""):
+            low = tok.lower()
+            if low in _RU_STOPWORDS or low in _EN_STOPWORDS:
+                continue
+            topic_counter[low] = topic_counter.get(low, 0) + 1
+    top_terms = sorted(topic_counter.items(), key=lambda x: -x[1])[:15]
+
+    out = {
+        "journal_name": journal_name,
+        "articles": [
+            {"title": a.get("name"), "year": a.get("year"),
+             "link": a.get("link"),
+             "annotation": a.get("annotation")}
+            for a in matched
+        ],
+        "matched_count": len(matched),
+        "years": sorted(set(years)),
+        "year_range": [min(years), max(years)] if years else None,
+        "unique_titles": len(set(titles)),
+        "top_topic_terms": [{"term": t, "count": c} for t, c in top_terms],
+        "evidence_status": "CYBERLENINKA_SEARCH_DERIVED",
+        "source": "CyberLeninka",
+        "unknowns": [
+            "no abstracts in article-level search API",
+            "no references in article-level search API",
+            "topic terms are bag-of-words from titles, not corpus_analyzer patterns",
+        ],
+    }
+    if not matched:
+        out["unknowns"].append(
+            f"no exact-name matches for {journal_name!r} in CyberLeninka "
+            f"(out of {len(raw_articles)} raw search hits)"
+        )
+    return out
+
+
+_RU_STOPWORDS = {
+    "вопросы", "журнал", "наука", "статья", "статьи", "вестник",
+    "номер", "тема", "ред", "проблема", "проблемы", "анализ",
+    "теория", "понятие", "понятия", "значение", "роль", "место",
+    "опыт", "автор", "обзор", "основные", "научный", "научной",
+    "научного", "исследования", "исследование",
+}
+_EN_STOPWORDS = {
+    "study", "studies", "review", "article", "analysis", "case",
+    "based", "between", "across", "through", "introduction",
+    "theory", "approach", "research", "perspective", "from",
+    "within", "without",
+}
 
 
 class CyberLeninkaAdapter(VenueAdapter):
