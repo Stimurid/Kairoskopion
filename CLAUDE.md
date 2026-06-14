@@ -146,12 +146,19 @@ For deep spec questions, read:
 ## UI Cockpit v0 (Operator/Staging Preview)
 
 > **This is an internal operator/staging preview, NOT a public product release.**
-> Deterministic backend fallbacks are still in use. Persistence is in-memory only.
-> Auth, job queue, and production hardening are NOT implemented.
-> Staging deployment must be protected (IP-restricted or auth-gated).
+> Deterministic backend fallbacks are still in use.
+> **Staging soft-auth is wired** (display name + optional email; no
+> password; no email verification). Trust-based identity for 3–10 known
+> testers only — see
+> [`docs/operations/STAGING_SOFT_AUTH_AND_PERSISTENCE_REPORT.md`](docs/operations/STAGING_SOFT_AUTH_AND_PERSISTENCE_REPORT.md).
+> **Persistence is disk-backed** via `CaseStore` JSON files under
+> `${KAIROSKOPION_DATA_DIR}` (default `.kairoskopion/`); user-scoped
+> cases live under `users/<user_id>/cases/`; users + sessions in
+> `users.jsonl` / `sessions.jsonl`. Cases survive restart.
+> Job queue and production hardening are NOT implemented.
 > No public prod claim.
 
-- **Backend:** FastAPI (`src/kairoskopion/api/`), 19 REST endpoints, in-memory Case orchestrator
+- **Backend:** FastAPI (`src/kairoskopion/api/`), Bearer auth on all `/cases/*`, disk-backed Case orchestrator
 - **Frontend:** React + TypeScript (`ui/`), Vite build, 17 components, dark theme, responsive
 - **Run:** `uvicorn kairoskopion.api.app:app --reload` (port 8000) + `cd ui && npm run dev` (port 5173)
 - **Build:** `cd ui && npx tsc --noEmit && npx vite build`

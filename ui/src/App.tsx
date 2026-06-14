@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CaseSummary, CaseDetail } from './types/domain';
-import { api } from './api/client';
+import { api, getToken, clearToken, type AuthUser } from './api/client';
 import { CaseWorkspace } from './components/CaseWorkspace';
 import { AgentMap } from './components/AgentMap';
+import { AuthGate } from './components/AuthGate';
 import './styles/cockpit.css';
 
 type AppView = 'cases' | 'agents';
@@ -12,6 +13,8 @@ export default function App() {
   const [activeCase, setActiveCase] = useState<CaseDetail | null>(null);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [appView, setAppView] = useState<AppView>('cases');
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     api.health()
@@ -19,16 +22,42 @@ export default function App() {
       .catch(() => setIsConnected(false));
   }, []);
 
+  // Resolve current user from token on boot
+  useEffect(() => {
+    if (!isConnected) return;
+    const tok = getToken();
+    if (!tok) {
+      setAuthChecked(true);
+      return;
+    }
+    api.me()
+      .then(r => setUser(r.user))
+      .catch(() => { clearToken(); setUser(null); })
+      .finally(() => setAuthChecked(true));
+  }, [isConnected]);
+
   const loadCases = useCallback(async () => {
     try {
       const list = await api.listCases();
       setCases(list);
-    } catch { /* backend not running */ }
+    } catch { /* backend not running or unauthenticated */ }
   }, []);
 
   useEffect(() => {
-    if (isConnected) loadCases();
-  }, [isConnected, loadCases]);
+    if (isConnected && user) loadCases();
+  }, [isConnected, user, loadCases]);
+
+  const handleAuthenticated = useCallback((u: AuthUser) => {
+    setUser(u);
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    try { await api.logout(); } catch { /* ignore */ }
+    clearToken();
+    setUser(null);
+    setActiveCase(null);
+    setCases([]);
+  }, []);
 
   const openCase = useCallback(async (caseId: string) => {
     try {
@@ -89,12 +118,17 @@ export default function App() {
     );
   }
 
-  if (isConnected === null) {
+  if (isConnected === null || !authChecked) {
     return (
       <div className="app-shell">
         <div className="connecting">Connecting...</div>
       </div>
     );
+  }
+
+  // Soft-auth gate: must have a current user (token + /auth/me ok)
+  if (!user) {
+    return <AuthGate onAuthenticated={handleAuthenticated} />;
   }
 
   return (
@@ -116,6 +150,21 @@ export default function App() {
             System / Agents
           </button>
         </nav>
+        <div className="top-bar-user">
+          <span
+            className="top-bar-user-name"
+            title={user.email ?? 'no email — workspace tied to this device only'}
+          >
+            {user.display_name}
+          </span>
+          <button
+            className="top-bar-logout"
+            onClick={handleLogout}
+            title="Sign out"
+          >
+            Sign out
+          </button>
+        </div>
       </header>
 
       <div className="app-body">

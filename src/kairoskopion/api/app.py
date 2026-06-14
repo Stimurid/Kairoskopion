@@ -15,11 +15,19 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from .auth import (
+    User,
+    continue_session as _auth_continue,
+    get_current_user,
+    logout as _auth_logout,
+    me as _auth_me,
+    signup as _auth_signup,
+)
 from .cases import CaseStore, Case, CaseStage
 
 _VERSION = "0.2.0-alpha"
@@ -81,6 +89,65 @@ def health():
 
 
 # ---------------------------------------------------------------------------
+# Staging soft-auth: signup / continue / me / logout
+# ---------------------------------------------------------------------------
+# Trust-based identity. No password. No email verification. Acceptable
+# only for the small trusted-tester staging group. See
+# docs/operations/STAGING_SOFT_AUTH_AND_PERSISTENCE_REPORT.md.
+
+class SignupRequest(BaseModel):
+    display_name: str
+    email: str | None = None
+
+
+class ContinueRequest(BaseModel):
+    email: str
+
+
+@app.post("/auth/signup")
+def auth_signup(req: SignupRequest):
+    if not (req.display_name or "").strip():
+        raise HTTPException(400, "display_name_required")
+    return _auth_signup(req.display_name, req.email)
+
+
+@app.post("/auth/continue")
+def auth_continue(req: ContinueRequest):
+    if not (req.email or "").strip():
+        raise HTTPException(400, "email_required")
+    return _auth_continue(req.email)
+
+
+@app.get("/auth/me")
+def auth_me(current_user: User = Depends(get_current_user)):
+    return _auth_me(current_user)
+
+
+@app.post("/auth/logout")
+def auth_logout(authorization: str | None = Header(default=None)):
+    # Idempotent: revoke if present + valid, else no-op.
+    if not authorization:
+        return {"revoked": False}
+    parts = authorization.split(maxsplit=1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return {"revoked": False}
+    return _auth_logout(parts[1].strip())
+
+
+# Shared dependency: resolves `case_id` to a Case owned by the
+# authenticated user, or 404. Cross-tenant access is silent (no
+# information leak about whether the case exists for some other user).
+def _user_case(
+    case_id: str,
+    current_user: User = Depends(get_current_user),
+) -> Case:
+    c = store.get(case_id, user_id=current_user.user_id)
+    if not c:
+        raise HTTPException(404, f"Case {case_id} not found")
+    return c
+
+
+# ---------------------------------------------------------------------------
 # Cases CRUD
 # ---------------------------------------------------------------------------
 
@@ -89,27 +156,29 @@ class CreateCaseRequest(BaseModel):
 
 
 @app.get("/cases")
-def list_cases():
-    return [c.summary() for c in store.all()]
+def list_cases(current_user: User = Depends(get_current_user)):
+    return [c.summary() for c in store.all(user_id=current_user.user_id)]
 
 
 @app.post("/cases")
-def create_case(req: CreateCaseRequest):
-    case = store.create(title=req.title)
+def create_case(
+    req: CreateCaseRequest,
+    current_user: User = Depends(get_current_user),
+):
+    case = store.create(title=req.title, user_id=current_user.user_id)
     return case.summary()
 
 
 @app.get("/cases/{case_id}")
-def get_case(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_case(case: Case = Depends(_user_case)):
     return case.to_dict()
 
 
 @app.delete("/cases/{case_id}")
-def delete_case(case_id: str):
-    if not store.delete(case_id):
+def delete_case(
+    case_id: str, current_user: User = Depends(get_current_user),
+):
+    if not store.delete(case_id, user_id=current_user.user_id):
         raise HTTPException(404, f"Case {case_id} not found")
     return {"deleted": case_id}
 
@@ -125,10 +194,7 @@ class IntakeTextRequest(BaseModel):
 
 
 @app.post("/cases/{case_id}/intake/text")
-def intake_text(case_id: str, req: IntakeTextRequest):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def intake_text(req: IntakeTextRequest, case: Case = Depends(_user_case)):
     result = case.intake_text(req.text, req.input_type, req.search_depth)
     store.save(case)
     return result
@@ -139,14 +205,11 @@ _SUPPORTED_UPLOAD_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".html", ".htm"}
 
 @app.post("/cases/{case_id}/intake/file")
 async def intake_file(
-    case_id: str,
     file: UploadFile = File(...),
     input_type: str = Form("auto"),
     search_depth: str = Form("none"),
+    case: Case = Depends(_user_case),
 ):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
 
     filename = file.filename or "upload"
     suffix = Path(filename).suffix.lower()
@@ -192,18 +255,14 @@ class InvestigateVenueRequest(BaseModel):
 
 
 @app.post("/cases/{case_id}/investigate-venue")
-def investigate_venue(case_id: str, req: InvestigateVenueRequest):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def investigate_venue(
+    req: InvestigateVenueRequest, case: Case = Depends(_user_case),
+):
     return case.investigate_venue(req.text)
 
 
 @app.get("/cases/{case_id}/investigated-venue")
-def get_investigated_venue(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_investigated_venue(case: Case = Depends(_user_case)):
     if not case.investigated_venue:
         raise HTTPException(404, "No venue investigated yet")
     result: dict = {"venue": case.investigated_venue.to_dict()}
@@ -217,10 +276,7 @@ def get_investigated_venue(case_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/cases/{case_id}/article-model")
-def get_article_model(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_article_model(case: Case = Depends(_user_case)):
     if not case.article_model:
         raise HTTPException(404, "Article model not built yet")
     return case.article_model.to_dict()
@@ -232,10 +288,9 @@ class ConfirmArticleRequest(BaseModel):
 
 
 @app.post("/cases/{case_id}/article-model/confirm")
-def confirm_article_model(case_id: str, req: ConfirmArticleRequest):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def confirm_article_model(
+    req: ConfirmArticleRequest, case: Case = Depends(_user_case),
+):
     if not case.article_model:
         raise HTTPException(400, "Article model not built yet")
     result = case.confirm_article_model(
@@ -263,20 +318,16 @@ class SetScenarioRequest(BaseModel):
 
 
 @app.post("/cases/{case_id}/scenario")
-def set_scenario(case_id: str, req: SetScenarioRequest):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def set_scenario(
+    req: SetScenarioRequest, case: Case = Depends(_user_case),
+):
     result = case.set_scenario(req.model_dump())
     store.save(case)
     return result
 
 
 @app.get("/cases/{case_id}/scenario")
-def get_scenario(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_scenario(case: Case = Depends(_user_case)):
     if not case.scenario:
         raise HTTPException(404, "Scenario not set")
     return case.scenario.to_dict()
@@ -287,10 +338,7 @@ def get_scenario(case_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/cases/{case_id}/pathways")
-def get_pathways(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_pathways(case: Case = Depends(_user_case)):
     return case.get_pathways()
 
 
@@ -299,20 +347,14 @@ def get_pathways(case_id: str):
 # ---------------------------------------------------------------------------
 
 @app.post("/cases/{case_id}/discover-venues")
-def discover_venues(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def discover_venues(case: Case = Depends(_user_case)):
     result = case.discover_venues()
     store.save(case)
     return result
 
 
 @app.get("/cases/{case_id}/venue-pool")
-def get_venue_pool(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_venue_pool(case: Case = Depends(_user_case)):
     return case.get_venue_pool()
 
 
@@ -321,28 +363,19 @@ def get_venue_pool(case_id: str):
 # ---------------------------------------------------------------------------
 
 @app.post("/cases/{case_id}/select-venue/{venue_id}")
-def select_venue(case_id: str, venue_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def select_venue(venue_id: str, case: Case = Depends(_user_case)):
     result = case.select_venue(venue_id)
     store.save(case)
     return result
 
 
 @app.get("/cases/{case_id}/fit")
-def get_fit(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_fit(case: Case = Depends(_user_case)):
     return case.get_fit()
 
 
 @app.get("/cases/{case_id}/mismatch-map")
-def get_mismatch_map(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_mismatch_map(case: Case = Depends(_user_case)):
     return case.get_mismatch_map()
 
 
@@ -351,10 +384,7 @@ def get_mismatch_map(case_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/cases/{case_id}/adaptation-plan")
-def get_adaptation_plan(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_adaptation_plan(case: Case = Depends(_user_case)):
     return case.get_adaptation_plan()
 
 
@@ -365,10 +395,10 @@ class UserDecisionRequest(BaseModel):
 
 
 @app.post("/cases/{case_id}/decisions")
-def apply_decisions(case_id: str, decisions: list[UserDecisionRequest]):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def apply_decisions(
+    decisions: list[UserDecisionRequest],
+    case: Case = Depends(_user_case),
+):
     result = case.apply_decisions([d.model_dump() for d in decisions])
     store.save(case)
     return result
@@ -379,10 +409,10 @@ def apply_decisions(case_id: str, decisions: list[UserDecisionRequest]):
 # ---------------------------------------------------------------------------
 
 @app.get("/cases/{case_id}/evidence/{entity_type}/{field_path}")
-def get_evidence(case_id: str, entity_type: str, field_path: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_evidence(
+    entity_type: str, field_path: str,
+    case: Case = Depends(_user_case),
+):
     return case.get_evidence(entity_type, field_path)
 
 
@@ -391,10 +421,7 @@ def get_evidence(case_id: str, entity_type: str, field_path: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/cases/{case_id}/quality-gates")
-def get_quality_gates(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_quality_gates(case: Case = Depends(_user_case)):
     return case.get_quality_gates()
 
 
@@ -403,10 +430,7 @@ def get_quality_gates(case_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/cases/{case_id}/dossier")
-def get_dossier(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_dossier(case: Case = Depends(_user_case)):
     return case.build_dossier()
 
 
@@ -415,10 +439,7 @@ def get_dossier(case_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/cases/{case_id}/decision-log")
-def get_decision_log(case_id: str):
-    case = store.get(case_id)
-    if not case:
-        raise HTTPException(404, f"Case {case_id} not found")
+def get_decision_log(case: Case = Depends(_user_case)):
     return case.decision_log
 
 

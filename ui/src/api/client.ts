@@ -4,16 +4,49 @@
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
+// --- Bearer token (staging soft-auth) ---
+const TOKEN_KEY = 'kairoskopion_token';
+
+export function getToken(): string | null {
+  try { return localStorage.getItem(TOKEN_KEY); }
+  catch { return null; }
+}
+
+export function setToken(token: string): void {
+  try { localStorage.setItem(TOKEN_KEY, token); } catch { /* private mode */ }
+}
+
+export function clearToken(): void {
+  try { localStorage.removeItem(TOKEN_KEY); } catch { /* private mode */ }
+}
+
+export class UnauthorizedError extends Error {
+  constructor(public body: string) {
+    super(`API 401: ${body}`);
+    this.name = 'UnauthorizedError';
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
-  });
+  const headers: Record<string, string> = {
+    ...((init?.headers as Record<string, string>) ?? {}),
+  };
+  // Only set Content-Type for JSON requests; multipart uploads set their own.
+  if (!headers['Content-Type'] && !(init?.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const tok = getToken();
+  if (tok && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${tok}`;
+  }
+  const res = await fetch(`${BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     const body = await res.text();
+    if (res.status === 401) {
+      // Token gone bad — surface so the gate can re-prompt
+      clearToken();
+      throw new UnauthorizedError(body);
+    }
     throw new Error(`API ${res.status}: ${body}`);
   }
   return res.json();
@@ -51,8 +84,28 @@ import type {
   VenueInvestigationResult,
 } from '../types/domain';
 
+export interface AuthUser {
+  user_id: string;
+  display_name: string;
+  email: string | null;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  user: AuthUser;
+  session_token: string;
+}
+
 export const api = {
   health: () => get<{ status: string; version: string }>('/health'),
+
+  // Auth (staging soft-auth: no password, no verification)
+  signup: (displayName: string, email?: string) =>
+    post<AuthResponse>('/auth/signup', { display_name: displayName, email: email || null }),
+  continueSession: (email: string) =>
+    post<AuthResponse>('/auth/continue', { email }),
+  me: () => get<{ user: AuthUser }>('/auth/me'),
+  logout: () => post<{ revoked: boolean }>('/auth/logout'),
 
   // Cases
   listCases: () => get<CaseSummary[]>('/cases'),
@@ -71,12 +124,22 @@ export const api = {
     const form = new FormData();
     form.append('file', file);
     form.append('input_type', inputType);
+    // Use fetch directly (FormData), but inject the Bearer header so
+    // user-scoped upload reaches the right workspace.
+    const tok = getToken();
+    const headers: Record<string, string> = {};
+    if (tok) headers['Authorization'] = `Bearer ${tok}`;
     const res = await fetch(`${BASE}/cases/${id}/intake/file`, {
       method: 'POST',
       body: form,
+      headers,
     });
     if (!res.ok) {
       const body = await res.text();
+      if (res.status === 401) {
+        clearToken();
+        throw new UnauthorizedError(body);
+      }
       throw new Error(`API ${res.status}: ${body}`);
     }
     return res.json() as Promise<{

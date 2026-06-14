@@ -62,13 +62,22 @@ def _get_llm_provider() -> OpenAICompatProvider | None:
 
 
 class Case:
-    """In-memory case state.  One case = one publication situation."""
+    """In-memory case state.  One case = one publication situation.
 
-    def __init__(self, case_id: str | None = None, title: str = ""):
+    `user_id` is None for legacy/demo/system cases (pre-auth, tests).
+    User-scoped cases carry the owner's user_id; the store partitions
+    on-disk storage and read access by it.
+    """
+
+    def __init__(
+        self, case_id: str | None = None, title: str = "",
+        user_id: str | None = None,
+    ):
         self.case_id = case_id or generate_id("case")
         self.title = title or "Untitled case"
         self.created_at = _now()
         self.stage = CaseStage.EMPTY
+        self.user_id: str | None = user_id
         self.input_text: str = ""
         self.input_type: str = ""
 
@@ -1009,24 +1018,45 @@ class Case:
 
 
 class CaseStore:
-    """File-backed case store.  Each case is a JSON file under data_dir/cases/."""
+    """File-backed case store with user partitioning.
+
+    Layout:
+      ${data_dir}/cases/<case_id>.json
+          legacy / system / demo cases (user_id = None)
+      ${data_dir}/users/<user_id>/cases/<case_id>.json
+          user-owned cases (user_id != None)
+
+    Read API supports optional `user_id` scoping:
+      - `user_id=None` (legacy mode): all cases, unrestricted. Used by
+        existing tests and CLI tooling.
+      - `user_id='user_xxx'`: only cases owned by that user. Used by
+        the auth-protected HTTP endpoints.
+    """
 
     def __init__(self, data_dir: str | None = None):
         import os
         from pathlib import Path
         raw = data_dir or os.environ.get("KAIROSKOPION_DATA_DIR") or ".kairoskopion"
-        self._dir = Path(raw) / "cases"
+        self._root = Path(raw)
+        self._dir = self._root / "cases"  # legacy/system cases live here
+        self._users_dir = self._root / "users"
         self._dir.mkdir(parents=True, exist_ok=True)
+        self._users_dir.mkdir(parents=True, exist_ok=True)
         self._cases: dict[str, Case] = {}
         self._load_all()
 
-    def _case_path(self, case_id: str):
+    def _case_path(self, case_id: str, user_id: str | None = None):
         from pathlib import Path
+        if user_id:
+            d = self._users_dir / user_id / "cases"
+            d.mkdir(parents=True, exist_ok=True)
+            return d / f"{case_id}.json"
         return self._dir / f"{case_id}.json"
 
     def _load_all(self):
         import json, logging
         logger = logging.getLogger(__name__)
+        # Legacy/system cases (no user_id)
         for p in sorted(self._dir.glob("*.json")):
             try:
                 data = json.loads(p.read_text(encoding="utf-8"))
@@ -1034,26 +1064,62 @@ class CaseStore:
                 self._cases[case.case_id] = case
             except Exception as exc:
                 logger.warning("Failed to load case %s: %s", p.name, exc)
+        # User-scoped cases — walk users/<user_id>/cases/
+        if self._users_dir.exists():
+            for udir in sorted(self._users_dir.glob("*/cases")):
+                for p in sorted(udir.glob("*.json")):
+                    try:
+                        data = json.loads(p.read_text(encoding="utf-8"))
+                        case = _case_from_snapshot(data)
+                        # Defensive: ensure user_id reflects directory location
+                        if not case.user_id:
+                            case.user_id = udir.parent.name
+                        self._cases[case.case_id] = case
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to load user case %s: %s", p.name, exc,
+                        )
 
-    def create(self, title: str = "") -> Case:
-        case = Case(title=title)
+    def create(self, title: str = "", user_id: str | None = None) -> Case:
+        case = Case(title=title, user_id=user_id)
         self._cases[case.case_id] = case
         self._persist(case)
         return case
 
-    def get(self, case_id: str) -> Case | None:
-        return self._cases.get(case_id)
+    def get(self, case_id: str, user_id: str | None = None) -> Case | None:
+        """Return the case if accessible to caller.
 
-    def all(self) -> list[Case]:
-        return list(self._cases.values())
+        Scoping rules:
+          - `user_id=None` (legacy): return whatever is in the store.
+          - `user_id='user_xxx'`: return only if the case's user_id
+            matches. Cross-tenant access is silently None.
+        """
+        c = self._cases.get(case_id)
+        if c is None:
+            return None
+        if user_id is None:
+            return c
+        if c.user_id == user_id:
+            return c
+        return None
 
-    def delete(self, case_id: str) -> bool:
-        removed = self._cases.pop(case_id, None)
-        if removed is not None:
-            path = self._case_path(case_id)
-            path.unlink(missing_ok=True)
-            return True
-        return False
+    def all(self, user_id: str | None = None) -> list[Case]:
+        if user_id is None:
+            return list(self._cases.values())
+        return [c for c in self._cases.values() if c.user_id == user_id]
+
+    def delete(self, case_id: str, user_id: str | None = None) -> bool:
+        c = self._cases.get(case_id)
+        if c is None:
+            return False
+        # Scope check on delete: callers with a user_id may only delete
+        # their own.
+        if user_id is not None and c.user_id != user_id:
+            return False
+        path = self._case_path(case_id, c.user_id)
+        self._cases.pop(case_id, None)
+        path.unlink(missing_ok=True)
+        return True
 
     def save(self, case: Case):
         self._cases[case.case_id] = case
@@ -1062,7 +1128,7 @@ class CaseStore:
     def _persist(self, case: Case):
         import json, logging
         logger = logging.getLogger(__name__)
-        path = self._case_path(case.case_id)
+        path = self._case_path(case.case_id, case.user_id)
         snapshot = _case_to_snapshot(case)
         try:
             tmp = path.with_suffix(".tmp")
@@ -1082,6 +1148,7 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         "title": case.title,
         "created_at": case.created_at,
         "stage": case.stage.value if isinstance(case.stage, CaseStage) else case.stage,
+        "user_id": case.user_id,
         "input_text": case.input_text,
         "input_type": case.input_type,
         "decision_log": case.decision_log,
@@ -1127,7 +1194,11 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
 
 def _case_from_snapshot(data: dict[str, Any]) -> Case:
     """Deserialize a snapshot dict back into a Case object."""
-    case = Case(case_id=data["case_id"], title=data.get("title", ""))
+    case = Case(
+        case_id=data["case_id"],
+        title=data.get("title", ""),
+        user_id=data.get("user_id"),
+    )
     case.created_at = data.get("created_at", case.created_at)
     stage_val = data.get("stage", "empty")
     try:
