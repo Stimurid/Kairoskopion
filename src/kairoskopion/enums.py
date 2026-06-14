@@ -560,3 +560,56 @@ class VenueCandidateReason(str, Enum):
     OA_POLICY_MATCH = "oa_policy_match"
     USER_SEED = "user_seed"
     WEAK_SIGNAL = "weak_signal"
+
+
+# --- Venue Funnel v1 (canon: VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md) ---
+
+class VenueFunnelLayer(str, Enum):
+    """Eight layers of the venue discovery funnel.
+
+    See VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md §1. The funnel narrows
+    from a broad publication universe to a concrete editorial scene;
+    each layer has its own source-category allowlist (§3) and its own
+    VenueProfilePackage subobjects (§2).
+    """
+    UNIVERSE = "universe"
+    DISCIPLINARY_REGIME = "disciplinary_regime"
+    TRIBE_SCHOOL = "tribe_school"
+    VENUE_CLASS = "venue_class"
+    JOURNAL_ENVELOPE = "journal_envelope"
+    SECTION_SPECIAL_ISSUE = "section_special_issue"
+    EDITORIAL_BOARD_CLOUD = "editorial_board_cloud"
+    PUBLISHED_CORPUS_HULL = "published_corpus_hull"
+
+
+class VenueSourceCategory(str, Enum):
+    """Ten source categories of the venue allowlist.
+
+    See VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md §3 (A–J) and the
+    operational rubric benchmarks/golden/venue_source_layer_map.md §1
+    (one authoritative source per FPM axis). H is corpus-only, never
+    authoritative for venue metadata. J is its own authority level.
+    """
+    A_JOURNAL_SITE = "A_journal_site"
+    B_PUBLISHER = "B_publisher"
+    C_INDEXER_REGISTRY = "C_indexer_registry"
+    D_CORPUS = "D_corpus"
+    E_EDITORIAL_BOARD = "E_editorial_board"
+    F_CORPUS_AUTHORS = "F_corpus_authors"
+    G_METADATA_API = "G_metadata_api"
+    H_FULL_TEXT_RESOLVER = "H_full_text_resolver"
+    I_CFP_SOCIETY_CHANNEL = "I_cfp_society_channel"
+    J_TACIT_SIGNAL = "J_tacit_signal"
+
+
+class CacheMissCategory(str, Enum):
+    """Two-stage DB→network cache-miss taxonomy.
+
+    See VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md §7. Hot path stays
+    deterministic; LLM fires only on cache-miss of the matching
+    category. FRESH_SUFFICIENT never spends an LLM key.
+    """
+    ABSENT = "absent"
+    STALE = "stale"
+    WEAK_EVIDENCE = "weak_evidence"
+    FRESH_SUFFICIENT = "fresh_sufficient"
