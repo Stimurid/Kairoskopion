@@ -233,6 +233,95 @@ def corpus_pattern_light_summary(
     return summary
 
 
+def enrich_board_for_vpkg(
+    vpkg, board_page_url: str | None,
+) -> dict[str, Any]:
+    """Wire the existing editorial_board adapter onto a discovered URL.
+
+    Returns a dossier dict with:
+      - vpkg_id, canonical_name
+      - board_page_url (the URL tried)
+      - extraction_status: one of
+          EXTRACTED_FROM_OFFICIAL_HTML | EXTRACTED_UNVERIFIED |
+          INACCESSIBLE | JS_ONLY | NOT_FOUND_AFTER_SEARCH | UNKNOWN
+      - editorial_board_cloud: the EBC dict (when extraction succeeded),
+        else None
+      - members_sampled: int
+      - notes: [...]
+
+    Does NOT mutate the VPKG. Caller does the safe upsert. Honors:
+      - empty extraction NEVER overwrites an existing non-empty board
+        cloud (caller must NOT overwrite if extraction_status is
+        anything other than EXTRACTED_FROM_OFFICIAL_HTML or
+        EXTRACTED_UNVERIFIED with members > 0);
+      - JS-only and INACCESSIBLE cases are honest, not fabricated.
+    """
+    from ..adapters.venue.editorial_board import (
+        build_editorial_board_cloud,
+    )
+
+    out: dict[str, Any] = {
+        "vpkg_id": vpkg.venue_profile_package_id,
+        "canonical_name": vpkg.canonical_name,
+        "board_page_url": board_page_url,
+        "extraction_status": "UNKNOWN",
+        "editorial_board_cloud": None,
+        "members_sampled": 0,
+        "notes": [],
+    }
+
+    if not board_page_url:
+        out["extraction_status"] = "NOT_FOUND_AFTER_SEARCH"
+        out["notes"].append(
+            "no board URL was discovered for this VPKG — board enrichment skipped"
+        )
+        return out
+
+    try:
+        cloud = build_editorial_board_cloud(
+            board_page_url=board_page_url,
+            venue_profile_package_id=vpkg.venue_profile_package_id,
+            target_sample=30,
+        )
+    except Exception as exc:  # noqa: BLE001
+        out["extraction_status"] = "INACCESSIBLE"
+        out["notes"].append(f"adapter raised: {type(exc).__name__}: {exc}")
+        return out
+
+    members = getattr(cloud, "members", []) or []
+    members_n = getattr(cloud, "members_sampled", 0) or len(members)
+    out["members_sampled"] = members_n
+
+    # Inspect the unknowns/warnings the adapter produced
+    unks_joined = " | ".join(getattr(cloud, "unknowns", []) or [])
+    warns_joined = " | ".join(getattr(cloud, "warnings", []) or [])
+    if members_n == 0:
+        if "JS-only" in warns_joined or "JS-only" in unks_joined:
+            out["extraction_status"] = "JS_ONLY"
+        elif "fetch failed" in unks_joined:
+            out["extraction_status"] = "INACCESSIBLE"
+        elif "no editor name/affiliation" in unks_joined:
+            out["extraction_status"] = "NOT_FOUND_AFTER_SEARCH"
+        else:
+            out["extraction_status"] = "UNKNOWN"
+        out["notes"].append("0 members extracted — VPKG board not updated")
+        out["editorial_board_cloud"] = cloud.to_dict()
+        return out
+
+    # We have members. Check whether at least one carried OpenAlex
+    # identity resolution (that flips status from UNVERIFIED to verified).
+    any_verified = any(
+        (m or {}).get("evidence_status") == "metadata_api_openalex"
+        for m in members
+    )
+    out["extraction_status"] = (
+        "EXTRACTED_FROM_OFFICIAL_HTML" if any_verified
+        else "EXTRACTED_UNVERIFIED"
+    )
+    out["editorial_board_cloud"] = cloud.to_dict()
+    return out
+
+
 # Late import of re (kept at bottom to be obvious that pattern
 # uses regex inside the function only)
 import re  # noqa: E402
