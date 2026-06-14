@@ -73,6 +73,10 @@ from .ids import (
     source_evidence_packet_id,
     protected_core_policy_id,
     evidence_policy_id,
+    venue_profile_package_id,
+    editorial_board_cloud_id,
+    editorial_board_member_id,
+    published_corpus_hull_id,
 )
 
 
@@ -1196,3 +1200,131 @@ class EvidencePolicy(_DictMixin):
     allow_inference_when_no_source: bool = True
     notes: list[str] = _list()
     created_at: str = dc.field(default_factory=_now)
+
+
+# ---------------------------------------------------------------------------
+# VF-C2: VenueProfilePackage and subobjects (canon §2, rubric v2 §1)
+# ---------------------------------------------------------------------------
+
+@dc.dataclass
+class EditorialBoardMember(_DictMixin):
+    """One row in the editorial board cloud.
+
+    Carries low/medium confidence per canon §3.E. Any derived signal
+    (theoretical commitments) must be `inference`, not `external_claim`.
+    """
+    editorial_board_member_id: str = dc.field(default_factory=editorial_board_member_id)
+    full_name: str | None = _field()
+    role: str | None = _field()  # editor_in_chief | associate | section | board
+    affiliation: str | None = _field()
+    country: str | None = _field()
+    orcid: str | None = _field()
+    openalex_author_id: str | None = _field()
+    research_concepts: list[str] = _list()  # OpenAlex machine-tagged, INFERENCE
+    recent_works_count: int | None = _field()
+    h_index: int | None = _field()
+    evidence_status: str = "external_claim"
+    source_url: str | None = _field()
+    unknowns: list[str] = _list()
+
+
+@dc.dataclass
+class EditorialBoardCloud(_DictMixin):
+    """Distribution of an editorial board's institutions × countries ×
+    concepts; per-editor entries plus derived center-of-gravity signals
+    marked `inference` with low/medium confidence."""
+
+    editorial_board_cloud_id: str = dc.field(default_factory=editorial_board_cloud_id)
+    venue_profile_package_id: str | None = _field()
+    members: list[dict[str, Any]] = _list()
+    members_sampled: int = 0
+    members_total_known: int | None = _field()
+    institutional_distribution: dict[str, int] = _dict()
+    country_distribution: dict[str, int] = _dict()
+    concept_distribution: dict[str, int] = _dict()
+    coverage_ratio: float | None = _field()  # sampled / total_known
+    derived_signals: dict[str, Any] = _dict()
+    derived_signals_authority: str = "inference"
+    derived_signals_confidence: str = "low"
+    warnings: list[str] = _list()
+    unknowns: list[str] = _list()
+    extracted_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class PublishedCorpusHull(_DictMixin):
+    """Wrapper that pairs a CorpusAnalysisResult-derived venue FPM with
+    its source meta (how many works, what time range, what source IDs).
+    Built by `venue_corpus_miner` from real OpenAlex Works.
+    """
+
+    published_corpus_hull_id: str = dc.field(default_factory=published_corpus_hull_id)
+    venue_profile_package_id: str | None = _field()
+    venue_field_position_id: str | None = _field()  # ref to FieldPositionModel(venue)
+    works_fetched: int = 0
+    abstracts_available: int = 0
+    references_available: int = 0
+    year_range_min: int | None = _field()
+    year_range_max: int | None = _field()
+    source_used: str | None = _field()  # OpenAlex source id
+    corpus_analysis_summary: dict[str, Any] = _dict()
+    warnings: list[str] = _list()
+    unknowns: list[str] = _list()
+    extracted_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class VenueProfilePackage(_DictMixin):
+    """Aggregating package per canon §2 (rubric v2 §1: 7 minimal subobjects).
+
+    This is the durable cross-session venue model. Indexed by canonical
+    name + ISSN in the venue_profile_registry. Future runs reuse what's
+    here instead of re-discovering.
+    """
+
+    venue_profile_package_id: str = dc.field(default_factory=venue_profile_package_id)
+
+    # 1. VenueIdentity (we reuse VenueModel fields by reference)
+    venue_model_id: str | None = _field()
+    canonical_name: str | None = _field()
+    issns: list[str] = _list()
+    publisher: str | None = _field()
+    homepage_url: str | None = _field()
+    languages: list[str] = _list()
+    venue_type: str = "journal"
+
+    # 2. VenueFieldPosition (composed)
+    venue_field_position_id: str | None = _field()
+
+    # 3. PublishedCorpusHull
+    published_corpus_hull_id: str | None = _field()
+
+    # 4. EditorialBoardCloud
+    editorial_board_cloud_id: str | None = _field()
+
+    # 5. FormalSubmissionProfile (reuse PublicationRegimeModel id)
+    publication_regime_id: str | None = _field()
+
+    # 6. CitationExpectationProfile (reuse existing dataclass)
+    citation_expectation_profile_id: str | None = _field()
+
+    # 7. SourceEvidencePacket (Sprint α)
+    source_evidence_packet_id: str | None = _field()
+
+    # Discovery + reuse metadata
+    discovery_sources: list[str] = _list()
+    discovery_clusters: list[str] = _list()
+    openalex_source_id: str | None = _field()
+    doaj_source_id: str | None = _field()
+    crossref_member_id: str | None = _field()
+    cyberleninka_source_id: str | None = _field()
+
+    # Lifecycle
+    completeness: dict[str, str] = _dict()  # per-subobject: present|missing|partial
+    confidence: str = "low"
+    evidence_status: str = "external_claim"
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+    updated_at: str = dc.field(default_factory=_now)
+    last_refreshed_at: str | None = _field()
