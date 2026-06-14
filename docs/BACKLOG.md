@@ -1,8 +1,33 @@
 # Engineering Backlog — Kairoskopion
 
-**Last updated:** 2026-06-13
+**Last updated:** 2026-06-14 (Mavrinsky golden-run integration pass)
 
 Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.md → PROJECT_STATUS → SPEC_COVERAGE_MATRIX → this BACKLOG, picks the next sprint, implements on a feature branch, updates docs/tests/status, commits, pushes. No manual micromanagement required.
+
+---
+
+## Mavrinsky golden-run baseline ✓ DONE (2026-06-14)
+
+**Goal:** Prove that the LLM-driven Case pipeline survives a real Russian
+philosophical draft end-to-end, with measurable correctness against a
+rubric.
+
+**What landed:**
+1. ✓ Stack: `feature/wire-fpm-pipeline` → `feature/sprint-alpha-evidence-policy` → `fix/llm-agent-tolerance-mavrinsky`.
+2. ✓ Provider reality: gpt-4.1-mini + strict json_schema hangs through 302.ai; gpt-4o-mini works. Documented in [docs/LLM_PROVIDER_REALITY_302AI.md](LLM_PROVIDER_REALITY_302AI.md).
+3. ✓ Nine 302.ai-output-shape bugs found and fixed (provider Protocol runtime_checkable, JSON fence parser, balanced `{}` fallback, `ranked_pathways` alias, `discipline` alias, out-of-enum `very_high`, `protected_core` string→list, axes dict→list, `_num` coercion).
+4. ✓ 25 regression tests in `tests/test_llm_agent_tolerance.py` (total: 1355 passed).
+5. ✓ Harness `scripts/run_mavrinsky_benchmark.py` with `--require-llm` so no silent fake success.
+6. ✓ Scorer `scripts/score_against_gold.py` implementing 10 §14 checks.
+7. ✓ Rubric `benchmarks/golden/mavrinsky_article_side_gold.md` (no manuscript body).
+8. ✓ Sanitized report `docs/benchmarks/MAVRINSKY_GOLDEN_RUN_REPORT.md`.
+9. ✓ Merge plan `docs/benchmarks/MAVRINSKY_MERGE_PLAN.md`.
+
+**Score (best of 3 runs):** 4 PASS / 3 PARTIAL / 3 FAIL.
+**FAIL list:** title extraction, fit_vector axes (in pre-fix snapshot), adaptation (downstream of axes).
+**Not solved here:** title-on-bilingual-input, score stochasticity, temperature centralisation, UI cockpit validation against this benchmark.
+
+**What this is NOT:** a finished product benchmark. It is a baseline + harness + rubric that future model swaps and prompt edits regress against.
 
 ---
 

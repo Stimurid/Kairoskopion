@@ -1,6 +1,6 @@
 # Project Status — Kairoskopion
 
-**Last updated:** 2026-06-13
+**Last updated:** 2026-06-14 (Mavrinsky golden-run integration pass)
 
 ## Repository
 
@@ -29,7 +29,7 @@
 - API smoke test: 18/18 PASS, 1 SKIP (expected)
 - Browser smoke: all views render, zero console errors, mobile responsive at 375px
 - Frontend build: `tsc --noEmit` clean, `vite build` clean
-- Backend: 1275 pytest tests passing (4 deselected = network)
+- Backend on `fix/llm-agent-tolerance-mavrinsky` (after this pass): **1355 pytest tests passing**, 4 deselected = network. Main is still at 1307.
 
 ## Recent commit history (main)
 
@@ -61,7 +61,10 @@ evidence-first article-to-venue trajectory engine.
 - Source Authority Model v0: SourceAccessMode/SourceAuthorityScope enums, SourceAuthorityClaim/SourceAuthorityAssessment models, authority checker service, EvidenceAuditor integration, 53 tests
 - Real Source Acquisition v0: 6 venue adapters (OpenAlex, Crossref, DOAJ, Unpaywall, OpenCitations, Snapshot) with authority enforcement at adapter boundary, cross-adapter conflict detection, aggregation service, 3 new CLI commands, 67 tests
 - Real Venue Pool Discovery v0: discovery pipeline (query planner, fixture pool discovery, identity normalization/dedupe, candidate screening), 3 new enums, 5 new schema models, 4 new services, VenueDiscoveryAgent rewrite, 3 new CLI commands, UC-1 workflow update, 58 tests
-- UI Cockpit v0: FastAPI REST API (19 endpoints), React+TypeScript frontend (17 components), pipeline continuity (select_venue → fit chain), quality gates, evidence badges, responsive dark theme, API smoke test, 188 backend tests — operator/staging preview only, not public product
+- UI Cockpit v0: FastAPI REST API (30 endpoints, audit-verified), React+TypeScript frontend (18 components), pipeline continuity (select_venue → fit chain), quality gates, evidence badges, responsive dark theme, API smoke test, 188 backend tests — operator/staging preview only, not public product
+- **FPM wiring (`feature/wire-fpm-pipeline`)**: `Case` orchestrator integrates `ArticleFieldPositionerAgent` + `VenueFieldPositionerAgent`; FPM-based fit runs in parallel to the legacy 12-axis FitAssessment.
+- **Sprint α (`feature/sprint-alpha-evidence-policy`)**: PIM v1 §2/§7 substrate — `SourceEvidencePacket` + `EvidenceGranularity` enum, `ProtectedCorePolicy` + `EvidencePolicy` dataclasses, deterministic builder, policy gate in `RewritePlanner` chain. +15 tests.
+- **Mavrinsky golden-run baseline (`fix/llm-agent-tolerance-mavrinsky`)** (2026-06-14): LLM-driven end-to-end run on a real Russian philosophical draft. Provider `gpt-4o-mini` via 302.ai (`gpt-4.1-mini` + strict json_schema hangs through this gateway — documented). 9 agent/parser/protocol bugs fixed with 25 regression tests. Best run: 4 PASS / 3 PARTIAL / 3 FAIL on a 10-check rubric. Harness, rubric, sanitized report, and merge plan committed under `benchmarks/` and `docs/benchmarks/`. NOT yet merged to main.
 
 ## Modules implemented
 

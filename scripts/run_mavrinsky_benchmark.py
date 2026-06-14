@@ -1,4 +1,4 @@
-"""End-to-end Kairoskopion UC1 driver.
+"""Mavrinsky golden-run benchmark driver.
 
 Loads .env, takes an article text file path, runs a full Case through
 intake → article model → semantic profile → article FPM → scenario →
@@ -6,11 +6,21 @@ pathways → venue pool → venue FPM → fit chain (FitAssessment + FPM fit
 + mismatch + rewrite + policy gate) → dossier, and writes every stage
 output to a run directory under private_inputs/runs/.
 
+The runner records provider/model/timeout/temperature into the run
+report so post-hoc analysis can tell which configuration produced
+which result.
+
 Usage:
-    python scripts/run_e2e_case.py \\
-        --article private_inputs/mavrinsky_article.txt \\
+    python scripts/run_mavrinsky_benchmark.py \\
+        --article  private_inputs/mavrinsky_article.txt \\
         --scenario private_inputs/scenarios/mavrinsky.json \\
-        --output private_inputs/runs/mavrinsky_$(date +%Y%m%d_%H%M%S)
+        --output   private_inputs/runs/mavrinsky_001 \\
+        --require-llm
+
+`--require-llm` exits with status 2 if no LLM is configured (no
+silent fake success). Omit it for a deterministic-only sanity check.
+
+See benchmarks/README.md for the full workflow.
 """
 
 from __future__ import annotations
@@ -40,7 +50,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s :: %(message)s",
 )
-log = logging.getLogger("e2e")
+log = logging.getLogger("benchmark")
 
 
 def _save(out_dir: Path, name: str, obj: Any):
@@ -63,12 +73,28 @@ def _safe(stage: str, fn):
         return None, {"error": str(exc), "traceback": tb}
 
 
-def run(article_path: Path, scenario_path: Path | None, output_dir: Path) -> dict[str, Any]:
+def run(
+    article_path: Path,
+    scenario_path: Path | None,
+    output_dir: Path,
+    require_llm: bool = False,
+) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     cfg = LLMConfig.from_env()
     llm_active = bool(cfg and cfg.api_key)
-    log.info("LLM active: %s (model=%s base=%s)",
-             llm_active, cfg.model if cfg else None, cfg.base_url if cfg else None)
+    log.info("LLM active: %s (model=%s base=%s timeout=%ss)",
+             llm_active,
+             cfg.model if cfg else None,
+             cfg.base_url if cfg else None,
+             cfg.timeout_seconds if cfg else None)
+
+    if require_llm and not llm_active:
+        log.error(
+            "--require-llm was set but no LLM provider is configured. "
+            "Set KAIROSKOPION_LLM_API_KEY (and optionally _MODEL, _BASE_URL, "
+            "_TIMEOUT_MS) in .env. Refusing to score without LLM."
+        )
+        raise SystemExit(2)
 
     article_text = article_path.read_text(encoding="utf-8")
     log.info("Loaded article %s chars=%d", article_path.name, len(article_text))
@@ -92,8 +118,15 @@ def run(article_path: Path, scenario_path: Path | None, output_dir: Path) -> dic
     run_report: dict[str, Any] = {
         "case_id": case.case_id,
         "article_path": str(article_path),
-        "llm_active": llm_active,
-        "llm_model": cfg.model if cfg else None,
+        "article_chars": len(article_text),
+        "scenario_path": str(scenario_path) if scenario_path else None,
+        "provider": {
+            "active": llm_active,
+            "model": cfg.model if cfg else None,
+            "base_url": cfg.base_url if cfg else None,
+            "timeout_seconds": cfg.timeout_seconds if cfg else None,
+        },
+        "deterministic_only": not llm_active,
         "stages": {},
         "errors": {},
     }
@@ -204,12 +237,20 @@ def run(article_path: Path, scenario_path: Path | None, output_dir: Path) -> dic
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--article", type=Path, required=True)
-    ap.add_argument("--scenario", type=Path, default=None)
-    ap.add_argument("--output", type=Path, required=True)
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--article", type=Path, required=True,
+                    help="Path to article text (UTF-8). Kept private; not committed.")
+    ap.add_argument("--scenario", type=Path, default=None,
+                    help="Optional scenario JSON. Defaults to a reasonable shape.")
+    ap.add_argument("--output", type=Path, required=True,
+                    help="Run output directory (private_inputs/runs/...).")
+    ap.add_argument("--require-llm", action="store_true",
+                    help="Exit non-zero if no LLM provider is configured. "
+                         "Use this for real benchmark runs; omit for deterministic "
+                         "sanity checks.")
     args = ap.parse_args()
-    report = run(args.article, args.scenario, args.output)
+    report = run(args.article, args.scenario, args.output,
+                 require_llm=args.require_llm)
     n_stages = len(report["stages"])
     n_errs = len(report["errors"])
     print(f"\nSTAGES OK: {n_stages}  ERRORS: {n_errs}")
