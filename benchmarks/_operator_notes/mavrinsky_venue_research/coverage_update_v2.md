@@ -263,6 +263,65 @@ Markov bridge-node analysis applies to ranks 1, 2, 3, 5, 8, 9, 10 simultaneously
 
 ---
 
+## Editorial board confirmations for new Tier-A/B venues
+
+Verified in extension batch after main update:
+
+**Шаги/Steps (RANEPA SHAGI)**
+- **Editor-in-Chief: С.Ю. Неклюдов / S.Yu. Neklyudov**
+  - ORCID: 0000-0002-4165-4604
+  - Specialization: folklore, intellectual history
+- Vol 12 No 2 (2026) sections: Archaization+Modernization in World
+  Literature; Text Interpretation; Folklore Motif Routes; **Varia
+  including "NFT art and cultural agency"** ⭐ Mavrinsky-adjacent;
+  Reviews
+- Address: Moscow, Vernadsky Prospect 82, Building 9
+- Contact: shagisteps-ion@ranepa.ru
+- Editorial board members beyond editor-in-chief: UNKNOWN
+
+**Studia Culturae (SPbU)**
+- **Editor-in-Chief: Б.Г. Соколов / B.G. Sokolov**
+  - Head, Department of Cultural Studies, Philosophy of Culture, and
+    Aesthetics, Institute of Philosophy, SPbU
+  - Doctor of Philosophical Sciences, Professor
+  - Teaches core courses: "Philosophy of Culture", "Philosophy of
+    Art", "History of Ancient Culture"
+  - **Direct continental aesthetics tribe match for Mavrinsky**
+- Editorial board beyond editor: UNKNOWN (direct site ECONNREFUSED)
+
+**Критика и семиотика (IF SO RAN Novosibirsk)**
+- **Editor-in-Chief: И.В. Силантьев / I.V. Silantiev**
+  - Corresponding Member of RAS
+  - Doctor of Philological Sciences, Professor
+- Publisher: Institute of Philology, Siberian Branch RAS
+- Twice yearly
+- ISSN 2307-1753 (Online)
+- DOI prefix: 10.25205/2307-1737
+- **Indexed in SCOPUS** ⭐ (significantly upgrades venue prestige)
+- Editorial board beyond editor: UNKNOWN (requires separate page fetch)
+
+**ЖССА — Журнал социологии и социальной антропологии (FNISC RAN)**
+- **Editor-in-Chief: В.В. Козловский / V.V. Kozlovskiy**
+  - Doctor of Philosophy, Professor
+  - Chief Research Fellow at SI RAN — branch of FNISC RAN
+- 4 issues/year since 1998
+- Indexed: RSCI, RISC, **VAK list K1 White List**
+- Current vol: 27 №3 (2024), 28 №4 (2025)
+- Editorial board beyond editor: UNKNOWN
+
+**Городские исследования и практики (Urban Studies and Practices, HSE)**
+- Editor-in-Chief: **Valery Anashvili** (confirmed via earlier search;
+  same person as Logos ed-in-chief)
+- Publisher: Faculty of Urban and Regional Development, HSE
+  (Высшая школа урбанистики им. А.А. Высоковского)
+- Editorial board beyond editor: UNKNOWN
+
+**Historiko-philosophical Yearbook (IF RAN)**
+- Editor-in-Chief: UNKNOWN (site ECONNREFUSED)
+- Founded 1986, IF RAN
+
+---
+
 ## Action items for next code-implementation session
 
 When VF-C2 lands and these become `VenueRecord` entries:
