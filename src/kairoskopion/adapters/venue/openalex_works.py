@@ -31,6 +31,13 @@ DEFAULT_UA = (
 
 
 def _http_json(url: str, timeout: int = 20, ua: str = DEFAULT_UA) -> dict | None:
+    # Polite-pool mailto if KAIROSKOPION_OPENALEX_MAILTO is set. No-op
+    # when unset. Cannot raise — pure URL string ops.
+    try:
+        from ...config.env import openalex_polite_url
+        url = openalex_polite_url(url)
+    except Exception:  # noqa: BLE001
+        pass
     try:
         req = urllib.request.Request(url, headers={"User-Agent": ua})
         with urllib.request.urlopen(req, timeout=timeout) as r:

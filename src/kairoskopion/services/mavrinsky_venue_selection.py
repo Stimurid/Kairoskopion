@@ -465,6 +465,7 @@ def assess_fit_for_vpkg(
 # ---------------------------------------------------------------------------
 
 def _bucket(fit: dict[str, Any]) -> str:
+    """Legacy v1 bucketer. Kept for backwards-compat. Use `_bucket_v2`."""
     axes = fit["axes"]
     fcr = axes["field_core_risk"]["value"]
     rewrite = axes["rewrite_effort"]["value"]
@@ -485,18 +486,162 @@ def _bucket(fit: dict[str, Any]) -> str:
     return "possible_but_costly"
 
 
-def select_shortlist(fits: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+def _bucket_v2(fit: dict[str, Any]) -> tuple[str, list[str]]:
+    """Calibrated bucketer per v2 rubric. Returns (bucket, reasons).
+
+    Order matters — first matching rule wins. Reasons are short
+    human-readable strings stating which axis values triggered the
+    rule (and so why the label is what it is).
+
+    Rules:
+      1. INSUFFICIENT_DATA — too many `unknown` axes, or the corpus/
+         identity stack is too thin to judge. Catchall for "we don't
+         know enough to call it". No catchall to possible_but_costly.
+      2. POOR_FIT — structural mismatch on topic / discipline /
+         argument form / field core. Cannot be rewritten without
+         destroying the article.
+      3. SIBLING_MANUSCRIPT — venue would require a genre / method /
+         empirical conversion that produces a different article, not
+         a rewrite of this one.
+      4. GOOD_FIT — strict: topic medium+, rewrite strong, field core
+         strong, citation ecology medium+, confidence medium+.
+      5. POSSIBLE_BUT_COSTLY — plausible bounded path with rewrite or
+         citation effort but core preserved. Topic medium+ or
+         disciplinary medium+, rewrite strong/medium, fcr strong/medium,
+         arg_form not bad, confidence medium+.
+      6. Else INSUFFICIENT_DATA (no permissive catchall).
+    """
+    axes = fit["axes"]
+    topic = axes["topic_fit"]["value"]
+    disc = axes["disciplinary_fit"]["value"]
+    genre = axes["genre_fit"]["value"]
+    arg_form = axes["argument_form_fit"]["value"]
+    method = axes["method_fit"]["value"]
+    fcr = axes["field_core_risk"]["value"]
+    rewrite = axes["rewrite_effort"]["value"]
+    cite = axes["citation_ecology_fit"]["value"]
+    cite_eff = axes["citation_effort"]["value"]
+    confidence = axes["evidence_confidence"]["value"]
+    unknowns_axis = axes["unknowns_axis"]["value"]
+
+    unknown_count = sum(
+        1 for k, ax in axes.items()
+        if k != "unknowns_axis" and ax["value"] == "unknown"
+    )
+
+    sig = fit.get("_signals_used", {}) or {}
+    has_corpus = bool(sig.get("has_corpus"))
+
+    # ---- Rule 1: INSUFFICIENT_DATA ---------------------------------
+    # Reject early when we cannot judge.
+    if confidence == "weak" and unknown_count >= 6:
+        return ("insufficient_data", [
+            f"confidence=weak, {unknown_count}/15 axes unknown",
+        ])
+    if not has_corpus and topic == "unknown":
+        return ("insufficient_data", [
+            "no corpus hull, topic_fit unknown — cannot judge",
+        ])
+    if unknown_count >= 8:
+        return ("insufficient_data", [
+            f"{unknown_count}/15 axes unknown — selection unsafe",
+        ])
+    # Russian venue without any RU support evidence and confidence weak
+    if (sig.get("is_russian_venue") and confidence == "weak"
+            and unknown_count >= 5):
+        return ("insufficient_data", [
+            "Russian venue with weak confidence and many unknowns",
+        ])
+
+    # ---- Rule 2: POOR_FIT ------------------------------------------
+    # Structural mismatch — rewriting would destroy the article.
+    if fcr == "bad":
+        return ("poor_fit", [
+            f"field_core_risk=bad (destructive): "
+            f"{axes['field_core_risk']['note']}",
+        ])
+    if topic == "bad" and disc in ("bad", "weak"):
+        return ("poor_fit", [
+            "topic=bad and disciplinary=bad/weak — structural mismatch",
+        ])
+
+    # ---- Rule 3: SIBLING_MANUSCRIPT --------------------------------
+    # The venue would require a different manuscript, not a rewrite.
+    if arg_form == "bad":
+        return ("sibling_manuscript", [
+            "argument_form=bad: venue expects empirical/conceptual hybrid; "
+            "produce sibling manuscript instead of adapting",
+        ])
+    if method == "weak" and genre == "weak":
+        return ("sibling_manuscript", [
+            "method=weak and genre=weak: empirical conversion required — "
+            "sibling manuscript more honest than rewrite",
+        ])
+    if fcr == "weak" and arg_form in ("weak", "unknown"):
+        return ("sibling_manuscript", [
+            f"field_core_risk=weak and argument_form={arg_form}: "
+            "preserving core requires a different article",
+        ])
+
+    # ---- Rule 4: GOOD_FIT ------------------------------------------
+    # Strict: must be a near-native fit.
+    if (topic in ("strong", "medium")
+            and rewrite == "strong"
+            and fcr == "strong"
+            and cite in ("strong", "medium")
+            and confidence in ("strong", "medium")):
+        return ("good_fit", [
+            f"topic={topic}, rewrite=strong, fcr=strong, "
+            f"citation_ecology={cite}, confidence={confidence}",
+        ])
+
+    # ---- Rule 5: POSSIBLE_BUT_COSTLY -------------------------------
+    # Plausible bounded path, core preserved.
+    if (topic in ("strong", "medium", "weak")
+            and disc in ("strong", "medium", "weak")
+            and rewrite in ("strong", "medium")
+            and fcr in ("strong", "medium")
+            and arg_form != "bad"
+            and confidence in ("strong", "medium")
+            and (cite in ("strong", "medium") or cite_eff in ("strong", "medium", "weak"))):
+        return ("possible_but_costly", [
+            f"topic={topic}, rewrite={rewrite}, fcr={fcr}, "
+            f"citation_effort={cite_eff}, confidence={confidence}",
+        ])
+
+    # ---- Rule 6: default to INSUFFICIENT_DATA, NOT possible_but_costly
+    return ("insufficient_data", [
+        f"no rule matched: topic={topic}, disc={disc}, arg_form={arg_form}, "
+        f"fcr={fcr}, rewrite={rewrite}, confidence={confidence}, "
+        f"unknown_axes={unknown_count}",
+    ])
+
+
+def select_shortlist(
+    fits: list[dict[str, Any]], *, calibrated: bool = True,
+) -> dict[str, list[dict[str, Any]]]:
+    """Bucket fits.
+
+    `calibrated=True` uses `_bucket_v2` (default; v2 rubric, no
+    permissive catchall). `calibrated=False` falls back to the legacy
+    `_bucket` (kept for one release for diffing).
+    """
     buckets: dict[str, list[dict[str, Any]]] = {
         "good_fit": [], "possible_but_costly": [],
         "sibling_manuscript": [], "poor_fit": [],
         "insufficient_data": [],
     }
     for f in fits:
-        b = _bucket(f)
+        if calibrated:
+            b, reasons = _bucket_v2(f)
+        else:
+            b = _bucket(f)
+            reasons = ["(legacy bucketer)"]
         buckets[b].append({
             "venue_profile_package_id": f["venue_profile_package_id"],
             "canonical_name": f["canonical_name"],
             "bucket": b,
+            "label_reasons": reasons,
             "topic_fit": f["axes"]["topic_fit"]["value"],
             "rewrite_effort": f["axes"]["rewrite_effort"]["value"],
             "field_core_risk": f["axes"]["field_core_risk"]["value"],
