@@ -233,6 +233,112 @@ def corpus_pattern_light_summary(
     return summary
 
 
+def board_completeness_from_status(
+    extraction_status: str, members_sampled: int,
+) -> str:
+    """Single source of truth for the completeness mapping.
+
+    Rule (per v2.3 task spec, section C):
+      - members_sampled >= 6  AND status in {EXTRACTED_FROM_OFFICIAL_HTML,
+        EXTRACTED_UNVERIFIED}                       -> 'present'
+      - members_sampled in 1..5 AND same statuses   -> 'partial'
+      - URL exists but extraction failed (INACCESSIBLE / JS_ONLY /
+        NOT_FOUND_AFTER_SEARCH / UNKNOWN)           -> 'missing'
+      - No URL at all (NOT_FOUND_AFTER_SEARCH with members=0) -> 'missing'
+    """
+    if extraction_status in ("EXTRACTED_FROM_OFFICIAL_HTML",
+                              "EXTRACTED_UNVERIFIED"):
+        if members_sampled >= 6:
+            return "present"
+        if members_sampled >= 1:
+            return "partial"
+    return "missing"
+
+
+_SPRINGER_JOURNAL_ID_RE = re.compile(
+    r"springer\.com/(?:journal|article)/(\d{4,7})", re.IGNORECASE,
+) if False else None  # placeholder, real one defined after re import
+
+
+def springer_board_url_candidates(homepage_url: str | None) -> list[str]:
+    """Derive a small set of Springer-canonical board URL candidates.
+
+    Bounded fallback for the one known Springer-SPA case (Philosophy &
+    Technology has homepage `https://www.springer.com/journal/13347`).
+    No broad web search; only well-known Springer patterns.
+    """
+    if not homepage_url:
+        return []
+    import re as _re
+    m = _re.search(r"springer\.com/journal/(\d{4,7})", homepage_url,
+                    _re.IGNORECASE)
+    if not m:
+        return []
+    jid = m.group(1)
+    base = f"https://www.springer.com/journal/{jid}"
+    return [
+        f"{base}/editors",
+        f"{base}/editorial-board",
+        f"{base}/editorial-team",
+    ]
+
+
+def enrich_board_with_springer_fallback(vpkg) -> dict[str, Any]:
+    """Try Springer-canonical /editors URL patterns when the homepage
+    hop did NOT find a board URL.
+
+    Returns the same shape as enrich_board_for_vpkg, but with
+    `springer_attempts` listing every URL tried and the per-URL
+    extraction status. The first success wins. If all attempts fail,
+    `extraction_status` is the spec-mandated stable failure tag
+    `SPRINGER_BOARD_INACCESSIBLE_SPA_OR_NOT_FOUND`.
+    """
+    candidates = springer_board_url_candidates(vpkg.homepage_url)
+    out: dict[str, Any] = {
+        "vpkg_id": vpkg.venue_profile_package_id,
+        "canonical_name": vpkg.canonical_name,
+        "fallback_kind": "springer_pattern",
+        "candidates_tried": candidates,
+        "per_url_status": [],
+        "extraction_status": "UNKNOWN",
+        "editorial_board_cloud": None,
+        "members_sampled": 0,
+        "board_page_url": None,
+        "notes": [],
+    }
+    if not candidates:
+        out["extraction_status"] = "SPRINGER_BOARD_INACCESSIBLE_SPA_OR_NOT_FOUND"
+        out["notes"].append(
+            "homepage_url does not match the Springer journal pattern; "
+            "fallback not applicable"
+        )
+        return out
+
+    for url in candidates:
+        sub = enrich_board_for_vpkg(vpkg, board_page_url=url)
+        out["per_url_status"].append({
+            "url": url,
+            "status": sub["extraction_status"],
+            "members": sub["members_sampled"],
+        })
+        if sub["extraction_status"] in (
+            "EXTRACTED_FROM_OFFICIAL_HTML", "EXTRACTED_UNVERIFIED"
+        ) and sub["members_sampled"] > 0:
+            out["extraction_status"] = sub["extraction_status"]
+            out["editorial_board_cloud"] = sub["editorial_board_cloud"]
+            out["members_sampled"] = sub["members_sampled"]
+            out["board_page_url"] = url
+            return out
+
+    # All candidates failed — record the stable honest failure tag.
+    out["extraction_status"] = "SPRINGER_BOARD_INACCESSIBLE_SPA_OR_NOT_FOUND"
+    out["notes"].append(
+        f"all {len(candidates)} Springer URL patterns returned no extractable "
+        "board page; no editor names fabricated"
+    )
+    return out
+
+
 def enrich_board_for_vpkg(
     vpkg, board_page_url: str | None,
 ) -> dict[str, Any]:
