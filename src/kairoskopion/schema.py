@@ -77,6 +77,16 @@ from .ids import (
     editorial_board_cloud_id,
     editorial_board_member_id,
     published_corpus_hull_id,
+    method_expectation_profile_id,
+    genre_move_profile_id,
+    style_register_profile_id,
+    author_eligibility_profile_id,
+    time_review_profile_id,
+    apc_access_profile_id,
+    tacit_venue_signal_id,
+    journal_model_id,
+    section_model_id,
+    special_issue_model_id,
 )
 
 
@@ -1319,6 +1329,18 @@ class VenueProfilePackage(_DictMixin):
     crossref_member_id: str | None = _field()
     cyberleninka_source_id: str | None = _field()
 
+    # VF-C3 sub-models (canon §2 supplementary subobjects, added 2026-06-14):
+    method_expectation_profile_id: str | None = _field()
+    genre_move_profile_id: str | None = _field()
+    style_register_profile_id: str | None = _field()
+    author_eligibility_profile_id: str | None = _field()
+    time_review_profile_id: str | None = _field()
+    apc_access_profile_id: str | None = _field()
+    tacit_venue_signal_ids: list[str] = _list()  # 0..N tacit signals
+    journal_model_id: str | None = _field()
+    section_model_ids: list[str] = _list()
+    special_issue_model_ids: list[str] = _list()
+
     # Lifecycle
     completeness: dict[str, str] = _dict()  # per-subobject: present|missing|partial
     confidence: str = "low"
@@ -1328,3 +1350,349 @@ class VenueProfilePackage(_DictMixin):
     created_at: str = dc.field(default_factory=_now)
     updated_at: str = dc.field(default_factory=_now)
     last_refreshed_at: str | None = _field()
+
+
+# ---------------------------------------------------------------------------
+# VF-C3 (canon §2 supplementary subobjects)
+#
+# Each sub-model carries the rubric-standard four fields:
+#   - evidence_refs:    list[str] of EvidenceItem/SourceSnapshot ids that
+#                       support the populated fields;
+#   - source_category:  one of VenueSourceCategory (canon §3 A-J) so an
+#                       auditor can tell which source family the data
+#                       came from;
+#   - confidence:       "high" | "medium" | "low" | "unknown";
+#   - evidence_status:  one of EvidenceStatus or "operator_seed_canonical"
+#                       (for operator-curated entries) or "unknown";
+#   - unknowns:         list of explicit UNKNOWN_NOT_FOUND / INACCESSIBLE /
+#                       AUTH_REQUIRED / JS_ONLY markers per the rubric.
+#
+# Every model defaults to "thin": empty fields are honest unknowns, never
+# silently inferred. Population is downstream services' job.
+# ---------------------------------------------------------------------------
+
+
+@dc.dataclass
+class MethodExpectationProfile(_DictMixin):
+    """What methods/empirical stances the venue typically accepts.
+
+    Reconstructed from corpus observation (which methods appear in the
+    published article hull) and from author guidelines (which methods
+    are explicitly required/forbidden). Authority depends on source.
+    """
+
+    method_expectation_profile_id: str = dc.field(default_factory=method_expectation_profile_id)
+    venue_profile_package_id: str | None = _field()
+
+    # Observed method distribution in the corpus (corpus_observation)
+    method_distribution: dict[str, float] = _dict()  # method_name -> share 0..1
+    dominant_methods: list[str] = _list()  # top-N method names
+    forbidden_methods: list[str] = _list()  # from guidelines, if stated
+
+    # Required vs accepted (from guidelines, source_category=A)
+    required_method_statement: bool | None = _field()
+    method_section_required: bool | None = _field()
+
+    # Article-side fit consequences (rubric §6.X mappings)
+    accepts_no_method_continental: bool | None = _field()
+    accepts_textual_analysis_only: bool | None = _field()
+
+    evidence_refs: list[str] = _list()
+    source_category: str | None = _field()  # VenueSourceCategory
+    confidence: str = "unknown"
+    evidence_status: str = "unknown"
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class GenreMoveProfile(_DictMixin):
+    """Argument-move distribution typical for the venue.
+
+    Per canon §4 and rubric: which argument moves appear in venue corpus
+    (concept_introduction, concept_reconstruction, case_study,
+    empirical_test, polemic_response, position_paper, ...) and which
+    move types are conspicuously absent.
+    """
+
+    genre_move_profile_id: str = dc.field(default_factory=genre_move_profile_id)
+    venue_profile_package_id: str | None = _field()
+
+    observed_moves: dict[str, float] = _dict()  # move_type -> share 0..1
+    dominant_moves: list[str] = _list()
+    conspicuously_absent_moves: list[str] = _list()
+
+    # Article types from guidelines (research / review / essay / commentary / ...)
+    declared_article_types: list[str] = _list()
+
+    # Per-section move expectations (when SectionModel knows)
+    per_section_moves: dict[str, list[str]] = _dict()
+
+    evidence_refs: list[str] = _list()
+    source_category: str | None = _field()
+    confidence: str = "unknown"
+    evidence_status: str = "unknown"
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class StyleRegisterProfile(_DictMixin):
+    """Language register / jargon density / structural style observable
+    from corpus + declared from guidelines."""
+
+    style_register_profile_id: str = dc.field(default_factory=style_register_profile_id)
+    venue_profile_package_id: str | None = _field()
+
+    primary_language: str | None = _field()  # "en" / "ru" / ...
+    abstract_languages: list[str] = _list()
+    register: str | None = _field()  # academic_dense / accessible / popular
+    jargon_density: float | None = _field()  # 0..1, corpus-observed
+    avg_word_count: int | None = _field()
+    typical_paragraph_length: int | None = _field()
+    citation_style: str | None = _field()  # apa / chicago / vancouver / numeric / mla
+    structured_abstract_required: bool | None = _field()
+
+    evidence_refs: list[str] = _list()
+    source_category: str | None = _field()
+    confidence: str = "unknown"
+    evidence_status: str = "unknown"
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class AuthorEligibilityProfile(_DictMixin):
+    """§6.15 sibling axis: who may publish.
+
+    Affiliation requirements (institutional ties / society membership),
+    career-stage focus (ECR / senior), geographic restrictions,
+    sponsorship/invitation-only entry. Honest unknown is the default.
+    """
+
+    author_eligibility_profile_id: str = dc.field(default_factory=author_eligibility_profile_id)
+    venue_profile_package_id: str | None = _field()
+
+    requires_institutional_affiliation: bool | None = _field()
+    affiliation_constraints: list[str] = _list()
+    requires_society_membership: bool | None = _field()
+    society_membership_required: str | None = _field()
+
+    career_stage_focus: list[str] = _list()  # "early_career" / "senior" / "any"
+    geographic_constraints: list[str] = _list()  # country / region codes
+    invitation_only: bool | None = _field()
+
+    # Common gates
+    requires_orcid: bool | None = _field()
+    requires_funding_disclosure: bool | None = _field()
+    requires_ethics_approval: bool | None = _field()
+
+    evidence_refs: list[str] = _list()
+    source_category: str | None = _field()
+    confidence: str = "unknown"
+    evidence_status: str = "unknown"
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class TimeReviewProfile(_DictMixin):
+    """Time-to-decision and review-process expectations."""
+
+    time_review_profile_id: str = dc.field(default_factory=time_review_profile_id)
+    venue_profile_package_id: str | None = _field()
+
+    review_type: str | None = _field()  # single_blind / double_blind / open / post_pub
+    desk_rejection_rate_pct: float | None = _field()
+    acceptance_rate_pct: float | None = _field()
+    avg_days_to_first_decision: int | None = _field()
+    avg_days_to_publication: int | None = _field()
+
+    # Special-issue cadence
+    special_issue_frequency_per_year: int | None = _field()
+    next_special_issue_deadline: str | None = _field()
+
+    # Anonymization / blinding requirements
+    anonymized_submission_required: bool | None = _field()
+
+    evidence_refs: list[str] = _list()
+    source_category: str | None = _field()
+    confidence: str = "unknown"
+    evidence_status: str = "unknown"
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class APCAccessProfile(_DictMixin):
+    """APC / OA / deposit / license terms."""
+
+    apc_access_profile_id: str = dc.field(default_factory=apc_access_profile_id)
+    venue_profile_package_id: str | None = _field()
+
+    open_access_model: str | None = _field()  # gold / hybrid / diamond / closed
+    apc_currency: str | None = _field()  # "USD" / "EUR" / "GBP" / ...
+    apc_amount_min: float | None = _field()
+    apc_amount_max: float | None = _field()
+    apc_waiver_policy: str | None = _field()  # free-text description if found
+
+    # License + deposit
+    license: str | None = _field()  # "CC-BY" / "CC-BY-NC" / ...
+    self_archiving_policy: str | None = _field()  # green/blue/yellow/white
+    embargo_months: int | None = _field()
+
+    # Author retains copyright?
+    author_retains_copyright: bool | None = _field()
+
+    evidence_refs: list[str] = _list()
+    source_category: str | None = _field()
+    confidence: str = "unknown"
+    evidence_status: str = "unknown"
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class TacitVenueSignal(_DictMixin):
+    """§6.16 — non-formal venue knowledge.
+
+    Operator-reported, community-reported, or inferred-from-low-signal
+    observations. **Not facts.** Each tacit signal carries source + date
+    + scope + confidence. Per canon §3.J the rubric forbids mixing tacit
+    signal with official policy.
+    """
+
+    tacit_venue_signal_id: str = dc.field(default_factory=tacit_venue_signal_id)
+    venue_profile_package_id: str | None = _field()
+
+    signal_kind: str | None = _field()  # "review_time" / "editor_says" /
+                                         # "rejection_reason" / "submission_outcome"
+    statement: str | None = _field()  # the actual claim, verbatim
+    reporter: str | None = _field()  # operator id / community handle (opaque)
+    reported_on: str | None = _field()  # ISO timestamp
+    scope: str | None = _field()  # "personal_experience" / "second_hand" /
+                                   # "community_consensus" / "single_anecdote"
+
+    # Mandatory honest typing
+    confidence: str = "low"  # tacit signals start low by default
+    evidence_status: str = "tacit_signal"
+    authority: str = "tacit_signal"  # never "official_fact"
+
+    evidence_refs: list[str] = _list()
+    source_category: str | None = _field()  # typically VenueSourceCategory.J
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class JournalModel(_DictMixin):
+    """§6.8 — serial journal entity (the "old VenueModel" per canon §2.2).
+
+    Canonical title, ISSN, publisher, URLs, scope, instructions URL,
+    editorial board URL, indexing snapshot, declared metrics. NOT a
+    citation/quality verdict on its own — that comes from VenueFieldPosition
+    + CitationExpectationProfile.
+    """
+
+    journal_model_id: str = dc.field(default_factory=journal_model_id)
+    venue_profile_package_id: str | None = _field()
+
+    canonical_title: str | None = _field()
+    aliases: list[str] = _list()
+    issn_print: str | None = _field()
+    issn_electronic: str | None = _field()
+    publisher: str | None = _field()
+    homepage_url: str | None = _field()
+    submission_url: str | None = _field()
+    guidelines_url: str | None = _field()
+    editorial_board_url: str | None = _field()
+    aims_scope_url: str | None = _field()
+
+    declared_scope: str | None = _field()
+    declared_disciplines: list[str] = _list()
+    declared_languages: list[str] = _list()
+
+    # Declared metrics (publisher self-report; vendor_claim authority)
+    declared_metrics: dict[str, Any] = _dict()  # e.g. {"impact_factor": 1.8}
+    indexing_claims: list[str] = _list()  # ["Scopus", "WoS", "DOAJ", "VAK"]
+
+    evidence_refs: list[str] = _list()
+    source_category: str | None = _field()
+    confidence: str = "unknown"
+    evidence_status: str = "unknown"
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    last_checked_at: str | None = _field()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class SectionModel(_DictMixin):
+    """§6.9 — section / article type within a journal.
+
+    Per canon §2.6: a journal as a whole can be wide but a specific
+    section accepts only essays / review articles / forum pieces /
+    methods papers / book reviews / case studies. Section-level fit is
+    often more accurate than journal-level fit.
+    """
+
+    section_model_id: str = dc.field(default_factory=section_model_id)
+    journal_model_id: str | None = _field()
+    venue_profile_package_id: str | None = _field()
+
+    section_name: str | None = _field()  # "Research Articles" / "Forum" / ...
+    article_type: str | None = _field()  # "research" / "review" / "essay" / ...
+    scope: str | None = _field()
+    requirements: list[str] = _list()  # bullet-list of section-specific gates
+    typical_structure: str | None = _field()  # IMRaD / argumentative / book-review
+    editor_refs: list[str] = _list()  # ids into EditorialBoardCloud.members
+    recent_article_refs: list[str] = _list()  # OpenAlex Work ids
+
+    fit_notes: list[str] = _list()  # operator-curated notes (TacitVenueSignal-grade)
+
+    evidence_refs: list[str] = _list()
+    source_category: str | None = _field()
+    confidence: str = "unknown"
+    evidence_status: str = "unknown"
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class SpecialIssueModel(_DictMixin):
+    """§6.10 — time-bound topical container / CFP."""
+
+    special_issue_model_id: str = dc.field(default_factory=special_issue_model_id)
+    journal_model_id: str | None = _field()
+    venue_profile_package_id: str | None = _field()
+
+    title: str | None = _field()
+    theme: str | None = _field()
+    description: str | None = _field()
+    submission_deadline: str | None = _field()  # ISO date
+    publication_target_date: str | None = _field()
+    guest_editor_refs: list[str] = _list()  # EditorialBoardMember ids
+    guest_editor_names: list[str] = _list()  # if no member ids resolved yet
+    article_types_accepted: list[str] = _list()
+    target_disciplines: list[str] = _list()
+    expected_articles: int | None = _field()
+    submission_url: str | None = _field()
+    cfp_url: str | None = _field()
+
+    status: str = "open"  # "open" / "closed" / "in_review" / "published"
+
+    evidence_refs: list[str] = _list()
+    source_category: str | None = _field()
+    confidence: str = "unknown"
+    evidence_status: str = "unknown"
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)

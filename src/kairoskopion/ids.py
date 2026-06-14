@@ -228,3 +228,45 @@ def editorial_board_member_id() -> str:
 
 def published_corpus_hull_id() -> str:
     return generate_id("pch")
+
+
+# --- VF-C3: VenueProfilePackage sub-models ---
+
+def method_expectation_profile_id() -> str:
+    return generate_id("mexp")
+
+
+def genre_move_profile_id() -> str:
+    return generate_id("gmove")
+
+
+def style_register_profile_id() -> str:
+    return generate_id("style")
+
+
+def author_eligibility_profile_id() -> str:
+    return generate_id("aelig")
+
+
+def time_review_profile_id() -> str:
+    return generate_id("trev")
+
+
+def apc_access_profile_id() -> str:
+    return generate_id("apc")
+
+
+def tacit_venue_signal_id() -> str:
+    return generate_id("tacit")
+
+
+def journal_model_id() -> str:
+    return generate_id("jrnl")
+
+
+def section_model_id() -> str:
+    return generate_id("sect")
+
+
+def special_issue_model_id() -> str:
+    return generate_id("spiss")
