@@ -212,3 +212,19 @@ def protected_core_policy_id() -> str:
 
 def evidence_policy_id() -> str:
     return generate_id("ep")
+
+
+def venue_profile_package_id() -> str:
+    return generate_id("vpkg")
+
+
+def editorial_board_cloud_id() -> str:
+    return generate_id("ebc")
+
+
+def editorial_board_member_id() -> str:
+    return generate_id("ebm")
+
+
+def published_corpus_hull_id() -> str:
+    return generate_id("pch")
