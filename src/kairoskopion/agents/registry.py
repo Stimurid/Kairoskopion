@@ -86,6 +86,22 @@ _SPECS: list[AgentSpec] = [
         first_workflows=["uc1_draft_to_venue_pool_positioning"],
     ),
     AgentSpec(
+        role_id="article_field_positioner",
+        display_name="Article Field Positioner",
+        layer="article",
+        implementation_status="operational_now",
+        execution_mode="llm_optional",
+        prompt_family_ids=["article_field_position"],
+        input_contract={
+            "entities.article": "ArticleModel dict",
+            "entities.semantic_profile": "ArticleSemanticProfile dict (optional)",
+            "raw_text": "manuscript text (optional)",
+        },
+        output_contract={"FieldPositionModel": "article position vectors (point)"},
+        mvp_phase="v0.2",
+        first_workflows=["uc1_draft_to_venue_pool_positioning"],
+    ),
+    AgentSpec(
         role_id="disciplinary_pathway_mapper",
         display_name="Disciplinary Pathway Mapper",
         aliases=["disciplinary_mapper"],
@@ -166,6 +182,24 @@ _SPECS: list[AgentSpec] = [
         output_contract={"VenuePublicationProfile": "full publication profile"},
         mvp_phase="v0.1",
         first_workflows=["venue_deep_profile", "uc1_draft_to_venue_pool_positioning"],
+    ),
+
+    AgentSpec(
+        role_id="venue_field_positioner",
+        display_name="Venue Field Positioner",
+        layer="venue",
+        implementation_status="operational_now",
+        execution_mode="llm_optional",
+        prompt_family_ids=["venue_field_position"],
+        input_contract={
+            "entities.venue": "VenueModel dict",
+            "entities.editorial_board": "editorial board dict (optional)",
+            "entities.corpus_summary": "corpus summary dict (optional)",
+            "entities.venue_guidelines_text": "guidelines text (optional)",
+        },
+        output_contract={"FieldPositionModel": "venue position envelope (region)"},
+        mvp_phase="v0.2",
+        first_workflows=["uc1_draft_to_venue_pool_positioning"],
     ),
 
     # --- Fit layer ---
@@ -372,10 +406,12 @@ AGENT_SPEC_REGISTRY: dict[str, AgentSpec] = {s.role_id: s for s in _SPECS}
 
 def _build_agent_class_map() -> dict[str, type]:
     """Lazy import to avoid circular deps — maps role_id to AgentRole subclass."""
+    from .article_field_positioner import ArticleFieldPositionerAgent
     from .article_modeler import ArticleModelerAgent
     from .semantic_profiler import ArticleSemanticProfilerAgent
     from .disciplinary_mapper import DisciplinaryPathwayMapperAgent
     from .fit_assessor import FitAssessorAgent
+    from .venue_field_positioner import VenueFieldPositionerAgent
     from .venue_profiler import VenueProfilerAgent
     from .control import (
         IntentClassifierAgent, ScenarioProberAgent,
@@ -405,10 +441,12 @@ def _build_agent_class_map() -> dict[str, type]:
         "status_job": StatusJobAgent,
         "article_modeler": ArticleModelerAgent,
         "article_semantic_profiler": ArticleSemanticProfilerAgent,
+        "article_field_positioner": ArticleFieldPositionerAgent,
         "disciplinary_pathway_mapper": DisciplinaryPathwayMapperAgent,
         "venue_identifier": VenueIdentifierAgent,
         "venue_discovery": VenueDiscoveryAgent,
         "venue_profiler": VenueProfilerAgent,
+        "venue_field_positioner": VenueFieldPositionerAgent,
         "corpus_sampler": CorpusSamplerAgent,
         "publication_regime_classifier": PublicationRegimeClassifierAgent,
         "venue_publication_profile_builder": VenuePublicationProfileBuilderAgent,

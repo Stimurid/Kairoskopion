@@ -22,6 +22,34 @@ class EvidenceStatus(str, Enum):
     CONFLICTING_EVIDENCE = "CONFLICTING_EVIDENCE"
 
 
+# --- Evidence granularity (Publication Integrability Model v1 §2) ---
+
+class EvidenceGranularity(str, Enum):
+    """Granularity of an item inside a SourceEvidencePacket.
+
+    Per v1.0 §2: unknown must not be promoted to absent. These eight values
+    cover the full taxonomy.
+    """
+    SOURCE_FACT = "source_fact"
+    TEXT_EXTRACTED_CLAIM = "text_extracted_claim"
+    INFERRED_PATTERN = "inferred_pattern"
+    CORPUS_OBSERVATION = "corpus_observation"
+    USER_TACIT_NOTE = "user_tacit_note"
+    VENDOR_CLAIM = "vendor_claim"
+    UNKNOWN = "unknown"
+    CONFLICTING_EVIDENCE = "conflicting_evidence"
+
+
+# --- Source access status (Publication Integrability Model v1 §2) ---
+
+class SourceAccessStatus(str, Enum):
+    FULL = "full"
+    PARTIAL = "partial"
+    INACCESSIBLE = "inaccessible"
+    STALE = "stale"
+    UNKNOWN = "unknown"
+
+
 # --- Entity lifecycle (Wave 2 §7) ---
 
 class LifecycleStatus(str, Enum):

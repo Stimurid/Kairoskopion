@@ -1,10 +1,12 @@
 """Agent roles for Kairoskopion (spec Wave 6, §52-§74)."""
 
+from .article_field_positioner import ArticleFieldPositionerAgent
 from .article_modeler import ArticleModelerAgent
 from .contract import AgentInput, AgentOutput, AgentRole
 from .disciplinary_mapper import DisciplinaryPathwayMapperAgent
 from .fit_assessor import FitAssessorAgent
 from .semantic_profiler import ArticleSemanticProfilerAgent
+from .venue_field_positioner import VenueFieldPositionerAgent
 from .venue_profiler import VenueProfilerAgent
 
 from .control import (
@@ -47,6 +49,7 @@ __all__ = [
     "ArticleModelerAgent",
     "ArticleSemanticProfilerAgent",
     "DisciplinaryPathwayMapperAgent",
+    "ArticleFieldPositionerAgent",
     # Control layer
     "IntentClassifierAgent",
     "ResearchPlannerAgent",
@@ -58,6 +61,7 @@ __all__ = [
     "VenueIdentifierAgent",
     "VenuePublicationProfileBuilderAgent",
     "VenueProfilerAgent",
+    "VenueFieldPositionerAgent",
     # Fit layer
     "CitationPlannerAgent",
     "FitAssessorAgent",

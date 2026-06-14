@@ -1,8 +1,33 @@
 # Engineering Backlog — Kairoskopion
 
-**Last updated:** 2026-06-13
+**Last updated:** 2026-06-14 (Mavrinsky golden-run integration pass)
 
 Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.md → PROJECT_STATUS → SPEC_COVERAGE_MATRIX → this BACKLOG, picks the next sprint, implements on a feature branch, updates docs/tests/status, commits, pushes. No manual micromanagement required.
+
+---
+
+## Mavrinsky golden-run baseline ✓ DONE (2026-06-14)
+
+**Goal:** Prove that the LLM-driven Case pipeline survives a real Russian
+philosophical draft end-to-end, with measurable correctness against a
+rubric.
+
+**What landed:**
+1. ✓ Stack: `feature/wire-fpm-pipeline` → `feature/sprint-alpha-evidence-policy` → `fix/llm-agent-tolerance-mavrinsky`.
+2. ✓ Provider reality: gpt-4.1-mini + strict json_schema hangs through 302.ai; gpt-4o-mini works. Documented in [docs/LLM_PROVIDER_REALITY_302AI.md](LLM_PROVIDER_REALITY_302AI.md).
+3. ✓ Nine 302.ai-output-shape bugs found and fixed (provider Protocol runtime_checkable, JSON fence parser, balanced `{}` fallback, `ranked_pathways` alias, `discipline` alias, out-of-enum `very_high`, `protected_core` string→list, axes dict→list, `_num` coercion).
+4. ✓ 25 regression tests in `tests/test_llm_agent_tolerance.py` (total: 1355 passed).
+5. ✓ Harness `scripts/run_mavrinsky_benchmark.py` with `--require-llm` so no silent fake success.
+6. ✓ Scorer `scripts/score_against_gold.py` implementing 10 §14 checks.
+7. ✓ Rubric `benchmarks/golden/mavrinsky_article_side_gold.md` (no manuscript body).
+8. ✓ Sanitized report `docs/benchmarks/MAVRINSKY_GOLDEN_RUN_REPORT.md`.
+9. ✓ Merge plan `docs/benchmarks/MAVRINSKY_MERGE_PLAN.md`.
+
+**Score (best of 3 runs):** 4 PASS / 3 PARTIAL / 3 FAIL.
+**FAIL list:** title extraction, fit_vector axes (in pre-fix snapshot), adaptation (downstream of axes).
+**Not solved here:** title-on-bilingual-input, score stochasticity, temperature centralisation, UI cockpit validation against this benchmark.
+
+**What this is NOT:** a finished product benchmark. It is a baseline + harness + rubric that future model swaps and prompt edits regress against.
 
 ---
 
@@ -649,6 +674,38 @@ that are in the spec but were missing from the backlog.
 - VenueAdapterStatus enum: success, partial, no_results, unavailable, error, rate_limited
 - Future: integration test that inaccessible source → INACCESSIBLE status preserved end-to-end through pipeline
 
+## Venue-side golden baseline v1 — DONE on `feature/venue-side-golden-baseline`
+
+**Status:** complete on `feature/venue-side-golden-baseline` (stacked on
+`feature/venue-funnel-v1-canon`). Awaits review for merge.
+
+**What landed:**
+- Three rubric files under `benchmarks/golden/`:
+  `venue_source_layer_map.md` (v2 — seven minimal subobjects, primary
+  computation layer language, six caveats),
+  `mavrinsky_venue_side_gold.md` (v2 — five envelope clusters with
+  expected shapes and VAP1–VAP7),
+  `source_acquisition_funnel.md` (pool / shortlist / deep mapped to
+  V1–V8, deferred adapters listed).
+- `services/corpus_hull_builder.py` — deterministic D-corpus → venue FPM
+  envelope builder. No LLM, no network.
+- `tests/test_corpus_hull_builder.py` — 15 tests covering all six caveats
+  and FPM-shape compatibility.
+- `scripts/run_venue_side_benchmark.py` — three-stage harness skeleton
+  with fixture-pool fallback and scorecard against the five-cluster gold.
+- `docs/benchmarks/VENUE_SIDE_GOLDEN_BASELINE.md` — pass report.
+
+**Deferred (deliberate non-goals of this pass):**
+- `EditorialBoardAdapter` live HTTP scraping. Contract is defined; sprint
+  scheduled as the next venue-side milestone.
+- ВАК / РИНЦ / КиберЛенинка adapters for cluster 5 (Russian philosophy).
+  Currently `UNKNOWN_NOT_VERIFIED`.
+- Shadow / full-text resolvers (OA repos, Sci-Hub-likes, ResearchGate,
+  Academia, personal libraries, user-uploaded ZIPs). H layer is corpus
+  material only, never metadata authority.
+- 50–80 venue live discovery. Pool stage is fixture-only.
+- The remaining 17 `VenueProfilePackage` subobjects.
+
 ## Venue Funnel v1 — Code Alignment (C1–C9)
 
 **Goal:** Bring the schema, services, agents, and benchmark up to the
@@ -659,7 +716,8 @@ canonical model in
 
 **Status:** PENDING. Spec landed on `feature/venue-funnel-v1-canon` (this
 branch, commits `8d7751b` canon + ADR-16 + v0 supersession headers and
-`126f8a9` operational rubric). No code change yet.
+`126f8a9` operational rubric). No code change yet beyond
+`feature/venue-side-golden-baseline`'s `corpus_hull_builder` (above).
 
 **Top-level principle:** hot path is deterministic composition from the
 registry. LLM fires only on cache-miss (`absent` / `stale` /

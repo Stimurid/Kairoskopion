@@ -1,34 +1,89 @@
 # Project Status — Kairoskopion
 
-**Last updated:** 2026-06-14 (Venue Funnel v1 canon pass)
+**Last updated:** 2026-06-14 (RC17 — Mavrinsky benchmark-backed baseline + Venue Funnel v1 doctrine)
 
-## Latest doctrine pass (2026-06-14)
+## Latest release pass — RC17 (2026-06-14)
 
-**Branch:** `feature/venue-funnel-v1-canon` (stacked on `main` at `2aaa8ae`)
+**Tag:** `v0.2.0-alpha-rc17` (pending push)
 
-Spec / doctrine landing — no code change:
+RC17 ships both halves of the Mavrinsky benchmark model in one
+coherent release:
 
-- `docs/VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md` — canonical reference for
-  venue discovery / profiling / database building (8-layer funnel,
+**Article-side stack (merged FF):**
+
+- `feature/wire-fpm-pipeline` — FieldPositionModel wired into Case orchestrator.
+- `feature/sprint-alpha-evidence-policy` — `SourceEvidencePacket` +
+  `ProtectedCorePolicy` + `EvidencePolicy` substrate (PIM v1 B1+B3).
+- `fix/llm-agent-tolerance-mavrinsky` — 9 LLM-output-shape bugs fixed;
+  Mavrinsky golden-run baseline (4 PASS / 3 PARTIAL / 3 FAIL on 10 §14
+  checks); 302.ai gateway reality doc; harness + scorer.
+
+**Venue-side doctrine + baseline (merged with content-clean 3-way):**
+
+- `feature/venue-funnel-v1-canon` — canonical reference
+  `docs/VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md` (8-layer funnel,
   `VenueProfilePackage` of 24 sub-models, source allowlist A–J,
-  two-stage DB→network search with cache-miss taxonomy, mirror gold).
-- `docs/DECISIONS.md` ADR-16 — supersedes v0 discovery scope constraints
-  (no-all-journal-DB, no-Google-Scholar, SnapshotCrawler-explicit-URL-only
-  lifted; user-seed-only / DOAJ≠Scopus / UNKNOWN≠absent NOT lifted).
-- `docs/REAL_VENUE_POOL_DISCOVERY_V0_IMPLEMENTATION_MAP.md`,
-  `docs/VENUE_CANDIDATE_SCREENING_V0.md` — supersession headers added;
-  v0 docs retained as MVP historical record.
-- `benchmarks/golden/venue_source_layer_map.md` — operational rubric:
-  authoritative-source matrix per FPM axis, anti-patterns (AP1–AP4),
-  per-axis Mavrinsky golden expectations.
-- `docs/BACKLOG.md` — new package **Venue Funnel v1 — Code Alignment
-  (VF-C1 … VF-C9)** for downstream code work.
-- `docs/SPEC_COVERAGE_MATRIX.md` — §6.7–§6.16 venue-side rows rerouted
-  to VF-C2/C3/C4/C8.
+  two-stage DB→network search with cache-miss taxonomy, mirror gold),
+  ADR-16 supersession, VF-C1…C9 code-alignment backlog,
+  `SPEC_COVERAGE_MATRIX` §6.7–§6.16 routing.
+- `feature/venue-side-golden-baseline` — operational rubric
+  `benchmarks/golden/venue_source_layer_map.md` (v2: 7 minimal
+  subobjects, primary computation layer per axis, six caveats),
+  five-cluster `mavrinsky_venue_side_gold.md` (continental /
+  philtech / STS / HCI / RU), `source_acquisition_funnel.md`,
+  deterministic `services/corpus_hull_builder.py` (15 tests),
+  harness skeleton `scripts/run_venue_side_benchmark.py`,
+  deterministic benchmark proof #001 (4 PASS / 1 PARTIAL / 0 FAIL,
+  all 5 clusters covered).
 
-Handoff target: a neighbouring branch reviews this canon + rubric stack
-before any code lands. No further changes on this branch until handoff
-returns sign-off.
+The release fixes the rc16-vs-main drift the audit closed by bringing
+all benchmark-relevant work into one coherent tag.
+
+**Not in RC17:**
+
+- Live `EditorialBoardCloud` adapter (next venue-side sprint).
+- ВАК / РИНЦ / КиберЛенинка adapters (deferred).
+- Shadow / full-text resolvers (deferred).
+- 50–80 venue live discovery (deferred).
+- `chore/state-audit-2026-06-14` doc-only branch: skipped from FF train
+  because it would have prevented FF of the article-side stack. Lands
+  as a follow-up doc patch.
+
+## Venue-side golden baseline (2026-06-14)
+
+**Branch:** `feature/venue-side-golden-baseline` (stacked on
+`feature/venue-funnel-v1-canon`).
+
+First deterministic venue-side baseline. NOT full journal intelligence.
+NOT a journal recommender. NOT a live editorial board scraper. NOT a
+Russian-regime adapter. NOT a 50–80 venue crawl.
+
+What this baseline IS:
+
+- Structural rubric (3 files under `benchmarks/golden/`) saying which
+  source layer is the primary computation per FPM envelope axis, what
+  the five Mavrinsky-side envelope clusters must look like, and how the
+  three-stage funnel (pool / shortlist / deep) maps to V1–V8 depth.
+- One deterministic service: `services/corpus_hull_builder.py` — turns
+  a `CorpusAnalysisResult` into a venue `FieldPositionModel`. No LLM,
+  no network. 15 unit tests enforcing the six fundamental caveats
+  (official scope ≠ corpus fact, indexing ≠ fit, full text ≠ metadata
+  authority, editorial board = inference, unknown ≠ absent, incomplete
+  graph ≠ absence of tradition) plus FPM-shape compatibility.
+- One harness skeleton: `scripts/run_venue_side_benchmark.py` — three
+  stages (pool / shortlist / deep) against a fixture pool with
+  synthetic per-venue corpus annotations. Writes to
+  `private_inputs/runs/<id>/venue/` (gitignored). Fails loudly when
+  no fixture is supplied and live discovery is not implemented.
+- One report: `docs/benchmarks/VENUE_SIDE_GOLDEN_BASELINE.md`.
+
+Deferred (documented as next backlog items):
+
+- `EditorialBoardAdapter` live HTTP scraping.
+- Russian-regime adapters (ВАК / РИНЦ / КиберЛенинка).
+- Shadow / full-text resolvers (OA / Sci-Hub-likes / ResearchGate / etc).
+- 50–80 venue live discovery.
+- Other 17 `VenueProfilePackage` subobjects beyond the 7 minimal.
 
 ## Repository
 
@@ -57,7 +112,7 @@ returns sign-off.
 - API smoke test: 18/18 PASS, 1 SKIP (expected)
 - Browser smoke: all views render, zero console errors, mobile responsive at 375px
 - Frontend build: `tsc --noEmit` clean, `vite build` clean
-- Backend: 1275 pytest tests passing (4 deselected = network)
+- Backend on `fix/llm-agent-tolerance-mavrinsky` (after this pass): **1355 pytest tests passing**, 4 deselected = network. Main is still at 1307.
 
 ## Recent commit history (main)
 
@@ -89,7 +144,10 @@ evidence-first article-to-venue trajectory engine.
 - Source Authority Model v0: SourceAccessMode/SourceAuthorityScope enums, SourceAuthorityClaim/SourceAuthorityAssessment models, authority checker service, EvidenceAuditor integration, 53 tests
 - Real Source Acquisition v0: 6 venue adapters (OpenAlex, Crossref, DOAJ, Unpaywall, OpenCitations, Snapshot) with authority enforcement at adapter boundary, cross-adapter conflict detection, aggregation service, 3 new CLI commands, 67 tests
 - Real Venue Pool Discovery v0: discovery pipeline (query planner, fixture pool discovery, identity normalization/dedupe, candidate screening), 3 new enums, 5 new schema models, 4 new services, VenueDiscoveryAgent rewrite, 3 new CLI commands, UC-1 workflow update, 58 tests
-- UI Cockpit v0: FastAPI REST API (19 endpoints), React+TypeScript frontend (17 components), pipeline continuity (select_venue → fit chain), quality gates, evidence badges, responsive dark theme, API smoke test, 188 backend tests — operator/staging preview only, not public product
+- UI Cockpit v0: FastAPI REST API (30 endpoints, audit-verified), React+TypeScript frontend (18 components), pipeline continuity (select_venue → fit chain), quality gates, evidence badges, responsive dark theme, API smoke test, 188 backend tests — operator/staging preview only, not public product
+- **FPM wiring (`feature/wire-fpm-pipeline`)**: `Case` orchestrator integrates `ArticleFieldPositionerAgent` + `VenueFieldPositionerAgent`; FPM-based fit runs in parallel to the legacy 12-axis FitAssessment.
+- **Sprint α (`feature/sprint-alpha-evidence-policy`)**: PIM v1 §2/§7 substrate — `SourceEvidencePacket` + `EvidenceGranularity` enum, `ProtectedCorePolicy` + `EvidencePolicy` dataclasses, deterministic builder, policy gate in `RewritePlanner` chain. +15 tests.
+- **Mavrinsky golden-run baseline (`fix/llm-agent-tolerance-mavrinsky`)** (2026-06-14): LLM-driven end-to-end run on a real Russian philosophical draft. Provider `gpt-4o-mini` via 302.ai (`gpt-4.1-mini` + strict json_schema hangs through this gateway — documented). 9 agent/parser/protocol bugs fixed with 25 regression tests. Best run: 4 PASS / 3 PARTIAL / 3 FAIL on a 10-check rubric. Harness, rubric, sanitized report, and merge plan committed under `benchmarks/` and `docs/benchmarks/`. NOT yet merged to main.
 
 ## Modules implemented
 

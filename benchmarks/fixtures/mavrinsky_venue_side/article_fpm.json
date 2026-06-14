@@ -1,0 +1,68 @@
+{
+  "entity_type": "article",
+  "entity_id": "fixture_mavrinsky_article",
+  "_fixture_note": "Synthetic article point mirroring the Mavrinsky article-side gold. Used by the venue-side deterministic benchmark to avoid coupling this fixture to private_inputs/runs/mavrinsky_006/03_article_field_position.json. Numbers are gold-aligned, not LLM-extracted.",
+  "discipline_vector": {
+    "continental_philosophy": 0.78,
+    "media_philosophy": 0.58,
+    "philosophy_of_technology": 0.55,
+    "interface_theory": 0.45,
+    "digital_culture": 0.30,
+    "STS": 0.15,
+    "HCI": 0.10
+  },
+  "subdiscipline_address": {
+    "primary": "continental philosophy of technology",
+    "niche": "ontology of interfaces and desire",
+    "working_area": "post-structuralist ontology of technical interface forms"
+  },
+  "school_affiliation_vector": {
+    "Deleuze_Guattari": 0.80,
+    "Agamben": 0.70,
+    "Foucault": 0.65,
+    "Heidegger": 0.20,
+    "Lacan_as_foil": 0.35,
+    "Simondon": 0.0,
+    "Stiegler": 0.0,
+    "Latour_ANT": 0.0,
+    "HCI_dark_patterns": 0.0
+  },
+  "argument_move_vector": {
+    "concept_reconstruction": 0.45,
+    "concept_introduction": 0.30,
+    "problem_statement": 0.15,
+    "genealogy": 0.10,
+    "empirical_conceptual_hybrid": 0.0,
+    "systematic_review": 0.0
+  },
+  "evidence_type_profile": {
+    "theoretical_argument": 0.85,
+    "textual_analysis": 0.10,
+    "case_study": 0.05,
+    "quantitative_data": 0.0,
+    "experimental": 0.0
+  },
+  "method_stance": {
+    "explicit_method": false,
+    "method_family": "philosophical_analysis",
+    "method_specificity": "low",
+    "empirical_component": false
+  },
+  "language_register": {
+    "language": "ru",
+    "register": "academic_dense",
+    "jargon_density": 0.78
+  },
+  "geographic_affinity": {
+    "author_region": "Russia",
+    "intellectual_tradition_region": "France/Germany",
+    "language_of_publication": "ru"
+  },
+  "novelty_mode": {
+    "mode": "concept_introduction_plus_synthesis",
+    "novelty_claim_strength": 0.65,
+    "builds_on_or_opposes": "both"
+  },
+  "confidence": "high",
+  "unknowns": []
+}

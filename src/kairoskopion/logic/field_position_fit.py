@@ -35,12 +35,22 @@ def _vector_distance_to_envelope(
     if not point or not center:
         return UNKNOWN, 0.0, None
 
+    def _num(v):
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, dict):
+            # nested {value: x} or {center: x} shapes
+            for k in ("value", "center", "score", "weight"):
+                if k in v and isinstance(v[k], (int, float)):
+                    return float(v[k])
+        return 0.0
+
     if envelope is None:
         all_dims = set(point) | set(center)
         if not all_dims:
             return UNKNOWN, 0.0, None
         sq_sum = sum(
-            (point.get(d, 0.0) - center.get(d, 0.0)) ** 2
+            (_num(point.get(d, 0.0)) - _num(center.get(d, 0.0))) ** 2
             for d in all_dims
         )
         dist = math.sqrt(sq_sum / len(all_dims))
@@ -55,11 +65,11 @@ def _vector_distance_to_envelope(
     all_dims = set(point) | set(envelope)
 
     for dim in all_dims:
-        val = point.get(dim, 0.0)
+        val = _num(point.get(dim, 0.0))
         rng = envelope.get(dim)
-        if rng is None or len(rng) < 2:
+        if rng is None or not isinstance(rng, (list, tuple)) or len(rng) < 2:
             continue
-        lo, hi = rng[0], rng[1]
+        lo, hi = _num(rng[0]), _num(rng[1])
         if val < lo:
             overshoot = lo - val
         elif val > hi:

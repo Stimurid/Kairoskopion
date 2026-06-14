@@ -15,12 +15,16 @@ from ..schema import (
     ArticleModel,
     ArticleSemanticProfile,
     DisciplinaryPathway,
+    EvidencePolicy,
+    FieldPositionModel,
     FitAssessment,
     MismatchMap,
+    ProtectedCorePolicy,
     PublicationRegimeModel,
     RewritePlan,
     CitationPlan,
     RiskReport,
+    SourceEvidencePacket,
     SubmissionScenario,
     VenueCandidatePool,
     VenueModel,
@@ -81,6 +85,13 @@ class Case:
         self.risk_report: RiskReport | None = None
         self.publication_regime: PublicationRegimeModel | None = None
         self.investigated_venue: VenueModel | None = None
+        self.article_field_position: FieldPositionModel | None = None
+        self.venue_field_position: FieldPositionModel | None = None
+        self.field_position_fit: dict[str, Any] | None = None
+        self.source_evidence_packet: SourceEvidencePacket | None = None
+        self.protected_core_policy: ProtectedCorePolicy | None = None
+        self.evidence_policy: EvidencePolicy | None = None
+        self.policy_blocked_changes: list[dict[str, Any]] = []
 
         self.decision_log: list[dict[str, Any]] = []
         self.quality_gates: dict[str, dict[str, Any]] = {}
@@ -223,6 +234,44 @@ class Case:
             from ..services.article_enrichment import build_article_semantic_profile
             self.semantic_profile = build_article_semantic_profile(self.article_model)
 
+        self._build_article_field_position()
+
+    def _build_article_field_position(self):
+        """Run article_field_positioner. LLM if available, deterministic otherwise."""
+        import logging
+        logger = logging.getLogger(__name__)
+        if self.article_model is None:
+            return
+
+        from ..agents.article_field_positioner import ArticleFieldPositionerAgent
+        from ..agents.contract import AgentInput as _AI
+
+        agent = ArticleFieldPositionerAgent()
+        entities: dict[str, Any] = {"article": self.article_model.to_dict()}
+        if self.semantic_profile is not None:
+            entities["semantic_profile"] = self.semantic_profile.to_dict()
+        inp = _AI(
+            operation_id="article_field_position",
+            agent_role_id="article_field_positioner",
+            entities=entities,
+            raw_text=self.input_text,
+        )
+        provider = _get_llm_provider()
+        try:
+            if provider is not None:
+                out = agent.execute(inp, provider)
+            else:
+                out = agent.execute_deterministic(inp)
+        except Exception as exc:
+            logger.warning("Article field positioning failed: %s", exc)
+            return
+        if out.output_entity:
+            try:
+                self.article_field_position = FieldPositionModel.from_dict(out.output_entity)
+                logger.info("Article FPM built (%s)", out.confidence)
+            except Exception as exc:
+                logger.warning("Failed to deserialize article FPM: %s", exc)
+
     def _enrich_article(self, search_depth: str) -> dict[str, Any]:
         """Run web enrichment on article_model. Returns enrichment metadata."""
         import logging
@@ -307,6 +356,7 @@ class Case:
 
         self.investigated_venue = venue
         self.publication_regime = regime
+        self._build_venue_field_position(venue, guidelines_text=text)
         self._log_decision("investigate_venue", {
             "venue_name": venue.canonical_name,
         })
@@ -314,6 +364,45 @@ class Case:
             "venue": venue.to_dict(),
             "publication_regime": regime.to_dict(),
         }
+
+    def _build_venue_field_position(
+        self,
+        venue: VenueModel,
+        *,
+        guidelines_text: str = "",
+    ):
+        """Run venue_field_positioner. LLM if available, deterministic otherwise."""
+        import logging
+        logger = logging.getLogger(__name__)
+        from ..agents.venue_field_positioner import VenueFieldPositionerAgent
+        from ..agents.contract import AgentInput as _AI
+
+        agent = VenueFieldPositionerAgent()
+        entities: dict[str, Any] = {
+            "venue": venue.to_dict(),
+            "venue_guidelines_text": guidelines_text,
+        }
+        inp = _AI(
+            operation_id="venue_field_position",
+            agent_role_id="venue_field_positioner",
+            entities=entities,
+            raw_text=guidelines_text,
+        )
+        provider = _get_llm_provider()
+        try:
+            if provider is not None:
+                out = agent.execute(inp, provider)
+            else:
+                out = agent.execute_deterministic(inp)
+        except Exception as exc:
+            logger.warning("Venue field positioning failed: %s", exc)
+            return
+        if out.output_entity:
+            try:
+                self.venue_field_position = FieldPositionModel.from_dict(out.output_entity)
+                logger.info("Venue FPM built (%s)", out.confidence)
+            except Exception as exc:
+                logger.warning("Failed to deserialize venue FPM: %s", exc)
 
     # -- Confirm article model --
 
@@ -489,6 +578,10 @@ class Case:
         self.stage = CaseStage.VENUE_SELECTED
         self._log_decision("select_venue", {"venue_id": venue_id})
 
+        # Build venue FPM for the selected venue (if not already produced)
+        if self.selected_venue is not None and self.venue_field_position is None:
+            self._build_venue_field_position(self.selected_venue)
+
         # Auto-run fit → mismatch → rewrite chain
         if self.selected_venue and self.article_model:
             self._run_fit_chain()
@@ -592,6 +685,28 @@ class Case:
             "axes_count": len(self.fit_assessment.axes),
         })
 
+        # FPM-based fit, parallel to legacy fit. Computed when both FPMs present.
+        if (
+            self.article_field_position is not None
+            and self.venue_field_position is not None
+        ):
+            try:
+                from ..logic.field_position_fit import compute_field_position_fit
+                self.field_position_fit = compute_field_position_fit(
+                    self.article_field_position.to_dict(),
+                    self.venue_field_position.to_dict(),
+                )
+                logger.info(
+                    "FPM fit computed (%s)",
+                    self.field_position_fit.get("overall_label"),
+                )
+                self._log_decision("fpm_fit_computed", {
+                    "overall_label": self.field_position_fit.get("overall_label"),
+                    "summary": self.field_position_fit.get("summary"),
+                })
+            except Exception as exc:
+                logger.warning("FPM fit computation failed: %s", exc)
+
         try:
             self.mismatch_map = build_mismatch_map(self.fit_assessment)
             self._log_decision("mismatch_mapped", {
@@ -619,6 +734,21 @@ class Case:
                     "changes_count": len(self.rewrite_plan.changes),
                     "effort": self.rewrite_plan.estimated_effort,
                 })
+                # Sprint α B3: pass the plan through the policy gate
+                try:
+                    from ..services.protected_core import apply_policy_gate
+                    policy = self.ensure_protected_core_policy()
+                    if policy.forbidden_moves:
+                        gated, blocked = apply_policy_gate(self.rewrite_plan, policy)
+                        self.rewrite_plan = gated
+                        self.policy_blocked_changes = blocked
+                        if blocked:
+                            self._log_decision("policy_gate_blocked", {
+                                "blocked_count": len(blocked),
+                                "moves": sorted({m for b in blocked for m in b.get("matched_moves", [])}),
+                            })
+                except Exception as exc:
+                    logger.warning("Policy gate failed (non-fatal): %s", exc)
             except Exception:
                 pass
 
@@ -626,8 +756,62 @@ class Case:
 
     def get_fit(self) -> dict[str, Any]:
         if self.fit_assessment:
-            return self.fit_assessment.to_dict()
+            result = self.fit_assessment.to_dict()
+            if self.field_position_fit is not None:
+                result["field_position_fit"] = self.field_position_fit
+            return result
         return {"status": "not_assessed"}
+
+    def get_source_evidence_packet(self) -> dict[str, Any]:
+        """Build (or rebuild) the SourceEvidencePacket from current case state.
+
+        Lazy: rebuilds every call so the packet always reflects the latest
+        input_text / investigated_venue / selected_venue. Deterministic, no LLM.
+        """
+        from ..services.source_evidence_packet import build_packet_from_case
+        self.source_evidence_packet = build_packet_from_case(self)
+        return self.source_evidence_packet.to_dict()
+
+    def ensure_protected_core_policy(self) -> ProtectedCorePolicy:
+        """Return a ProtectedCorePolicy, deriving one from ArticleModel if missing."""
+        if self.protected_core_policy is not None:
+            return self.protected_core_policy
+        from ..services.protected_core import policy_from_article
+        article = self.article_model
+        self.protected_core_policy = policy_from_article(
+            article_model_id=article.article_model_id if article else None,
+            protected_core=article.protected_core if article else [],
+            mutable_zones=article.mutable_zones if article else [],
+        )
+        return self.protected_core_policy
+
+    def get_protected_core_policy(self) -> dict[str, Any]:
+        return self.ensure_protected_core_policy().to_dict()
+
+    def set_protected_core_policy(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Author or update the ProtectedCorePolicy from operator input."""
+        existing = self.ensure_protected_core_policy().to_dict()
+        existing.update({k: v for k, v in data.items() if v is not None})
+        self.protected_core_policy = ProtectedCorePolicy.from_dict(existing)
+        return self.protected_core_policy.to_dict()
+
+    def get_evidence_policy(self) -> dict[str, Any]:
+        if self.evidence_policy is None:
+            self.evidence_policy = EvidencePolicy(case_id=self.case_id)
+        return self.evidence_policy.to_dict()
+
+    def get_field_positions(self) -> dict[str, Any]:
+        return {
+            "article_field_position": (
+                self.article_field_position.to_dict()
+                if self.article_field_position else None
+            ),
+            "venue_field_position": (
+                self.venue_field_position.to_dict()
+                if self.venue_field_position else None
+            ),
+            "field_position_fit": self.field_position_fit,
+        }
 
     def get_mismatch_map(self) -> dict[str, Any]:
         if self.mismatch_map:
@@ -741,6 +925,12 @@ class Case:
             dossier["citation_plan"] = self.citation_plan.to_dict()
         if self.risk_report:
             dossier["risk_report"] = self.risk_report.to_dict()
+        if self.article_field_position:
+            dossier["article_field_position"] = self.article_field_position.to_dict()
+        if self.venue_field_position:
+            dossier["venue_field_position"] = self.venue_field_position.to_dict()
+        if self.field_position_fit is not None:
+            dossier["field_position_fit"] = self.field_position_fit
 
         dossier["decision_log"] = self.decision_log
         dossier["quality_gates"] = self.quality_gates
@@ -910,6 +1100,11 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         ("risk_report", "risk_report"),
         ("publication_regime", "publication_regime"),
         ("investigated_venue", "investigated_venue"),
+        ("article_field_position", "article_field_position"),
+        ("venue_field_position", "venue_field_position"),
+        ("source_evidence_packet", "source_evidence_packet"),
+        ("protected_core_policy", "protected_core_policy"),
+        ("evidence_policy", "evidence_policy"),
     ]:
         obj = getattr(case, attr, None)
         if obj is not None:
@@ -920,6 +1115,12 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
             p.to_dict() if hasattr(p, "to_dict") else p
             for p in case.pathways
         ]
+
+    if case.field_position_fit is not None:
+        snap["field_position_fit"] = case.field_position_fit
+
+    if case.policy_blocked_changes:
+        snap["policy_blocked_changes"] = case.policy_blocked_changes
 
     return snap
 
@@ -951,6 +1152,11 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
         "risk_report": RiskReport,
         "publication_regime": PublicationRegimeModel,
         "investigated_venue": VenueModel,
+        "article_field_position": FieldPositionModel,
+        "venue_field_position": FieldPositionModel,
+        "source_evidence_packet": SourceEvidencePacket,
+        "protected_core_policy": ProtectedCorePolicy,
+        "evidence_policy": EvidencePolicy,
     }
     for key, cls in model_map.items():
         raw = data.get(key)
@@ -959,6 +1165,14 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
                 setattr(case, key, cls.from_dict(raw))
             except Exception:
                 pass
+
+    fpm_fit = data.get("field_position_fit")
+    if isinstance(fpm_fit, dict):
+        case.field_position_fit = fpm_fit
+
+    pbc = data.get("policy_blocked_changes")
+    if isinstance(pbc, list):
+        case.policy_blocked_changes = pbc
 
     raw_pathways = data.get("pathways", [])
     for p in raw_pathways:

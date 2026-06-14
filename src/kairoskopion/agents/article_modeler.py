@@ -203,29 +203,67 @@ def _build_from_llm(
     has_full = has_sections and has_substantial
     input_mode = InputMode.FULL_MANUSCRIPT.value if has_full else InputMode.ABSTRACT_ONLY.value
 
+    def _pick(*keys: str, default=None):
+        for k in keys:
+            v = parsed.get(k)
+            if v not in (None, "", []):
+                return v
+        return default
+
+    def _to_list(v) -> list:
+        if v is None or v == "":
+            return []
+        if isinstance(v, list):
+            return [str(x) if not isinstance(x, str) else x for x in v]
+        if isinstance(v, str):
+            return [v]
+        if isinstance(v, dict):
+            return [str(x) for x in v.values()]
+        return [str(v)]
+
+    def _coerce_str(v) -> str | None:
+        if v is None:
+            return None
+        if isinstance(v, list):
+            return ", ".join(str(x) for x in v) if v else None
+        if isinstance(v, dict):
+            return ", ".join(f"{k}={v}" for k, v in v.items()) if v else None
+        return str(v) if v else None
+
+    title_llm = _pick("title", "title_current", "title_ru", "title_en", "title_extracted")
+    abstract_llm = _pick("abstract_summary", "abstract", "abstract_current", "abstract_ru", "abstract_en")
+    pcore_llm = _pick(
+        "protected_core_candidate",
+        "protected_core",
+        "protected_core_candidates",
+        "core_protection",
+        default=[],
+    )
+    mut_llm = _pick("mutable_zones", "mutable_zones_candidates", "flexible_zones", default=[])
+
     return ArticleModel(
         article_model_id=article_model_id(),
         source_refs=[source_ref] if source_ref else [],
-        title_current=parsed.get("title") or manuscript.title,
-        abstract_current=parsed.get("abstract_summary") or manuscript.abstract,
-        language=parsed.get("language") or manuscript.language,
+        title_current=_coerce_str(title_llm) or manuscript.title,
+        abstract_current=_coerce_str(abstract_llm) or manuscript.abstract,
+        language=_coerce_str(parsed.get("language")) or manuscript.language,
         input_mode=input_mode,
         article_stage=stage,
-        problem_statement=parsed.get("problem_statement"),
-        research_question=parsed.get("research_question"),
-        object_of_inquiry=parsed.get("object_of_inquiry"),
-        core_claims=parsed.get("core_claims", []),
+        problem_statement=_coerce_str(parsed.get("problem_statement")),
+        research_question=_coerce_str(parsed.get("research_question")),
+        object_of_inquiry=_coerce_str(parsed.get("object_of_inquiry")),
+        core_claims=_to_list(parsed.get("core_claims")),
         genre_current=genre,
-        disciplinary_register_current=parsed.get("disciplinary_register_current"),
+        disciplinary_register_current=_coerce_str(parsed.get("disciplinary_register_current")),
         novelty_mode=novelty,
         method_status=method,
-        method_description=parsed.get("method_description"),
-        theoretical_shoulders=parsed.get("theoretical_shoulders", []),
-        citation_ecology_current=parsed.get("citation_ecology_description")
-            or f"{ref_count} references found" if ref_count else "no bibliography found",
-        protected_core=parsed.get("protected_core_candidate", []),
-        mutable_zones=parsed.get("mutable_zones", []),
-        unknowns=parsed.get("unknowns", []),
+        method_description=_coerce_str(parsed.get("method_description")),
+        theoretical_shoulders=_to_list(parsed.get("theoretical_shoulders")),
+        citation_ecology_current=_coerce_str(parsed.get("citation_ecology_description"))
+            or (f"{ref_count} references found" if ref_count else "no bibliography found"),
+        protected_core=_to_list(pcore_llm),
+        mutable_zones=_to_list(mut_llm),
+        unknowns=_to_list(parsed.get("unknowns")),
         confidence=parsed.get("confidence", "medium"),
         evidence_refs=[source_ref] if source_ref else [],
         lifecycle_status=LifecycleStatus.PRELIMINARY.value,

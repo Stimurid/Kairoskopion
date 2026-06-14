@@ -114,10 +114,12 @@ class OpenAICompatProvider:
 
                 parsed = None
                 if response_schema is not None and content:
-                    try:
-                        parsed = json.loads(content)
-                    except json.JSONDecodeError:
-                        logger.warning("LLM returned non-JSON despite schema request")
+                    parsed = _parse_json_robust(content)
+                    if parsed is None:
+                        logger.warning(
+                            "LLM returned non-JSON despite schema request "
+                            "(preview=%r)", content[:120]
+                        )
 
                 return LLMResponse(
                     content=content,
@@ -156,3 +158,42 @@ class OpenAICompatProvider:
             f"LLM failed after {self._config.max_retries} attempts: {last_error}",
             error_code="RETRIES_EXHAUSTED",
         )
+
+
+def _parse_json_robust(text: str) -> Any | None:
+    """Parse JSON from a model response, tolerating common wrappers.
+
+    Handles: plain JSON, ```json ... ``` fences, ``` ... ``` fences,
+    leading/trailing prose. Falls back to extracting the first balanced
+    {...} block when nothing else works.
+    """
+    s = (text or "").strip()
+    if not s:
+        return None
+
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        pass
+
+    if s.startswith("```"):
+        first_nl = s.find("\n")
+        if first_nl != -1:
+            inner = s[first_nl + 1:]
+            if inner.rstrip().endswith("```"):
+                inner = inner.rstrip()[:-3]
+            try:
+                return json.loads(inner.strip())
+            except json.JSONDecodeError:
+                pass
+
+    lo = s.find("{")
+    hi = s.rfind("}")
+    if lo != -1 and hi != -1 and hi > lo:
+        candidate = s[lo:hi + 1]
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            pass
+
+    return None

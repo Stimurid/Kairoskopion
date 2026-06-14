@@ -159,16 +159,59 @@ def _build_from_llm(
     axes = []
     all_unknowns: list[str] = list(parsed.get("unknowns", []))
 
-    for ax in parsed.get("axes", []):
-        value_raw = ax.get("value", "unknown")
+    # Accept several common axis-container key names AND both list/dict shapes.
+    # The 302.ai-flavored output often returns axes as
+    #   "axes": {"topic_fit": {"value": "strong", ...}, ...}
+    # instead of the strict-schema list.
+    raw_axes_obj = None
+    for key in ("axes", "fit_axes", "fit_vector", "dimensions",
+                "fit_dimensions", "assessments", "axis_assessments"):
+        v = parsed.get(key)
+        if v:
+            raw_axes_obj = v
+            break
+
+    raw_axes: list = []
+    if isinstance(raw_axes_obj, list):
+        raw_axes = raw_axes_obj
+    elif isinstance(raw_axes_obj, dict):
+        for k, v in raw_axes_obj.items():
+            if isinstance(v, dict):
+                raw_axes.append({"axis": k, **v})
+            else:
+                raw_axes.append({"axis": k, "value": v})
+
+    for ax in raw_axes:
+        if not isinstance(ax, dict):
+            continue
+        value_raw = (
+            ax.get("value")
+            or ax.get("status")
+            or ax.get("strength")
+            or ax.get("rating")
+            or "unknown"
+        )
+        if isinstance(value_raw, str):
+            value_raw = value_raw.lower().strip()
         value = _VALUE_MAP.get(value_raw, FitAxisValue.UNKNOWN.value)
-        axis_unknowns = ax.get("unknowns", [])
+        axis_unknowns = ax.get("unknowns", []) or []
+        if isinstance(axis_unknowns, str):
+            axis_unknowns = [axis_unknowns]
         all_unknowns.extend(axis_unknowns)
+        notes = (
+            ax.get("reasoning")
+            or ax.get("notes")
+            or ax.get("explanation")
+            or ax.get("rationale")
+            or ""
+        )
+        if isinstance(notes, list):
+            notes = "; ".join(str(x) for x in notes)
         axes.append({
-            "axis": ax.get("axis", ""),
+            "axis": ax.get("axis", "") or ax.get("name", ""),
             "value": value,
-            "notes": ax.get("reasoning", ""),
-            "evidence_refs": ax.get("evidence_refs", []),
+            "notes": str(notes),
+            "evidence_refs": ax.get("evidence_refs", []) or [],
             "unknowns": axis_unknowns,
         })
 
