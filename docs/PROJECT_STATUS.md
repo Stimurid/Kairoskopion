@@ -1,6 +1,53 @@
 # Project Status — Kairoskopion
 
-**Last updated:** 2026-06-14 (Mavrinsky golden-run integration pass)
+**Last updated:** 2026-06-14 (RC17 — Mavrinsky benchmark-backed baseline + Venue Funnel v1 doctrine)
+
+## Latest release pass — RC17 (2026-06-14)
+
+**Tag:** `v0.2.0-alpha-rc17` (pending push)
+
+RC17 ships both halves of the Mavrinsky benchmark model in one
+coherent release:
+
+**Article-side stack (merged FF):**
+
+- `feature/wire-fpm-pipeline` — FieldPositionModel wired into Case orchestrator.
+- `feature/sprint-alpha-evidence-policy` — `SourceEvidencePacket` +
+  `ProtectedCorePolicy` + `EvidencePolicy` substrate (PIM v1 B1+B3).
+- `fix/llm-agent-tolerance-mavrinsky` — 9 LLM-output-shape bugs fixed;
+  Mavrinsky golden-run baseline (4 PASS / 3 PARTIAL / 3 FAIL on 10 §14
+  checks); 302.ai gateway reality doc; harness + scorer.
+
+**Venue-side doctrine + baseline (merged with content-clean 3-way):**
+
+- `feature/venue-funnel-v1-canon` — canonical reference
+  `docs/VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md` (8-layer funnel,
+  `VenueProfilePackage` of 24 sub-models, source allowlist A–J,
+  two-stage DB→network search with cache-miss taxonomy, mirror gold),
+  ADR-16 supersession, VF-C1…C9 code-alignment backlog,
+  `SPEC_COVERAGE_MATRIX` §6.7–§6.16 routing.
+- `feature/venue-side-golden-baseline` — operational rubric
+  `benchmarks/golden/venue_source_layer_map.md` (v2: 7 minimal
+  subobjects, primary computation layer per axis, six caveats),
+  five-cluster `mavrinsky_venue_side_gold.md` (continental /
+  philtech / STS / HCI / RU), `source_acquisition_funnel.md`,
+  deterministic `services/corpus_hull_builder.py` (15 tests),
+  harness skeleton `scripts/run_venue_side_benchmark.py`,
+  deterministic benchmark proof #001 (4 PASS / 1 PARTIAL / 0 FAIL,
+  all 5 clusters covered).
+
+The release fixes the rc16-vs-main drift the audit closed by bringing
+all benchmark-relevant work into one coherent tag.
+
+**Not in RC17:**
+
+- Live `EditorialBoardCloud` adapter (next venue-side sprint).
+- ВАК / РИНЦ / КиберЛенинка adapters (deferred).
+- Shadow / full-text resolvers (deferred).
+- 50–80 venue live discovery (deferred).
+- `chore/state-audit-2026-06-14` doc-only branch: skipped from FF train
+  because it would have prevented FF of the article-side stack. Lands
+  as a follow-up doc patch.
 
 ## Repository
 

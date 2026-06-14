@@ -1,5 +1,14 @@
 # Real Venue Pool Discovery v0 — Implementation Map
 
+> **Status: superseded for scope decisions.**
+> The "not an all-journal database", "no web crawling", and
+> "SnapshotCrawler explicit-URL-only" constraints below are lifted by
+> [VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md](VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md)
+> (see [DECISIONS.md](DECISIONS.md) ADR-16).
+> This document remains valid as the v0 MVP implementation record and
+> for the rules NOT lifted by v1 (user-seed-only screening, DOAJ ≠
+> Scopus inference, UNKNOWN ≠ absent, closed-source degradation).
+
 ## What venue discovery means in Kairoskopion
 
 Venue discovery is the process of turning an article's semantic profile, disciplinary

@@ -1,5 +1,16 @@
 # Venue Candidate Screening v0
 
+> **Status: partially superseded.**
+> The 7 screening axes below are extended to the 16-axis `FitAssessment`
+> defined in
+> [PUBLICATION_INTEGRABILITY_MODEL_v1.md](PUBLICATION_INTEGRABILITY_MODEL_v1.md)
+> §8, and the funnel-driven discovery flow is canonicalised in
+> [VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md](VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md)
+> (see [DECISIONS.md](DECISIONS.md) ADR-16).
+> Rules NOT superseded: user-seed-only candidates cannot be
+> `screened_in`, missing corpus evidence is always a gap, unknown
+> indexing is not negative, DOAJ ≠ Scopus inference is forbidden.
+
 ## Overview
 
 Candidate screening evaluates each venue candidate against the article's

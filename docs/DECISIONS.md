@@ -163,3 +163,46 @@ analysis state. A self-contained zip with metadata.json (version, creation
 time, registry counts) is simple, portable, and inspectable. Append mode
 preserves existing data; replace mode is explicit-only to prevent accidental
 data loss. No network protocol, no conflict resolution — just file copy.
+
+## ADR-16: Venue funnel v1 supersedes v0 discovery scope
+
+**Decision:** [VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md](VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md)
+is the canonical reference for venue discovery, profiling, and database
+building. It explicitly lifts three constraints from
+`REAL_VENUE_POOL_DISCOVERY_V0_IMPLEMENTATION_MAP.md`:
+
+1. The *"not an all-journal database"* rule. A growing corpus of
+   pre-built `VenueProfilePackage` records is now allowed (and required)
+   so that LLM keys do not burn on every fit query. Hot path stays
+   deterministic; LLM fires only on cache-miss.
+2. The *"no web crawling"* rule. Arbitrary crawling remains forbidden,
+   but a closed allowlist of source categories (A–J in the funnel
+   document) is permitted at stage 2 of the two-stage search.
+3. The *"SnapshotCrawler — explicit URL only, not search"* rule.
+   SnapshotCrawler retains its explicit-URL mode as one option, but
+   discovery-driven fetches via the allowlist are now allowed.
+
+Bans on Google Scholar, publisher pages, and aggregators as primary
+discovery sources are lifted.
+
+**What is NOT lifted:**
+
+- User-seed-only candidates still cannot be `screened_in` without
+  external evidence.
+- DOAJ inclusion still does NOT imply Scopus/WoS/VAK indexing.
+- Official webpage self-claim still does NOT override metadata source.
+- Unknown still ≠ absent.
+- Closed/paid sources (Scopus/WoS/JCR) still degrade to
+  `UNKNOWN_NOT_VERIFIED` rather than blocking the pipeline.
+
+**Rationale:** v0 was an MVP scope, deliberately narrow to keep the
+first implementation tractable. The funnel model — 8 layers from venue
+universe to published-corpus hull — was always implicit in
+`FieldPositionModel` (article point ↔ venue envelope) and
+`PUBLICATION_INTEGRABILITY_MODEL_v1.md` §6, but the discovery flow that
+realises it was not written down. After the Mavrinsky golden-run, venue
+modelling must be symmetric to article modelling. That requires the
+full source allowlist and a persistent corpus of `VenueProfilePackage`
+records, not just on-demand assembly.
+
+v0 docs are kept as historical record of the MVP cut.
