@@ -15,6 +15,49 @@ import traceback
 from pathlib import Path
 from typing import Any
 
+
+# ---------------------------------------------------------------------------
+# Load .env BEFORE anything imports LLMConfig / reads os.environ.
+# Per docs/LLM_PROVIDER_REALITY_302AI.md §1 — every entry point should
+# read via python-dotenv. Without this, `uvicorn ...:app` starts with an
+# empty env and LLMConfig.from_env() returns None even when .env is
+# populated, silently dropping all agents to deterministic fallback.
+# Pure-stdlib loader so this is a no-op when no .env exists and adds
+# zero runtime deps.
+# ---------------------------------------------------------------------------
+
+def _load_dotenv_if_present() -> None:
+    # Skip when running under pytest: tests already control env via
+    # monkeypatch; auto-loading a real .env (with real LLM keys) would
+    # turn cases-intake unit tests into live LLM HTTP calls that hang.
+    import sys
+    if "pytest" in sys.modules or os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+    if os.environ.get("KAIROSKOPION_NO_DOTENV") == "1":
+        return
+    env_path_str = os.environ.get("KAIROSKOPION_ENV_FILE", ".env")
+    env_path = Path(env_path_str)
+    if not env_path.is_file():
+        return
+    for raw in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip()
+        # Strip optional surrounding quotes
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
+            val = val[1:-1]
+        # Do NOT overwrite already-set env (operator overrides win).
+        if key and key not in os.environ:
+            os.environ[key] = val
+
+
+_load_dotenv_if_present()
+
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, File, Form, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
