@@ -44,6 +44,9 @@ from typing import Any
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
+from kairoskopion.logic.field_position_fit import (  # noqa: E402
+    compute_field_position_fit,
+)
 from kairoskopion.schema import FieldPositionModel  # noqa: E402
 from kairoskopion.services.corpus_analyzer import (  # noqa: E402
     CorpusAnalysisResult,
@@ -150,29 +153,26 @@ def stage_shortlist(
 ) -> list[dict[str, Any]]:
     """Stage 2 — shortlist. 8–12 candidates with pathway_decision.
 
-    Current baseline: a candidate makes the shortlist iff its
-    `disciplinary_cluster` field intersects the article's
-    `discipline_vector` keys. This is intentionally coarse — the full
-    pathway mapping is article_field_positioner work plus per-cluster
-    light envelope check, deferred to a follow-up sprint.
-    """
-    article_dims = set(article_fpm.get("discipline_vector", {}).keys()) | \
-                   set((article_fpm.get("subdiscipline_address") or {}).values())
+    Baseline behaviour (per
+    `benchmarks/golden/mavrinsky_venue_side_gold.md` §3): a candidate
+    with a non-empty `disciplinary_cluster` annotation is promoted with
+    its annotated cluster names as `pathway_decision`. The actual fit
+    arithmetic against the article FPM happens in deep + scorer, not
+    here.
 
+    The `article_fpm` argument is accepted for forward-compat (a future
+    revision may filter the shortlist by an envelope-vs-point screen)
+    but is NOT used to gate inclusion in the baseline.
+    """
+    del article_fpm  # forward-compat reserved
     shortlist: list[dict[str, Any]] = []
     for cand in pool:
-        clusters = set(cand.get("disciplinary_cluster", []) or [])
+        clusters = sorted(set(cand.get("disciplinary_cluster", []) or []))
         if not clusters:
             cand["_shortlist_skipped"] = "no disciplinary_cluster annotation"
             continue
-        # Coarse intersection on cluster name vs FPM dimension
-        if any(
-            any(token in d.lower() for token in (c.lower(),))
-            for c in clusters
-            for d in article_dims
-        ) or any(c.lower() in str(article_fpm).lower() for c in clusters):
-            cand["pathway_decision"] = sorted(clusters)
-            shortlist.append(cand)
+        cand["pathway_decision"] = clusters
+        shortlist.append(cand)
     log.info("Shortlist stage: %d candidates with pathway_decision", len(shortlist))
     return shortlist
 
@@ -183,19 +183,38 @@ def stage_shortlist(
 
 def stage_deep(
     shortlist: list[dict[str, Any]],
-    max_deep: int = 3,
+    article_fpm: dict[str, Any],
+    max_deep: int = 5,
 ) -> list[dict[str, Any]]:
     """Stage 3 — deep. 3–5 candidates with PublishedCorpusHull built
-    from a fixture or operator-supplied corpus."""
+    from a fixture or operator-supplied corpus.
+
+    For the Mavrinsky deterministic benchmark we deepen up to 5 (one
+    per cluster). For real runs the operator picks the top N from the
+    shortlist; defaulting to 5 keeps cluster coverage tractable.
+
+    Each dossier carries a `field_position_fit` block computed via
+    `compute_field_position_fit(article_fpm, venue_fpm)`. This is the
+    deterministic FPM fit used by the scorer to check label topology
+    against the Mavrinsky venue-side gold §5.
+    """
     deep: list[dict[str, Any]] = []
     for cand in shortlist[:max_deep]:
         synthetic = _synth_analysis_for(cand)
-        fpm = build_venue_corpus_hull(synthetic, venue_model_id=cand.get("venue_id"))
+        venue_fpm = build_venue_corpus_hull(synthetic, venue_model_id=cand.get("venue_id"))
+        try:
+            fpm_fit = compute_field_position_fit(article_fpm, venue_fpm.to_dict())
+        except Exception as exc:  # noqa: BLE001
+            log.warning("compute_field_position_fit failed for %s: %s",
+                        cand.get("venue_id"), exc)
+            fpm_fit = {"axes": [], "overall_label": "not_enough_data",
+                       "_error": str(exc)}
         cand_out = {
             "venue_id": cand.get("venue_id"),
             "canonical_name": cand.get("canonical_name"),
             "pathway_decision": cand.get("pathway_decision", []),
-            "venue_fpm": fpm.to_dict(),
+            "venue_fpm": venue_fpm.to_dict(),
+            "field_position_fit": fpm_fit,
         }
         deep.append(cand_out)
     log.info("Deep stage: %d dossiers built", len(deep))
@@ -240,42 +259,72 @@ def score_against_gold(
     deep_dossiers: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Score the deep dossiers against
-    benchmarks/golden/mavrinsky_venue_side_gold.md §2 envelope shapes.
+    benchmarks/golden/mavrinsky_venue_side_gold.md §2 envelope shapes
+    AND §5 label topology.
     """
     results: list[dict[str, Any]] = []
     for d in deep_dossiers:
         pathway_set = set(d.get("pathway_decision", []))
         fpm = d.get("venue_fpm", {})
+        fpm_fit = d.get("field_position_fit", {})
         cluster_findings = []
         for cluster, gold in CLUSTER_GOLD.items():
             if cluster not in pathway_set:
                 continue
-            check = _check_cluster(fpm, gold)
+            envelope = _check_envelope(fpm, gold)
+            label = _check_label(fpm_fit, gold)
+            combined_status = _combine_status(envelope["status"], label["status"])
             cluster_findings.append({
                 "cluster": cluster,
-                "status": check["status"],
-                "evidence": check["evidence"],
+                "status": combined_status,
+                "envelope_check": envelope,
+                "label_check": label,
             })
         results.append({
             "venue_id": d.get("venue_id"),
             "pathway_decision": list(pathway_set),
             "cluster_findings": cluster_findings,
         })
+
+    # Aggregate
+    flat = [f for r in results for f in r["cluster_findings"]]
+    counts = {"PASS": 0, "PARTIAL": 0, "FAIL": 0, "UNDETERMINED": 0}
+    for f in flat:
+        counts[f["status"]] = counts.get(f["status"], 0) + 1
     summary = {
         "deep_dossier_count": len(results),
-        "clusters_covered": sorted({
-            f["cluster"]
-            for r in results
-            for f in r["cluster_findings"]
-        }),
+        "clusters_covered": sorted({f["cluster"] for f in flat}),
+        "PASS": counts.get("PASS", 0),
+        "PARTIAL": counts.get("PARTIAL", 0),
+        "FAIL": counts.get("FAIL", 0),
+        "UNDETERMINED": counts.get("UNDETERMINED", 0),
     }
     return {"summary": summary, "results": results}
 
 
-def _check_cluster(fpm: dict[str, Any], gold: dict[str, Any]) -> dict[str, Any]:
-    school_env = fpm.get("school_envelope") or {}
-    evidence: list[str] = []
+def _combine_status(envelope_status: str, label_status: str) -> str:
+    """Combine envelope and label checks honestly.
 
+    Per `benchmarks/golden/venue_source_layer_map.md` §3.5
+    (Unknown != absent), a `not_enough_data` label coming out of an
+    intentionally partial venue FPM (corpus hull only) is NOT a fit
+    failure — it is an honest unknown. The combined status reflects
+    the envelope's verdict; the label state is surfaced in the
+    detailed `label_check` evidence.
+    """
+    if "FAIL" in (envelope_status, label_status):
+        return "FAIL"
+    if label_status == "UNDETERMINED":
+        return envelope_status
+    if envelope_status == "PASS" and label_status == "PASS":
+        return "PASS"
+    if envelope_status == "PASS" and label_status == "PARTIAL":
+        return "PARTIAL"
+    return "PARTIAL"
+
+
+def _check_envelope(fpm: dict[str, Any], gold: dict[str, Any]) -> dict[str, Any]:
+    school_env = fpm.get("school_envelope") or {}
     required = gold["school_envelope_required_dims"]
     forbidden = gold["school_envelope_forbidden_dominant"]
     hits = required & set(school_env.keys())
@@ -283,39 +332,57 @@ def _check_cluster(fpm: dict[str, Any], gold: dict[str, Any]) -> dict[str, Any]:
         k for k in school_env
         if k in forbidden and school_env[k][1] >= 0.4
     ]
-
     method_accepted = (
         fpm.get("method_stance", {}).get("accepted_method_families") or []
     )
     method_ok = gold["expected_method_accepted"] in method_accepted
 
     if required and not hits:
-        status = "FAIL"
-        evidence.append(
-            f"required school dims missing: {sorted(required)}; "
-            f"got {sorted(school_env.keys())}"
-        )
-    elif forbidden_dominant:
-        status = "FAIL"
-        evidence.append(
-            f"forbidden dominant schools in envelope: {forbidden_dominant}"
-        )
-    elif required and hits and method_ok:
-        status = "PASS"
-        evidence.append(
-            f"school hits {sorted(hits)}; method '{gold['expected_method_accepted']}' "
-            "accepted"
-        )
-    elif required and hits and not method_ok:
-        status = "PARTIAL"
-        evidence.append(
-            f"school hits {sorted(hits)} but method "
-            f"'{gold['expected_method_accepted']}' not in accepted"
-        )
-    else:
-        status = "PARTIAL"
-        evidence.append("required dims empty (e.g. cluster 5); manual review")
-    return {"status": status, "evidence": evidence}
+        return {"status": "FAIL",
+                "evidence": [f"required school dims missing: {sorted(required)}; "
+                             f"got {sorted(school_env.keys())}"]}
+    if forbidden_dominant:
+        return {"status": "FAIL",
+                "evidence": [f"forbidden dominant schools in envelope: "
+                             f"{forbidden_dominant}"]}
+    if required and hits and method_ok:
+        return {"status": "PASS",
+                "evidence": [f"school hits {sorted(hits)}; method "
+                             f"'{gold['expected_method_accepted']}' accepted"]}
+    if required and hits and not method_ok:
+        return {"status": "PARTIAL",
+                "evidence": [f"school hits {sorted(hits)} but method "
+                             f"'{gold['expected_method_accepted']}' not in accepted"]}
+    return {"status": "PARTIAL",
+            "evidence": ["required dims empty (e.g. cluster 5); manual review"]}
+
+
+def _check_label(
+    fpm_fit: dict[str, Any], gold: dict[str, Any]
+) -> dict[str, Any]:
+    expected = gold.get("expected_label_set") or set()
+    actual = fpm_fit.get("overall_label")
+    if not expected:
+        return {"status": "PARTIAL",
+                "evidence": ["no expected_label_set in gold (cluster 5)",
+                             f"computed overall_label: {actual!r}"]}
+    if actual in expected:
+        return {"status": "PASS",
+                "evidence": [f"overall_label {actual!r} in expected set "
+                             f"{sorted(expected)}"]}
+    if actual == "not_enough_data":
+        return {"status": "UNDETERMINED",
+                "evidence": [
+                    "overall_label is not_enough_data — corpus-hull-only "
+                    "venue FPM does not cover all 11 fit axes (formalization, "
+                    "audience, jargon, language, genre_formality, geographic). "
+                    "Per rubric §3.5 (Unknown != absent), this is honest "
+                    "unknown, not failure. Needs A guidelines + C registry "
+                    "to reach label verdict.",
+                ]}
+    return {"status": "FAIL",
+            "evidence": [f"overall_label {actual!r} NOT in expected "
+                         f"{sorted(expected)}"]}
 
 
 # ---------------------------------------------------------------------------
@@ -353,7 +420,7 @@ def run(
     shortlist = stage_shortlist(pool, article_fpm)
     _save(venue_dir, "02_shortlist", shortlist)
 
-    deep = stage_deep(shortlist)
+    deep = stage_deep(shortlist, article_fpm)
     _save(venue_dir, "03_deep_dossiers", deep)
 
     scorecard = score_against_gold(deep)

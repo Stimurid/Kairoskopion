@@ -1,0 +1,192 @@
+[
+  {
+    "venue_id": "fixture_continental_01",
+    "canonical_name": "[FIXTURE] Continental Media Philosophy Quarterly",
+    "venue_type": "journal",
+    "publisher": "[FIXTURE Publisher A]",
+    "language": "en",
+    "disciplinary_cluster": ["continental_media_philosophy"],
+    "scope_summary": "[FIXTURE] Continental philosophy and media philosophy; theoretical essays on subjectivity, dispositif, technical mediation",
+    "fixture_corpus_summary": {
+      "corpus_size": 30,
+      "method_distribution": {
+        "theoretical": 0.72,
+        "textual": 0.18,
+        "case_study": 0.04,
+        "experimental": 0.0
+      },
+      "school_distribution": {
+        "Deleuze_Guattari": 0.46,
+        "Foucault": 0.40,
+        "Agamben": 0.22,
+        "Heidegger": 0.18,
+        "Latour_ANT": 0.03,
+        "HCI_dark_patterns": 0.0
+      },
+      "genre_distribution": {
+        "theoretical_essay": 0.60,
+        "conceptual_article": 0.30,
+        "commentary": 0.10
+      },
+      "citation_stats": {
+        "avg_references": 42.5,
+        "median_year": 1995
+      },
+      "confidence": "high"
+    }
+  },
+  {
+    "venue_id": "fixture_philtech_01",
+    "canonical_name": "[FIXTURE] Philosophy of Technology Journal",
+    "venue_type": "journal",
+    "publisher": "[FIXTURE Publisher B]",
+    "language": "en",
+    "disciplinary_cluster": ["philosophy_of_technology"],
+    "scope_summary": "[FIXTURE] Philosophy of technology; postphenomenology; Simondon and Stiegler scholarship",
+    "fixture_corpus_summary": {
+      "corpus_size": 28,
+      "method_distribution": {
+        "theoretical": 0.55,
+        "case_study": 0.22,
+        "textual": 0.18,
+        "experimental": 0.0
+      },
+      "school_distribution": {
+        "Simondon": 0.42,
+        "Stiegler": 0.38,
+        "Yuk_Hui": 0.20,
+        "Heidegger_on_technology": 0.30,
+        "Verbeek": 0.22,
+        "Deleuze_Guattari": 0.10,
+        "Foucault": 0.10,
+        "Agamben": 0.05
+      },
+      "genre_distribution": {
+        "conceptual_article": 0.50,
+        "theoretical_essay": 0.30,
+        "empirical_conceptual_hybrid": 0.20
+      },
+      "citation_stats": {
+        "avg_references": 38.2,
+        "median_year": 2008
+      },
+      "confidence": "high"
+    }
+  },
+  {
+    "venue_id": "fixture_sts_01",
+    "canonical_name": "[FIXTURE] STS / Platform Studies Review",
+    "venue_type": "journal",
+    "publisher": "[FIXTURE Publisher C]",
+    "language": "en",
+    "disciplinary_cluster": ["STS_platform_studies"],
+    "scope_summary": "[FIXTURE] Science and technology studies; platform studies; actor-network theory; sociotechnical case studies",
+    "fixture_corpus_summary": {
+      "corpus_size": 32,
+      "method_distribution": {
+        "case_study": 0.62,
+        "interview_ethnographic": 0.28,
+        "archival": 0.10,
+        "theoretical": 0.05,
+        "experimental": 0.0
+      },
+      "school_distribution": {
+        "Latour_ANT": 0.60,
+        "Callon": 0.30,
+        "STS_empirical": 0.55,
+        "Deleuze_Guattari": 0.04,
+        "Foucault": 0.10
+      },
+      "genre_distribution": {
+        "empirical_conceptual_hybrid": 0.55,
+        "case_study": 0.30,
+        "conceptual_article": 0.10,
+        "commentary": 0.05
+      },
+      "citation_stats": {
+        "avg_references": 65.0,
+        "median_year": 2014
+      },
+      "confidence": "high"
+    }
+  },
+  {
+    "venue_id": "fixture_hci_01",
+    "canonical_name": "[FIXTURE] HCI / Design Theory Annual",
+    "venue_type": "journal",
+    "publisher": "[FIXTURE Publisher D]",
+    "language": "en",
+    "disciplinary_cluster": ["HCI_design_theory"],
+    "scope_summary": "[FIXTURE] Human-computer interaction; interaction design; dark patterns; persuasive technology; user studies",
+    "fixture_corpus_summary": {
+      "corpus_size": 35,
+      "method_distribution": {
+        "experimental": 0.50,
+        "user_study": 0.55,
+        "quantitative_data": 0.45,
+        "design_intervention": 0.30,
+        "theoretical": 0.06
+      },
+      "school_distribution": {
+        "HCI_affordances": 0.42,
+        "dark_patterns": 0.25,
+        "persuasive_technology": 0.20,
+        "interaction_design": 0.50,
+        "Deleuze_Guattari": 0.0,
+        "Foucault": 0.02,
+        "Agamben": 0.0
+      },
+      "genre_distribution": {
+        "empirical_study": 0.55,
+        "design_intervention": 0.25,
+        "case_study": 0.15,
+        "conceptual_article": 0.05
+      },
+      "citation_stats": {
+        "avg_references": 48.0,
+        "median_year": 2018
+      },
+      "confidence": "high"
+    }
+  },
+  {
+    "venue_id": "fixture_ru_phil_01",
+    "canonical_name": "[FIXTURE] Российский философский журнал",
+    "venue_type": "journal",
+    "publisher": "[FIXTURE Издатель E]",
+    "language": "ru",
+    "disciplinary_cluster": ["RU_philosophy_regime"],
+    "scope_summary": "[FIXTURE] Русская континентальная философия; история философии; континентальная пост-советская традиция; ВАК-перечень, РИНЦ.",
+    "fixture_corpus_summary": {
+      "corpus_size": 24,
+      "method_distribution": {
+        "theoretical": 0.65,
+        "textual": 0.25,
+        "case_study": 0.05
+      },
+      "school_distribution": {
+        "Russian_metaphysical_tradition": 0.30,
+        "continental_post_Soviet": 0.30,
+        "phenomenological_tradition": 0.22,
+        "Foucault": 0.12,
+        "Deleuze_Guattari": 0.10,
+        "Agamben": 0.05
+      },
+      "genre_distribution": {
+        "theoretical_essay": 0.45,
+        "conceptual_article": 0.25,
+        "commentary": 0.20,
+        "review": 0.10
+      },
+      "citation_stats": {
+        "avg_references": 28.0,
+        "median_year": 2005,
+        "_vendor_indexing_claim": "ВАК-перечень, РИНЦ"
+      },
+      "confidence": "medium",
+      "warnings": [
+        "RU-cluster confidence intentionally medium: editorial board variance across the cluster is not captured by a single fixture; real cluster spans metaphysical / phenomenological / continental-post-Soviet / analytical lines"
+      ]
+    }
+  }
+]
