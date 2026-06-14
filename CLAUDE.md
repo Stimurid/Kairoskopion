@@ -50,6 +50,16 @@ For deep spec questions, read:
 - `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` — master spec (12665 lines, 10 waves)
 - `docs/DECISIONS.md` — architectural decisions and rationale
 
+**Before starting any venue-discovery session**, read:
+- `docs/VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md` — canonical funnel
+  doctrine (8 layers, VenueProfilePackage, source allowlist A–J)
+- **`docs/VENUE_DISCOVERY_TRADECRAFT.md` — operator playbook with
+  accumulated URL-pattern lifehacks, aggregator allowlist
+  (motto-distribution, CyberLeninka, Istina MSU, ...), Chrome MCP usage,
+  cross-listing inference, anti-pattern checklist.** Reusable Python
+  primitives in `src/kairoskopion/services/venue_discovery_tradecraft.py`.
+  Skip this and you will burn classifier budget rediscovering 403 walls.
+
 ## What is implemented (foundation)
 
 - 29+ dataclass domain models with `to_dict`/`from_dict`

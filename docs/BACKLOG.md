@@ -665,6 +665,17 @@ branch, commits `8d7751b` canon + ADR-16 + v0 supersession headers and
 registry. LLM fires only on cache-miss (`absent` / `stale` /
 `weak_evidence`); `fresh_sufficient` never spends a key. See canon §7.
 
+**Tradecraft prerequisite:** before implementing any VF-C5/C6/C8 work
+(navigator, discovery agent, backlog adapters), read
+[VENUE_DISCOVERY_TRADECRAFT.md](VENUE_DISCOVERY_TRADECRAFT.md) and
+import primitives from
+`src/kairoskopion/services/venue_discovery_tradecraft.py`. The module
+codifies the URL-fallback library, aggregator allowlist, known-broken
+patterns, transliteration heuristics, and deterministic ID generation
+that already shipped in
+`scripts/build_mavrinsky_ru_seed_corpus.py`. Reuse instead of
+re-deriving.
+
 ### Sprint VF-C1: VenueFunnelLayer enum + source category enum
 
 **Scope:**

@@ -17,6 +17,11 @@ and database building. Supersedes the v0 discovery scope restrictions
   — authority levels for sources used in the funnel.
 - [VENUE_CORPUS_PROFILER_V2.md](VENUE_CORPUS_PROFILER_V2.md) — corpus mining
   policy referenced from layer 8 of the funnel.
+- **[VENUE_DISCOVERY_TRADECRAFT.md](VENUE_DISCOVERY_TRADECRAFT.md)** —
+  operator playbook with accumulated URL-pattern lifehacks, aggregator
+  allowlist, auth strategy, cross-listing inference, anti-patterns.
+  **Required reading before any new discovery session** — saves
+  re-inventing workarounds and burning classifier budget.
 
 **Status of code:** purely additive specification. No schema change is
 mandated by this document. Code alignment will go through separate
