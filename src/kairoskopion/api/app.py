@@ -348,6 +348,87 @@ def confirm_article_model(
 
 
 # ---------------------------------------------------------------------------
+# Human-readable model views (author-facing markdown)
+# ---------------------------------------------------------------------------
+
+
+@app.get(
+    "/cases/{case_id}/article-model/human-view",
+    response_class=JSONResponse,
+)
+def get_article_model_human_view(case: Case = Depends(_user_case)):
+    """Return the author-facing prose review of the ArticleModel."""
+    if not case.article_model:
+        raise HTTPException(404, "Article model not built yet")
+    from ..services.human_readable_card import article_model_human_view
+    article = case.article_model.to_dict()
+    pathways = [
+        p.to_dict() if hasattr(p, "to_dict") else p
+        for p in (case.pathways or [])
+    ]
+    return {
+        "format": "markdown",
+        "case_id": case.case_id,
+        "lifecycle_status": article.get("lifecycle_status", "preliminary"),
+        "not_a_submission_recommendation": True,
+        "markdown": article_model_human_view(article, pathways=pathways),
+    }
+
+
+@app.get("/cases/{case_id}/venues/{venue_key}/human-view")
+def get_venue_human_view(
+    venue_key: str, case: Case = Depends(_user_case),
+):
+    """Return the author-facing prose review of a venue / VPKG.
+
+    `venue_key` matches either:
+      - the case's currently `investigated_venue` (use literal
+        "investigated");
+      - or a `canonical_name` of a candidate in `case.venue_pool`;
+      - or a venue_model_id / venue_candidate_id present on the case.
+    """
+    from ..services.human_readable_card import venue_human_view
+
+    venue_dict: dict | None = None
+    if venue_key == "investigated":
+        if case.investigated_venue is None:
+            raise HTTPException(404, "No investigated venue on this case yet")
+        venue_dict = case.investigated_venue.to_dict()
+    else:
+        pool = case.venue_pool
+        if pool is not None and hasattr(pool, "candidates"):
+            for cand in pool.candidates or []:
+                cand_dict = cand.to_dict() if hasattr(cand, "to_dict") else cand
+                if (
+                    cand_dict.get("canonical_name") == venue_key
+                    or cand_dict.get("venue_candidate_id") == venue_key
+                    or cand_dict.get("venue_model_id") == venue_key
+                    or cand_dict.get("venue_profile_package_id") == venue_key
+                ):
+                    venue_dict = cand_dict
+                    break
+        if venue_dict is None and case.investigated_venue is not None:
+            iv = case.investigated_venue.to_dict()
+            if iv.get("canonical_name") == venue_key:
+                venue_dict = iv
+        if venue_dict is None and case.selected_venue is not None:
+            sv = case.selected_venue.to_dict()
+            if sv.get("canonical_name") == venue_key:
+                venue_dict = sv
+
+    if venue_dict is None:
+        raise HTTPException(404, f"Venue {venue_key!r} not found on this case")
+
+    return {
+        "format": "markdown",
+        "case_id": case.case_id,
+        "venue_key": venue_key,
+        "not_a_submission_recommendation": True,
+        "markdown": venue_human_view(venue_dict),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Scenario
 # ---------------------------------------------------------------------------
 

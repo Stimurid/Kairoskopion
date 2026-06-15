@@ -16,6 +16,7 @@ import { StatusBar } from './StatusBar';
 import { EvidenceDrawer } from './EvidenceDrawer';
 import { IntakeSurface } from './IntakeSurface';
 import { ArticleCard } from './ArticleCard';
+import { HumanModelView } from './HumanModelView';
 import { VenueProfile } from './VenueProfile';
 import { ScenarioBuilder } from './ScenarioBuilder';
 import { MismatchMapView } from './MismatchMapView';
@@ -35,6 +36,11 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
   const [activeView, setActiveView] = useState<string>(caseData.stage);
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const [articleModel, setArticleModel] = useState<ArticleModel | null>(null);
+  // Human / Technical toggle for ArticleModel view. Human is default —
+  // the Mavrinsky reviewer feedback that triggered this was that the raw
+  // structured view was unreadable.
+  const [articleViewMode, setArticleViewMode] = useState<'human' | 'technical'>('human');
+  const [venueViewMode, setVenueViewMode] = useState<'human' | 'technical'>('human');
   const [pathways, setPathways] = useState<DisciplinaryPathway[]>([]);
   const [venueModel, setVenueModel] = useState<VenueModel | null>(null);
   const [pubRegime, setPubRegime] = useState<PublicationRegimeModel | undefined>(undefined);
@@ -318,12 +324,43 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
           );
         }
         return (
-          <ArticleCard
-            article={articleModel}
-            onConfirm={handleConfirmArticle}
-            onEvidenceClick={handleEvidenceClick}
-            onBack={() => setActiveView('intake')}
-          />
+          <>
+            <div className="model-view-toggle" role="tablist" aria-label="Article view mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={articleViewMode === 'human'}
+                className={`model-view-toggle-btn ${articleViewMode === 'human' ? 'model-view-toggle-btn--active' : ''}`}
+                onClick={() => setArticleViewMode('human')}
+              >
+                Человеческая модель
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={articleViewMode === 'technical'}
+                className={`model-view-toggle-btn ${articleViewMode === 'technical' ? 'model-view-toggle-btn--active' : ''}`}
+                onClick={() => setArticleViewMode('technical')}
+              >
+                Техническая модель
+              </button>
+            </div>
+            {articleViewMode === 'human' ? (
+              <HumanModelView
+                caseId={caseId}
+                kind="article"
+                onBack={() => setActiveView('intake')}
+                onConfirm={() => handleConfirmArticle(articleModel.protected_core || [], {})}
+              />
+            ) : (
+              <ArticleCard
+                article={articleModel}
+                onConfirm={handleConfirmArticle}
+                onEvidenceClick={handleEvidenceClick}
+                onBack={() => setActiveView('intake')}
+              />
+            )}
+          </>
         );
 
       case 'venue_investigation':
@@ -343,11 +380,41 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
           );
         }
         return (
-          <VenueProfile
-            venue={venueModel}
-            regime={pubRegime}
-            onEvidenceClick={handleEvidenceClick}
-          />
+          <>
+            <div className="model-view-toggle" role="tablist" aria-label="Venue view mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={venueViewMode === 'human'}
+                className={`model-view-toggle-btn ${venueViewMode === 'human' ? 'model-view-toggle-btn--active' : ''}`}
+                onClick={() => setVenueViewMode('human')}
+              >
+                Человеческая модель
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={venueViewMode === 'technical'}
+                className={`model-view-toggle-btn ${venueViewMode === 'technical' ? 'model-view-toggle-btn--active' : ''}`}
+                onClick={() => setVenueViewMode('technical')}
+              >
+                Техническая модель
+              </button>
+            </div>
+            {venueViewMode === 'human' ? (
+              <HumanModelView
+                caseId={caseId}
+                kind="venue"
+                venueKey="investigated"
+              />
+            ) : (
+              <VenueProfile
+                venue={venueModel}
+                regime={pubRegime}
+                onEvidenceClick={handleEvidenceClick}
+              />
+            )}
+          </>
         );
 
       case 'scenario':

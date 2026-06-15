@@ -203,4 +203,34 @@ cleared. Use the **Continue** tab to come back.
 - **Backend tests do not exercise live LLM.** CI deterministic
   tests pass; live LLM smoke is manual and run by the operator.
 
+## Before trusting fit / venue output — read your human model
+
+The cockpit now has a **Human / Technical** toggle on the Article
+view and the Venue view. The default is **«Человеческая модель»**.
+
+Before you act on any fit/mismatch/venue output:
+
+1. Open the article view and read the human model. It's the same
+   structured model the system uses internally — just written as
+   sentences you can actually read. It has 11 sections (короткое
+   резюме, главный объект, проблема, утверждения, тип, дисциплины,
+   плечи, неприкосновенное ядро, что система не знает, вопросы к
+   автору, что можно поправить).
+2. If the model is correct: hit «Подтвердить модель». Lifecycle
+   flips from `preliminary` to `confirmed`.
+3. If something is wrong: switch to «Техническая модель», correct
+   the fields, then hit Confirm there. Then switch back to read the
+   corrected human view.
+
+**Wrong model → correct the model. Do not trust the recommendation
+built on a wrong model.** The system is not giving you a "submit
+here" verdict — it's giving you a model of your article + a map of
+possible journals. The submission decision is yours; the model is
+the artefact you review and confirm.
+
+The same toggle is available on the Venue view. The venue human
+card is honest about what is `source_fact`, `vendor_claim`,
+`corpus_observation`, `inference`, `unknown`, or `inaccessible` per
+axis. It does NOT speculate about editor tastes.
+
 End of guide.
