@@ -3761,3 +3761,42 @@ code.agent-detail-value {
   color: var(--text-primary, #e7ebf0);
   border-color: var(--text-muted, #8b94a3);
 }
+
+/* ============================================================ */
+/* Tester-readiness additions: preliminary banner + pathway reasoning */
+/* ============================================================ */
+
+.preliminary-banner {
+  margin: 0 0 12px 0;
+  padding: 10px 14px;
+  background: rgba(212, 169, 80, 0.10);
+  border: 1px solid rgba(212, 169, 80, 0.35);
+  border-left: 3px solid rgba(212, 169, 80, 0.9);
+  border-radius: 6px;
+  color: var(--text-primary, #e7ebf0);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.preliminary-banner strong {
+  color: rgba(212, 169, 80, 1);
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.pathway-reasoning {
+  margin: 8px 0 6px;
+  padding: 8px 10px;
+  background: rgba(91, 127, 255, 0.06);
+  border-left: 2px solid rgba(91, 127, 255, 0.55);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-secondary, #c2c9d4);
+  text-align: left;
+}
+
+.pathway-badge--confidence {
+  background: rgba(176, 122, 255, 0.15);
+  color: var(--badge-inferred, #b07aff);
+}

@@ -51,7 +51,16 @@ export function PathwayMap({ pathways, onSelectPathway, selectedPathwayId }: Pro
               <div className="pathway-badges">
                 <span className={`pathway-badge ${fit.className}`}>{fit.label} fit</span>
                 <span className={`pathway-badge ${core.className}`}>{core.label}</span>
+                {p.confidence && (
+                  <span className="pathway-badge pathway-badge--confidence">
+                    confidence: {p.confidence}
+                  </span>
+                )}
               </div>
+
+              {p.reasoning && (
+                <p className="pathway-reasoning">{p.reasoning}</p>
+              )}
 
               {p.required_adaptations.length > 0 && (
                 <div className="pathway-adaptations">

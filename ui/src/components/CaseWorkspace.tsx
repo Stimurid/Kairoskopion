@@ -460,6 +460,12 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
         onStageClick={handleStageClick}
       />
 
+      <div className="preliminary-banner" role="note">
+        <strong>Preliminary positioning</strong> — this is not a submission
+        recommendation. Outputs are evidence-traceable hypotheses, not
+        decisions. Unknowns are marked explicitly.
+      </div>
+
       {error && (
         <div className="error-banner" role="alert">
           <span>{error}</span>

@@ -137,6 +137,8 @@ export interface DisciplinaryPathway {
   example_venue_names: string[];
   rank: number;
   strategic_value_notes: string;
+  reasoning?: string;
+  confidence?: string;
 }
 
 // --- Venue ---
