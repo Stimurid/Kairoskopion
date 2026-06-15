@@ -512,6 +512,10 @@ class Case:
             logger = logging.getLogger(__name__)
             from ..agents.disciplinary_mapper import DisciplinaryPathwayMapperAgent
             from ..agents.contract import AgentInput
+            from ..llm.attempt_metadata import (
+                FALLBACK_REASON_PROVIDER_ERROR,
+                LLMAttemptMetadata,
+            )
             agent = DisciplinaryPathwayMapperAgent()
             am_dict = self.article_model.to_dict() if self.article_model else {}
             inp = AgentInput(
@@ -522,6 +526,7 @@ class Case:
                     "semantic_profile": self.semantic_profile.to_dict(),
                 },
             )
+            case_level_attempt: LLMAttemptMetadata | None = None
             provider = _get_llm_provider()
             if provider is not None:
                 try:
@@ -529,11 +534,25 @@ class Case:
                     logger.info("Pathways mapped via LLM")
                 except Exception as exc:
                     logger.warning("LLM pathway mapping failed, falling back: %s", exc)
+                    case_level_attempt = LLMAttemptMetadata.fallback(
+                        reason=FALLBACK_REASON_PROVIDER_ERROR,
+                        provider="openai_compatible",
+                        validation_errors=[str(exc)[:240]],
+                    )
                     output = agent.execute_deterministic(inp)
             else:
+                case_level_attempt = LLMAttemptMetadata.not_attempted()
                 output = agent.execute_deterministic(inp)
+
             if output.output_entity:
                 raw = output.output_entity.get("pathways", [])
+                # If we hit a case-level fallback that the agent didn't
+                # know about, stamp every pathway with the metadata.
+                if case_level_attempt is not None:
+                    meta_dict = case_level_attempt.to_dict()
+                    for p in raw:
+                        if isinstance(p, dict) and not p.get("extraction_attempt"):
+                            p["extraction_attempt"] = meta_dict
                 self.pathways = [
                     DisciplinaryPathway(**p) if isinstance(p, dict) else p
                     for p in raw

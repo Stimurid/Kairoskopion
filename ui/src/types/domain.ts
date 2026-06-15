@@ -127,6 +127,20 @@ export interface SubmissionScenario {
 
 // --- Pathway ---
 
+export interface ExtractionAttempt {
+  llm_attempted?: boolean;
+  llm_provider?: string | null;
+  llm_model?: string | null;
+  llm_latency_ms?: number | null;
+  parse_status?: string;
+  fallback_used?: boolean;
+  fallback_reason?: string;
+  warning_for_user?: string | null;
+  repair_attempted?: boolean;
+  repair_status?: string;
+  raw_output_ref?: string | null;
+}
+
 export interface DisciplinaryPathway {
   disciplinary_pathway_id: string;
   discipline_name: string;
@@ -139,6 +153,7 @@ export interface DisciplinaryPathway {
   strategic_value_notes: string;
   reasoning?: string;
   confidence?: string;
+  extraction_attempt?: ExtractionAttempt | null;
 }
 
 // --- Venue ---

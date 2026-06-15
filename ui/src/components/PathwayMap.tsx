@@ -22,6 +22,10 @@ interface Props {
 
 export function PathwayMap({ pathways, onSelectPathway, selectedPathwayId }: Props) {
   const sorted = [...pathways].sort((a, b) => a.rank - b.rank);
+  // Surface the LLM-attempt fallback banner if any pathway carries a
+  // visible fallback metadata. Same shape as the ArticleModel warning
+  // -- Russian sentence + compact technical hint.
+  const fallback = pathways.find(p => p.extraction_attempt?.fallback_used)?.extraction_attempt ?? null;
 
   return (
     <div className="pathway-map">
@@ -29,6 +33,18 @@ export function PathwayMap({ pathways, onSelectPathway, selectedPathwayId }: Pro
         <h2>Disciplinary Pathways</h2>
         <span className="pathway-count">{pathways.length} pathways mapped</span>
       </div>
+
+      {fallback && (
+        <div className="pathway-fallback-banner" role="note">
+          <strong>⚠ Дисциплинарная карта построена в предварительном режиме.</strong>{' '}
+          {fallback.warning_for_user ??
+            'LLM-вызов не дал корректный результат, поэтому использован fallback.'}
+          <div className="pathway-fallback-meta">
+            <code>parse_status: '{fallback.parse_status ?? 'unknown'}'</code>{' '}
+            <code>· fallback_reason: '{fallback.fallback_reason ?? 'unknown'}'</code>
+          </div>
+        </div>
+      )}
 
       <div className="pathway-grid">
         {sorted.map((p) => {

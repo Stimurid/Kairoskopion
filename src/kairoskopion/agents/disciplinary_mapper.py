@@ -16,6 +16,19 @@ from typing import Any
 
 from ..enums import DisciplinaryFitStrength, EvidenceStatus
 from ..ids import disciplinary_pathway_id
+from ..llm.attempt_metadata import (
+    FALLBACK_REASON_INVALID_JSON,
+    FALLBACK_REASON_PROVIDER_ERROR,
+    FALLBACK_REASON_REPAIR_FAILED,
+    FALLBACK_REASON_SCHEMA_VALIDATION_FAILED,
+    LLMAttemptMetadata,
+)
+from ..llm.json_repair import (
+    PARSE_STATUS_PARSED_OK,
+    PARSE_STATUS_REPAIRED_OK,
+    PARSE_STATUS_SCHEMA_VALIDATION_FAILED,
+    repair_and_parse,
+)
 from ..llm.provider import LLMProvider
 from ..prompts.disciplinary_mapping import (
     DISCIPLINARY_MAPPING_FAMILY,
@@ -69,25 +82,86 @@ class DisciplinaryPathwayMapperAgent(AgentRole):
             )
         except Exception as e:
             logger.warning("LLM call failed for disciplinary_mapper, falling back: %s", e)
-            return self.execute_deterministic(inp)
+            meta = LLMAttemptMetadata.fallback(
+                reason=FALLBACK_REASON_PROVIDER_ERROR,
+                provider="openai_compatible",
+                model=None,
+                validation_errors=[str(e)[:240]],
+                parse_status="invalid_json",
+            )
+            return self._deterministic_with_attempt(inp, meta)
 
+        provider_model = response.model
+        latency_ms = response.latency_ms
+        content_present = bool(response.content)
         parsed = response.parsed
-        if not parsed:
-            try:
-                parsed = json.loads(response.content)
-            except (json.JSONDecodeError, TypeError):
-                logger.warning("LLM returned non-JSON, falling back to deterministic")
-                return self.execute_deterministic(inp)
+
+        if isinstance(parsed, dict):
+            outcome_status = PARSE_STATUS_PARSED_OK
+            outcome_steps: list[str] = []
+            outcome_errors: list[str] = []
+            repaired = False
+        else:
+            outcome = repair_and_parse(
+                response.content, schema=family.get("output_schema"),
+            )
+            parsed = outcome.parsed
+            outcome_status = outcome.status
+            outcome_steps = outcome.repair_steps
+            outcome_errors = outcome.validation_errors
+            repaired = outcome_status == PARSE_STATUS_REPAIRED_OK
+            if parsed is None or outcome_status not in (
+                PARSE_STATUS_PARSED_OK, PARSE_STATUS_REPAIRED_OK,
+            ):
+                reason = (
+                    FALLBACK_REASON_SCHEMA_VALIDATION_FAILED
+                    if outcome_status == PARSE_STATUS_SCHEMA_VALIDATION_FAILED
+                    else (
+                        FALLBACK_REASON_REPAIR_FAILED
+                        if outcome_steps
+                        else FALLBACK_REASON_INVALID_JSON
+                    )
+                )
+                logger.warning(
+                    "LLM disciplinary_mapper fallback: reason=%s steps=%s errors=%s",
+                    reason, outcome_steps, outcome_errors,
+                )
+                meta = LLMAttemptMetadata.fallback(
+                    reason=reason,
+                    provider="openai_compatible",
+                    model=provider_model,
+                    latency_ms=latency_ms,
+                    content_present=content_present,
+                    repair_attempted=bool(outcome_steps),
+                    repair_steps=outcome_steps,
+                    validation_errors=outcome_errors,
+                    parse_status=outcome_status,
+                )
+                return self._deterministic_with_attempt(inp, meta)
 
         validation_warnings = validate_disciplinary_mapping(parsed)
 
         pathways = _build_pathways(parsed, article_dict.get("article_model_id"))
+
+        # Attach attempt metadata to every pathway so the API + UI see it
+        meta = LLMAttemptMetadata.parse_ok(
+            provider="openai_compatible",
+            model=provider_model,
+            latency_ms=latency_ms,
+            content_present=content_present,
+            repaired=repaired,
+            repair_steps=outcome_steps,
+        )
+        meta_dict = meta.to_dict()
+        for p in pathways:
+            p.extraction_attempt = meta_dict
 
         return AgentOutput(
             output_entity_type="DisciplinaryPathwaySet",
             output_entity={
                 "pathways": [p.to_dict() for p in pathways],
                 "article_model_id": article_dict.get("article_model_id"),
+                "extraction_attempt": meta_dict,
             },
             evidence_refs=[],
             unknowns=parsed.get("unknowns", []),
@@ -100,6 +174,8 @@ class DisciplinaryPathwayMapperAgent(AgentRole):
                 f"LLM model: {response.model}",
                 f"Tokens: {response.input_tokens}+{response.output_tokens}",
                 f"Pathways found: {len(pathways)}",
+                f"parse_status: {meta.parse_status}",
+                f"repair_steps: {','.join(outcome_steps) if outcome_steps else 'none'}",
             ],
             evidence_status=EvidenceStatus.INFERENCE.value,
             llm_usage={
@@ -107,8 +183,30 @@ class DisciplinaryPathwayMapperAgent(AgentRole):
                 "input_tokens": response.input_tokens,
                 "output_tokens": response.output_tokens,
                 "latency_ms": response.latency_ms,
+                "extraction_attempt": meta_dict,
             },
         )
+
+    def _deterministic_with_attempt(
+        self, inp: AgentInput, meta: LLMAttemptMetadata,
+    ) -> AgentOutput:
+        """Run deterministic fallback, then annotate every pathway with
+        the captured LLM attempt metadata so the API + UI surface the
+        visible warning."""
+        out = self.execute_deterministic(inp)
+        meta_dict = meta.to_dict()
+        if isinstance(out.output_entity, dict):
+            out.output_entity["extraction_attempt"] = meta_dict
+            for p in out.output_entity.get("pathways") or []:
+                if isinstance(p, dict):
+                    p["extraction_attempt"] = meta_dict
+        out.trace_notes = list(out.trace_notes or []) + [
+            f"fallback_reason: {meta.fallback_reason}",
+            f"parse_status: {meta.parse_status}",
+        ]
+        if meta.warning_for_user:
+            out.warnings = list(out.warnings or []) + [meta.warning_for_user]
+        return out
 
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
         article_dict = inp.entities.get("article", {})

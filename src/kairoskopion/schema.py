@@ -726,6 +726,10 @@ class DisciplinaryPathway(_DictMixin):
     unknowns: list[str] = _list()
     confidence: str | None = _field()
     created_at: str = dc.field(default_factory=_now)
+    # LLM attempt audit per llm.attempt_metadata.LLMAttemptMetadata.
+    # Same field name as ArticleModel.extraction_attempt for consistency.
+    # None for purely-deterministic builds.
+    extraction_attempt: dict[str, Any] | None = _field()
 
 
 @dc.dataclass

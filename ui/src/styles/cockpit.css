@@ -3925,3 +3925,35 @@ code.agent-detail-value {
   color: var(--text-muted, #8b94a3);
   line-height: 1.5;
 }
+
+/* ============================================================ */
+/* Pathway mapper fallback banner (mirror of preliminary banner) */
+/* ============================================================ */
+
+.pathway-fallback-banner {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  background: rgba(212, 169, 80, 0.10);
+  border: 1px solid rgba(212, 169, 80, 0.35);
+  border-left: 3px solid rgba(212, 169, 80, 0.9);
+  border-radius: 6px;
+  color: var(--text-primary, #e7ebf0);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.pathway-fallback-banner strong {
+  color: rgba(212, 169, 80, 1);
+  font-weight: 700;
+}
+
+.pathway-fallback-meta {
+  margin-top: 6px;
+  font-size: 0.7rem;
+  color: var(--text-muted, #8b94a3);
+}
+
+.pathway-fallback-meta code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+}
