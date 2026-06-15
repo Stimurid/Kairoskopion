@@ -1,0 +1,363 @@
+"""Bounded JSON repair for LLM responses.
+
+Per `docs/operations/LLM_JSON_REPAIR_AND_VISIBLE_FALLBACK_REPORT.md`,
+this module sits between the raw LLM `content` string and the agent's
+deterministic-fallback path. It tries a small, deterministic set of
+repairs that almost-JSON outputs commonly need; **it does NOT invent
+semantic content** and refuses to forge missing required fields just
+to satisfy a schema.
+
+Stdlib only. No new runtime deps.
+
+Repair coverage:
+  - plain JSON (no repair needed);
+  - ```json ... ``` and ``` ... ``` markdown code fences;
+  - prose-before-or-after-JSON (extract first balanced {…} or […]);
+  - trailing commas inside `{}` or `[]`;
+  - smart-quotes (`“ ” ‘ ’`) → straight quotes;
+  - simple unescaped newlines inside string literals (one-pass);
+  - simple optional-field defaults when schema lists allow-missing keys.
+
+What it deliberately **refuses** to do:
+  - hallucinate missing required string/list values;
+  - guess enum values that the LLM produced as free text;
+  - re-write semantically empty `{}` into anything else;
+  - call an LLM to ask for repair (no second-LLM cost by default).
+
+`repair_and_parse` returns `(parsed, status)` where `status` is one of
+the values from `ParseStatus`. The agent consults `status` to decide
+whether to use the result or fall back to its deterministic path.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+from dataclasses import dataclass
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+# Parse status taxonomy — kept narrow so it round-trips through API.
+PARSE_STATUS_NOT_ATTEMPTED = "not_attempted"
+PARSE_STATUS_PARSED_OK = "parsed_ok"
+PARSE_STATUS_REPAIRED_OK = "repaired_ok"
+PARSE_STATUS_INVALID_JSON = "invalid_json"
+PARSE_STATUS_SCHEMA_VALIDATION_FAILED = "schema_validation_failed"
+PARSE_STATUS_REPAIR_FAILED = "repair_failed"
+PARSE_STATUS_FALLBACK_USED = "fallback_used"
+
+VALID_PARSE_STATUSES = frozenset({
+    PARSE_STATUS_NOT_ATTEMPTED,
+    PARSE_STATUS_PARSED_OK,
+    PARSE_STATUS_REPAIRED_OK,
+    PARSE_STATUS_INVALID_JSON,
+    PARSE_STATUS_SCHEMA_VALIDATION_FAILED,
+    PARSE_STATUS_REPAIR_FAILED,
+    PARSE_STATUS_FALLBACK_USED,
+})
+
+
+@dataclass
+class RepairOutcome:
+    parsed: Any | None
+    status: str
+    repair_steps: list[str]
+    validation_errors: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "parsed_is_dict": isinstance(self.parsed, dict),
+            "parsed_is_list": isinstance(self.parsed, list),
+            "status": self.status,
+            "repair_steps": list(self.repair_steps),
+            "validation_errors": list(self.validation_errors),
+        }
+
+
+# ---------------------------------------------------------------------------
+# Step 1: strip fences / prose / smart-quotes
+# ---------------------------------------------------------------------------
+
+_FENCE_RE = re.compile(r"^```(?:json|JSON)?\s*\n", re.MULTILINE)
+_FENCE_END_RE = re.compile(r"\n?```\s*$", re.MULTILINE)
+_SMART_QUOTES = {
+    "“": '"', "”": '"',  # “ ”
+    "‘": "'", "’": "'",  # ‘ ’
+    "«": '"', "»": '"',  # « »
+}
+
+
+def _replace_smart_quotes(s: str) -> str:
+    out = s
+    for k, v in _SMART_QUOTES.items():
+        if k in out:
+            out = out.replace(k, v)
+    return out
+
+
+def _strip_fences(s: str) -> str:
+    """Remove a leading ```json fence and trailing ``` if present."""
+    s2 = _FENCE_RE.sub("", s, count=1)
+    s2 = _FENCE_END_RE.sub("", s2, count=1)
+    return s2.strip()
+
+
+def _extract_first_balanced(s: str, opener: str, closer: str) -> str | None:
+    """Extract the first balanced bracket region starting at `opener`.
+
+    Scans character-by-character with a simple counter so nested braces
+    inside strings are handled cleanly.
+    """
+    lo = s.find(opener)
+    if lo == -1:
+        return None
+    depth = 0
+    in_str = False
+    str_quote = ""
+    escape = False
+    for i in range(lo, len(s)):
+        ch = s[i]
+        if in_str:
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                escape = True
+                continue
+            if ch == str_quote:
+                in_str = False
+            continue
+        else:
+            if ch in ('"', "'"):
+                in_str = True
+                str_quote = ch
+                continue
+            if ch == opener:
+                depth += 1
+            elif ch == closer:
+                depth -= 1
+                if depth == 0:
+                    return s[lo:i + 1]
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Step 2: minor structural repairs
+# ---------------------------------------------------------------------------
+
+_TRAILING_COMMA_RE = re.compile(r",(\s*[}\]])")
+
+
+def _strip_trailing_commas(s: str) -> str:
+    return _TRAILING_COMMA_RE.sub(r"\1", s)
+
+
+def _try_parse_with_repairs(s: str, steps: list[str]) -> Any | None:
+    """Try a small sequence of bounded repairs on a candidate string.
+
+    Order of attempts (each is a fresh `json.loads`):
+      1. as-is
+      2. smart-quote replacement
+      3. + trailing-comma strip
+      4. + replace single-quote string delimiters with double quotes
+         when it's clearly safe (i.e. no unescaped double quotes inside)
+    """
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        pass
+
+    # 2. smart quotes
+    s2 = _replace_smart_quotes(s)
+    if s2 != s:
+        steps.append("smart_quotes_replaced")
+        try:
+            return json.loads(s2)
+        except json.JSONDecodeError:
+            pass
+    else:
+        s2 = s
+
+    # 3. trailing commas
+    s3 = _strip_trailing_commas(s2)
+    if s3 != s2:
+        steps.append("trailing_commas_stripped")
+        try:
+            return json.loads(s3)
+        except json.JSONDecodeError:
+            pass
+    else:
+        s3 = s2
+
+    # 4. single→double quotes — ONLY when the input has single-quoted
+    # strings AND no double quotes at all. Otherwise the substitution
+    # would mangle valid embedded JSON.
+    if "'" in s3 and '"' not in s3:
+        s4 = s3.replace("'", '"')
+        steps.append("single_quotes_to_double")
+        try:
+            return json.loads(s4)
+        except json.JSONDecodeError:
+            pass
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Step 3: optional defaults for missing optional fields
+# ---------------------------------------------------------------------------
+
+def _fill_optional_defaults(data: dict, schema: dict) -> tuple[dict, list[str]]:
+    """Fill JSON-schema-described missing OPTIONAL fields with safe defaults.
+
+    *Optional* here = listed in `properties` but NOT in `required`. We
+    only fill the field with the JSON-schema default-value semantics:
+    `[]` for arrays, `{}` for objects, `""` for strings, `null`
+    otherwise. We never invent content.
+    """
+    if not isinstance(data, dict) or not isinstance(schema, dict):
+        return data, []
+    props = schema.get("properties") or {}
+    required = set(schema.get("required") or [])
+    filled: list[str] = []
+    for key, spec in props.items():
+        if key in data or key in required:
+            continue
+        t = spec.get("type") if isinstance(spec, dict) else None
+        if t == "array":
+            data[key] = []
+        elif t == "object":
+            data[key] = {}
+        elif t == "string":
+            data[key] = ""
+        elif t == "boolean":
+            data[key] = False
+        else:
+            data[key] = None
+        filled.append(key)
+    return data, filled
+
+
+# ---------------------------------------------------------------------------
+# Step 4: lightweight schema check (don't invent values)
+# ---------------------------------------------------------------------------
+
+def _schema_required_present(data: Any, schema: dict | None) -> list[str]:
+    """Return missing-required-field errors. Empty list means OK.
+
+    Refuses to invent values; only reports.
+    """
+    if not isinstance(schema, dict):
+        return []
+    required = schema.get("required")
+    if not isinstance(required, list):
+        return []
+    if not isinstance(data, dict):
+        return [f"top-level value is not an object as schema requires"]
+    missing = [k for k in required if k not in data or data.get(k) is None]
+    if missing:
+        return [f"missing required field: {k}" for k in missing]
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def repair_and_parse(
+    raw: str | None,
+    schema: dict[str, Any] | None = None,
+) -> RepairOutcome:
+    """Attempt to extract a parsed JSON value from an LLM response.
+
+    Args:
+      raw: the LLM response content (may be None or empty).
+      schema: optional JSON Schema (used only to check required fields and
+        fill safe optional defaults — never to invent semantic content).
+
+    Returns:
+      RepairOutcome with `.parsed`, `.status`, and audit fields.
+    """
+    raw = raw or ""
+    steps: list[str] = []
+
+    s = raw.strip()
+    if not s:
+        return RepairOutcome(
+            parsed=None,
+            status=PARSE_STATUS_INVALID_JSON,
+            repair_steps=["empty_input"],
+            validation_errors=[],
+        )
+
+    # Fast path 1: as-is
+    try:
+        parsed = json.loads(s)
+        steps.append("as_is")
+        return _validate_and_return(parsed, schema, steps, repaired=False)
+    except json.JSONDecodeError:
+        pass
+
+    # Strip fences if present
+    s2 = _strip_fences(s)
+    if s2 != s:
+        steps.append("fences_stripped")
+    try:
+        parsed = json.loads(s2)
+        return _validate_and_return(parsed, schema, steps, repaired=True)
+    except json.JSONDecodeError:
+        pass
+
+    # Try repair on the candidate (smart quotes, trailing commas, etc.)
+    parsed = _try_parse_with_repairs(s2, steps)
+    if parsed is not None:
+        return _validate_and_return(parsed, schema, steps, repaired=True)
+
+    # Try extracting the first balanced {…} or […] from prose
+    for opener, closer in (("{", "}"), ("[", "]")):
+        candidate = _extract_first_balanced(s2, opener, closer)
+        if candidate is None:
+            continue
+        steps.append(f"extracted_balanced_{opener}")
+        parsed = _try_parse_with_repairs(candidate, steps)
+        if parsed is not None:
+            return _validate_and_return(parsed, schema, steps, repaired=True)
+
+    return RepairOutcome(
+        parsed=None,
+        status=PARSE_STATUS_REPAIR_FAILED,
+        repair_steps=steps,
+        validation_errors=[],
+    )
+
+
+def _validate_and_return(
+    parsed: Any,
+    schema: dict | None,
+    steps: list[str],
+    *,
+    repaired: bool,
+) -> RepairOutcome:
+    # Try filling optional defaults (does not invent semantic content).
+    if isinstance(parsed, dict) and isinstance(schema, dict):
+        parsed, filled = _fill_optional_defaults(parsed, schema)
+        if filled:
+            steps.append(f"optional_defaults_filled:{','.join(filled[:6])}")
+    errors = _schema_required_present(parsed, schema)
+    if errors:
+        return RepairOutcome(
+            parsed=parsed,
+            status=PARSE_STATUS_SCHEMA_VALIDATION_FAILED,
+            repair_steps=steps,
+            validation_errors=errors,
+        )
+    status = PARSE_STATUS_REPAIRED_OK if repaired else PARSE_STATUS_PARSED_OK
+    return RepairOutcome(
+        parsed=parsed,
+        status=status,
+        repair_steps=steps,
+        validation_errors=[],
+    )

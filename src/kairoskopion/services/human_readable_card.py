@@ -522,6 +522,7 @@ def article_model_human_view(
     article = article or {}
     title = _safe_str(article.get("title_current")) or "Untitled article"
     lifecycle = _safe_str(article.get("lifecycle_status")) or "preliminary"
+    extraction_attempt = article.get("extraction_attempt") or {}
 
     lines: list[str] = []
     # Frontmatter — kept for vault navigation; cockpit ignores it
@@ -530,6 +531,14 @@ def article_model_human_view(
     lines.append("type: ArticleModel (human view)")
     lines.append(f"lifecycle: {lifecycle}")
     lines.append("not_a_submission_recommendation: true")
+    if extraction_attempt:
+        lines.append(
+            f"parse_status: {extraction_attempt.get('parse_status', 'unknown')}"
+        )
+        if extraction_attempt.get("fallback_used"):
+            lines.append(
+                f"fallback_reason: {extraction_attempt.get('fallback_reason')}"
+            )
     lines.append("---")
     lines.append("")
     lines.append(f"# {title}")
@@ -541,6 +550,20 @@ def article_model_human_view(
         "подтвердите/исправьте её ниже."
     )
     lines.append("")
+
+    # LLM-fallback warning, if attempted-and-failed
+    if extraction_attempt.get("fallback_used"):
+        warning = extraction_attempt.get("warning_for_user")
+        if warning:
+            lines.append(
+                f"> ⚠ **{warning}**"
+            )
+            lines.append("")
+            lines.append(
+                f"> _(parse_status: `{extraction_attempt.get('parse_status', 'unknown')}` · "
+                f"fallback_reason: `{extraction_attempt.get('fallback_reason', 'unknown')}`)_"
+            )
+            lines.append("")
 
     lines.append(_h(2, "Коротко", "article_model._summary"))
     lines.append(_short_summary_article(article))

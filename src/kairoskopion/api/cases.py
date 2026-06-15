@@ -190,6 +190,18 @@ class Case:
         import logging
         logger = logging.getLogger(__name__)
 
+        # Track LLM attempt explicitly so case-level fallbacks (not just
+        # agent-level) carry the visible warning that the human view
+        # surfaces. Without this, a deeper crash silently falls to the
+        # deterministic service path with no audit trail.
+        from ..llm.attempt_metadata import (
+            FALLBACK_REASON_LLM_UNAVAILABLE,
+            FALLBACK_REASON_PROVIDER_ERROR,
+            LLMAttemptMetadata,
+        )
+
+        case_level_attempt: LLMAttemptMetadata | None = None
+
         provider = _get_llm_provider()
         if provider is not None:
             from ..agents.article_modeler import ArticleModelerAgent
@@ -207,7 +219,15 @@ class Case:
                     logger.info("Article model built via LLM (%s)", output.confidence)
             except Exception as exc:
                 logger.warning("LLM article modeling failed, falling back: %s", exc)
+                case_level_attempt = LLMAttemptMetadata.fallback(
+                    reason=FALLBACK_REASON_PROVIDER_ERROR,
+                    provider="openai_compatible",
+                    validation_errors=[str(exc)[:240]],
+                )
                 provider = None
+        else:
+            # No provider configured at all.
+            case_level_attempt = LLMAttemptMetadata.not_attempted()
 
         if self.article_model is None:
             from ..services.article_modeling import (
@@ -217,6 +237,13 @@ class Case:
             manuscript = build_manuscript_model(self.input_text)
             self.article_model = build_article_model(manuscript, self.input_text)
             logger.info("Article model built via deterministic fallback")
+            # If we got here via a case-level crash, attach metadata so the
+            # human view warns the author honestly.
+            if case_level_attempt is not None and self.article_model is not None:
+                try:
+                    self.article_model.extraction_attempt = case_level_attempt.to_dict()
+                except Exception:  # noqa: BLE001
+                    pass
 
         self.stage = CaseStage.ARTICLE_MODEL
 

@@ -217,6 +217,9 @@ class ArticleModel(_DictMixin):
     manuscript_stage: str | None = _field()
     protected_core_status: str | None = _field()
     extraction_status: str | None = _field()
+    # LLM attempt audit (per llm.attempt_metadata.LLMAttemptMetadata).
+    # None for purely-deterministic builds; populated for LLM agent runs.
+    extraction_attempt: dict[str, Any] | None = _field()
 
 
 @dc.dataclass

@@ -20,6 +20,19 @@ from ..enums import (
     NoveltyMode,
 )
 from ..ids import article_model_id, manuscript_id
+from ..llm.attempt_metadata import (
+    FALLBACK_REASON_INVALID_JSON,
+    FALLBACK_REASON_PROVIDER_ERROR,
+    FALLBACK_REASON_REPAIR_FAILED,
+    FALLBACK_REASON_SCHEMA_VALIDATION_FAILED,
+    LLMAttemptMetadata,
+)
+from ..llm.json_repair import (
+    PARSE_STATUS_PARSED_OK,
+    PARSE_STATUS_REPAIRED_OK,
+    PARSE_STATUS_SCHEMA_VALIDATION_FAILED,
+    repair_and_parse,
+)
 from ..llm.provider import LLMProvider
 from ..prompts.article_modeling import (
     ARTICLE_MODELING_FAMILY,
@@ -62,21 +75,83 @@ class ArticleModelerAgent(AgentRole):
             )
         except Exception as e:
             logger.warning("LLM call failed for article_modeler, falling back: %s", e)
-            return self.execute_deterministic(inp)
+            meta = LLMAttemptMetadata.fallback(
+                reason=FALLBACK_REASON_PROVIDER_ERROR,
+                provider="openai_compatible",
+                model=None,
+                validation_errors=[str(e)[:240]],
+                parse_status="invalid_json",
+            )
+            return self._deterministic_with_attempt(inp, meta)
 
+        provider_model = response.model
+        latency_ms = response.latency_ms
+        content_present = bool(response.content)
         parsed = response.parsed
-        if not parsed:
-            try:
-                parsed = json.loads(response.content)
-            except (json.JSONDecodeError, TypeError):
-                logger.warning("LLM returned non-JSON, falling back to deterministic")
-                return self.execute_deterministic(inp)
 
-        # Validate
+        # First try: provider already gave us parsed JSON
+        if isinstance(parsed, dict):
+            outcome_status = PARSE_STATUS_PARSED_OK
+            outcome_steps: list[str] = []
+            outcome_errors: list[str] = []
+            repaired = False
+        else:
+            # Provider parse failed — run our bounded repair pass
+            outcome = repair_and_parse(
+                response.content, schema=family.get("output_schema"),
+            )
+            parsed = outcome.parsed
+            outcome_status = outcome.status
+            outcome_steps = outcome.repair_steps
+            outcome_errors = outcome.validation_errors
+            repaired = outcome_status == PARSE_STATUS_REPAIRED_OK
+            if parsed is None or outcome_status not in (
+                PARSE_STATUS_PARSED_OK, PARSE_STATUS_REPAIRED_OK,
+            ):
+                # Decide fallback reason
+                reason = (
+                    FALLBACK_REASON_SCHEMA_VALIDATION_FAILED
+                    if outcome_status == PARSE_STATUS_SCHEMA_VALIDATION_FAILED
+                    else (
+                        FALLBACK_REASON_REPAIR_FAILED
+                        if outcome_steps
+                        else FALLBACK_REASON_INVALID_JSON
+                    )
+                )
+                logger.warning(
+                    "LLM article_modeler fallback: reason=%s steps=%s errors=%s",
+                    reason, outcome_steps, outcome_errors,
+                )
+                meta = LLMAttemptMetadata.fallback(
+                    reason=reason,
+                    provider="openai_compatible",
+                    model=provider_model,
+                    latency_ms=latency_ms,
+                    content_present=content_present,
+                    repair_attempted=bool(outcome_steps),
+                    repair_steps=outcome_steps,
+                    validation_errors=outcome_errors,
+                    parse_status=outcome_status,
+                )
+                return self._deterministic_with_attempt(inp, meta)
+
+        # Validate semantic shape (warnings only — does not gate fallback)
         validation_warnings = validate_article_extraction(parsed)
 
         # Build ArticleModel from LLM output + deterministic diagnostics
         article = _build_from_llm(parsed, manuscript, text, source_ref)
+
+        # Attach attempt metadata — this is the audit trail that surfaces
+        # in API + human view.
+        meta = LLMAttemptMetadata.parse_ok(
+            provider="openai_compatible",
+            model=provider_model,
+            latency_ms=latency_ms,
+            content_present=content_present,
+            repaired=repaired,
+            repair_steps=outcome_steps,
+        )
+        article.extraction_attempt = meta.to_dict()
 
         return AgentOutput(
             output_entity_type="ArticleModel",
@@ -92,6 +167,8 @@ class ArticleModelerAgent(AgentRole):
                 f"LLM model: {response.model}",
                 f"Tokens: {response.input_tokens}+{response.output_tokens}",
                 f"Latency: {response.latency_ms:.0f}ms",
+                f"parse_status: {meta.parse_status}",
+                f"repair_steps: {','.join(outcome_steps) if outcome_steps else 'none'}",
             ],
             evidence_status=EvidenceStatus.INFERENCE.value,
             llm_usage={
@@ -99,8 +176,34 @@ class ArticleModelerAgent(AgentRole):
                 "input_tokens": response.input_tokens,
                 "output_tokens": response.output_tokens,
                 "latency_ms": response.latency_ms,
+                "extraction_attempt": meta.to_dict(),
             },
         )
+
+    def _deterministic_with_attempt(
+        self, inp: AgentInput, meta: LLMAttemptMetadata,
+    ) -> AgentOutput:
+        """Run the deterministic fallback AND annotate the result with the
+        captured LLM attempt metadata, so the UI can surface the warning.
+        """
+        out = self.execute_deterministic(inp)
+        # Attach attempt metadata onto the ArticleModel dict so the
+        # CaseStore persists it and the API surfaces it.
+        if isinstance(out.output_entity, dict):
+            out.output_entity["extraction_attempt"] = meta.to_dict()
+        else:
+            try:
+                out.output_entity.extraction_attempt = meta.to_dict()
+            except Exception:  # noqa: BLE001
+                pass
+        # Annotate trace + warnings too
+        out.trace_notes = list(out.trace_notes or []) + [
+            f"fallback_reason: {meta.fallback_reason}",
+            f"parse_status: {meta.parse_status}",
+        ]
+        if meta.warning_for_user:
+            out.warnings = list(out.warnings or []) + [meta.warning_for_user]
+        return out
 
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
         text = inp.raw_text or ""
