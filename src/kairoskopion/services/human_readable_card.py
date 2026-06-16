@@ -326,23 +326,10 @@ def _section_disciplines(
     body = _h(2, "Дисциплинарные регистры", "article_model.disciplinary_registers")
     registers = article.get("disciplinary_registers") or []
 
-    # If any pathway carries a fallback attempt metadata, surface a
-    # single visible warning at the start of the section. Same shape as
-    # the ArticleModel fallback warning.
-    if pathways:
-        for p in pathways:
-            ea = (p or {}).get("extraction_attempt") or {}
-            if ea.get("fallback_used"):
-                warn = ea.get("warning_for_user") or (
-                    "Часть дисциплинарной карты построена в "
-                    "предварительном режиме."
-                )
-                body += (
-                    f"\n> ⚠ **Дисциплинарная карта: {warn}**\n\n"
-                    f"> _(parse_status: `{ea.get('parse_status', 'unknown')}` · "
-                    f"fallback_reason: `{ea.get('fallback_reason', 'unknown')}`)_\n\n"
-                )
-                break  # one banner is enough
+    # NOTE: pathway-level LLM fallback warnings live in the aggregated
+    # banner at the top of `article_model_human_view`, NOT here. This
+    # keeps the section quiet on success and avoids double-rendering
+    # when both article-level and pathway-level fallbacks fired.
 
     if not pathways and not registers:
         body += (
@@ -578,6 +565,25 @@ def article_model_human_view(
     lifecycle = _safe_str(article.get("lifecycle_status")) or "preliminary"
     extraction_attempt = article.get("extraction_attempt") or {}
 
+    # Aggregate fallback warnings across all 4 LLM-driven layers via the
+    # shared helper. Single layer → existing single-banner shape;
+    # multiple layers → a bullet list under one parent block.
+    from ..llm.attempt_helpers import aggregate_warnings as _agg_warn
+    first_pathway_attempt = None
+    for p in (pathways or []):
+        ea = (p or {}).get("extraction_attempt")
+        if ea and ea.get("fallback_used"):
+            first_pathway_attempt = ea
+            break
+    aggregated_banner = _agg_warn({
+        "article_model": extraction_attempt or None,
+        "semantic_profile":
+            semantic_profile.get("extraction_attempt") if semantic_profile else None,
+        "pathways": first_pathway_attempt,
+        "fit_assessment":
+            fit_assessment.get("extraction_attempt") if fit_assessment else None,
+    })
+
     lines: list[str] = []
     # Frontmatter — kept for vault navigation; cockpit ignores it
     lines.append("---")
@@ -605,36 +611,9 @@ def article_model_human_view(
     )
     lines.append("")
 
-    # LLM-fallback warning, if attempted-and-failed
-    if extraction_attempt.get("fallback_used"):
-        warning = extraction_attempt.get("warning_for_user")
-        if warning:
-            lines.append(
-                f"> ⚠ **{warning}**"
-            )
-            lines.append("")
-            lines.append(
-                f"> _(parse_status: `{extraction_attempt.get('parse_status', 'unknown')}` · "
-                f"fallback_reason: `{extraction_attempt.get('fallback_reason', 'unknown')}`)_"
-            )
-            lines.append("")
-
-    # Per-layer fallback warnings — semantic profile + fit assessment.
-    # Each is shown only if it carries `fallback_used: True`.
-    # Russian gender agreement: "профиль" is masculine, "оценка" is
-    # feminine, so the verb form differs.
-    sem_banner = _layer_fallback_banner(
-        "Семантический профиль построен в предварительном режиме",
-        semantic_profile.get("extraction_attempt") if semantic_profile else None,
-    )
-    if sem_banner:
-        lines.append(sem_banner)
-    fit_banner = _layer_fallback_banner(
-        "Оценка соответствия построена в предварительном режиме",
-        fit_assessment.get("extraction_attempt") if fit_assessment else None,
-    )
-    if fit_banner:
-        lines.append(fit_banner)
+    # Single aggregated banner (renders nothing when no layer fell back)
+    if aggregated_banner:
+        lines.append(aggregated_banner)
 
     lines.append(_h(2, "Коротко", "article_model._summary"))
     lines.append(_short_summary_article(article))

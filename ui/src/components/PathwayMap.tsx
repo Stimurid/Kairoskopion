@@ -1,4 +1,6 @@
 import type { DisciplinaryPathway } from '../types/domain';
+import { LLMAttemptBadge } from './LLMAttemptBadge';
+import { LLMAttemptWarning } from './LLMAttemptWarning';
 
 const FIT_CONFIG: Record<string, { label: string; className: string }> = {
   strong: { label: 'Strong', className: 'fit-strong' },
@@ -34,17 +36,11 @@ export function PathwayMap({ pathways, onSelectPathway, selectedPathwayId }: Pro
         <span className="pathway-count">{pathways.length} pathways mapped</span>
       </div>
 
-      {fallback && (
-        <div className="pathway-fallback-banner" role="note">
-          <strong>⚠ Дисциплинарная карта построена в предварительном режиме.</strong>{' '}
-          {fallback.warning_for_user ??
-            'LLM-вызов не дал корректный результат, поэтому использован fallback.'}
-          <div className="pathway-fallback-meta">
-            <code>parse_status: '{fallback.parse_status ?? 'unknown'}'</code>{' '}
-            <code>· fallback_reason: '{fallback.fallback_reason ?? 'unknown'}'</code>
-          </div>
-        </div>
-      )}
+      <LLMAttemptWarning
+        layers={[
+          { key: 'pathways', label: 'Дисциплинарная карта', attempt: fallback },
+        ]}
+      />
 
       <div className="pathway-grid">
         {sorted.map((p) => {
@@ -62,6 +58,7 @@ export function PathwayMap({ pathways, onSelectPathway, selectedPathwayId }: Pro
               <div className="pathway-card-header">
                 <span className="pathway-rank">#{p.rank}</span>
                 <h3 className="pathway-name">{p.discipline_name}</h3>
+                <LLMAttemptBadge attempt={p.extraction_attempt} onlyOnFallback />
               </div>
 
               <div className="pathway-badges">

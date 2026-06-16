@@ -1,4 +1,6 @@
-import type { MismatchItem, MismatchMap } from '../types/domain';
+import type { FitAssessment, MismatchItem, MismatchMap } from '../types/domain';
+import { LLMAttemptBadge } from './LLMAttemptBadge';
+import { LLMAttemptWarning } from './LLMAttemptWarning';
 
 const SEVERITY_ORDER: Record<string, number> = {
   blocking: 0,
@@ -61,9 +63,10 @@ function MismatchRow({ item }: { item: MismatchItem }) {
 
 interface Props {
   mismatchMap: MismatchMap;
+  fitAssessment?: FitAssessment | null;
 }
 
-export function MismatchMapView({ mismatchMap }: Props) {
+export function MismatchMapView({ mismatchMap, fitAssessment }: Props) {
   const sorted = [...mismatchMap.mismatches].sort(
     (a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9)
   );
@@ -83,8 +86,19 @@ export function MismatchMapView({ mismatchMap }: Props) {
             <span className="severity-badge severity-major">{majorCount} major</span>
           )}
           <span className="mismatch-total">{sorted.length} total</span>
+          <LLMAttemptBadge attempt={fitAssessment?.extraction_attempt} label="Fit LLM" />
         </div>
       </div>
+
+      <LLMAttemptWarning
+        layers={[
+          {
+            key: 'fit_assessment',
+            label: 'Оценка соответствия',
+            attempt: fitAssessment?.extraction_attempt,
+          },
+        ]}
+      />
 
       {mismatchMap.summary && (
         <p className="mismatch-map-summary">{mismatchMap.summary}</p>

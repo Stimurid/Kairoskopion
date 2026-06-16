@@ -3987,3 +3987,74 @@ code.agent-detail-value {
 .global-notice-dismiss:hover {
   color: var(--text-primary, #e7ebf0);
 }
+
+/* ============================================================ */
+/* Shared LLM-attempt observability components                  */
+/* ============================================================ */
+
+.llm-attempt-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.68rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.llm-attempt-badge--ok {
+  background: rgba(91, 127, 255, 0.12);
+  color: var(--color-primary, #5b7fff);
+  border: 1px solid rgba(91, 127, 255, 0.3);
+}
+
+.llm-attempt-badge--fallback {
+  background: rgba(212, 169, 80, 0.15);
+  color: rgba(212, 169, 80, 1);
+  border: 1px solid rgba(212, 169, 80, 0.4);
+}
+
+.llm-attempt-warning {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  background: rgba(212, 169, 80, 0.10);
+  border: 1px solid rgba(212, 169, 80, 0.35);
+  border-left: 3px solid rgba(212, 169, 80, 0.9);
+  border-radius: 6px;
+  color: var(--text-primary, #e7ebf0);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.llm-attempt-warning-headline {
+  margin: 0;
+  color: var(--text-primary, #e7ebf0);
+}
+
+.llm-attempt-warning-headline strong {
+  color: rgba(212, 169, 80, 1);
+  font-weight: 700;
+}
+
+.llm-attempt-warning-list {
+  margin: 8px 0 0;
+  padding-left: 1.2em;
+}
+
+.llm-attempt-warning-list li {
+  margin: 6px 0;
+}
+
+.llm-attempt-warning-hint {
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: var(--text-muted, #8b94a3);
+}
+
+.llm-attempt-warning-hint code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+}

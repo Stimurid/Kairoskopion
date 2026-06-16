@@ -268,7 +268,10 @@ class TestHumanViewSurfacesLayerFallbacks(unittest.TestCase):
             }
         }
         md = article_model_human_view(article, semantic_profile=sem)
-        self.assertIn("Семантический профиль построен в предварительном режиме", md)
+        # New unified contract: aggregator labels the layer as
+        # "Семантический профиль" and renders warning_for_user verbatim.
+        self.assertIn("Семантический профиль", md)
+        self.assertIn("LLM-провайдер вернул ошибку", md)
         self.assertIn("parse_status", md)
         self.assertIn("fallback_reason", md)
         self.assertNotIn("Traceback", md)
@@ -292,7 +295,9 @@ class TestHumanViewSurfacesLayerFallbacks(unittest.TestCase):
             }
         }
         md = article_model_human_view(article, fit_assessment=fit)
-        self.assertIn("Оценка соответствия построена в предварительном режиме", md)
+        # New unified contract.
+        self.assertIn("Оценка соответствия", md)
+        self.assertIn("LLM-анализ был запущен", md)
         self.assertNotIn("Traceback", md)
         self.assertNotIn("raw_output_ref", md)
 
@@ -306,8 +311,64 @@ class TestHumanViewSurfacesLayerFallbacks(unittest.TestCase):
         md = article_model_human_view(
             article, semantic_profile=sem, fit_assessment=fit,
         )
-        self.assertNotIn("Семантический профиль построен в предварительном", md)
-        self.assertNotIn("Оценка соответствия построена в предварительном", md)
+        # No fallback warning blockquote of any shape.
+        self.assertNotIn("Семантический профиль:", md)
+        self.assertNotIn("Оценка соответствия:", md)
+        self.assertNotIn("Несколько слоёв", md)
+
+    def test_multi_layer_aggregates_into_single_block(self):
+        """When 2+ layers fall back, the unified aggregator renders ONE
+        bullet-list block instead of N separate banners."""
+        from kairoskopion.services.human_readable_card import (
+            article_model_human_view,
+        )
+        article = {
+            "article_model_id": "x",
+            "title_current": "T",
+            "extraction_attempt": {
+                "fallback_used": True,
+                "fallback_reason": "invalid_json",
+                "parse_status": "invalid_json",
+                "warning_for_user": "Invalid JSON warning",
+                "raw_output_ref": None,
+            },
+        }
+        sem = {"extraction_attempt": {
+            "fallback_used": True,
+            "fallback_reason": "provider_error",
+            "parse_status": "fallback_used",
+            "warning_for_user": "Provider error warning",
+            "raw_output_ref": None,
+        }}
+        md = article_model_human_view(article, semantic_profile=sem)
+        self.assertIn("Несколько слоёв", md)
+        self.assertIn("Модель статьи", md)
+        self.assertIn("Семантический профиль", md)
+        self.assertIn("invalid_json", md)
+        self.assertIn("provider_error", md)
+        # Only ONE aggregated parent heading
+        self.assertEqual(md.count("Несколько слоёв"), 1)
+
+    def test_anti_leak_on_aggregated_block(self):
+        """Adversarial: raw_output_ref must never appear in rendered md
+        even when set on an attempt dict."""
+        from kairoskopion.services.human_readable_card import (
+            article_model_human_view,
+        )
+        article = {
+            "article_model_id": "x",
+            "title_current": "T",
+            "extraction_attempt": {
+                "fallback_used": True,
+                "fallback_reason": "provider_error",
+                "parse_status": "fallback_used",
+                "warning_for_user": "Provider error",
+                "raw_output_ref": "MUST-NOT-RENDER-RAW-PAYLOAD",
+            },
+        }
+        md = article_model_human_view(article)
+        self.assertNotIn("raw_output_ref", md)
+        self.assertNotIn("MUST-NOT-RENDER-RAW-PAYLOAD", md)
 
 
 # ---------------------------------------------------------------------------

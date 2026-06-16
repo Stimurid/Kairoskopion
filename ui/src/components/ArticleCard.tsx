@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ArticleModel, EvidenceStatus } from '../types/domain';
 import { EvidenceBadge } from './EvidenceBadge';
+import { LLMAttemptBadge } from './LLMAttemptBadge';
 
 interface FieldRowProps {
   label: string;
@@ -128,6 +129,7 @@ export function ArticleCard({ article, onConfirm, onEvidenceClick, onBack }: Pro
         <span className={`lifecycle-badge lifecycle-${article.lifecycle_status}`}>
           {article.lifecycle_status}
         </span>
+        <LLMAttemptBadge attempt={article.extraction_attempt} label="LLM" />
       </div>
 
       {isShallow && !isConfirmed && (

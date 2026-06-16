@@ -95,6 +95,7 @@ export interface ArticleModel {
   confidence: string;
   lifecycle_status: LifecycleStatus;
   evidence_refs: string[];
+  extraction_attempt?: ExtractionAttempt | null;
 }
 
 // --- Semantic Profile ---
@@ -107,6 +108,7 @@ export interface ArticleSemanticProfile {
   protected_core_candidates: string[];
   mutable_zones: string[];
   intended_audience: string;
+  extraction_attempt?: ExtractionAttempt | null;
 }
 
 // --- Scenario ---
@@ -209,6 +211,7 @@ export interface FitAssessment {
   mismatch_map_id: string;
   recommendation: string;
   unknowns: string[];
+  extraction_attempt?: ExtractionAttempt | null;
 }
 
 // --- Mismatch ---
