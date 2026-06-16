@@ -3957,3 +3957,33 @@ code.agent-detail-value {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.7rem;
 }
+
+/* ============================================================ */
+/* App-level global notice (stale-case recovery, etc.)            */
+/* ============================================================ */
+
+.global-notice {
+  margin: 0;
+  padding: 10px 16px;
+  background: rgba(212, 169, 80, 0.10);
+  border-bottom: 1px solid rgba(212, 169, 80, 0.35);
+  color: var(--text-primary, #e7ebf0);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.global-notice-dismiss {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #8b94a3);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.global-notice-dismiss:hover {
+  color: var(--text-primary, #e7ebf0);
+}

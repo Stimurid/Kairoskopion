@@ -351,6 +351,9 @@ class FitAssessment(_DictMixin):
     recommendation: str | None = _field()
     lifecycle_status: str = LifecycleStatus.PRELIMINARY.value
     created_at: str = dc.field(default_factory=_now)
+    # LLM attempt audit per llm.attempt_metadata.LLMAttemptMetadata.
+    # Same vocabulary as ArticleModel and DisciplinaryPathway.
+    extraction_attempt: dict[str, Any] | None = _field()
 
 
 @dc.dataclass
@@ -698,6 +701,9 @@ class ArticleSemanticProfile(_DictMixin):
     confidence: str | None = _field()
     evidence_refs: list[str] = _list()
     created_at: str = dc.field(default_factory=_now)
+    # LLM attempt audit per llm.attempt_metadata.LLMAttemptMetadata.
+    # Same vocabulary as ArticleModel and DisciplinaryPathway.
+    extraction_attempt: dict[str, Any] | None = _field()
 
 
 @dc.dataclass

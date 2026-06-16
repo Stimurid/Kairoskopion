@@ -30,9 +30,22 @@ import { DossierView } from './DossierView';
 interface Props {
   caseData: CaseDetail;
   onCaseUpdate: () => void;
+  onCaseGone?: () => void;
 }
 
-export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
+// Match ONLY the case-orchestrator 404, which always uses the literal
+// "Case case_<hex> not found" shape produced by the FastAPI _user_case
+// dependency. Tightened so it does NOT match other 404 messages such
+// as "Article model not built yet" or "Scenario not set" — those
+// should NOT trigger the activeCase reset.
+const _CASE_GONE_RE = /Case\s+case_[a-f0-9]+\s+not\s+found/i;
+
+function _isCaseGoneError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? '');
+  return _CASE_GONE_RE.test(msg);
+}
+
+export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
   const [activeView, setActiveView] = useState<string>(caseData.stage);
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const [articleModel, setArticleModel] = useState<ArticleModel | null>(null);
@@ -60,6 +73,21 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
   };
 
   const handleError = (err: unknown) => {
+    // If the backend says this case no longer exists (e.g. server
+    // storage was reset, case deleted in another tab), don't strand
+    // the user on a dead workspace — clear active state and refresh
+    // the case list.
+    if (_isCaseGoneError(err)) {
+      setError(
+        'Этот case больше не существует на сервере. Возможно, бэкенд ' +
+        'был перезапущен или case был удалён в другой вкладке. ' +
+        'Создайте новый case или выберите существующий.',
+      );
+      if (onCaseGone) {
+        onCaseGone();
+      }
+      return;
+    }
     setError(err instanceof Error ? err.message : String(err));
   };
 
@@ -67,14 +95,32 @@ export function CaseWorkspace({ caseData, onCaseUpdate }: Props) {
 
   const handleIntakeResult = useCallback(async (result: { article_model_built: boolean; venue_investigated?: boolean }) => {
     if (result.article_model_built) {
-      const am = await api.getArticleModel(caseId);
-      setArticleModel(am);
+      try {
+        const am = await api.getArticleModel(caseId);
+        setArticleModel(am);
+      } catch (e) {
+        // getArticleModel can 404 with "Article model not built yet"
+        // if persistence raced. Swallow — the article-model view will
+        // re-fetch via its own loader.
+        console.warn('getArticleModel after intake failed:', e);
+      }
       setActiveView('article_model');
     } else if (result.venue_investigated) {
-      const venueResult = await api.getInvestigatedVenue(caseId);
-      setVenueModel(venueResult.venue);
-      setPubRegime(venueResult.publication_regime);
+      try {
+        const venueResult = await api.getInvestigatedVenue(caseId);
+        setVenueModel(venueResult.venue);
+        setPubRegime(venueResult.publication_regime);
+      } catch (e) {
+        console.warn('getInvestigatedVenue after intake failed:', e);
+      }
       setActiveView('venue_investigation');
+    } else {
+      // Neither branch fired (input may have been too short or LLM +
+      // deterministic both produced nothing). Don't leave the user
+      // staring at the intake surface thinking nothing happened —
+      // route to the article-model view, which will show whatever
+      // exists (or its own "Load Article Model" affordance).
+      setActiveView('article_model');
     }
     onCaseUpdate();
   }, [caseId, onCaseUpdate]);

@@ -18,6 +18,11 @@ from ..enums import (
     LifecycleStatus,
 )
 from ..ids import fit_assessment_id
+from ..llm.attempt_metadata import (
+    FALLBACK_REASON_PROVIDER_ERROR,
+    LLMAttemptMetadata,
+    classify_llm_response,
+)
 from ..llm.provider import LLMProvider
 from ..prompts.fit_assessment import (
     FIT_ASSESSMENT_FAMILY,
@@ -77,15 +82,24 @@ class FitAssessorAgent(AgentRole):
             )
         except Exception as e:
             logger.warning("LLM call failed for fit_assessor, falling back: %s", e)
-            return self._fallback_deterministic(inp)
+            meta = LLMAttemptMetadata.fallback(
+                reason=FALLBACK_REASON_PROVIDER_ERROR,
+                provider="openai_compatible",
+                model=None,
+                validation_errors=[str(e)[:240]],
+                parse_status="invalid_json",
+            )
+            return self._deterministic_with_attempt(inp, meta)
 
-        parsed = response.parsed
-        if not parsed:
-            try:
-                parsed = json.loads(response.content)
-            except (json.JSONDecodeError, TypeError):
-                logger.warning("LLM returned non-JSON, falling back to deterministic")
-                return self._fallback_deterministic(inp)
+        parsed, meta, repair_steps, errors = classify_llm_response(
+            response, family["output_schema"],
+        )
+        if parsed is None:
+            logger.warning(
+                "LLM fit_assessor fallback: reason=%s steps=%s",
+                meta.fallback_reason, repair_steps,
+            )
+            return self._deterministic_with_attempt(inp, meta)
 
         validation_warnings = validate_fit_assessment(parsed)
 
@@ -95,6 +109,7 @@ class FitAssessorAgent(AgentRole):
             venue_id=venue_dict.get("venue_model_id"),
             scenario_id=scenario_dict.get("submission_scenario_id"),
         )
+        fit.extraction_attempt = meta.to_dict()
 
         return AgentOutput(
             output_entity_type="FitAssessment",
@@ -110,6 +125,7 @@ class FitAssessorAgent(AgentRole):
                 f"LLM model: {response.model}",
                 f"Tokens: {response.input_tokens}+{response.output_tokens}",
                 f"Latency: {response.latency_ms:.0f}ms",
+                f"parse_status: {meta.parse_status}",
             ],
             evidence_status=EvidenceStatus.INFERENCE.value,
             llm_usage={
@@ -117,8 +133,26 @@ class FitAssessorAgent(AgentRole):
                 "input_tokens": response.input_tokens,
                 "output_tokens": response.output_tokens,
                 "latency_ms": response.latency_ms,
+                "extraction_attempt": meta.to_dict(),
             },
         )
+
+    def _deterministic_with_attempt(
+        self, inp: AgentInput, meta: LLMAttemptMetadata,
+    ) -> AgentOutput:
+        """Annotate deterministic-fallback fit assessment with attempt
+        metadata so the API + UI surface the visible warning."""
+        out = self._fallback_deterministic(inp)
+        meta_dict = meta.to_dict()
+        if isinstance(out.output_entity, dict):
+            out.output_entity["extraction_attempt"] = meta_dict
+        out.trace_notes = list(out.trace_notes or []) + [
+            f"fallback_reason: {meta.fallback_reason}",
+            f"parse_status: {meta.parse_status}",
+        ]
+        if meta.warning_for_user:
+            out.warnings = list(out.warnings or []) + [meta.warning_for_user]
+        return out
 
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
         return self._fallback_deterministic(inp)

@@ -15,8 +15,10 @@ interface Props {
   isLoading: boolean;
 }
 
-const ACCEPTED_EXTENSIONS = '.pdf,.docx,.txt,.md,.html,.htm';
-const FORMAT_LABEL = 'PDF, DOCX, TXT, MD, HTML';
+const ACCEPTED_EXTENSIONS = '.pdf,.docx,.doc,.txt,.md,.html,.htm,.rtf,.json';
+// .doc (old Word 97-2003) is accepted at upload time but rejected at
+// extraction with a clear Russian message asking the user to save as .docx.
+const FORMAT_LABEL = 'PDF, DOCX, TXT, MD, HTML, RTF';
 
 const TYPE_LABELS: Record<string, string> = {
   auto: 'Auto-detect',

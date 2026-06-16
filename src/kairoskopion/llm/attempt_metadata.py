@@ -214,3 +214,86 @@ class LLMAttemptMetadata:
             fallback_reason=FALLBACK_REASON_LLM_UNAVAILABLE,
             warning_for_user=user_warning_for(FALLBACK_REASON_LLM_UNAVAILABLE),
         )
+
+
+# ---------------------------------------------------------------------------
+# Shared agent helper — classify provider response into (parsed, meta)
+# ---------------------------------------------------------------------------
+
+def classify_llm_response(
+    response,
+    schema,
+    *,
+    provider_name: str = "openai_compatible",
+) -> tuple[Any | None, "LLMAttemptMetadata", list[str], list[str]]:
+    """Run the standard parse → repair → schema-validate decision tree.
+
+    Used by every LLM-backed agent (`article_modeler`, `disciplinary_mapper`,
+    `semantic_profiler`, `fit_assessor`) so the parse/repair/fallback
+    classification is identical and stays in lockstep.
+
+    Returns:
+      parsed       — the parsed dict, OR None if the agent must fall back.
+      meta         — LLMAttemptMetadata describing exactly what happened.
+      repair_steps — the trace of repair attempts.
+      errors       — short error strings (also embedded in meta).
+    """
+    # Lazy import to avoid a circular module load with the agents.
+    from .json_repair import (
+        PARSE_STATUS_PARSED_OK,
+        PARSE_STATUS_REPAIRED_OK,
+        PARSE_STATUS_SCHEMA_VALIDATION_FAILED,
+        repair_and_parse,
+    )
+
+    provider_model = getattr(response, "model", None)
+    latency_ms = getattr(response, "latency_ms", None)
+    content_present = bool(getattr(response, "content", ""))
+    parsed = getattr(response, "parsed", None)
+
+    # Fast path: provider already parsed a dict
+    if isinstance(parsed, dict):
+        meta = LLMAttemptMetadata.parse_ok(
+            provider=provider_name,
+            model=provider_model,
+            latency_ms=latency_ms,
+            content_present=content_present,
+        )
+        return parsed, meta, [], []
+
+    # Repair path
+    outcome = repair_and_parse(
+        getattr(response, "content", ""), schema=schema,
+    )
+    if outcome.parsed is not None and outcome.status in (
+        PARSE_STATUS_PARSED_OK, PARSE_STATUS_REPAIRED_OK,
+    ):
+        meta = LLMAttemptMetadata.parse_ok(
+            provider=provider_name,
+            model=provider_model,
+            latency_ms=latency_ms,
+            content_present=content_present,
+            repaired=(outcome.status == PARSE_STATUS_REPAIRED_OK),
+            repair_steps=outcome.repair_steps,
+        )
+        return outcome.parsed, meta, outcome.repair_steps, []
+
+    # Fallback path — pick the right reason
+    if outcome.status == PARSE_STATUS_SCHEMA_VALIDATION_FAILED:
+        reason = FALLBACK_REASON_SCHEMA_VALIDATION_FAILED
+    elif outcome.repair_steps:
+        reason = FALLBACK_REASON_REPAIR_FAILED
+    else:
+        reason = FALLBACK_REASON_INVALID_JSON
+    meta = LLMAttemptMetadata.fallback(
+        reason=reason,
+        provider=provider_name,
+        model=provider_model,
+        latency_ms=latency_ms,
+        content_present=content_present,
+        repair_attempted=bool(outcome.repair_steps),
+        repair_steps=outcome.repair_steps,
+        validation_errors=outcome.validation_errors,
+        parse_status=outcome.status,
+    )
+    return None, meta, outcome.repair_steps, outcome.validation_errors

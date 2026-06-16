@@ -15,6 +15,10 @@ export default function App() {
   const [appView, setAppView] = useState<AppView>('cases');
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  // Transient top-level notice for stale-case recoveries — surfaces a
+  // Russian message after handleCaseGone fires so the user knows the
+  // workspace reset wasn't random.
+  const [globalNotice, setGlobalNotice] = useState<string | null>(null);
 
   useEffect(() => {
     api.health()
@@ -65,8 +69,31 @@ export default function App() {
       setActiveCase(detail);
     } catch (e) {
       console.error('Failed to open case:', e);
+      // Drop stale active only when the backend specifically says
+      // the case doesn't exist (literal "Case case_<id> not found"
+      // from the FastAPI _user_case dep). Other 404s like
+      // "Article model not built yet" must NOT clear activeCase.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/Case\s+case_[a-f0-9]+\s+not\s+found/i.test(msg)) {
+        setActiveCase(null);
+        loadCases();
+      }
     }
-  }, []);
+  }, [loadCases]);
+
+  const handleCaseGone = useCallback(() => {
+    // Triggered when a case-scoped API call inside a CaseWorkspace
+    // returns 404 (case deleted, server reset, etc.). Drop active +
+    // re-sync the list, and explain what happened at the App level
+    // since the CaseWorkspace (and its error banner) will unmount.
+    setActiveCase(null);
+    loadCases();
+    setGlobalNotice(
+      'Этот case больше не существует на сервере. Возможно, бэкенд ' +
+      'был перезапущен или case был удалён в другой вкладке. Создайте ' +
+      'новый case или выберите существующий.',
+    );
+  }, [loadCases]);
 
   const createCase = useCallback(async () => {
     try {
@@ -167,6 +194,18 @@ export default function App() {
         </div>
       </header>
 
+      {globalNotice && (
+        <div className="global-notice" role="status">
+          <span>{globalNotice}</span>
+          <button
+            type="button"
+            className="global-notice-dismiss"
+            onClick={() => setGlobalNotice(null)}
+            aria-label="Dismiss"
+          >&times;</button>
+        </div>
+      )}
+
       <div className="app-body">
         {appView === 'agents' ? (
           <AgentMap />
@@ -208,6 +247,7 @@ export default function App() {
                 key={activeCase.case_id}
                 caseData={activeCase}
                 onCaseUpdate={refreshActiveCase}
+                onCaseGone={handleCaseGone}
               />
             ) : (
               <div className="workspace-empty">

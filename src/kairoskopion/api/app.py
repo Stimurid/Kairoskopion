@@ -246,7 +246,10 @@ def intake_text(req: IntakeTextRequest, case: Case = Depends(_user_case)):
     return result
 
 
-_SUPPORTED_UPLOAD_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".html", ".htm"}
+_SUPPORTED_UPLOAD_EXTENSIONS = {
+    ".pdf", ".docx", ".doc", ".txt", ".md",
+    ".html", ".htm", ".rtf", ".json",
+}
 
 
 @app.post("/cases/{case_id}/intake/file")
@@ -366,12 +369,19 @@ def get_article_model_human_view(case: Case = Depends(_user_case)):
         p.to_dict() if hasattr(p, "to_dict") else p
         for p in (case.pathways or [])
     ]
+    # Surface semantic profile + fit assessment fallback warnings if
+    # those layers carry extraction_attempt metadata. Optional fields.
+    sem = case.semantic_profile.to_dict() if case.semantic_profile else None
+    fit = case.fit_assessment.to_dict() if case.fit_assessment else None
     return {
         "format": "markdown",
         "case_id": case.case_id,
         "lifecycle_status": article.get("lifecycle_status", "preliminary"),
         "not_a_submission_recommendation": True,
-        "markdown": article_model_human_view(article, pathways=pathways),
+        "markdown": article_model_human_view(
+            article, pathways=pathways,
+            semantic_profile=sem, fit_assessment=fit,
+        ),
     }
 
 

@@ -522,9 +522,41 @@ def _section_corrections_article() -> str:
     return body
 
 
+def _layer_fallback_banner(
+    layer_phrase: str, attempt: dict[str, Any] | None,
+) -> str:
+    """Render a Russian fallback banner for any layer (semantic/fit/etc.).
+
+    Returns an empty string when no fallback fired.
+    Used by the article human view to surface semantic_profile and
+    fit_assessment fallback states beside the article-level one.
+
+    Args:
+      layer_phrase: full Russian phrase with correct gender agreement,
+        e.g. "Семантический профиль построен в предварительном режиме"
+        (masculine) or "Оценка соответствия построена в предварительном
+        режиме" (feminine).
+      attempt: the LLMAttemptMetadata dict from the layer.
+    """
+    if not attempt or not attempt.get("fallback_used"):
+        return ""
+    warn = attempt.get("warning_for_user") or (
+        "LLM-вызов не дал корректный результат, поэтому использован fallback."
+    )
+    parse_status = attempt.get("parse_status", "unknown")
+    fallback_reason = attempt.get("fallback_reason", "unknown")
+    return (
+        f"> ⚠ **{layer_phrase}:** {warn}\n\n"
+        f"> _(parse_status: `{parse_status}` · fallback_reason: "
+        f"`{fallback_reason}`)_\n\n"
+    )
+
+
 def article_model_human_view(
     article: dict[str, Any],
     pathways: list[dict[str, Any]] | None = None,
+    semantic_profile: dict[str, Any] | None = None,
+    fit_assessment: dict[str, Any] | None = None,
 ) -> str:
     """Render the 11-section author-facing markdown view of an ArticleModel.
 
@@ -532,6 +564,10 @@ def article_model_human_view(
       article: dict shape of an ArticleModel (ArticleModel.to_dict()).
       pathways: optional list of DisciplinaryPathway dicts to enrich
                 section 6 with reasoning per pathway.
+      semantic_profile: optional ArticleSemanticProfile dict. If it
+                carries fallback metadata, a Russian warning is surfaced
+                at the top of the view.
+      fit_assessment: optional FitAssessment dict. Same surfacing.
 
     Returns:
       Markdown string, ready for direct cockpit rendering or vault
@@ -582,6 +618,23 @@ def article_model_human_view(
                 f"fallback_reason: `{extraction_attempt.get('fallback_reason', 'unknown')}`)_"
             )
             lines.append("")
+
+    # Per-layer fallback warnings — semantic profile + fit assessment.
+    # Each is shown only if it carries `fallback_used: True`.
+    # Russian gender agreement: "профиль" is masculine, "оценка" is
+    # feminine, so the verb form differs.
+    sem_banner = _layer_fallback_banner(
+        "Семантический профиль построен в предварительном режиме",
+        semantic_profile.get("extraction_attempt") if semantic_profile else None,
+    )
+    if sem_banner:
+        lines.append(sem_banner)
+    fit_banner = _layer_fallback_banner(
+        "Оценка соответствия построена в предварительном режиме",
+        fit_assessment.get("extraction_attempt") if fit_assessment else None,
+    )
+    if fit_banner:
+        lines.append(fit_banner)
 
     lines.append(_h(2, "Коротко", "article_model._summary"))
     lines.append(_short_summary_article(article))
