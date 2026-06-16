@@ -88,7 +88,24 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
       }
       return;
     }
-    setError(err instanceof Error ? err.message : String(err));
+    const raw = err instanceof Error ? err.message : String(err);
+    // FastAPI structured detail (e.g. 413 input_too_large) — pull the
+    // user-facing Russian message out of the JSON body instead of
+    // showing the raw `API 413: {...}` blob.
+    const m = raw.match(/^API \d+:\s*(\{.*\})$/);
+    if (m) {
+      try {
+        const body = JSON.parse(m[1]);
+        const detail = body?.detail ?? body;
+        if (typeof detail === 'object' && detail?.message) {
+          setError(detail.message);
+          return;
+        }
+      } catch {
+        /* fall through to raw */
+      }
+    }
+    setError(raw);
   };
 
   // --- Intake ---

@@ -35,6 +35,7 @@ from ..enums import (
     LifecycleStatus,
 )
 from ..llm.config import LLMConfig
+from ..llm.input_limits import LLM_INPUT_CHAR_CAP, cap_llm_input
 from ..llm.openai_compat import OpenAICompatProvider
 
 
@@ -80,6 +81,10 @@ class Case:
         self.user_id: str | None = user_id
         self.input_text: str = ""
         self.input_type: str = ""
+        # LLM-bound projection of input_text (clipped via input_limits).
+        # Recomputed each intake_text() call.
+        self._llm_input_text: str = ""
+        self._llm_input_truncation = None
 
         self.article_model: ArticleModel | None = None
         self.semantic_profile: ArticleSemanticProfile | None = None
@@ -159,6 +164,12 @@ class Case:
         search_depth: str = "none",
     ) -> dict[str, Any]:
         self.input_text = text
+        # Cap the LLM-bound projection once per intake. The original full
+        # text stays on self.input_text for deterministic processing and
+        # persistence; only the prompt-facing copy is clipped.
+        capped, truncation = cap_llm_input(text, LLM_INPUT_CHAR_CAP)
+        self._llm_input_text = capped
+        self._llm_input_truncation = truncation
         self.input_type = input_type if input_type != "auto" else _classify_input(text)
         self.stage = CaseStage.INTAKE
 
@@ -182,6 +193,8 @@ class Case:
             "venue_investigated": self.investigated_venue is not None,
             "stage": self.stage.value,
         }
+        if truncation.truncated:
+            result["input_truncated_for_llm"] = truncation.to_dict()
         if enrichment_result:
             result["enrichment"] = enrichment_result
         return result
@@ -210,7 +223,7 @@ class Case:
             inp = AgentInput(
                 operation_id="intake_article",
                 agent_role_id="article_modeler",
-                raw_text=self.input_text,
+                raw_text=self._llm_input_text or self.input_text,
             )
             try:
                 output = agent.execute(inp, provider)
@@ -290,7 +303,7 @@ class Case:
             operation_id="article_field_position",
             agent_role_id="article_field_positioner",
             entities=entities,
-            raw_text=self.input_text,
+            raw_text=getattr(self, "_llm_input_text", None) or self.input_text,
         )
         provider = _get_llm_provider()
         try:

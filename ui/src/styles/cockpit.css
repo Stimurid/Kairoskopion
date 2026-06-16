@@ -506,6 +506,21 @@ body {
   color: var(--text-muted);
 }
 
+.intake-hint--warn {
+  color: #f0b429;
+}
+
+.intake-hint--block {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.intake-result-badge--warn {
+  background: rgba(240, 180, 41, 0.15);
+  color: #f0b429;
+  border: 1px solid rgba(240, 180, 41, 0.4);
+}
+
 .intake-input-area {
   position: relative;
   border-radius: var(--radius);

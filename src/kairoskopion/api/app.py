@@ -241,6 +241,22 @@ class IntakeTextRequest(BaseModel):
 
 @app.post("/cases/{case_id}/intake/text")
 def intake_text(req: IntakeTextRequest, case: Case = Depends(_user_case)):
+    from ..llm.input_limits import INTAKE_HARD_CHAR_CAP
+    if len(req.text) > INTAKE_HARD_CHAR_CAP:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "error": "input_too_large",
+                "received_chars": len(req.text),
+                "max_chars": INTAKE_HARD_CHAR_CAP,
+                "message": (
+                    f"Текст слишком длинный для синхронной обработки "
+                    f"({len(req.text)} символов). Максимум: "
+                    f"{INTAKE_HARD_CHAR_CAP}. Сократите вход или разделите "
+                    f"его на части."
+                ),
+            },
+        )
     result = case.intake_text(req.text, req.input_type, req.search_depth)
     store.save(case)
     return result
@@ -284,6 +300,24 @@ async def intake_file(
                 400,
                 f"Could not extract text from {filename}: "
                 + "; ".join(errors or ["unknown error"]),
+            )
+
+        from ..llm.input_limits import INTAKE_HARD_CHAR_CAP
+        if len(text) > INTAKE_HARD_CHAR_CAP:
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "error": "extracted_text_too_large",
+                    "filename": filename,
+                    "received_chars": len(text),
+                    "max_chars": INTAKE_HARD_CHAR_CAP,
+                    "message": (
+                        f"Извлечённый текст слишком длинный "
+                        f"({len(text)} символов). Максимум: "
+                        f"{INTAKE_HARD_CHAR_CAP}. Загрузите фрагмент или "
+                        f"сократите файл."
+                    ),
+                },
             )
 
         result = case.intake_text(text, input_type, search_depth)

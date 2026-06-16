@@ -1,5 +1,12 @@
 import { useRef, useState } from 'react';
 
+interface TruncationInfo {
+  original_chars: number;
+  used_chars: number;
+  cap: number;
+  truncated: boolean;
+}
+
 interface IntakeResult {
   input_type: string;
   text_length: number;
@@ -7,7 +14,12 @@ interface IntakeResult {
   venue_investigated?: boolean;
   filename?: string;
   extraction_status?: string;
+  input_truncated_for_llm?: TruncationInfo;
 }
+
+// Keep in sync with src/kairoskopion/llm/input_limits.py
+const LLM_SOFT_CAP = 40_000;
+const INTAKE_HARD_CAP = 200_000;
 
 interface Props {
   onSubmit: (text: string, inputType: string, searchDepth: string) => Promise<IntakeResult | void>;
@@ -182,17 +194,33 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
       )}
 
       <div className="intake-actions">
-        <span className="intake-hint">
+        <span
+          className={`intake-hint ${
+            text.length > INTAKE_HARD_CAP
+              ? 'intake-hint--block'
+              : text.length > LLM_SOFT_CAP
+                ? 'intake-hint--warn'
+                : ''
+          }`}
+        >
           {selectedFile
             ? selectedFile.name
-            : text.length > 0
-              ? `${text.length} characters`
-              : 'Ctrl+Enter to submit'}
+            : text.length === 0
+              ? 'Ctrl+Enter to submit'
+              : text.length > INTAKE_HARD_CAP
+                ? `${text.length.toLocaleString('ru-RU')} символов — превышает максимум ${INTAKE_HARD_CAP.toLocaleString('ru-RU')}. Сократите вход.`
+                : text.length > LLM_SOFT_CAP
+                  ? `${text.length.toLocaleString('ru-RU')} символов — LLM получит только первые ${LLM_SOFT_CAP.toLocaleString('ru-RU')}; остальное обработается детерминированно.`
+                  : `${text.length} characters`}
         </span>
         <button
           className="btn btn-primary"
           onClick={handleSubmit}
-          disabled={(!text.trim() && !selectedFile) || isLoading}
+          disabled={
+            (!text.trim() && !selectedFile) ||
+            isLoading ||
+            text.length > INTAKE_HARD_CAP
+          }
         >
           {isLoading ? 'Analyzing...' : 'Analyze'}
         </button>
@@ -217,6 +245,15 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
           {lastResult.venue_investigated && (
             <span className="intake-result-badge intake-result-badge--success">
               Venue profile built
+            </span>
+          )}
+          {lastResult.input_truncated_for_llm?.truncated && (
+            <span
+              className="intake-result-badge intake-result-badge--warn"
+              title={`LLM получил первые ${lastResult.input_truncated_for_llm.used_chars.toLocaleString('ru-RU')} из ${lastResult.input_truncated_for_llm.original_chars.toLocaleString('ru-RU')} символов`}
+            >
+              LLM: обрезано до{' '}
+              {lastResult.input_truncated_for_llm.used_chars.toLocaleString('ru-RU')} симв.
             </span>
           )}
         </div>
