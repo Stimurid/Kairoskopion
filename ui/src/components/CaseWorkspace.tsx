@@ -110,7 +110,21 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
 
   // --- Intake ---
 
-  const handleIntakeResult = useCallback(async (result: { article_model_built: boolean; venue_investigated?: boolean }) => {
+  const handleIntakeResult = useCallback(async (result: {
+    article_model_built: boolean;
+    venue_investigated?: boolean;
+    needs_user_choice?: boolean;
+    input_type?: string;
+  }) => {
+    // If the LLM classifier was uncertain (or returned unknown), stay
+    // on intake — IntakeSurface renders the classifier verdict and
+    // asks the user to pick a chip explicitly. Routing to a wrong
+    // pipeline is worse than asking one extra question.
+    if (result.needs_user_choice) {
+      setActiveView('intake');
+      onCaseUpdate();
+      return;
+    }
     if (result.article_model_built) {
       try {
         const am = await api.getArticleModel(caseId);
@@ -132,12 +146,10 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
       }
       setActiveView('venue_investigation');
     } else {
-      // Neither branch fired (input may have been too short or LLM +
-      // deterministic both produced nothing). Don't leave the user
-      // staring at the intake surface thinking nothing happened —
-      // route to the article-model view, which will show whatever
-      // exists (or its own "Load Article Model" affordance).
-      setActiveView('article_model');
+      // Classified as something we don't have a pipeline for yet
+      // (review_letter), or LLM provider was down and classifier
+      // returned unknown. Stay on intake so the user can re-route.
+      setActiveView('intake');
     }
     onCaseUpdate();
   }, [caseId, onCaseUpdate]);

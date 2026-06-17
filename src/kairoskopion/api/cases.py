@@ -170,11 +170,22 @@ class Case:
         capped, truncation = cap_llm_input(text, LLM_INPUT_CHAR_CAP)
         self._llm_input_text = capped
         self._llm_input_truncation = truncation
-        self.input_type = input_type if input_type != "auto" else _classify_input(text)
+
+        # Classification path: LLM agent if provider available, else
+        # ask the user. Explicit override from the UI chip skips the
+        # classifier entirely.
+        classification_result: dict[str, Any] | None = None
+        if input_type != "auto":
+            self.input_type = input_type
+        else:
+            classification_result = self._classify_input_llm(text)
+            self.input_type = classification_result["input_type"]
+
         self.stage = CaseStage.INTAKE
 
         enrichment_result: dict[str, Any] = {}
 
+        # Treat 'abstract' as a tiny manuscript — same pipeline.
         if self.input_type in ("article", "abstract", "manuscript"):
             self._build_article_model()
             # Web enrichment pass
@@ -185,6 +196,8 @@ class Case:
                 self.investigate_venue(text)
             except Exception:
                 pass
+        # 'review_letter' and 'unknown' run no pipeline — the UI prompts
+        # the user to either pick a type chip or paste different text.
 
         result: dict[str, Any] = {
             "input_type": self.input_type,
@@ -193,11 +206,60 @@ class Case:
             "venue_investigated": self.investigated_venue is not None,
             "stage": self.stage.value,
         }
+        if classification_result is not None:
+            # Surface the LLM classifier verdict to the UI so it can
+            # raise a "confirm type" banner instead of silently routing.
+            result["classification"] = classification_result
+            if classification_result.get("needs_user_choice"):
+                result["needs_user_choice"] = True
         if truncation.truncated:
             result["input_truncated_for_llm"] = truncation.to_dict()
         if enrichment_result:
             result["enrichment"] = enrichment_result
         return result
+
+    def _classify_input_llm(self, text: str) -> dict[str, Any]:
+        """Run InputClassifierAgent — LLM if provider available, else
+        deterministic fallback (which returns unknown + needs_user_choice).
+
+        Maps the classifier's output_entity to the legacy input_type
+        vocabulary expected by intake_text. Specifically, 'manuscript'
+        from the classifier is treated as the legacy 'manuscript' label.
+        """
+        from ..agents.contract import AgentInput
+        from ..agents.input_classifier import InputClassifierAgent
+
+        agent = InputClassifierAgent()
+        ag_input = AgentInput(
+            operation_id="intake_classify",
+            agent_role_id="input_classifier",
+            raw_text=text,
+        )
+        provider = _get_llm_provider()
+        try:
+            if provider is not None:
+                output = agent.execute(ag_input, provider)
+            else:
+                output = agent.execute_deterministic(ag_input)
+        except Exception as exc:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning(
+                "Input classifier crashed: %s", exc,
+            )
+            return {
+                "input_type": "unknown",
+                "confidence": "low",
+                "needs_user_choice": True,
+                "language_detected": "unknown",
+                "reasoning": "Классификатор не отработал — выберите тип вручную.",
+            }
+        return output.output_entity or {
+            "input_type": "unknown",
+            "confidence": "low",
+            "needs_user_choice": True,
+            "language_detected": "unknown",
+            "reasoning": "Классификатор не вернул результат — выберите тип.",
+        }
 
     def _build_article_model(self):
         import logging
@@ -1317,29 +1379,9 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
     return case
 
 
-def _classify_input(text: str) -> str:
-    """Heuristic input classifier — used only when input_type='auto'.
-
-    Default falls back to 'manuscript' so the article-modeling path
-    always fires. Review-letter / venue branches are only chosen when
-    BOTH the keyword cue is present AND the size matches a realistic
-    instance of that genre — a long manuscript that incidentally
-    mentions 'reviewer' in a citation must not be misclassified as a
-    review letter (which would skip the whole pipeline).
-    """
-    lower = text.lower()
-    n = len(text)
-    # Review letters are typically short emails / responses to editors
-    # (<5k chars). A 75k-char manuscript that happens to cite work on
-    # peer review must NOT route here.
-    review_kw = ["reviewer", "revision", "reject", "resubmit", "referee"]
-    if n < 5_000 and any(k in lower for k in review_kw):
-        return "review_letter"
-    # Venue / journal guidelines: strong, specific cues. Allow longer
-    # texts here because guidelines pages can be 10-30k chars.
-    venue_kw = ["issn", "author guidelines", "scope of the journal"]
-    if n < 50_000 and any(k in lower for k in venue_kw):
-        return "venue"
-    if n < 500:
-        return "abstract"
-    return "manuscript"
+# NOTE: the legacy keyword-based ``_classify_input`` was removed in the
+# Phase A LLM-classifier migration. Routing now goes through
+# ``Case._classify_input_llm`` which dispatches to
+# ``InputClassifierAgent``. When the LLM provider is unavailable, the
+# agent returns ``input_type=unknown`` with ``needs_user_choice=True``
+# rather than guessing — the UI then asks the user to pick a chip.

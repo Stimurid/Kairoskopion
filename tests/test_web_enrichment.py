@@ -92,6 +92,7 @@ class TestCaseIntakeSearchDepth(unittest.TestCase):
         result = case.intake_text(
             "This paper examines individuation in technical objects "
             "through a Simondonian lens.",
+            input_type="article",
             search_depth="none",
         )
         self.assertIn("input_type", result)

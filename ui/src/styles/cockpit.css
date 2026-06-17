@@ -521,6 +521,41 @@ body {
   border: 1px solid rgba(240, 180, 41, 0.4);
 }
 
+.intake-classification-banner {
+  margin-top: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: rgba(240, 180, 41, 0.08);
+  border: 1px solid rgba(240, 180, 41, 0.4);
+  border-left: 4px solid #f0b429;
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.intake-classification-headline {
+  color: #f0b429;
+}
+
+.intake-classification-headline code {
+  background: rgba(240, 180, 41, 0.18);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+}
+
+.intake-classification-reasoning {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.intake-classification-action {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
 .intake-input-area {
   position: relative;
   border-radius: var(--radius);

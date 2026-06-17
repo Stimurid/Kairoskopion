@@ -16,6 +16,23 @@ if TYPE_CHECKING:
 _SPECS: list[AgentSpec] = [
     # --- Control layer ---
     AgentSpec(
+        role_id="input_classifier",
+        display_name="Input Classifier",
+        layer="control",
+        implementation_status="operational_now",
+        execution_mode="llm_optional",
+        prompt_family_ids=["input_classification"],
+        input_contract={"raw_text": "pasted/uploaded text"},
+        output_contract={
+            "InputClassification": (
+                "input_type (manuscript|venue|review_letter|unknown) + "
+                "confidence + needs_user_choice + language_detected"
+            )
+        },
+        mvp_phase="v0.1",
+        first_workflows=["uc1_draft_to_venue_pool_positioning"],
+    ),
+    AgentSpec(
         role_id="intent_classifier",
         display_name="Intent Classifier",
         layer="control",
@@ -408,6 +425,7 @@ def _build_agent_class_map() -> dict[str, type]:
     """Lazy import to avoid circular deps — maps role_id to AgentRole subclass."""
     from .article_field_positioner import ArticleFieldPositionerAgent
     from .article_modeler import ArticleModelerAgent
+    from .input_classifier import InputClassifierAgent
     from .semantic_profiler import ArticleSemanticProfilerAgent
     from .disciplinary_mapper import DisciplinaryPathwayMapperAgent
     from .fit_assessor import FitAssessorAgent
@@ -435,6 +453,7 @@ def _build_agent_class_map() -> dict[str, type]:
     from .evidence import EvidenceAuditorAgent, ReferenceVerifierAgent
 
     return {
+        "input_classifier": InputClassifierAgent,
         "intent_classifier": IntentClassifierAgent,
         "scenario_prober": ScenarioProberAgent,
         "research_planner": ResearchPlannerAgent,

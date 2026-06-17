@@ -4,25 +4,57 @@ from __future__ import annotations
 
 import unittest
 
-from kairoskopion.api.cases import Case, CaseStore, CaseStage, _classify_input
+from kairoskopion.api.cases import Case, CaseStore, CaseStage
 
 
-class TestClassifyInput(unittest.TestCase):
-    def test_short_text_is_abstract(self):
-        self.assertEqual(_classify_input("Some short text"), "abstract")
+class TestInputClassifierDeterministicFallback(unittest.TestCase):
+    """The legacy keyword-based ``_classify_input`` was retired in
+    Phase A; routing now goes through ``InputClassifierAgent``. When no
+    LLM provider is configured, the agent must return
+    ``input_type=unknown`` with ``needs_user_choice=True`` — never a
+    silent default to 'manuscript' / 'review_letter'."""
 
-    def test_journal_mention_is_venue(self):
-        self.assertEqual(_classify_input("ISSN 1234-5678 for this journal"), "venue")
+    def setUp(self):
+        from kairoskopion.agents.contract import AgentInput
+        from kairoskopion.agents.input_classifier import InputClassifierAgent
+        self.agent = InputClassifierAgent()
+        self.AgentInput = AgentInput
 
-    def test_reviewer_mention_is_review(self):
-        self.assertEqual(
-            _classify_input("The reviewer recommended to reject this paper"),
-            "review_letter",
+    def _run(self, text: str) -> dict:
+        out = self.agent.execute_deterministic(
+            self.AgentInput(
+                operation_id="t",
+                agent_role_id="input_classifier",
+                raw_text=text,
+            )
         )
+        return out.output_entity
 
-    def test_long_text_is_manuscript(self):
-        text = "word " * 200
-        self.assertEqual(_classify_input(text), "manuscript")
+    def test_short_text_yields_unknown_not_abstract(self):
+        result = self._run("Some short text")
+        self.assertEqual(result["input_type"], "unknown")
+        self.assertTrue(result["needs_user_choice"])
+
+    def test_long_text_yields_unknown_not_manuscript(self):
+        # The deterministic fallback never guesses — it asks the user.
+        result = self._run("word " * 200)
+        self.assertEqual(result["input_type"], "unknown")
+        self.assertTrue(result["needs_user_choice"])
+
+    def test_reviewer_word_does_not_route_to_review_letter(self):
+        # Regression: prior keyword heuristic flagged any "reviewer"
+        # mention as review_letter, silently skipping the whole pipeline.
+        result = self._run(
+            "The reviewer recommended to reject this paper" * 200,
+        )
+        self.assertNotEqual(result["input_type"], "review_letter")
+        self.assertEqual(result["input_type"], "unknown")
+        self.assertTrue(result["needs_user_choice"])
+
+    def test_empty_text_yields_unknown(self):
+        result = self._run("")
+        self.assertEqual(result["input_type"], "unknown")
+        self.assertTrue(result["needs_user_choice"])
 
 
 class TestCaseStore(unittest.TestCase):
@@ -66,21 +98,29 @@ class TestCaseStore(unittest.TestCase):
 
 class TestCaseIntake(unittest.TestCase):
     def test_intake_abstract(self):
+        # Phase A: classifier is now LLM-driven; without a provider
+        # the test must pass the type explicitly via the chip
+        # equivalent (input_type="article") so the article-modeling
+        # pipeline runs deterministically.
         case = Case(title="Test")
         result = case.intake_text(
             "This paper examines individuation in technical objects "
             "through a Simondonian lens, offering a conceptual analysis "
             "of how technical objects acquire identity through their "
             "functioning within associated milieus.",
+            input_type="article",
         )
-        self.assertEqual(result["input_type"], "abstract")
+        self.assertEqual(result["input_type"], "article")
         self.assertTrue(result["article_model_built"])
         self.assertEqual(case.stage, CaseStage.ARTICLE_MODEL)
         self.assertIsNotNone(case.article_model)
 
     def test_intake_venue(self):
         case = Case()
-        result = case.intake_text("ISSN 1234-5678 journal scope")
+        result = case.intake_text(
+            "ISSN 1234-5678 journal scope",
+            input_type="venue",
+        )
         self.assertEqual(result["input_type"], "venue")
         self.assertFalse(result["article_model_built"])
         self.assertEqual(case.stage, CaseStage.INTAKE)
@@ -93,7 +133,8 @@ class TestCaseConfirm(unittest.TestCase):
             "This paper offers a conceptual analysis of individuation "
             "in technical objects, drawing on Simondon's philosophy of "
             "technology to argue that technical objects have genuine "
-            "individuality through their associated milieu."
+            "individuality through their associated milieu.",
+            input_type="article",
         )
 
     def test_confirm_sets_lifecycle(self):
@@ -115,7 +156,8 @@ class TestCaseScenario(unittest.TestCase):
         case = Case()
         case.intake_text(
             "A conceptual analysis of individuation in technical objects "
-            "through Simondon's philosophy of technology."
+            "through Simondon's philosophy of technology.",
+            input_type="article",
         )
         result = case.set_scenario({
             "goal": "Q1-Q2 Scopus publication",
@@ -155,7 +197,8 @@ class TestCaseDossier(unittest.TestCase):
         case = Case()
         case.intake_text(
             "A conceptual analysis of individuation in technical objects "
-            "through Simondon's philosophy of technology."
+            "through Simondon's philosophy of technology.",
+            input_type="article",
         )
         d = case.build_dossier()
         self.assertIn("article_model", d)
@@ -178,7 +221,10 @@ class TestCaseVenueInvestigation(unittest.TestCase):
 
     def test_intake_venue_auto_investigates(self):
         case = Case()
-        result = case.intake_text("ISSN 1234-5678 author guidelines for this journal")
+        result = case.intake_text(
+            "ISSN 1234-5678 author guidelines for this journal",
+            input_type="venue",
+        )
         self.assertEqual(result["input_type"], "venue")
         self.assertIn("venue_investigated", result)
 

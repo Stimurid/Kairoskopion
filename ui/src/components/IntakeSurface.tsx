@@ -7,6 +7,14 @@ interface TruncationInfo {
   truncated: boolean;
 }
 
+interface ClassificationVerdict {
+  input_type: string;
+  confidence: 'high' | 'medium' | 'low';
+  needs_user_choice: boolean;
+  language_detected: 'ru' | 'en' | 'mixed' | 'unknown';
+  reasoning: string;
+}
+
 interface IntakeResult {
   input_type: string;
   text_length: number;
@@ -15,6 +23,8 @@ interface IntakeResult {
   filename?: string;
   extraction_status?: string;
   input_truncated_for_llm?: TruncationInfo;
+  classification?: ClassificationVerdict;
+  needs_user_choice?: boolean;
 }
 
 // Keep in sync with src/kairoskopion/llm/input_limits.py
@@ -225,6 +235,23 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
           {isLoading ? 'Analyzing...' : 'Analyze'}
         </button>
       </div>
+
+      {lastResult?.needs_user_choice && lastResult.classification && (
+        <div className="intake-classification-banner" role="alert">
+          <div className="intake-classification-headline">
+            <strong>⚠ Не уверен в типе текста.</strong>{' '}
+            Классификатор предположил:{' '}
+            <code>{lastResult.classification.input_type}</code>{' '}
+            (уверенность: {lastResult.classification.confidence}).
+          </div>
+          <div className="intake-classification-reasoning">
+            {lastResult.classification.reasoning}
+          </div>
+          <div className="intake-classification-action">
+            Выберите тип вручную чипом выше и нажмите Analyze ещё раз.
+          </div>
+        </div>
+      )}
 
       {lastResult && (
         <div className="intake-result" role="status">
