@@ -250,10 +250,9 @@ def intake_text(req: IntakeTextRequest, case: Case = Depends(_user_case)):
                 "received_chars": len(req.text),
                 "max_chars": INTAKE_HARD_CHAR_CAP,
                 "message": (
-                    f"Текст слишком длинный для синхронной обработки "
-                    f"({len(req.text)} символов). Максимум: "
-                    f"{INTAKE_HARD_CHAR_CAP}. Сократите вход или разделите "
-                    f"его на части."
+                    f"Текст слишком длинный ({len(req.text)} символов). "
+                    f"Максимум: {INTAKE_HARD_CHAR_CAP}. Сократите вход "
+                    f"или разделите его на части."
                 ),
             },
         )
@@ -314,8 +313,8 @@ async def intake_file(
                     "message": (
                         f"Извлечённый текст слишком длинный "
                         f"({len(text)} символов). Максимум: "
-                        f"{INTAKE_HARD_CHAR_CAP}. Загрузите фрагмент или "
-                        f"сократите файл."
+                        f"{INTAKE_HARD_CHAR_CAP}. Загрузите фрагмент "
+                        f"или сократите файл."
                     ),
                 },
             )

@@ -119,5 +119,38 @@ class TestIntakeEndpointHardCap(unittest.TestCase):
         self.assertNotIn("raw_output_ref", resp.text)
 
 
+class TestInputClassifier(unittest.TestCase):
+    """Regression: a long manuscript that happens to mention 'reviewer'
+    in a citation must not be misclassified as review_letter (which
+    would skip the entire intake pipeline)."""
+
+    def test_long_text_with_reviewer_word_is_manuscript(self):
+        from kairoskopion.api.cases import _classify_input
+        # 75k chars of bibliography that mentions 'reviewer' once.
+        text = ("Vygotsky, Lev S. 1978. Mind in Society. " * 1000) + (
+            "Includes reviewer comments by an unnamed referee."
+        )
+        self.assertGreater(len(text), 5_000)
+        self.assertEqual(_classify_input(text), "manuscript")
+
+    def test_short_review_letter_still_classified(self):
+        from kairoskopion.api.cases import _classify_input
+        text = (
+            "Dear editor, thank you for the reviewer comments. "
+            "We have revised the manuscript and resubmit it for "
+            "consideration."
+        )
+        self.assertLess(len(text), 5_000)
+        self.assertEqual(_classify_input(text), "review_letter")
+
+    def test_short_text_no_cues_is_abstract(self):
+        from kairoskopion.api.cases import _classify_input
+        self.assertEqual(_classify_input("just a short paragraph"), "abstract")
+
+    def test_long_text_default_manuscript(self):
+        from kairoskopion.api.cases import _classify_input
+        self.assertEqual(_classify_input("x" * 10_000), "manuscript")
+
+
 if __name__ == "__main__":
     unittest.main()

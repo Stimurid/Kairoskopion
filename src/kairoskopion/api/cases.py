@@ -1318,11 +1318,28 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
 
 
 def _classify_input(text: str) -> str:
+    """Heuristic input classifier — used only when input_type='auto'.
+
+    Default falls back to 'manuscript' so the article-modeling path
+    always fires. Review-letter / venue branches are only chosen when
+    BOTH the keyword cue is present AND the size matches a realistic
+    instance of that genre — a long manuscript that incidentally
+    mentions 'reviewer' in a citation must not be misclassified as a
+    review letter (which would skip the whole pipeline).
+    """
     lower = text.lower()
-    if any(k in lower for k in ["reviewer", "revision", "reject", "resubmit", "referee"]):
+    n = len(text)
+    # Review letters are typically short emails / responses to editors
+    # (<5k chars). A 75k-char manuscript that happens to cite work on
+    # peer review must NOT route here.
+    review_kw = ["reviewer", "revision", "reject", "resubmit", "referee"]
+    if n < 5_000 and any(k in lower for k in review_kw):
         return "review_letter"
-    if any(k in lower for k in ["issn", "author guidelines", "scope of the journal"]):
+    # Venue / journal guidelines: strong, specific cues. Allow longer
+    # texts here because guidelines pages can be 10-30k chars.
+    venue_kw = ["issn", "author guidelines", "scope of the journal"]
+    if n < 50_000 and any(k in lower for k in venue_kw):
         return "venue"
-    if len(text) < 500:
+    if n < 500:
         return "abstract"
     return "manuscript"

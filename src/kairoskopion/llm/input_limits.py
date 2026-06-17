@@ -33,8 +33,8 @@ from typing import Final
 # Tunable by env later if needed, but for now hardcoded — these are
 # input-shaping guards, not LLM parameters. Sized empirically for the
 # current ManuscriptVenueFitPipeline and 302.ai default models.
-LLM_INPUT_CHAR_CAP: Final[int] = 40_000
-INTAKE_HARD_CHAR_CAP: Final[int] = 200_000
+LLM_INPUT_CHAR_CAP: Final[int] = 150_000
+INTAKE_HARD_CHAR_CAP: Final[int] = 400_000
 
 TRUNCATION_MARKER: Final[str] = (
     "\n\n[... текст обрезан для отправки в LLM "

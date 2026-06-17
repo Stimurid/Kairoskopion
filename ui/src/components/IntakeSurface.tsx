@@ -18,8 +18,8 @@ interface IntakeResult {
 }
 
 // Keep in sync with src/kairoskopion/llm/input_limits.py
-const LLM_SOFT_CAP = 40_000;
-const INTAKE_HARD_CAP = 200_000;
+const LLM_SOFT_CAP = 150_000;
+const INTAKE_HARD_CAP = 400_000;
 
 interface Props {
   onSubmit: (text: string, inputType: string, searchDepth: string) => Promise<IntakeResult | void>;
@@ -210,7 +210,7 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
               : text.length > INTAKE_HARD_CAP
                 ? `${text.length.toLocaleString('ru-RU')} символов — превышает максимум ${INTAKE_HARD_CAP.toLocaleString('ru-RU')}. Сократите вход.`
                 : text.length > LLM_SOFT_CAP
-                  ? `${text.length.toLocaleString('ru-RU')} символов — LLM получит только первые ${LLM_SOFT_CAP.toLocaleString('ru-RU')}; остальное обработается детерминированно.`
+                  ? `${text.length.toLocaleString('ru-RU')} символов — LLM получит только первые ${LLM_SOFT_CAP.toLocaleString('ru-RU')}; остальное в анализ не пойдёт. Сократите вход или разбейте на части.`
                   : `${text.length} characters`}
         </span>
         <button
