@@ -8,30 +8,27 @@ Sprint 2: expanded from 8 to 12 axes:
   novelty_positioning, language_register, audience, formal_compliance,
   author_eligibility, publication_regime.
 
-.. deprecated:: Phase B
-   ``_DISCIPLINE_KEYWORDS`` (13 buckets) and ``_ADJACENCY`` (hardcoded
-   discipline graph) are Anglo-biased lookups that conflict with the
-   disciplinary landscape registry. Retained as a temporary last
-   resort. Routing for the ``discipline`` fit axis should go through
-   ``DisciplineMatcherAgent``; the adjacency graph should come from
-   ``DisciplineRegistry.adjacent_of(...)``.
+Phase B refactor (commit 3/5)
+-----------------------------
+The Anglo-biased ``_DISCIPLINE_KEYWORDS`` (13 buckets) and
+``_ADJACENCY`` (hardcoded discipline graph) have been REMOVED. The
+deterministic discipline-fit axis now consumes the disciplinary
+landscape registry built in B0/B1:
 
-   These tables will be removed once ``FitAssessorAgent`` consumes the
-   registry. Do NOT extend them.
+* ``_detect_disciplines`` returns discipline_ids surfaced by
+  ``DisciplineRegistry.candidates_keyword``.
+* ``_adjacent_disciplines`` walks one hop along the registry's
+  ``adjacent`` + ``international_mapping`` graph instead of the
+  hardcoded set.
+
+When the registry is unavailable (test isolation, data dir missing),
+both helpers return empty sets. The discipline axis then comes back
+``unknown`` — honest fallback, not a fabricated value.
 """
 
 from __future__ import annotations
 
 import re
-import warnings as _stdlib_warnings
-
-_stdlib_warnings.warn(
-    "services.fit_assessment._DISCIPLINE_KEYWORDS / _ADJACENCY are "
-    "deprecated; route discipline matching through "
-    "DisciplineMatcherAgent + DisciplineRegistry. See Phase B notes.",
-    DeprecationWarning,
-    stacklevel=2,
-)
 
 from ..enums import (
     AssessmentLevel,
@@ -45,56 +42,34 @@ from ..ids import fit_assessment_id
 from ..schema import ArticleModel, FitAssessment, SubmissionScenario, VenueModel
 
 
-_DISCIPLINE_KEYWORDS: dict[str, list[str]] = {
-    "philosophy": ["philosophy", "philosophical", "phenomenology", "epistemology",
-                   "ontology", "hermeneutic", "metaphysics"],
-    "social_theory": ["social theory", "social sciences", "sociology", "sociological"],
-    "cultural_studies": ["cultural studies", "cultural theory", "culture"],
-    "education": ["education", "pedagogy", "higher education", "university",
-                  "academic", "curriculum"],
-    "sts": ["sts", "science and technology studies", "science studies"],
-    "political_science": ["political science", "political philosophy", "politics",
-                          "governance", "democracy"],
-    "ethics": ["ethics", "bioethics", "research ethics", "ai ethics"],
-    "humanities": ["humanities", "literary", "philology", "history of ideas"],
-    "psychology": ["psychology", "cognitive", "behavioral"],
-    "economics": ["economics", "economic", "political economy"],
-    "computer_science": ["computer science", "artificial intelligence",
-                         "machine learning", "computational"],
-    "media_studies": ["media studies", "communication", "journalism"],
-    "law": ["law", "legal", "jurisprudence"],
-}
-
-_ADJACENCY: dict[str, set[str]] = {
-    "philosophy": {"ethics", "social_theory", "humanities", "political_science", "sts"},
-    "social_theory": {"philosophy", "cultural_studies", "political_science", "sts"},
-    "cultural_studies": {"social_theory", "humanities", "media_studies"},
-    "education": {"social_theory", "psychology", "philosophy"},
-    "sts": {"philosophy", "social_theory", "ethics"},
-    "political_science": {"philosophy", "social_theory", "law", "economics"},
-    "ethics": {"philosophy", "law", "sts"},
-    "humanities": {"philosophy", "cultural_studies", "education"},
-    "psychology": {"education", "social_theory"},
-    "economics": {"political_science", "social_theory"},
-    "computer_science": {"sts", "ethics"},
-    "media_studies": {"cultural_studies", "social_theory"},
-    "law": {"political_science", "ethics"},
-}
+def _load_registry_silently():
+    try:
+        from .discipline_registry import load_default_registry
+        return load_default_registry()
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _detect_disciplines(text: str) -> set[str]:
-    lower = text.lower()
-    found: set[str] = set()
-    for discipline, keywords in _DISCIPLINE_KEYWORDS.items():
-        if any(kw in lower for kw in keywords):
-            found.add(discipline)
-    return found
+    """Return discipline_ids surfaced by the registry's keyword pre-filter."""
+    if not text or not text.strip():
+        return set()
+    reg = _load_registry_silently()
+    if reg is None:
+        return set()
+    cands = reg.candidates_keyword(text, region="auto", limit=8)
+    return {d.discipline_id for d in cands}
 
 
 def _adjacent_disciplines(disciplines: set[str]) -> set[str]:
+    """Walk one hop along the registry adjacency + international_mapping."""
+    reg = _load_registry_silently()
+    if reg is None or not disciplines:
+        return set()
     adj: set[str] = set()
     for d in disciplines:
-        adj.update(_ADJACENCY.get(d, set()))
+        for n in reg.adjacent_of(d):
+            adj.add(n.discipline_id)
     return adj
 
 

@@ -1,88 +1,35 @@
-"""Article semantic profile enrichment — deterministic heuristic builder.
+"""Article semantic profile enrichment — last-resort deterministic builder.
 
-Builds ArticleSemanticProfile from ArticleModel by extracting disciplinary
-registers, schools/traditions, argument structure, and protected core
-candidates from the article's existing fields.
+Builds ``ArticleSemanticProfile`` from ``ArticleModel`` when the
+LLM-backed ``ArticleSemanticProfilerAgent`` is unavailable.
 
-MVP: keyword-based heuristics. LLM enrichment would improve quality.
+Phase B refactor (commit 3/5)
+-----------------------------
+The Anglo-biased hardcoded keyword tables (``_DISCIPLINE_KEYWORDS`` /
+``_SCHOOL_KEYWORDS``) have been REMOVED. The deterministic path now
+consumes the disciplinary landscape registry built in B0/B1:
 
-.. deprecated:: Phase B
-   The keyword tables ``_DISCIPLINE_KEYWORDS`` and ``_SCHOOL_KEYWORDS``
-   are Anglo-biased hardcoded lookups that conflict with the
-   disciplinary landscape registry. They are retained as a temporary
-   last-resort fallback ONLY (no LLM provider AND no registry hit).
+* Disciplines are surfaced via
+  ``DisciplineRegistry.candidates_keyword`` (substring pre-filter
+  over display names + aliases + legitimate_objects + ontologies).
+* Schools/traditions are surfaced by matching ``key_authors[].name``
+  across registry cards. This keeps the deterministic path useful
+  for the most obvious cases (Latour → Latourian / ANT) without
+  hardcoded Anglo-philosophy assumptions.
 
-   New work routes through ``DisciplineMatcherAgent`` →
-   ``services.discipline_registry.DisciplineRegistry``. When all
-   downstream agents (semantic_profiler, fit_assessor,
-   venue_candidate_screening) are on the registry, these tables will
-   be removed. Do NOT extend them.
+Argument-move detection still uses the small keyword table below
+(``_ARGUMENT_MOVE_PATTERNS``). Move detection is style-based, not
+discipline-based — distinct concern from the discipline registry.
+That deterministic table is acceptable for the fallback path; the
+LLM-driven semantic profiler does this properly when available.
 """
 
 from __future__ import annotations
 
-import re
-import warnings as _stdlib_warnings
 from typing import Any
 
 from ..schema import ArticleModel, ArticleSemanticProfile
 
-_stdlib_warnings.warn(
-    "services.article_enrichment._DISCIPLINE_KEYWORDS / _SCHOOL_KEYWORDS "
-    "are deprecated; route discipline matching through "
-    "DisciplineMatcherAgent + DisciplineRegistry. See Phase B notes.",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
-
-_DISCIPLINE_KEYWORDS: dict[str, list[str]] = {
-    "philosophy_of_technology": [
-        "technology", "technics", "technical", "artifact", "artefact",
-        "design", "engineering ethics", "philosophy of technology",
-    ],
-    "STS": [
-        "science and technology studies", "STS", "sociotechnical",
-        "actor-network", "ANT", "social construction",
-    ],
-    "philosophy_of_mind": [
-        "consciousness", "mind", "mental", "qualia", "intentionality",
-        "phenomenal", "cognition",
-    ],
-    "philosophy_of_science": [
-        "scientific method", "falsification", "paradigm", "theory choice",
-        "explanation", "causation", "realism",
-    ],
-    "ethics": [
-        "ethics", "moral", "normative", "deontological", "consequentialism",
-        "virtue ethics", "bioethics",
-    ],
-    "epistemology": [
-        "knowledge", "epistemic", "justification", "belief", "skepticism",
-        "epistemology",
-    ],
-    "phenomenology": [
-        "phenomenology", "phenomenological", "lifeworld", "lebenswelt",
-        "intentionality", "embodiment", "lived experience",
-    ],
-    "critical_theory": [
-        "critical theory", "Frankfurt School", "ideology", "emancipation",
-        "power", "hegemony", "Habermas",
-    ],
-}
-
-_SCHOOL_KEYWORDS: dict[str, list[str]] = {
-    "Simondonian": ["Simondon", "individuation", "transduction", "concretization"],
-    "Heideggerian": ["Heidegger", "Dasein", "enframing", "Gestell", "ready-to-hand"],
-    "Deleuzian": ["Deleuze", "assemblage", "rhizome", "deterritorialization"],
-    "Stieglerian": ["Stiegler", "technics", "epiphylogenesis", "pharmacology"],
-    "Latourian": ["Latour", "actor-network", "ANT", "translation"],
-    "pragmatist": ["pragmatism", "Dewey", "James", "Peirce", "inquiry"],
-    "analytic": ["analytic philosophy", "logical analysis", "conceptual analysis"],
-    "continental": ["continental philosophy", "hermeneutics", "existentialism"],
-    "feminist_technoscience": ["feminist", "Haraway", "situated knowledge", "cyborg"],
-    "postphenomenology": ["postphenomenology", "Ihde", "human-technology", "multistability"],
-}
 
 _ARGUMENT_MOVE_PATTERNS: dict[str, list[str]] = {
     "conceptual_analysis": ["conceptual analysis", "concept of", "notion of", "what is"],
@@ -115,24 +62,57 @@ def _text_pool(article: ArticleModel) -> str:
     return " ".join(parts).lower()
 
 
-def _detect_disciplines(text: str) -> list[str]:
-    found: list[str] = []
-    for discipline, keywords in _DISCIPLINE_KEYWORDS.items():
-        for kw in keywords:
-            if kw.lower() in text:
-                found.append(discipline)
-                break
-    return found
+def _load_registry_silently():
+    """Return a DisciplineRegistry or None. The deterministic fallback
+    must not crash when the registry data dir is missing (tests with
+    isolated tmp dirs may not include it)."""
+    try:
+        from .discipline_registry import load_default_registry
+        return load_default_registry()
+    except Exception:  # noqa: BLE001
+        return None
 
 
-def _detect_schools(text: str) -> list[str]:
-    found: list[str] = []
-    for school, keywords in _SCHOOL_KEYWORDS.items():
-        for kw in keywords:
-            if kw.lower() in text:
-                found.append(school)
-                break
-    return found
+def _detect_disciplines_via_registry(text: str) -> list[str]:
+    """Return discipline_ids surfaced by the keyword pre-filter.
+    Empty list when the registry is unavailable or text is empty.
+    """
+    reg = _load_registry_silently()
+    if reg is None or not text.strip():
+        return []
+    candidates = reg.candidates_keyword(text, region="auto", limit=6)
+    return [d.discipline_id for d in candidates]
+
+
+def _detect_schools_via_registry(text: str) -> list[str]:
+    """Return display names of authors found in the text by scanning
+    ``key_authors[].name`` across all registry cards. The returned
+    list is deduplicated and ordered by first occurrence.
+
+    NOT a school taxonomy — just a "which canonical authors are
+    explicitly named here" signal. The LLM-backed semantic profiler
+    handles real school detection when available.
+    """
+    reg = _load_registry_silently()
+    if reg is None or not text.strip():
+        return []
+    lower = text.lower()
+    seen: set[str] = set()
+    out: list[str] = []
+    for d in reg.all():
+        for author in d.key_authors:
+            name = (author.name or "").strip()
+            if not name or name in seen:
+                continue
+            # Match by last-word token — robust across "Bruno Latour" /
+            # "B. Latour" / "Latour, Bruno". Skip very short tokens.
+            last = name.split()[-1].lower().strip(",.")
+            if len(last) >= 4 and last in lower:
+                seen.add(name)
+                out.append(name)
+                if len(out) >= 8:
+                    return out
+    return out
 
 
 def _detect_argument_move(text: str) -> str | None:
@@ -159,13 +139,9 @@ def _extract_protected_core_candidates(article: ArticleModel) -> list[str]:
 def _infer_audience(disciplines: list[str], text: str) -> str | None:
     if not disciplines:
         return None
-    if len(disciplines) > 2:
+    if len(disciplines) >= 3:
         return "interdisciplinary"
-    if "ethics" in disciplines:
-        return "applied ethics community"
-    if "STS" in disciplines:
-        return "STS scholars"
-    return f"{disciplines[0]} researchers"
+    return f"{disciplines[0]} readership"
 
 
 def build_article_semantic_profile(
@@ -173,27 +149,34 @@ def build_article_semantic_profile(
     *,
     manuscript_text: str | None = None,
 ) -> ArticleSemanticProfile:
-    """Build an ArticleSemanticProfile from an ArticleModel.
+    """Build an ``ArticleSemanticProfile`` from an ``ArticleModel``.
 
-    Uses keyword heuristics to detect disciplines, schools, argument moves,
-    and protected core candidates. Optional manuscript_text broadens detection.
+    Last-resort deterministic builder. Uses the disciplinary landscape
+    registry for discipline/author detection; argument moves stay on
+    a small keyword table. Returns a profile marked
+    ``confidence="low"`` if no disciplines surfaced (matches the
+    LLM-fallback convention).
     """
     text = _text_pool(article)
     if manuscript_text:
         text += " " + manuscript_text.lower()
 
-    disciplines = _detect_disciplines(text)
-    schools = _detect_schools(text)
+    disciplines = _detect_disciplines_via_registry(text)
+    schools = _detect_schools_via_registry(text)
     argument_move = _detect_argument_move(text)
     core_candidates = _extract_protected_core_candidates(article)
 
     unknowns: list[str] = []
     if not disciplines:
-        unknowns.append("Could not detect disciplinary registers — heuristic insufficient")
+        unknowns.append(
+            "Could not surface any registry discipline — text needs LLM-driven matching"
+        )
     if not schools:
-        unknowns.append("Could not detect schools/traditions — heuristic insufficient")
+        unknowns.append(
+            "Could not surface canonical authors from registry — text needs LLM-driven matching"
+        )
     if not argument_move:
-        unknowns.append("Could not detect argument move type — heuristic insufficient")
+        unknowns.append("Could not detect argument move type — keyword heuristic insufficient")
 
     profile = ArticleSemanticProfile(
         article_model_id=article.article_model_id,

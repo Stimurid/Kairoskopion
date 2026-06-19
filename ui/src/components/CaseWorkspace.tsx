@@ -17,6 +17,7 @@ import { EvidenceDrawer } from './EvidenceDrawer';
 import { IntakeSurface } from './IntakeSurface';
 import { ArticleCard } from './ArticleCard';
 import { HumanModelView } from './HumanModelView';
+import { DisciplineMatches } from './DisciplineMatches';
 import { VenueProfile } from './VenueProfile';
 import { ScenarioBuilder } from './ScenarioBuilder';
 import { MismatchMapView } from './MismatchMapView';
@@ -154,11 +155,11 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
     onCaseUpdate();
   }, [caseId, onCaseUpdate]);
 
-  const handleIntakeSubmit = useCallback(async (text: string, inputType: string, searchDepth: string) => {
+  const handleIntakeSubmit = useCallback(async (text: string, inputType: string, searchDepth: string, region: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await api.intakeText(caseId, text, inputType, searchDepth);
+      const result = await api.intakeText(caseId, text, inputType, searchDepth, region);
       await handleIntakeResult(result);
       return result;
     } catch (e) {
@@ -168,11 +169,11 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
     }
   }, [caseId, handleIntakeResult]);
 
-  const handleIntakeFile = useCallback(async (file: File, inputType: string, searchDepth: string) => {
+  const handleIntakeFile = useCallback(async (file: File, inputType: string, searchDepth: string, region: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await api.intakeFile(caseId, file, inputType);
+      const result = await api.intakeFile(caseId, file, inputType, region);
       await handleIntakeResult(result);
       return result;
     } catch (e) {
@@ -435,6 +436,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
                 onBack={() => setActiveView('intake')}
               />
             )}
+            <DisciplineMatches caseId={caseId} />
           </>
         );
 
