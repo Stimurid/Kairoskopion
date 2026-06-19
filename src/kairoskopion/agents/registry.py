@@ -36,6 +36,44 @@ _SPECS: list[AgentSpec] = [
         first_workflows=["uc1_draft_to_venue_pool_positioning"],
     ),
     AgentSpec(
+        role_id="discipline_source_acquisition",
+        display_name="Discipline Source Acquisition",
+        layer="article",
+        implementation_status="operational_now",
+        execution_mode="llm_optional",
+        prompt_family_ids=["discipline_source_acquisition"],
+        input_contract={
+            "entities.discipline_name": "str — discipline to seed",
+            "entities.region": "ru|international|...",
+            "entities.hints": "optional list of source hints",
+        },
+        output_contract={
+            "DisciplineSourceAcquisitionResult": (
+                "packets (≤3 DisciplineSourcePackets) + reasoning"
+            ),
+        },
+        mvp_phase="v0.2",
+        first_workflows=["discipline_registry_growth"],
+    ),
+    AgentSpec(
+        role_id="discipline_seeder",
+        display_name="Discipline Seeder",
+        layer="article",
+        implementation_status="operational_now",
+        execution_mode="llm_optional",
+        prompt_family_ids=["discipline_seeding"],
+        input_contract={
+            "entities.discipline_name": "str",
+            "entities.region": "ru|international|...",
+            "entities.packets": "list of DisciplineSourcePacket dicts",
+        },
+        output_contract={
+            "DisciplineModel": "draft card with source_status=llm_draft",
+        },
+        mvp_phase="v0.2",
+        first_workflows=["discipline_registry_growth"],
+    ),
+    AgentSpec(
         role_id="input_classifier",
         display_name="Input Classifier",
         layer="control",
@@ -446,6 +484,8 @@ def _build_agent_class_map() -> dict[str, type]:
     from .article_field_positioner import ArticleFieldPositionerAgent
     from .article_modeler import ArticleModelerAgent
     from .discipline_matcher import DisciplineMatcherAgent
+    from .discipline_source_acquisition import DisciplineSourceAcquisitionAgent
+    from .discipline_seeder import DisciplineSeederAgent
     from .input_classifier import InputClassifierAgent
     from .semantic_profiler import ArticleSemanticProfilerAgent
     from .disciplinary_mapper import DisciplinaryPathwayMapperAgent
@@ -475,6 +515,8 @@ def _build_agent_class_map() -> dict[str, type]:
 
     return {
         "discipline_matcher": DisciplineMatcherAgent,
+        "discipline_source_acquisition": DisciplineSourceAcquisitionAgent,
+        "discipline_seeder": DisciplineSeederAgent,
         "input_classifier": InputClassifierAgent,
         "intent_classifier": IntentClassifierAgent,
         "scenario_prober": ScenarioProberAgent,

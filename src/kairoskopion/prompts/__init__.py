@@ -2,6 +2,8 @@
 
 from .article_modeling import ARTICLE_MODELING_FAMILY
 from .discipline_matching import DISCIPLINE_MATCHING_FAMILY
+from .discipline_seeding import DISCIPLINE_SEEDING_FAMILY
+from .discipline_source_acquisition import DISCIPLINE_SOURCE_ACQUISITION_FAMILY
 from .disciplinary_mapping import DISCIPLINARY_MAPPING_FAMILY
 from .field_positioning import (
     ARTICLE_FIELD_POSITION_FAMILY,
@@ -17,6 +19,8 @@ __all__ = [
     "ARTICLE_MODELING_FAMILY",
     "DISCIPLINARY_MAPPING_FAMILY",
     "DISCIPLINE_MATCHING_FAMILY",
+    "DISCIPLINE_SEEDING_FAMILY",
+    "DISCIPLINE_SOURCE_ACQUISITION_FAMILY",
     "FIT_ASSESSMENT_FAMILY",
     "INPUT_CLASSIFICATION_FAMILY",
     "SEMANTIC_PROFILING_FAMILY",
