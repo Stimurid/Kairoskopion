@@ -58,75 +58,25 @@ def _count_words(text: str) -> int:
 
 
 def _detect_genre(text: str, sections: list[str]) -> str:
-    lower = text.lower()
-    # Philosophical/theoretical markers take priority — a theoretical article
-    # may mention "review" or "empirical" in passing without being that genre
-    philosophical_markers = [
-        "conceptual argument", "philosophical argument", "philosophical",
-        "epistemic", "ontological", "category error", "theoretical essay",
-        "theory of", "legitimation", "institutional theory",
-    ]
-    review_markers = ["systematic review", "literature review", "meta-analysis"]
-    # Count marker hits to disambiguate
-    phil_hits = sum(1 for k in philosophical_markers if k in lower)
-    review_hits = sum(1 for k in review_markers if k in lower)
-    if phil_hits >= 2:
-        return Genre.THEORETICAL_ESSAY.value
-    if review_hits > 0 and phil_hits == 0:
-        return Genre.SYSTEMATIC_REVIEW.value
-    if any(k in lower for k in ["case study", "case-based", "empirical case"]):
-        return Genre.RESEARCH_ARTICLE.value
-    if phil_hits == 1:
-        return Genre.THEORETICAL_ESSAY.value
-    if review_hits > 0:
-        return Genre.SYSTEMATIC_REVIEW.value
-    if "commentary" in lower or "response to" in lower:
-        return Genre.COMMENTARY.value
+    """Deterministic fallback honesty: genre is domain reasoning, not
+    substring counting. Single-word triggers like "critique" appear in
+    almost any literature review and the prior marker-counting heuristic
+    produced false-positive labels that then flowed into disciplinary
+    matching and rewrite planning. Last-resort fallback returns UNKNOWN
+    and lets the LLM ArticleModelerAgent provide the real classification
+    when available."""
     return Genre.UNKNOWN.value
 
 
 def _detect_method(text: str) -> str:
-    lower = text.lower()
-    conceptual_markers = [
-        "conceptual analysis", "conceptual argument", "philosophical argument",
-        "category error", "epistemic legitimation", "institutional analysis",
-        "genealogy of", "historical genealogy", "philosophical",
-        "normative framework", "normative theory", "theoretical framework",
-        "conceptual framework", "critical analysis", "deliberative",
-        "we argue that", "this paper argues", "this essay argues",
-    ]
-    empirical_markers = ["experiment", "survey", "interview", "ethnograph",
-                         "dataset", "sample size", "regression", "statistical",
-                         "mixed-methods", "quantitative", "qualitative data",
-                         "thematic analysis", "participants"]
-    # Count hits — a philosophical article may mention "empirical" in passing
-    conceptual_hits = sum(1 for k in conceptual_markers if k in lower)
-    empirical_hits = sum(1 for k in empirical_markers if k in lower)
-    if conceptual_hits >= 2:
-        return MethodStatus.CONCEPTUAL_METHOD.value
-    if conceptual_hits > 0 and empirical_hits == 0:
-        return MethodStatus.CONCEPTUAL_METHOD.value
-    if empirical_hits >= 2 and conceptual_hits == 0:
-        return MethodStatus.EMPIRICAL_METHOD.value
-    if conceptual_hits > 0 and empirical_hits > 0:
-        return MethodStatus.MIXED.value
-    if empirical_hits > 0:
-        return MethodStatus.EMPIRICAL_METHOD.value
-    if "case" in lower and ("study" in lower or "based" in lower):
-        return MethodStatus.CASE_BASED.value
-    if "review" in lower and "method" in lower:
-        return MethodStatus.REVIEW_METHOD.value
+    """Same rationale as ``_detect_genre``: method status is interpretive,
+    not lexical. UNKNOWN as honest fallback."""
     return MethodStatus.UNKNOWN.value
 
 
 def _detect_novelty(text: str) -> str:
-    lower = text.lower()
-    if "critique" in lower or "against" in lower or "impossibility" in lower:
-        return NoveltyMode.CRITIQUE.value
-    if "new framework" in lower or "new theory" in lower:
-        return NoveltyMode.NEW_THEORY.value
-    if "translation" in lower and "field" in lower:
-        return NoveltyMode.TRANSLATION_BETWEEN_FIELDS.value
+    """Same rationale: novelty mode is the kind of intellectual move the
+    article makes, not a keyword presence. UNKNOWN as honest fallback."""
     return NoveltyMode.UNKNOWN.value
 
 

@@ -85,12 +85,36 @@ class TestNullsForNullAllowedRequiredFields(unittest.TestCase):
         self.assertEqual(out.validation_errors, [])
         self.assertIsInstance(out.parsed, dict)
 
-    def test_missing_key_still_flags_schema_validation_failed(self):
+    def test_missing_required_key_still_flags_schema_validation_failed(self):
+        # Use a key that REMAINS required after the
+        # intake-routing-and-model-strategy schema-looseness pass.
+        # `problem_statement` is a core-invariant required field.
+        d = _valid_output()
+        del d["problem_statement"]
+        out = repair_and_parse(json.dumps(d), schema=SCHEMA)
+        self.assertEqual(out.status, PARSE_STATUS_SCHEMA_VALIDATION_FAILED)
+        self.assertTrue(any("problem_statement" in e for e in out.validation_errors))
+
+    def test_missing_optional_title_is_filled_and_parses(self):
+        # Regression for branch feature/intake-routing-and-model-strategy:
+        # title moved from required → optional with safe default. Cheaper
+        # models (haiku-4-5-20251001, gpt-4o-mini) consistently skip
+        # title in their structured output; the schema must accept that.
         d = _valid_output()
         del d["title"]
         out = repair_and_parse(json.dumps(d), schema=SCHEMA)
-        self.assertEqual(out.status, PARSE_STATUS_SCHEMA_VALIDATION_FAILED)
-        self.assertTrue(any("title" in e for e in out.validation_errors))
+        self.assertEqual(out.status, PARSE_STATUS_PARSED_OK)
+        # _fill_optional_defaults supplies "" (string default)
+        self.assertIn("title", out.parsed)
+
+    def test_missing_optional_confidence_questions_for_user_are_filled(self):
+        d = _valid_output()
+        del d["confidence"]
+        del d["questions_for_user"]
+        out = repair_and_parse(json.dumps(d), schema=SCHEMA)
+        self.assertEqual(out.status, PARSE_STATUS_PARSED_OK)
+        self.assertIn("confidence", out.parsed)
+        self.assertIn("questions_for_user", out.parsed)
 
     def test_non_null_required_field_with_null_still_flags(self):
         # core_claims has type "array" (not nullable) but is required.

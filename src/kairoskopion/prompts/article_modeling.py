@@ -154,14 +154,31 @@ ARTICLE_MODELING_OUTPUT_SCHEMA: dict = {
         },
         "questions_for_user": {"type": "array", "items": {"type": "string"}},
     },
+    # Required fields = those without which downstream code (semantic
+    # profiler, fit assessor, disciplinary mapper, human view) reads
+    # missing/wrong data and produces meaningless results.
+    #
+    # Moved to OPTIONAL with safe defaults (filled by
+    # _fill_optional_defaults in json_repair) — display/metadata only:
+    #   - title: dataclass already nullable; downstream uses
+    #     "(untitled manuscript)" fallback in litops_bridge / submission_pack;
+    #   - confidence: pure observability metadata; agent reads via
+    #     parsed.get("confidence", "medium");
+    #   - questions_for_user: never persisted to ArticleModel, only
+    #     flows into AgentOutput; empty list is semantically "model had
+    #     no follow-up questions".
+    # Loosening these three unblocks cheaper LLM routes
+    # (claude-haiku-4-5-20251001, gpt-4o-mini) which return rich content
+    # but consistently skip these three keys, without weakening any
+    # downstream invariant or observability signal (extraction_attempt
+    # remains the source of truth for parse success).
     "required": [
-        "title", "language", "article_stage", "problem_statement",
+        "language", "article_stage", "problem_statement",
         "research_question", "object_of_inquiry", "core_claims",
         "argument_structure", "method_status", "genre_current",
         "disciplinary_register_current", "novelty_mode",
         "theoretical_shoulders", "key_terms", "protected_core_candidate",
         "mutable_zones", "high_risk_zones", "unknowns", "assumptions",
-        "confidence", "questions_for_user",
     ],
     "additionalProperties": False,
 }

@@ -103,17 +103,22 @@ def _build_fpm_from_parsed(parsed: dict[str, Any], venue: dict[str, Any]) -> Fie
 
 
 def _deterministic_fpm(venue: dict[str, Any]) -> FieldPositionModel:
-    scope = (venue.get("scope_summary") or "").lower()
-    discipline_vector: dict[str, float] = {}
-    if scope:
-        for tok in scope.replace(",", " ").split():
-            tok = tok.strip()
-            if len(tok) > 3:
-                discipline_vector.setdefault(tok, 1.0)
+    """Honest fallback: do NOT fabricate a discipline_vector by
+    tokenising scope_summary. That produced fake vector entries like
+    ``"and": 1.0`` and ``"the": 1.0`` from stopwords, then those leaked
+    into downstream fit assessment and venue-candidate screening as if
+    they were real discipline weights.
+
+    Keep ONLY the formally extractable institutional signals + language.
+    Discipline positioning requires the LLM-backed
+    ``VenueFieldPositionerAgent`` path. When LLM is unavailable, emit
+    an empty ``discipline_vector`` and an explicit unknown so the UI
+    can warn rather than show a garbage chart.
+    """
     return FieldPositionModel(
         entity_type="venue",
         entity_id=venue.get("venue_model_id"),
-        discipline_vector=discipline_vector,
+        discipline_vector={},
         institutional_signals={
             "prestige_tier": "unknown",
             "open_access": venue.get("open_access_model") or venue.get("open_access"),
@@ -123,7 +128,8 @@ def _deterministic_fpm(venue: dict[str, Any]) -> FieldPositionModel:
                             if isinstance(venue.get("languages"), list)
                             else venue.get("language")},
         unknowns=[
-            "Deterministic venue FPM: no envelopes, vectors derived from scope tokens only",
+            "Deterministic venue FPM: no discipline vector — needs LLM "
+            "VenueFieldPositionerAgent. Institutional signals only.",
         ],
         confidence="low",
     )

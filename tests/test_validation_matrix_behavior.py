@@ -180,18 +180,30 @@ class TestMethodGenreBlocker:
             VN / "empirical_social_science_venue.md",
         )
 
-    def test_theoretical_at_empirical_method_mismatch(self):
+    def test_theoretical_at_empirical_method_axis_honest(self):
+        # intake-routing-and-model-strategy: deterministic
+        # _detect_method demoted to UNKNOWN — the validation matrix
+        # exercises the deterministic build_article_model path, so
+        # article.method_status is now "unknown" instead of the
+        # keyword-inferred "conceptual_method". Fit assessor reports
+        # "unknown" for method axis when method_status is unknown —
+        # honest absence, not invented weakness. The LLM ArticleModeler
+        # provides real method classification in production.
         ax = _axis(self.theoretical["fit"], "method")
         assert ax is not None
-        assert ax["value"] in ("weak", "bad"), (
-            f"Expected method weakness for theoretical at empirical venue, got {ax['value']}"
+        assert ax["value"] in ("weak", "bad", "unknown"), (
+            f"Method axis must report weak/bad/unknown for theoretical "
+            f"article at empirical venue (honest), got {ax['value']}"
         )
 
-    def test_empirical_at_empirical_method_ok(self):
+    def test_empirical_at_empirical_method_axis_honest(self):
+        # Same rationale: method_status is now "unknown" in
+        # deterministic fallback; fit axis is consequently "unknown".
         ax = _axis(self.empirical["fit"], "method")
         assert ax is not None
-        assert ax["value"] in ("strong", "medium"), (
-            f"Expected method match for empirical at empirical venue, got {ax['value']}"
+        assert ax["value"] in ("strong", "medium", "unknown"), (
+            f"Method axis at empirical venue must report "
+            f"strong/medium/unknown, got {ax['value']}"
         )
 
     def test_language_ok_for_both(self):

@@ -202,19 +202,29 @@ class Case:
 
         enrichment_result: dict[str, Any] = {}
 
-        # Treat 'abstract' as a tiny manuscript — same pipeline.
-        if self.input_type in ("article", "abstract", "manuscript"):
+        # Routing centralised in the classifier prompt module so the
+        # set of types and their routes stay consistent across LLM
+        # output, validator, agent, and intake.
+        from ..prompts.input_classification import (
+            ARTICLE_PIPELINE_TYPES,
+            NEEDS_USER_CHOICE_TYPES,
+            VENUE_PIPELINE_TYPES,
+        )
+        if self.input_type in ARTICLE_PIPELINE_TYPES:
             self._build_article_model()
-            # Web enrichment pass
             if search_depth != "none" and self.article_model is not None:
                 enrichment_result = self._enrich_article(search_depth)
-        elif self.input_type == "venue":
+        elif self.input_type in VENUE_PIPELINE_TYPES:
             try:
                 self.investigate_venue(text)
             except Exception:
                 pass
-        # 'review_letter' and 'unknown' run no pipeline — the UI prompts
-        # the user to either pick a type chip or paste different text.
+        elif self.input_type in NEEDS_USER_CHOICE_TYPES:
+            # bibliography / field_notes / review_letter / mixed / unknown
+            # — no automated pipeline. Save the text on the case so the
+            # UI can re-submit after the user picks a chip; do not run
+            # ArticleModeler on a thesis dump or a reference list.
+            pass
 
         result: dict[str, Any] = {
             "input_type": self.input_type,

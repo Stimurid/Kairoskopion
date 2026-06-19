@@ -29,6 +29,7 @@ from ..llm.json_repair import (
 from ..llm.provider import LLMProvider
 from ..prompts.input_classification import (
     INPUT_CLASSIFICATION_FAMILY,
+    NEEDS_USER_CHOICE_TYPES,
     validate_input_classification,
 )
 from .contract import AgentInput, AgentOutput, AgentRole
@@ -122,9 +123,11 @@ class InputClassifierAgent(AgentRole):
         # Soft validation — surface warnings but don't fall back if shape ok.
         warnings = validate_input_classification(parsed)
 
-        # Enforce invariant: unknown / low confidence must request user choice.
+        # Enforce invariant: any type without an automated pipeline OR
+        # low confidence must request user choice. Mirrors the policy
+        # documented in prompts/input_classification.py.
         if (
-            parsed.get("input_type") == "unknown"
+            parsed.get("input_type") in NEEDS_USER_CHOICE_TYPES
             or parsed.get("confidence") == "low"
         ):
             parsed["needs_user_choice"] = True

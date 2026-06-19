@@ -51,17 +51,23 @@ class TestBuildArticleModel:
         assert am.article_model_id.startswith("art_")
         assert am.title_current is not None
 
-    def test_detects_genre(self):
+    def test_genre_is_unknown_in_deterministic_fallback(self):
+        # intake-routing-and-model-strategy branch: keyword-counting
+        # genre detection produced false-positive labels (any "critique"
+        # mention → CRITIQUE, any double "philosophical" → THEORETICAL_ESSAY).
+        # The deterministic fallback now honestly returns UNKNOWN; real
+        # genre classification lives in the LLM ArticleModelerAgent path.
         text = _load_manuscript()
         ms = build_manuscript_model(text)
         am = build_article_model(ms, text)
-        assert am.genre_current == Genre.THEORETICAL_ESSAY.value
+        assert am.genre_current == Genre.UNKNOWN.value
 
-    def test_detects_method(self):
+    def test_method_is_unknown_in_deterministic_fallback(self):
+        # Same rationale as test_genre_is_unknown_in_deterministic_fallback.
         text = _load_manuscript()
         ms = build_manuscript_model(text)
         am = build_article_model(ms, text)
-        assert am.method_status == MethodStatus.CONCEPTUAL_METHOD.value
+        assert am.method_status == MethodStatus.UNKNOWN.value
 
     def test_full_manuscript_stage(self):
         text = _load_manuscript()
@@ -133,20 +139,24 @@ Engelbart, Douglas. 1962. Augmenting Human Intellect.
 
 
 class TestPhilosophicalArticle:
-    """Genre/method detection for philosophical-theoretical articles."""
+    """Deterministic fallback path on a philosophical-theoretical article.
 
-    def test_genre_is_theoretical_essay(self):
+    intake-routing-and-model-strategy branch: the keyword-counting
+    detectors that previously labelled this article as
+    THEORETICAL_ESSAY / CONCEPTUAL_METHOD have been demoted to UNKNOWN.
+    Real genre/method classification requires the LLM ArticleModeler;
+    the deterministic fallback is honest about not knowing.
+    """
+
+    def test_genre_is_unknown_in_fallback(self):
         ms = build_manuscript_model(PHILOSOPHICAL_ARTICLE)
         am = build_article_model(ms, PHILOSOPHICAL_ARTICLE)
-        assert am.genre_current == Genre.THEORETICAL_ESSAY.value
+        assert am.genre_current == Genre.UNKNOWN.value
 
-    def test_method_is_conceptual(self):
+    def test_method_is_unknown_in_fallback(self):
         ms = build_manuscript_model(PHILOSOPHICAL_ARTICLE)
         am = build_article_model(ms, PHILOSOPHICAL_ARTICLE)
-        assert am.method_status in (
-            MethodStatus.CONCEPTUAL_METHOD.value,
-            MethodStatus.MIXED.value,
-        )
+        assert am.method_status == MethodStatus.UNKNOWN.value
 
     def test_no_false_ai_disclosure(self):
         """Article about AI should not trigger AI disclosure detection."""
