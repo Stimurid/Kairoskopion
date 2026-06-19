@@ -155,6 +155,22 @@ export const api = {
   getInvestigatedVenue: (id: string) =>
     get<VenueInvestigationResult>(`/cases/${id}/investigated-venue`),
 
+  // Intake override (Track A, intake-choice-and-routing-seam)
+  overrideIntakeType: (id: string, chosenType: string) =>
+    post<{
+      input_type: string;
+      effective_input_type: string;
+      classifier_input_type: string | null;
+      classifier_confidence: string | null;
+      user_selected_input_type: string;
+      override_source: string;
+      override_at: string;
+      text_length: number;
+      article_model_built: boolean;
+      venue_investigated: boolean;
+      stage: string;
+    }>(`/cases/${id}/intake/override`, { chosen_type: chosenType }),
+
   // Disciplines (Phase B2)
   getDisciplineMatches: (id: string) =>
     get<{

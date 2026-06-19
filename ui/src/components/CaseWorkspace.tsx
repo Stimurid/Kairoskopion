@@ -15,6 +15,7 @@ import { api } from '../api/client';
 import { StatusBar } from './StatusBar';
 import { EvidenceDrawer } from './EvidenceDrawer';
 import { IntakeSurface } from './IntakeSurface';
+import { InputTypeOverridePanel } from './InputTypeOverridePanel';
 import { ArticleCard } from './ArticleCard';
 import { HumanModelView } from './HumanModelView';
 import { DisciplineMatches } from './DisciplineMatches';
@@ -66,6 +67,18 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
   const [protectedCore, setProtectedCore] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Track A: last intake result drives the override panel state.
+  const [lastIntakeResult, setLastIntakeResult] = useState<{
+    needs_user_choice?: boolean;
+    classification?: {
+      input_type: string;
+      confidence: 'high' | 'medium' | 'low';
+      needs_user_choice: boolean;
+      language_detected: 'ru' | 'en' | 'mixed' | 'unknown';
+      reasoning: string;
+    };
+    effective_input_type?: string;
+  } | null>(null);
 
   const caseId = caseData.case_id;
 
@@ -122,10 +135,15 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
     // asks the user to pick a chip explicitly. Routing to a wrong
     // pipeline is worse than asking one extra question.
     if (result.needs_user_choice) {
+      // Remember the classifier verdict so the InputTypeOverridePanel
+      // can render the "уточните тип" chips on the intake view.
+      setLastIntakeResult(result as never);
       setActiveView('intake');
       onCaseUpdate();
       return;
     }
+    // Confident classification — clear any stale override-panel state.
+    setLastIntakeResult(null);
     if (result.article_model_built) {
       try {
         const am = await api.getArticleModel(caseId);
@@ -162,6 +180,21 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
       const result = await api.intakeText(caseId, text, inputType, searchDepth, region);
       await handleIntakeResult(result);
       return result;
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [caseId, handleIntakeResult]);
+
+  const handleOverrideType = useCallback(async (chosenType: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await api.overrideIntakeType(caseId, chosenType);
+      await handleIntakeResult(result as never);
+      // Update panel state immediately so the chip looks selected
+      setLastIntakeResult((prev) => prev ? { ...prev, effective_input_type: chosenType } : prev);
     } catch (e) {
       handleError(e);
     } finally {
@@ -380,7 +413,18 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
       case 'empty':
       case 'intake':
         return (
-          <IntakeSurface onSubmit={handleIntakeSubmit} onFileSubmit={handleIntakeFile} isLoading={isLoading} />
+          <>
+            <IntakeSurface onSubmit={handleIntakeSubmit} onFileSubmit={handleIntakeFile} isLoading={isLoading} />
+            {lastIntakeResult?.classification && lastIntakeResult.needs_user_choice && (
+              <InputTypeOverridePanel
+                caseId={caseId}
+                classification={lastIntakeResult.classification}
+                effectiveType={lastIntakeResult.effective_input_type}
+                onOverride={handleOverrideType}
+                isLoading={isLoading}
+              />
+            )}
+          </>
         );
 
       case 'article_model':

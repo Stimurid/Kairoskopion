@@ -264,6 +264,30 @@ def intake_text(req: IntakeTextRequest, case: Case = Depends(_user_case)):
     return result
 
 
+class IntakeOverrideRequest(BaseModel):
+    chosen_type: str  # manuscript | article | abstract | bibliography
+                      # | journal_or_venue | review_letter | field_notes
+                      # | mixed | unknown
+
+
+@app.post("/cases/{case_id}/intake/override")
+def intake_override(req: IntakeOverrideRequest, case: Case = Depends(_user_case)):
+    """Operator picks a different input_type than the classifier did
+    (or confirms an ambiguous one) and reruns the pipeline. The original
+    classifier verdict is preserved on the case for audit; the pipeline
+    runs on the user's chosen type."""
+    if not case.input_text:
+        raise HTTPException(
+            400, "No text on this case yet — call /intake/text first.",
+        )
+    try:
+        result = case.apply_input_override(req.chosen_type)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    store.save(case)
+    return result
+
+
 _SUPPORTED_UPLOAD_EXTENSIONS = {
     ".pdf", ".docx", ".doc", ".txt", ".md",
     ".html", ".htm", ".rtf", ".json",

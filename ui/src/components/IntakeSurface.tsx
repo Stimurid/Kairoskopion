@@ -17,6 +17,7 @@ interface ClassificationVerdict {
 
 interface IntakeResult {
   input_type: string;
+  effective_input_type?: string;
   text_length: number;
   article_model_built: boolean;
   venue_investigated?: boolean;
@@ -25,6 +26,7 @@ interface IntakeResult {
   input_truncated_for_llm?: TruncationInfo;
   classification?: ClassificationVerdict;
   needs_user_choice?: boolean;
+  override_source?: 'classifier' | 'user' | 'chip';
 }
 
 // Keep in sync with src/kairoskopion/llm/input_limits.py

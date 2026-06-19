@@ -101,6 +101,37 @@ class LLMConfig:
             timeout_seconds=timeout_s,
         )
 
+    @classmethod
+    def for_role(cls, role_id: str | None = None) -> "LLMConfig | None":
+        """Return a per-role-overridden LLMConfig or fall through to global.
+
+        Per-role override env var pattern:
+            KAIROSKOPION_LLM_MODEL_<ROLE_UPPER>
+        where ``<ROLE_UPPER>`` is the agent ``role_id`` uppercased with
+        hyphens replaced by underscores (e.g. ``input_classifier`` →
+        ``KAIROSKOPION_LLM_MODEL_INPUT_CLASSIFIER``).
+
+        Only the *model* alias can be overridden per-role. All other
+        provider params (base_url, api_key_env, timeout, retries) come
+        from the global config. Per-call tuning of those belongs to
+        Agentum, not Kairoskopion.
+
+        ``role_id=None`` or unknown role → returns the unchanged global
+        config. Missing override env var → returns the unchanged global
+        config. Empty override value → returns the unchanged global
+        config (treats blank as "use default").
+        """
+        base = cls.from_env()
+        if base is None or not role_id:
+            return base
+        env_name = (
+            f"KAIROSKOPION_LLM_MODEL_{role_id.upper().replace('-', '_')}"
+        )
+        override = os.environ.get(env_name, "").strip()
+        if not override or override == base.model:
+            return base
+        return dc.replace(base, model=override)
+
     @property
     def api_key(self) -> str:
         """Read API key from the env var named by api_key_env.
@@ -131,6 +162,31 @@ def provider_status() -> dict:
             "reason": "LLM not configured (set KAIROSKOPION_LLM_MODEL or LLM_MODEL)",
         }
     has_key = bool(cfg.api_key)
+    # Per-call routing seam (Track C): resolve known role overrides.
+    # Each role_id matches an existing agent registry entry; the env var
+    # name is documented in docs/operations/PER_CALL_MODEL_ROUTING_SPEC.md.
+    # We only expose the *model* per role — never the key, base_url, or
+    # timeout (those remain global).
+    routed_roles = (
+        "input_classifier",
+        "article_modeler",
+        "article_semantic_profiler",
+        "discipline_matcher",
+        "disciplinary_pathway_mapper",
+        "fit_assessor",
+        "venue_profiler",
+        "discipline_source_acquisition",
+        "discipline_seeder",
+    )
+    per_role_models: dict[str, str] = {}
+    overridden_roles: list[str] = []
+    for role in routed_roles:
+        rcfg = LLMConfig.for_role(role)
+        if rcfg is None:
+            continue
+        per_role_models[role] = rcfg.model
+        if rcfg.model != cfg.model:
+            overridden_roles.append(role)
     return {
         "available": bool(cfg.model and cfg.base_url),
         "provider": cfg.provider,
@@ -139,4 +195,7 @@ def provider_status() -> dict:
         "has_api_key": has_key,
         "timeout_seconds": cfg.timeout_seconds,
         "max_retries": cfg.max_retries,
+        "model_default": cfg.model,
+        "model_per_role": per_role_models,
+        "overridden_roles": overridden_roles,
     }

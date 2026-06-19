@@ -53,8 +53,16 @@ class CaseStage(str, enum.Enum):
     DOSSIER = "dossier"
 
 
-def _get_llm_provider() -> OpenAICompatProvider | None:
-    cfg = LLMConfig.from_env()
+def _get_llm_provider(role_id: str | None = None) -> OpenAICompatProvider | None:
+    """Construct a provider for a specific agent role.
+
+    Per-call routing seam (Track C, intake-choice-and-routing-seam):
+    when ``KAIROSKOPION_LLM_MODEL_<ROLE>`` env var is set, the per-role
+    config supplies a different model alias while reusing the global
+    provider/base_url/api_key/timeout/retries. ``role_id=None`` falls
+    through to the global model.
+    """
+    cfg = LLMConfig.for_role(role_id) if role_id else LLMConfig.from_env()
     if cfg is None:
         return None
     if not cfg.api_key:
@@ -109,6 +117,23 @@ class Case:
 
         self.decision_log: list[dict[str, Any]] = []
         self.quality_gates: dict[str, dict[str, Any]] = {}
+
+        # Track A (intake-choice-and-routing-seam): user-choice override
+        # state. ``classifier_input_type`` / ``classifier_confidence`` /
+        # ``classifier_needs_user_choice`` preserve the AUTO classifier
+        # verdict for audit. ``user_selected_input_type`` is what the
+        # operator chose via the UI chip flow. ``effective_input_type``
+        # is what the pipeline actually used. ``override_source`` is
+        # ``"classifier"`` / ``"user"`` / ``"chip"`` (chip = the user
+        # picked the chip on first submit and skipped the classifier).
+        # ``override_at`` is an ISO timestamp.
+        self.classifier_input_type: str | None = None
+        self.classifier_confidence: str | None = None
+        self.classifier_needs_user_choice: bool = False
+        self.user_selected_input_type: str | None = None
+        self.effective_input_type: str | None = None
+        self.override_source: str = "classifier"
+        self.override_at: str | None = None
 
         # Phase B2: matched disciplines from the registry-driven matcher.
         # Populated by DisciplineMatcherAgent in _build_article_model
@@ -194,9 +219,24 @@ class Case:
         classification_result: dict[str, Any] | None = None
         if input_type != "auto":
             self.input_type = input_type
+            self.user_selected_input_type = input_type
+            self.override_source = "chip"
+            self.override_at = _now()
         else:
             classification_result = self._classify_input_llm(text)
             self.input_type = classification_result["input_type"]
+            # Preserve classifier verdict for audit and override resolution.
+            self.classifier_input_type = classification_result.get("input_type")
+            self.classifier_confidence = classification_result.get("confidence")
+            self.classifier_needs_user_choice = bool(
+                classification_result.get("needs_user_choice")
+            )
+            self.override_source = "classifier"
+
+        # ``effective_input_type`` is the routing key. Initially equals
+        # the classifier verdict / chip; if the user later POSTs to
+        # /intake/override it gets reassigned and the pipeline reruns.
+        self.effective_input_type = self.input_type
 
         self.stage = CaseStage.INTAKE
 
@@ -210,16 +250,16 @@ class Case:
             NEEDS_USER_CHOICE_TYPES,
             VENUE_PIPELINE_TYPES,
         )
-        if self.input_type in ARTICLE_PIPELINE_TYPES:
+        if self.effective_input_type in ARTICLE_PIPELINE_TYPES:
             self._build_article_model()
             if search_depth != "none" and self.article_model is not None:
                 enrichment_result = self._enrich_article(search_depth)
-        elif self.input_type in VENUE_PIPELINE_TYPES:
+        elif self.effective_input_type in VENUE_PIPELINE_TYPES:
             try:
                 self.investigate_venue(text)
             except Exception:
                 pass
-        elif self.input_type in NEEDS_USER_CHOICE_TYPES:
+        elif self.effective_input_type in NEEDS_USER_CHOICE_TYPES:
             # bibliography / field_notes / review_letter / mixed / unknown
             # — no automated pipeline. Save the text on the case so the
             # UI can re-submit after the user picks a chip; do not run
@@ -228,10 +268,12 @@ class Case:
 
         result: dict[str, Any] = {
             "input_type": self.input_type,
+            "effective_input_type": self.effective_input_type,
             "text_length": len(text),
             "article_model_built": self.article_model is not None,
             "venue_investigated": self.investigated_venue is not None,
             "stage": self.stage.value,
+            "override_source": self.override_source,
         }
         if classification_result is not None:
             # Surface the LLM classifier verdict to the UI so it can
@@ -239,6 +281,81 @@ class Case:
             result["classification"] = classification_result
             if classification_result.get("needs_user_choice"):
                 result["needs_user_choice"] = True
+        if truncation.truncated:
+            result["input_truncated_for_llm"] = truncation.to_dict()
+        if enrichment_result:
+            result["enrichment"] = enrichment_result
+        return result
+
+    def apply_input_override(self, chosen_type: str) -> dict[str, Any]:
+        """Operator picks a different input_type than the classifier did
+        (or confirms an ambiguous one). Reruns the pipeline with the
+        chosen type. Preserves the original classifier verdict for audit.
+
+        Returns the same result shape as ``intake_text``.
+        """
+        from ..prompts.input_classification import (
+            ARTICLE_PIPELINE_TYPES,
+            NEEDS_USER_CHOICE_TYPES,
+            VENUE_PIPELINE_TYPES,
+        )
+
+        # All known types — accept anything the classifier might return
+        # OR a chip the user pressed (chips use the same vocabulary).
+        valid_types = (
+            ARTICLE_PIPELINE_TYPES | VENUE_PIPELINE_TYPES
+            | NEEDS_USER_CHOICE_TYPES
+        )
+        if chosen_type not in valid_types:
+            raise ValueError(f"Unknown input_type: {chosen_type!r}")
+
+        # Clear any prior pipeline output so the override-driven rerun
+        # starts from a clean slate. We preserve input_text + classifier
+        # audit trail + region_hint; everything semantic gets rebuilt.
+        self.article_model = None
+        self.semantic_profile = None
+        self.discipline_matches = None
+        self.investigated_venue = None
+        self.publication_regime = None
+        self.article_field_position = None
+
+        self.user_selected_input_type = chosen_type
+        self.effective_input_type = chosen_type
+        self.input_type = chosen_type  # legacy alias kept in sync
+        self.override_source = "user"
+        self.override_at = _now()
+
+        text = self.input_text or ""
+        capped, truncation = cap_llm_input(text, LLM_INPUT_CHAR_CAP)
+        self._llm_input_text = capped
+        self._llm_input_truncation = truncation
+
+        enrichment_result: dict[str, Any] = {}
+        self.stage = CaseStage.INTAKE
+        if chosen_type in ARTICLE_PIPELINE_TYPES:
+            self._build_article_model()
+        elif chosen_type in VENUE_PIPELINE_TYPES:
+            try:
+                self.investigate_venue(text)
+            except Exception:
+                pass
+        # NEEDS_USER_CHOICE_TYPES selected by user means the user
+        # explicitly chose to NOT run a pipeline (e.g. "treat as
+        # field notes, no analysis yet"). Don't run anything.
+
+        result: dict[str, Any] = {
+            "input_type": self.input_type,
+            "effective_input_type": self.effective_input_type,
+            "classifier_input_type": self.classifier_input_type,
+            "classifier_confidence": self.classifier_confidence,
+            "user_selected_input_type": self.user_selected_input_type,
+            "override_source": self.override_source,
+            "override_at": self.override_at,
+            "text_length": len(text),
+            "article_model_built": self.article_model is not None,
+            "venue_investigated": self.investigated_venue is not None,
+            "stage": self.stage.value,
+        }
         if truncation.truncated:
             result["input_truncated_for_llm"] = truncation.to_dict()
         if enrichment_result:
@@ -262,7 +379,7 @@ class Case:
             agent_role_id="input_classifier",
             raw_text=text,
         )
-        provider = _get_llm_provider()
+        provider = _get_llm_provider("input_classifier")
         try:
             if provider is not None:
                 output = agent.execute(ag_input, provider)
@@ -304,7 +421,7 @@ class Case:
 
         case_level_attempt: LLMAttemptMetadata | None = None
 
-        provider = _get_llm_provider()
+        provider = _get_llm_provider("article_modeler")
         if provider is not None:
             from ..agents.article_modeler import ArticleModelerAgent
             from ..agents.contract import AgentInput
@@ -360,7 +477,7 @@ class Case:
         # known_disciplines_context comes from the matcher output
         # (registry-driven) so the profiler can position the article
         # against ACTUAL discipline cards, not invented Anglo labels.
-        provider = _get_llm_provider()
+        provider = _get_llm_provider("article_semantic_profiler")
         if provider is not None:
             from ..agents.semantic_profiler import ArticleSemanticProfilerAgent
             from ..agents.contract import AgentInput as _AI
@@ -434,7 +551,7 @@ class Case:
                 "region": self.region_hint or "auto",
             },
         )
-        provider = _get_llm_provider()
+        provider = _get_llm_provider("discipline_matcher")
         try:
             if provider is not None:
                 out = agent.execute(inp, provider)
@@ -503,7 +620,7 @@ class Case:
             entities=entities,
             raw_text=getattr(self, "_llm_input_text", None) or self.input_text,
         )
-        provider = _get_llm_provider()
+        provider = _get_llm_provider("article_field_positioner")
         try:
             if provider is not None:
                 out = agent.execute(inp, provider)
@@ -572,7 +689,7 @@ class Case:
         import logging
         logger = logging.getLogger(__name__)
 
-        provider = _get_llm_provider()
+        provider = _get_llm_provider("venue_profiler")
         venue = None
         regime = None
 
@@ -635,7 +752,7 @@ class Case:
             entities=entities,
             raw_text=guidelines_text,
         )
-        provider = _get_llm_provider()
+        provider = _get_llm_provider("venue_field_positioner")
         try:
             if provider is not None:
                 out = agent.execute(inp, provider)
@@ -738,7 +855,7 @@ class Case:
                 },
             )
             case_level_attempt: LLMAttemptMetadata | None = None
-            provider = _get_llm_provider()
+            provider = _get_llm_provider("disciplinary_pathway_mapper")
             if provider is not None:
                 try:
                     output = agent.execute(inp, provider)
@@ -799,7 +916,7 @@ class Case:
                 "seed_venues": seed_venues,
             },
         )
-        provider = _get_llm_provider()
+        provider = _get_llm_provider("venue_discovery")
         if provider is not None:
             import logging
             logger = logging.getLogger(__name__)
@@ -912,7 +1029,7 @@ class Case:
             if self.article_model else "",
         )
 
-        provider = _get_llm_provider()
+        provider = _get_llm_provider("fit_assessor")
         fit_via_llm = False
 
         if provider is not None:
@@ -1451,6 +1568,22 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
     if case.region_hint and case.region_hint != "auto":
         snap["region_hint"] = case.region_hint
 
+    # Track A: intake-choice override audit trail.
+    if case.classifier_input_type is not None:
+        snap["classifier_input_type"] = case.classifier_input_type
+    if case.classifier_confidence is not None:
+        snap["classifier_confidence"] = case.classifier_confidence
+    if case.classifier_needs_user_choice:
+        snap["classifier_needs_user_choice"] = True
+    if case.user_selected_input_type is not None:
+        snap["user_selected_input_type"] = case.user_selected_input_type
+    if case.effective_input_type is not None:
+        snap["effective_input_type"] = case.effective_input_type
+    if case.override_source and case.override_source != "classifier":
+        snap["override_source"] = case.override_source
+    if case.override_at is not None:
+        snap["override_at"] = case.override_at
+
     return snap
 
 
@@ -1513,6 +1646,22 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
     region = data.get("region_hint")
     if isinstance(region, str) and region:
         case.region_hint = region
+
+    # Track A: intake-choice override audit trail.
+    if isinstance(data.get("classifier_input_type"), str):
+        case.classifier_input_type = data["classifier_input_type"]
+    if isinstance(data.get("classifier_confidence"), str):
+        case.classifier_confidence = data["classifier_confidence"]
+    if data.get("classifier_needs_user_choice"):
+        case.classifier_needs_user_choice = True
+    if isinstance(data.get("user_selected_input_type"), str):
+        case.user_selected_input_type = data["user_selected_input_type"]
+    if isinstance(data.get("effective_input_type"), str):
+        case.effective_input_type = data["effective_input_type"]
+    if isinstance(data.get("override_source"), str):
+        case.override_source = data["override_source"]
+    if isinstance(data.get("override_at"), str):
+        case.override_at = data["override_at"]
 
     raw_pathways = data.get("pathways", [])
     for p in raw_pathways:

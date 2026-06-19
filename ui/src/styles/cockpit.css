@@ -4264,3 +4264,125 @@ code.agent-detail-value {
   background: rgba(180, 100, 220, 0.06);
   font-size: var(--font-size-sm);
 }
+
+/* Track A: input-type override panel */
+.input-type-override-panel {
+  margin-top: var(--space-lg);
+  padding: var(--space-lg);
+  background: rgba(240, 180, 41, 0.04);
+  border: 1px solid rgba(240, 180, 41, 0.35);
+  border-radius: var(--radius);
+}
+
+.override-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.override-header h3 {
+  font-size: 1rem;
+  margin: 0;
+  color: var(--text-primary, #e8eaf2);
+}
+
+.override-meta {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  display: inline-flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.override-detected-type {
+  color: rgb(180, 200, 235);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+.override-conf {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.override-conf--high {
+  background: rgba(80, 180, 100, 0.18);
+  color: rgb(120, 220, 140);
+}
+.override-conf--medium {
+  background: rgba(240, 180, 41, 0.18);
+  color: #f0b429;
+}
+.override-conf--low {
+  background: rgba(231, 76, 60, 0.18);
+  color: #e74c3c;
+}
+
+.override-reasoning {
+  margin: 0 0 var(--space-md);
+  font-size: 0.85rem;
+  color: var(--text-secondary, #b8bccc);
+  font-style: italic;
+}
+
+.override-effective {
+  margin: var(--space-sm) 0;
+  font-size: 0.85rem;
+  color: rgb(120, 220, 140);
+}
+
+.override-help {
+  margin: 0 0 var(--space-md);
+  font-size: 0.85rem;
+  color: var(--text-secondary, #b8bccc);
+}
+
+.override-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-sm);
+}
+
+.override-action-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-sm) var(--space-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text-primary, #e8eaf2);
+  transition: background 0.15s, border 0.15s;
+}
+
+.override-action-chip:hover:not(:disabled) {
+  background: rgba(120, 160, 240, 0.1);
+  border-color: rgba(120, 160, 240, 0.4);
+}
+
+.override-action-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.override-action-chip--active {
+  background: rgba(120, 220, 140, 0.12);
+  border-color: rgba(120, 220, 140, 0.45);
+}
+
+.override-action-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.override-action-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
