@@ -207,6 +207,47 @@ def _try_parse_with_repairs(s: str, steps: list[str]) -> Any | None:
 
 
 # ---------------------------------------------------------------------------
+# Step 2b: enum value normalization
+# ---------------------------------------------------------------------------
+
+def _normalize_enums(data: Any, schema: dict | None) -> list[str]:
+    """Normalize enum values that differ from the schema only by case
+    or by space-vs-underscore. Returns list of field names normalized.
+
+    Example: schema enum ``"theoretical_essay"``, LLM produced
+    ``"Theoretical Essay"`` → normalize to ``"theoretical_essay"``.
+
+    Does NOT change values that map to NO schema enum entry — those
+    remain so the family-level validator can warn on them. Refuses
+    to invent enum values for missing keys.
+    """
+    if not isinstance(data, dict) or not isinstance(schema, dict):
+        return []
+    props = schema.get("properties") or {}
+    normalized: list[str] = []
+    for key, spec in props.items():
+        if key not in data or not isinstance(spec, dict):
+            continue
+        enum = spec.get("enum")
+        if not isinstance(enum, list):
+            continue
+        v = data[key]
+        if not isinstance(v, str) or v in enum:
+            continue
+        # Build a canonical-form → enum mapping for case/space tolerance.
+        canon: dict[str, str] = {}
+        for e in enum:
+            if not isinstance(e, str):
+                continue
+            canon[e.lower().replace(" ", "_").replace("-", "_")] = e
+        probe = v.lower().replace(" ", "_").replace("-", "_")
+        if probe in canon:
+            data[key] = canon[probe]
+            normalized.append(key)
+    return normalized
+
+
+# ---------------------------------------------------------------------------
 # Step 3: optional defaults for missing optional fields
 # ---------------------------------------------------------------------------
 
@@ -245,8 +286,37 @@ def _fill_optional_defaults(data: dict, schema: dict) -> tuple[dict, list[str]]:
 # Step 4: lightweight schema check (don't invent values)
 # ---------------------------------------------------------------------------
 
+def _type_allows_null(spec: Any) -> bool:
+    """JSON Schema 'type' can be a string OR a list of strings.
+
+    Returns True if the type spec admits ``null`` as a valid value
+    (``"type": "null"`` OR ``"type": ["string", "null"]`` etc.). When
+    the spec is absent, we conservatively allow null — the validator
+    is meant to catch *missing keys*, not type mismatches.
+    """
+    if not isinstance(spec, dict):
+        return True
+    t = spec.get("type")
+    if t is None:
+        return True
+    if isinstance(t, str):
+        return t == "null"
+    if isinstance(t, list):
+        return "null" in t
+    return True
+
+
 def _schema_required_present(data: Any, schema: dict | None) -> list[str]:
     """Return missing-required-field errors. Empty list means OK.
+
+    JSON Schema semantics: ``required: ["foo"]`` means the KEY must be
+    present in the object. The VALUE may be ``null`` if the field's
+    ``type`` admits null (e.g. ``"type": ["string", "null"]``). We
+    must not flag explicit-null fields as missing when the schema
+    invites them — that pattern is exactly what the article-modeling
+    prompt asks the LLM to do ("Use null for fields you cannot
+    determine"), and treating it as a failure rejected most valid
+    outputs in production.
 
     Refuses to invent values; only reports.
     """
@@ -256,8 +326,16 @@ def _schema_required_present(data: Any, schema: dict | None) -> list[str]:
     if not isinstance(required, list):
         return []
     if not isinstance(data, dict):
-        return [f"top-level value is not an object as schema requires"]
-    missing = [k for k in required if k not in data or data.get(k) is None]
+        return ["top-level value is not an object as schema requires"]
+    props = schema.get("properties") or {}
+    missing: list[str] = []
+    for k in required:
+        if k not in data:
+            missing.append(k)
+            continue
+        # Key is present; value may be null if the spec allows it.
+        if data.get(k) is None and not _type_allows_null(props.get(k)):
+            missing.append(k)
     if missing:
         return [f"missing required field: {k}" for k in missing]
     return []
@@ -284,7 +362,10 @@ def repair_and_parse(
     raw = raw or ""
     steps: list[str] = []
 
-    s = raw.strip()
+    # Strip UTF-8 BOM + non-breaking spaces that some providers prepend.
+    s = raw.lstrip("﻿ ").strip()
+    if s != raw.strip():
+        steps.append("bom_stripped")
     if not s:
         return RepairOutcome(
             parsed=None,
@@ -341,6 +422,14 @@ def _validate_and_return(
     *,
     repaired: bool,
 ) -> RepairOutcome:
+    # Normalize enum casing/spacing first — many LLMs return
+    # "Theoretical Essay" or "Theoretical_Essay" when schema expects
+    # "theoretical_essay". Doing this BEFORE the schema check ensures
+    # a near-correct enum doesn't trigger a validation_failed status.
+    if isinstance(parsed, dict) and isinstance(schema, dict):
+        norm = _normalize_enums(parsed, schema)
+        if norm:
+            steps.append(f"enums_normalized:{','.join(norm[:6])}")
     # Try filling optional defaults (does not invent semantic content).
     if isinstance(parsed, dict) and isinstance(schema, dict):
         parsed, filled = _fill_optional_defaults(parsed, schema)

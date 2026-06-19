@@ -74,13 +74,19 @@ class ArticleModelerAgent(AgentRole):
                 max_tokens=4096,
             )
         except Exception as e:
+            # Provider call itself failed (network, timeout, API error,
+            # empty content guard). This is NOT a JSON-parse failure —
+            # the LLM never produced content for us to try to parse.
+            # Label honestly so the observability UI can show
+            # "provider unavailable" vs "model returned bad JSON".
             logger.warning("LLM call failed for article_modeler, falling back: %s", e)
+            err_code = getattr(e, "error_code", None) or e.__class__.__name__
             meta = LLMAttemptMetadata.fallback(
                 reason=FALLBACK_REASON_PROVIDER_ERROR,
                 provider="openai_compatible",
                 model=None,
-                validation_errors=[str(e)[:240]],
-                parse_status="invalid_json",
+                validation_errors=[f"{err_code}: {str(e)[:200]}"],
+                parse_status="not_attempted",
             )
             return self._deterministic_with_attempt(inp, meta)
 
