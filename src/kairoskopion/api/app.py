@@ -237,6 +237,7 @@ class IntakeTextRequest(BaseModel):
     text: str
     input_type: str = "auto"  # auto | article | venue | review_letter
     search_depth: str = "none"  # none | light | deep
+    region: str = "auto"  # auto | ru | international | eu-fr | ...
 
 
 @app.post("/cases/{case_id}/intake/text")
@@ -256,7 +257,9 @@ def intake_text(req: IntakeTextRequest, case: Case = Depends(_user_case)):
                 ),
             },
         )
-    result = case.intake_text(req.text, req.input_type, req.search_depth)
+    result = case.intake_text(
+        req.text, req.input_type, req.search_depth, region=req.region,
+    )
     store.save(case)
     return result
 
@@ -272,6 +275,7 @@ async def intake_file(
     file: UploadFile = File(...),
     input_type: str = Form("auto"),
     search_depth: str = Form("none"),
+    region: str = Form("auto"),
     case: Case = Depends(_user_case),
 ):
 
@@ -319,7 +323,7 @@ async def intake_file(
                 },
             )
 
-        result = case.intake_text(text, input_type, search_depth)
+        result = case.intake_text(text, input_type, search_depth, region=region)
         result["filename"] = filename
         result["extraction_status"] = extraction_status
         store.save(case)
@@ -362,6 +366,21 @@ def get_article_model(case: Case = Depends(_user_case)):
     if not case.article_model:
         raise HTTPException(404, "Article model not built yet")
     return case.article_model.to_dict()
+
+
+@app.get("/cases/{case_id}/discipline-matches")
+def get_discipline_matches(case: Case = Depends(_user_case)):
+    """Phase B2: discipline matcher verdict produced during intake.
+    Returns 404 (not 200 with empty) when matcher hasn't run yet, so
+    the UI can show a "matcher pending" state distinctly from an
+    intentional "no matches found" state.
+    """
+    if not case.discipline_matches:
+        raise HTTPException(404, "Discipline matcher has not run yet")
+    return {
+        "region_hint": case.region_hint,
+        **case.discipline_matches,
+    }
 
 
 class ConfirmArticleRequest(BaseModel):

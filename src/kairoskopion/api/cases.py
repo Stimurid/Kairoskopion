@@ -110,6 +110,16 @@ class Case:
         self.decision_log: list[dict[str, Any]] = []
         self.quality_gates: dict[str, dict[str, Any]] = {}
 
+        # Phase B2: matched disciplines from the registry-driven matcher.
+        # Populated by DisciplineMatcherAgent in _build_article_model
+        # BEFORE semantic_profile so the profiler gets a narrowed
+        # known_disciplines_context instead of the implicit keyword
+        # pre-filter fallback.
+        self.discipline_matches: dict[str, Any] | None = None
+        # Operator hint: region of work — drives matcher slice.
+        # Pulled from intake_text(region=...) or defaults to "auto".
+        self.region_hint: str = "auto"
+
     # -- Stage tracking --
 
     def _objects_present(self) -> dict[str, bool]:
@@ -153,6 +163,10 @@ class Case:
             result["selected_venue_id"] = self.selected_venue.venue_model_id
         if self.fit_assessment:
             result["fit_label"] = self.fit_assessment.overall_label
+        if self.discipline_matches:
+            matched_count = len(self.discipline_matches.get("matched") or [])
+            result["discipline_matches_count"] = matched_count
+            result["region_hint"] = self.region_hint
         return result
 
     # -- Intake --
@@ -162,8 +176,11 @@ class Case:
         text: str,
         input_type: str = "auto",
         search_depth: str = "none",
+        region: str = "auto",
     ) -> dict[str, Any]:
         self.input_text = text
+        # Operator hint persists for downstream matcher runs in this case
+        self.region_hint = (region or "auto").strip() or "auto"
         # Cap the LLM-bound projection once per intake. The original full
         # text stays on self.input_text for deterministic processing and
         # persistence; only the prompt-facing copy is clipped.
@@ -322,16 +339,30 @@ class Case:
 
         self.stage = CaseStage.ARTICLE_MODEL
 
-        # Semantic profile: try LLM agent, fall back to deterministic
+        # Phase B2: route through DisciplineMatcherAgent BEFORE
+        # semantic_profile so the profiler sees registry-narrowed
+        # disciplines instead of falling back to keyword pre-filter
+        # implicitly. Honest fallback: if LLM unavailable, matcher
+        # still emits keyword candidates marked confidence=low.
+        self._run_discipline_matcher()
+
+        # Semantic profile: try LLM agent, fall back to deterministic.
+        # known_disciplines_context comes from the matcher output
+        # (registry-driven) so the profiler can position the article
+        # against ACTUAL discipline cards, not invented Anglo labels.
         provider = _get_llm_provider()
         if provider is not None:
             from ..agents.semantic_profiler import ArticleSemanticProfilerAgent
             from ..agents.contract import AgentInput as _AI
             sp_agent = ArticleSemanticProfilerAgent()
+            sp_entities: dict[str, Any] = {"article": self.article_model.to_dict()}
+            disc_ctx = self._build_matched_disciplines_context()
+            if disc_ctx:
+                sp_entities["known_disciplines_context"] = disc_ctx
             sp_inp = _AI(
                 operation_id="semantic_profile",
                 agent_role_id="article_semantic_profiler",
-                entities={"article": self.article_model.to_dict()},
+                entities=sp_entities,
             )
             try:
                 sp_out = sp_agent.execute(sp_inp, provider)
@@ -346,6 +377,101 @@ class Case:
             self.semantic_profile = build_article_semantic_profile(self.article_model)
 
         self._build_article_field_position()
+
+    def _run_discipline_matcher(self) -> None:
+        """Phase B2: run DisciplineMatcherAgent after article_model is
+        built. Saves result on ``self.discipline_matches`` for downstream
+        agents + UI inspection.
+
+        Honest fallback: matcher's own deterministic path returns
+        keyword candidates with confidence=low; we save them as-is so
+        the UI can show "no LLM available; here are keyword hints".
+        Never substitutes a fake LLM verdict.
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        if self.article_model is None:
+            return
+
+        try:
+            from ..agents.contract import AgentInput as _AI
+            from ..agents.discipline_matcher import DisciplineMatcherAgent
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("DisciplineMatcherAgent unavailable: %s", exc)
+            return
+
+        # Compact summary for the matcher (avoid shipping the whole
+        # article text; matcher needs intent, not corpus).
+        summary_parts: list[str] = []
+        for k in (
+            "title", "problem_statement", "object_of_inquiry",
+            "core_claims", "key_terms", "disciplinary_register_current",
+        ):
+            v = getattr(self.article_model, k, None)
+            if isinstance(v, list):
+                v = "; ".join(str(x) for x in v if x)
+            if v:
+                summary_parts.append(f"{k}: {v}")
+        summary = "\n".join(summary_parts)[:4000]
+
+        agent = DisciplineMatcherAgent()
+        inp = _AI(
+            operation_id="discipline_match",
+            agent_role_id="discipline_matcher",
+            raw_text=summary,
+            entities={
+                "article_summary": summary,
+                "region": self.region_hint or "auto",
+            },
+        )
+        provider = _get_llm_provider()
+        try:
+            if provider is not None:
+                out = agent.execute(inp, provider)
+            else:
+                out = agent.execute_deterministic(inp)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Discipline matcher crashed: %s", exc)
+            out = agent.execute_deterministic(inp)
+        if out and out.output_entity:
+            self.discipline_matches = out.output_entity
+            logger.info(
+                "Discipline matcher emitted %d matches (%s)",
+                len(out.output_entity.get("matched", [])),
+                out.confidence,
+            )
+
+    def _build_matched_disciplines_context(self) -> str | None:
+        """Build a compact block summarizing the matcher's verdict for
+        downstream prompts (semantic_profiler). Returns None when no
+        matches are available — the profiler then falls back to its
+        own implicit keyword pre-filter.
+        """
+        if not self.discipline_matches:
+            return None
+        matched = self.discipline_matches.get("matched") or []
+        if not matched:
+            return None
+        try:
+            from ..services.discipline_registry import load_default_registry
+            registry = load_default_registry()
+        except Exception:  # noqa: BLE001
+            registry = None
+        lines: list[str] = []
+        for m in matched[:6]:
+            did = m.get("discipline_id")
+            strength = m.get("strength", "unknown")
+            why = m.get("why", "")
+            card = registry.get(did) if registry else None
+            if card is not None:
+                lines.append(
+                    f"- [{strength}] {card.summary_for_context(500)} — {why}"
+                )
+            elif did:
+                lines.append(f"- [{strength}] {did} — {why}")
+        if not lines:
+            return None
+        return "\n".join(lines)
 
     def _build_article_field_position(self):
         """Run article_field_positioner. LLM if available, deterministic otherwise."""
@@ -1310,6 +1436,11 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
     if case.policy_blocked_changes:
         snap["policy_blocked_changes"] = case.policy_blocked_changes
 
+    if case.discipline_matches is not None:
+        snap["discipline_matches"] = case.discipline_matches
+    if case.region_hint and case.region_hint != "auto":
+        snap["region_hint"] = case.region_hint
+
     return snap
 
 
@@ -1365,6 +1496,13 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
     pbc = data.get("policy_blocked_changes")
     if isinstance(pbc, list):
         case.policy_blocked_changes = pbc
+
+    dm = data.get("discipline_matches")
+    if isinstance(dm, dict):
+        case.discipline_matches = dm
+    region = data.get("region_hint")
+    if isinstance(region, str) and region:
+        case.region_hint = region
 
     raw_pathways = data.get("pathways", [])
     for p in raw_pathways:
