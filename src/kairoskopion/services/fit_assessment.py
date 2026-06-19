@@ -7,11 +7,31 @@ Sprint 2: expanded from 8 to 12 axes:
   topic, discipline, genre, argument_structure, method, citation_ecology,
   novelty_positioning, language_register, audience, formal_compliance,
   author_eligibility, publication_regime.
+
+.. deprecated:: Phase B
+   ``_DISCIPLINE_KEYWORDS`` (13 buckets) and ``_ADJACENCY`` (hardcoded
+   discipline graph) are Anglo-biased lookups that conflict with the
+   disciplinary landscape registry. Retained as a temporary last
+   resort. Routing for the ``discipline`` fit axis should go through
+   ``DisciplineMatcherAgent``; the adjacency graph should come from
+   ``DisciplineRegistry.adjacent_of(...)``.
+
+   These tables will be removed once ``FitAssessorAgent`` consumes the
+   registry. Do NOT extend them.
 """
 
 from __future__ import annotations
 
 import re
+import warnings as _stdlib_warnings
+
+_stdlib_warnings.warn(
+    "services.fit_assessment._DISCIPLINE_KEYWORDS / _ADJACENCY are "
+    "deprecated; route discipline matching through "
+    "DisciplineMatcherAgent + DisciplineRegistry. See Phase B notes.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 from ..enums import (
     AssessmentLevel,

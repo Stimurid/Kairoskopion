@@ -34,6 +34,11 @@ htmlcov/
 *~
 
 data/
+# Canonical disciplinary-landscape data (schema + seed JSONL + CHANGELOG)
+# ships with the repo. Only the live (mutable) registry stays untracked.
+!data/disciplinary_landscape/
+!data/disciplinary_landscape/**
+data/disciplinary_landscape/registry/
 registry/
 vault/
 

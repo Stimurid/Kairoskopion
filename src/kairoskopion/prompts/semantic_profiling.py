@@ -78,6 +78,16 @@ Build a semantic profile for this article.
 ## Manuscript text (first 8000 chars, may be truncated)
 {manuscript_text}
 
+## Known disciplinary landscape (optional context)
+
+These are disciplines the registry already knows about. If the article \
+clearly belongs to one or more of them, prefer their canonical names \
+in ``disciplinary_registers`` and ``primary_discipline`` so downstream \
+matchers can find the venue space directly. If the article does NOT \
+fit any of them, ignore this block — do not force-fit.
+
+{known_disciplines_context}
+
 Return a JSON object with the full semantic profile.
 """
 

@@ -31,6 +31,35 @@ from .contract import AgentInput, AgentOutput, AgentRole
 logger = logging.getLogger(__name__)
 
 
+def _build_known_disciplines_context(article_dict: dict, text: str) -> str:
+    """Build a compact block of registry-known disciplines that look
+    plausibly relevant to this article, by keyword pre-filter.
+
+    Best-effort: returns a placeholder if the registry can't be loaded
+    (e.g. data dir missing in tests). NEVER raises — the semantic
+    profile should still run when the registry is unavailable.
+    """
+    try:
+        from ..services.discipline_registry import load_default_registry
+        registry = load_default_registry()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Discipline registry unavailable: %s", exc)
+        return "(registry unavailable)"
+    if len(registry) == 0:
+        return "(registry empty)"
+    # Build a lightweight haystack from the article fields + first
+    # slice of text — enough for the keyword pre-filter, not enough to
+    # blow the prompt budget.
+    article_blob = " ".join(
+        str(v) for v in article_dict.values() if isinstance(v, (str, list))
+    )
+    haystack = (article_blob + " " + (text[:2000] if text else ""))[:6000]
+    candidates = registry.candidates_keyword(haystack, region="auto", limit=15)
+    if not candidates:
+        return "(no registry candidates surfaced by keyword pre-filter)"
+    return "\n".join(f"- {d.summary_for_context(600)}" for d in candidates)
+
+
 class ArticleSemanticProfilerAgent(AgentRole):
     role_id = "article_semantic_profiler"
 
@@ -38,10 +67,19 @@ class ArticleSemanticProfilerAgent(AgentRole):
         article_dict = inp.entities.get("article", {})
         text = inp.raw_text or ""
 
+        # Phase B: pull discipline candidates from the registry to feed
+        # the LLM as soft context. Caller may inject a pre-narrowed
+        # block; otherwise we build one here from the article fields.
+        known_disciplines_context = (
+            inp.entities.get("known_disciplines_context")
+            or _build_known_disciplines_context(article_dict, text)
+        )
+
         family = SEMANTIC_PROFILING_FAMILY
         user_prompt = family["user_prompt_template"].format(
             article_json=json.dumps(article_dict, ensure_ascii=False, indent=2),
             manuscript_text=text[:8000] if text else "(no raw text available)",
+            known_disciplines_context=known_disciplines_context,
         )
         messages = [
             {"role": "system", "content": family["system_prompt"]},

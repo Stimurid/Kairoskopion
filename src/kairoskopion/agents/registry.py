@@ -16,6 +16,26 @@ if TYPE_CHECKING:
 _SPECS: list[AgentSpec] = [
     # --- Control layer ---
     AgentSpec(
+        role_id="discipline_matcher",
+        display_name="Discipline Matcher",
+        layer="article",
+        implementation_status="operational_now",
+        execution_mode="llm_optional",
+        prompt_family_ids=["discipline_matching"],
+        input_contract={
+            "entities.article_summary": "str — concise summary of article",
+            "entities.region": "ru|international|... — registry slice",
+        },
+        output_contract={
+            "DisciplineMatch": (
+                "matched (≤4 ids + strength + why) + "
+                "new_candidate (or null) + confidence + reasoning"
+            ),
+        },
+        mvp_phase="v0.2",
+        first_workflows=["uc1_draft_to_venue_pool_positioning"],
+    ),
+    AgentSpec(
         role_id="input_classifier",
         display_name="Input Classifier",
         layer="control",
@@ -425,6 +445,7 @@ def _build_agent_class_map() -> dict[str, type]:
     """Lazy import to avoid circular deps — maps role_id to AgentRole subclass."""
     from .article_field_positioner import ArticleFieldPositionerAgent
     from .article_modeler import ArticleModelerAgent
+    from .discipline_matcher import DisciplineMatcherAgent
     from .input_classifier import InputClassifierAgent
     from .semantic_profiler import ArticleSemanticProfilerAgent
     from .disciplinary_mapper import DisciplinaryPathwayMapperAgent
@@ -453,6 +474,7 @@ def _build_agent_class_map() -> dict[str, type]:
     from .evidence import EvidenceAuditorAgent, ReferenceVerifierAgent
 
     return {
+        "discipline_matcher": DisciplineMatcherAgent,
         "input_classifier": InputClassifierAgent,
         "intent_classifier": IntentClassifierAgent,
         "scenario_prober": ScenarioProberAgent,

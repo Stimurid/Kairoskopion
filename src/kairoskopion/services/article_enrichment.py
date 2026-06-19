@@ -5,14 +5,35 @@ registers, schools/traditions, argument structure, and protected core
 candidates from the article's existing fields.
 
 MVP: keyword-based heuristics. LLM enrichment would improve quality.
+
+.. deprecated:: Phase B
+   The keyword tables ``_DISCIPLINE_KEYWORDS`` and ``_SCHOOL_KEYWORDS``
+   are Anglo-biased hardcoded lookups that conflict with the
+   disciplinary landscape registry. They are retained as a temporary
+   last-resort fallback ONLY (no LLM provider AND no registry hit).
+
+   New work routes through ``DisciplineMatcherAgent`` →
+   ``services.discipline_registry.DisciplineRegistry``. When all
+   downstream agents (semantic_profiler, fit_assessor,
+   venue_candidate_screening) are on the registry, these tables will
+   be removed. Do NOT extend them.
 """
 
 from __future__ import annotations
 
 import re
+import warnings as _stdlib_warnings
 from typing import Any
 
 from ..schema import ArticleModel, ArticleSemanticProfile
+
+_stdlib_warnings.warn(
+    "services.article_enrichment._DISCIPLINE_KEYWORDS / _SCHOOL_KEYWORDS "
+    "are deprecated; route discipline matching through "
+    "DisciplineMatcherAgent + DisciplineRegistry. See Phase B notes.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 _DISCIPLINE_KEYWORDS: dict[str, list[str]] = {

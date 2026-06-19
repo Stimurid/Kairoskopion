@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kairoskopion://schema/discipline_model_v1",
+  "title": "DisciplineModel",
+  "description": "Working-tool description of an academic discipline for Kairoskopion's disciplinary landscape registry. NOT an encyclopedia entry — fields are chosen so downstream agents (semantic_profiler, fit_assessor, venue_candidate_screening) can decide which objects, methods, questions, evidence, and genres this discipline legitimately admits.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Schema version that produced this record. Bump on additive change; document under data/disciplinary_landscape/schema/CHANGELOG.md."
+    },
+    "model_version": {
+      "type": "string",
+      "description": "Semver of this particular discipline card. Bumps when content (not schema) is revised."
+    },
+
+    "discipline_id": {
+      "type": "string",
+      "description": "Stable id, kebab-case, namespaced by region/source: ru-vak-5.7.8, eu-erc-sh4-philosophy, intl-oecd-ford-6.3, etc.",
+      "pattern": "^[a-z0-9]+(-[a-z0-9.]+)*$"
+    },
+    "display_names": {
+      "type": "object",
+      "description": "Localized names. At least one of ru / en must be present.",
+      "properties": {
+        "ru": {"type": "string"},
+        "en": {"type": "string"}
+      },
+      "additionalProperties": {"type": "string"}
+    },
+    "region": {
+      "type": "string",
+      "enum": ["ru", "international", "eu-fr", "eu-de", "en-us", "en-uk", "other"],
+      "description": "Where this discipline lives institutionally. 'international' is for disciplines that have no single national home."
+    },
+    "aliases": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Alternative names, mis-spellings, near-synonyms, historical names. Used by the matcher for fuzzy candidate selection."
+    },
+
+    "source_status": {
+      "type": "string",
+      "enum": ["llm_draft", "needs_review", "user_confirmed", "auto_enriched", "disputed", "merged", "deprecated", "rejected", "candidate"],
+      "description": "Lifecycle status. New cards are llm_draft. Cards proposed by semantic_profiler on a real case are 'candidate'. Curator promotes to user_confirmed. See operating-loop notes."
+    },
+    "curator_notes": {
+      "type": ["string", "null"],
+      "description": "Free-form notes by the human curator. Null until reviewed."
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_type": {"type": "string", "enum": ["vak_passport", "erc_descriptor", "oecd_ford", "isced_f", "acm_ccs", "eric", "phil_papers", "apa", "case_observation", "llm_pretraining", "other"]},
+          "source_id": {"type": "string", "description": "Stable id within the source (e.g. ВАК '5.7.8', ERC 'SH4.11', OECD FORD '6.3.1')."},
+          "source_url": {"type": ["string", "null"]},
+          "retrieved_at": {"type": ["string", "null"], "format": "date"},
+          "excerpt": {"type": ["string", "null"], "description": "Short verbatim excerpt the LLM read from this source."}
+        },
+        "required": ["source_type"],
+        "additionalProperties": false
+      }
+    },
+    "confidence_by_section": {
+      "type": "object",
+      "description": "Per-field confidence in {paradigm, objects, methods, key_authors, history, ...}. Values: high / medium / low / null.",
+      "additionalProperties": {
+        "type": ["string", "null"],
+        "enum": ["high", "medium", "low", null]
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Fields the seeder/curator could not determine. Surfaces to UI."
+    },
+    "disputed_fields": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Fields where sources disagree. Surfaces to UI as a 'needs review' badge."
+    },
+
+    "paradigm": {
+      "type": ["string", "null"],
+      "description": "One paragraph: how this discipline frames its world. NOT a textbook definition — what makes it recognizable as itself."
+    },
+    "epistemic_regime": {
+      "type": ["string", "null"],
+      "description": "How this discipline KNOWS. What counts as a valid epistemic operation here? (e.g. 'phenomenological description of lived experience as primary evidence'; 'statistical inference from controlled experiments'; 'genealogical reconstruction of concepts')."
+    },
+    "forms_of_evidence": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "What counts as proof in this discipline. Examples: 'first-person phenomenological reports', 'historical archive', 'controlled-experiment p-values', 'conceptual analysis showing logical entailment', 'ethnographic field notes', 'corpus-based frequency data'."
+    },
+    "canonical_questions": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Questions this discipline knows how to FORMULATE (regardless of whether it answers them). A discipline is defined by the questions it accepts as legitimate."
+    },
+    "typical_problem_forms": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Shapes a research problem takes here: 'tension between X and Y', 'apparent paradox of Z', 'inadequacy of current concept of W', 'mismatch between theory and practice in V'."
+    },
+    "legitimate_objects": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Objects this discipline legitimately studies. Examples for philosophy of technology: 'technical artifact', 'mediation of action', 'sociotechnical assemblage', 'technical mentality'."
+    },
+    "illegitimate_or_borderline_objects": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Objects this discipline does NOT legitimately study OR borderline cases that mark its edges. Critical for fit assessment — knowing what does NOT fit is as important as what does."
+    },
+    "argument_styles": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Modes of argumentation accepted as proper here: 'conceptual analysis', 'transcendental argument', 'genealogical critique', 'comparative case study', 'thought experiment', 'phenomenological description', 'formal proof', 'statistical inference'."
+    },
+    "publication_genres": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Genres this discipline actually publishes in: 'theoretical essay', 'empirical study with IMRAD', 'philosophical commentary', 'systematic review', 'book chapter', 'critical edition', 'review essay'."
+    },
+    "institutional_forms": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Where this discipline lives institutionally: 'philosophy departments', 'STS programs', 'педагогические институты', 'institutes of psychology', 'iSchools', 'AHRC-funded research centres'."
+    },
+    "russian_specificity": {
+      "type": ["string", "null"],
+      "description": "Russian-tradition specifics — divergences from international namesakes, native authors who define the field, unique objects/methods. Null when irrelevant (international-only discipline)."
+    },
+    "international_mapping": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "discipline_ids of equivalent / overlapping disciplines in other regions. Critical for cross-region search and venue fit."
+    },
+
+    "methods": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Concrete research methods practiced here. Subset of forms_of_evidence operationalized as procedures."
+    },
+    "instruments": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Specific intellectual instruments: 'concept analysis', 'reflective equilibrium', 'phenomenological reduction', 'discourse analysis software', 'fMRI', 'corpus tools'."
+    },
+    "ontologies": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Core concepts the discipline operates with as primitive entities: 'Dasein', 'Lebenswelt', 'mediation', 'assemblage', 'habitus', 'paradigm'."
+    },
+    "key_authors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "role": {"type": "string", "enum": ["founder", "classic", "contemporary", "boundary_setter", "critic"]},
+          "era": {"type": ["string", "null"]},
+          "discipline_relevance": {"type": ["string", "null"], "description": "One line: why this author matters here specifically."}
+        },
+        "required": ["name", "role"],
+        "additionalProperties": false
+      }
+    },
+    "history": {
+      "type": ["string", "null"],
+      "description": "When the discipline emerged, what it split from, what split from it. Not a Wikipedia summary — the structural shifts."
+    },
+    "boundaries": {
+      "type": ["string", "null"],
+      "description": "What this discipline is OFTEN confused with and the criterion that distinguishes them. Examples: 'Not to be confused with cultural anthropology (empirical) — philosophical anthropology is a priori reflection on the human as such'."
+    },
+    "adjacent": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "discipline_ids of neighbouring disciplines (in this or other regions). Different from international_mapping — these are NEIGHBOURS, not equivalents."
+    },
+    "typical_venues": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "venue_ids from Kairoskopion's venue registry, when known. Empty until venue registry has matching entries."
+    },
+
+    "first_seen_in_case": {
+      "type": ["string", "null"],
+      "description": "case_id where this discipline first surfaced (for 'candidate' records proposed by semantic_profiler)."
+    },
+    "times_seen": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How many cases have invoked this discipline. Drives ordering/priority for the matcher."
+    },
+    "last_updated": {"type": "string", "format": "date"},
+    "last_enriched": {"type": ["string", "null"], "format": "date"}
+  },
+  "required": [
+    "schema_version",
+    "model_version",
+    "discipline_id",
+    "display_names",
+    "region",
+    "source_status",
+    "last_updated"
+  ],
+  "additionalProperties": false
+}
