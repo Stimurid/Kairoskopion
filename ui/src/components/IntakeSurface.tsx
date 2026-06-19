@@ -32,8 +32,8 @@ const LLM_SOFT_CAP = 150_000;
 const INTAKE_HARD_CAP = 400_000;
 
 interface Props {
-  onSubmit: (text: string, inputType: string, searchDepth: string) => Promise<IntakeResult | void>;
-  onFileSubmit?: (file: File, inputType: string, searchDepth: string) => Promise<IntakeResult | void>;
+  onSubmit: (text: string, inputType: string, searchDepth: string, region: string) => Promise<IntakeResult | void>;
+  onFileSubmit?: (file: File, inputType: string, searchDepth: string, region: string) => Promise<IntakeResult | void>;
   isLoading: boolean;
 }
 
@@ -63,10 +63,26 @@ const SEARCH_DEPTH_LABELS: Record<string, { label: string; desc: string }> = {
   deep: { label: 'Deep search', desc: 'Multiple rounds, verification' },
 };
 
+const REGION_LABELS: Record<string, { label: string; desc: string }> = {
+  auto: {
+    label: 'Auto',
+    desc: 'Определить по языку текста',
+  },
+  ru: {
+    label: 'RU',
+    desc: 'Российская академическая зона — ВАК, ИФРАН, СМД, русскоязычные дисциплины',
+  },
+  international: {
+    label: 'International',
+    desc: 'OECD FORD, ERC, ISCED-F — англоязычная международная зона',
+  },
+};
+
 export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
   const [text, setText] = useState('');
   const [inputType, setInputType] = useState('auto');
   const [searchDepth, setSearchDepth] = useState('none');
+  const [region, setRegion] = useState('auto');
   const [lastResult, setLastResult] = useState<IntakeResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -75,14 +91,14 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
   const handleSubmit = async () => {
     if (selectedFile && onFileSubmit) {
       setLastResult(null);
-      const result = await onFileSubmit(selectedFile, inputType, searchDepth);
+      const result = await onFileSubmit(selectedFile, inputType, searchDepth, region);
       if (result) setLastResult(result);
       setSelectedFile(null);
       return;
     }
     if (!text.trim()) return;
     setLastResult(null);
-    const result = await onSubmit(text.trim(), inputType, searchDepth);
+    const result = await onSubmit(text.trim(), inputType, searchDepth, region);
     if (result) setLastResult(result);
   };
 
@@ -144,6 +160,22 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
             title={SEARCH_DEPTH_LABELS[d].desc}
           >
             {SEARCH_DEPTH_LABELS[d].label}
+          </button>
+        ))}
+      </div>
+
+      <div className="intake-region-selector" role="radiogroup" aria-label="Регион академической работы">
+        <span className="intake-search-label">Регион:</span>
+        {(['auto', 'ru', 'international'] as const).map((r) => (
+          <button
+            key={r}
+            className={`search-chip ${region === r ? 'search-chip--active' : ''}`}
+            onClick={() => setRegion(r)}
+            role="radio"
+            aria-checked={region === r}
+            title={REGION_LABELS[r].desc}
+          >
+            {REGION_LABELS[r].label}
           </button>
         ))}
       </div>

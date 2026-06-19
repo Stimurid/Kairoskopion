@@ -114,16 +114,17 @@ export const api = {
   deleteCase: (id: string) => del<{ deleted: string }>(`/cases/${id}`),
 
   // Intake
-  intakeText: (id: string, text: string, inputType = 'auto', searchDepth = 'none') =>
+  intakeText: (id: string, text: string, inputType = 'auto', searchDepth = 'none', region = 'auto') =>
     post<{ input_type: string; text_length: number; article_model_built: boolean; venue_investigated: boolean; stage: string; enrichment?: { status: string; fields_updated?: string[]; unknowns_resolved?: string[] } }>(
       `/cases/${id}/intake/text`,
-      { text, input_type: inputType, search_depth: searchDepth },
+      { text, input_type: inputType, search_depth: searchDepth, region },
     ),
 
-  intakeFile: async (id: string, file: File, inputType = 'auto') => {
+  intakeFile: async (id: string, file: File, inputType = 'auto', region = 'auto') => {
     const form = new FormData();
     form.append('file', file);
     form.append('input_type', inputType);
+    form.append('region', region);
     // Use fetch directly (FormData), but inject the Bearer header so
     // user-scoped upload reaches the right workspace.
     const tok = getToken();
@@ -153,6 +154,16 @@ export const api = {
     post<VenueInvestigationResult>(`/cases/${id}/investigate-venue`, { text }),
   getInvestigatedVenue: (id: string) =>
     get<VenueInvestigationResult>(`/cases/${id}/investigated-venue`),
+
+  // Disciplines (Phase B2)
+  getDisciplineMatches: (id: string) =>
+    get<{
+      region_hint: string;
+      matched: { discipline_id: string; strength: string; why: string }[];
+      new_candidate: { display_name: string; reason: string } | null;
+      confidence: 'high' | 'medium' | 'low';
+      reasoning: string;
+    }>(`/cases/${id}/discipline-matches`),
 
   // Article
   getArticleModel: (id: string) => get<ArticleModel>(`/cases/${id}/article-model`),
