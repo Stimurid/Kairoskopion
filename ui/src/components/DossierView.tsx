@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
-import type { Dossier } from '../types/domain';
+import type {
+  Dossier,
+  CitationPlanV2D,
+  ComplianceChecklistV2D,
+  ComplianceItemV2D,
+  SubmissionPackV2D,
+} from '../types/domain';
 import { api } from '../api/client';
 import { DecisionLog } from './DecisionLog';
 
@@ -479,35 +485,44 @@ export function DossierView({ caseId }: Props) {
             </SectionCard>
           )}
 
-          {/* V2-C: honest placeholders for follow-on chain outputs */}
-          {!dossier.citation_plan && (
+          {/* V2-D: real CitationPlan when built, V2-C placeholder otherwise */}
+          {dossier.citation_plan ? (
+            <SectionCard title={`Citation plan — статус: ${dossier.citation_plan.status}`}>
+              <CitationPlanSection plan={dossier.citation_plan} />
+            </SectionCard>
+          ) : (
             <SectionCard title="Citation plan">
               <p className="placeholder-note">
                 <strong>Citation plan not built yet</strong> для этого case.
-                Citation gaps по площадке частично отражены в FitAssessment
-                (ось <code>citation_ecology</code>) и RewritePlan. Полноценный
-                CitationPlan строится отдельным проходом с BibliographyProfile.
+                Будет построен автоматически после fit chain.
               </p>
             </SectionCard>
           )}
-          {!dossier.compliance_checklist && (
+
+          {dossier.compliance_checklist ? (
+            <SectionCard
+              title={`Compliance checklist — статус: ${dossier.compliance_checklist.status}`}
+            >
+              <ComplianceChecklistSection checklist={dossier.compliance_checklist} />
+            </SectionCard>
+          ) : (
             <SectionCard title="Compliance checklist">
               <p className="placeholder-note">
                 <strong>Compliance checklist not built yet</strong> для этого case.
-                Формальные риски подачи (AI disclosure, data availability, ethics,
-                conflict of interest и т.д.) частично отражены в RiskReport
-                выше. Venue-specific compliance lane — отдельный проход.
               </p>
             </SectionCard>
           )}
-          {!dossier.submission_pack && (
+
+          {dossier.submission_pack ? (
+            <SectionCard
+              title={`Submission pack readiness — ${dossier.submission_pack.ready_status}`}
+            >
+              <SubmissionPackSection pack={dossier.submission_pack} />
+            </SectionCard>
+          ) : (
             <SectionCard title="Submission pack">
               <p className="placeholder-note">
                 <strong>Submission pack not built yet</strong> для этого case.
-                Этот dossier — pre-submission assessment: статья × площадка ×
-                сценарий → fit + mismatch + risk + rewrite. SubmissionPack
-                (cover letter, statements, ready-to-submit gate) — отдельная
-                фаза после принятия RewritePlan.
               </p>
             </SectionCard>
           )}
@@ -581,11 +596,44 @@ function NextActionBlock({ dossier }: { dossier: Dossier }) {
     status: (dossier.rewrite_plan && dossier.rewrite_plan.changes.length > 0)
       ? 'done' : 'pending',
   });
+  // V2-D real lanes
+  steps.push({
+    label: 'Citation plan',
+    status: (dossier.citation_plan
+      && ['partially_ready', 'search_tasks_ready', 'draft'].includes(dossier.citation_plan.status))
+      ? 'done' : 'pending',
+    note: dossier.citation_plan?.status === 'needs_bibliography'
+      ? 'нужна распарсенная библиография'
+      : dossier.citation_plan?.status === 'needs_venue_corpus'
+      ? 'нужен корпус площадки'
+      : dossier.citation_plan?.status === 'blocked_missing_evidence'
+      ? 'нет ни библиографии, ни текста площадки'
+      : undefined,
+  });
+  steps.push({
+    label: 'Compliance checklist',
+    status: dossier.compliance_checklist?.status === 'ready' ? 'done' : 'pending',
+    note: dossier.compliance_checklist
+      ? `статус ${dossier.compliance_checklist.status} (${dossier.compliance_checklist.missing_items.length} missing, ${dossier.compliance_checklist.unknowns.length} unknown)`
+      : undefined,
+  });
+  steps.push({
+    label: 'Submission pack readiness',
+    status: dossier.submission_pack?.ready_status === 'ready_for_manual_submission'
+      ? 'done' : 'pending',
+    note: dossier.submission_pack
+      ? `ready_status: ${dossier.submission_pack.ready_status}`
+      : undefined,
+  });
 
-  // First pending step is the recommended next action.
+  // V2-D: prefer SubmissionPack.next_actions when present.
+  const packNext = dossier.submission_pack?.next_actions || [];
   const firstPending = steps.find(s => s.status === 'pending');
+
   let primary: string;
-  if (!firstPending) {
+  if (packNext.length > 0 && firstPending) {
+    primary = packNext[0];
+  } else if (!firstPending) {
     primary = 'Все основные секции построены. Откройте Risk и Rewrite plan и решите, какие изменения принять.';
   } else if (firstPending.label === 'Scenario provided') {
     primary = 'Заполните SubmissionScenario (цель, дедлайн, риск-толерантность, APC max) — это уточнит fit-вердикт.';
@@ -607,6 +655,226 @@ function NextActionBlock({ dossier }: { dossier: Dossier }) {
           </li>
         ))}
       </ul>
+      {packNext.length > 1 && (
+        <details className="next-action-pack-details">
+          <summary>Все next actions из SubmissionPack ({packNext.length})</summary>
+          <ol className="next-action-pack-list">
+            {packNext.map((a, i) => <li key={i}>{a}</li>)}
+          </ol>
+        </details>
+      )}
+    </div>
+  );
+}
+
+
+function CitationPlanSection({ plan }: { plan: CitationPlanV2D }) {
+  return (
+    <div className="lane-section">
+      <div className="lane-head">
+        <span className={`lane-status-badge lane-status--${plan.status}`}>
+          {plan.status}
+        </span>
+        {plan.confidence && (
+          <span className={`lane-conf lane-conf--${plan.confidence}`}>
+            confidence: {plan.confidence}
+          </span>
+        )}
+        {plan.created_from && plan.created_from.length > 0 && (
+          <span className="lane-created-from">
+            built from: {plan.created_from.join(', ')}
+          </span>
+        )}
+      </div>
+      <KVRow label="Bibliography status" value={plan.current_bibliography_status} />
+      <KVRow label="Venue citation expectation" value={plan.venue_citation_expectation_status} />
+
+      {plan.citation_gap_categories.length > 0 && (
+        <div className="lane-list-block">
+          <strong>Citation gap categories ({plan.citation_gap_categories.length}):</strong>
+          <ul>
+            {plan.citation_gap_categories.map((g, i) => <li key={i}>{g}</li>)}
+          </ul>
+        </div>
+      )}
+      {plan.missing_bridge_categories.length > 0 && (
+        <div className="lane-list-block">
+          <strong>Missing bridge categories ({plan.missing_bridge_categories.length}):</strong>
+          <ul>
+            {plan.missing_bridge_categories.map((g, i) => <li key={i}>{g}</li>)}
+          </ul>
+        </div>
+      )}
+      {plan.recommended_reference_search_tasks.length > 0 && (
+        <div className="lane-list-block">
+          <strong>Search tasks ({plan.recommended_reference_search_tasks.length}):</strong>
+          <ul>
+            {plan.recommended_reference_search_tasks.map((t, i) => <li key={i}>{t}</li>)}
+          </ul>
+        </div>
+      )}
+      {plan.verification_tasks.length > 0 && (
+        <div className="lane-list-block">
+          <strong>Verification tasks ({plan.verification_tasks.length}):</strong>
+          <ul>
+            {plan.verification_tasks.map((t, i) => <li key={i}>{t}</li>)}
+          </ul>
+        </div>
+      )}
+      {plan.dangerous_padding_warnings.length > 0 && (
+        <div className="lane-warning-block" role="alert">
+          <strong>⚠ Padding warning:</strong>
+          <ul>
+            {plan.dangerous_padding_warnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      )}
+      {plan.unknowns.length > 0 && (
+        <div className="lane-unknowns">
+          <strong>Unknowns ({plan.unknowns.length}):</strong>
+          <ul>
+            {plan.unknowns.map((u, i) => <li key={i}>{u}</li>)}
+          </ul>
+        </div>
+      )}
+      <p className="lane-disclaimer">
+        <em>
+          CitationPlan не предлагает конкретные ссылки — это карта работ.
+          Конкретные источники должен подобрать автор; см. dangerous_padding_warnings.
+        </em>
+      </p>
+    </div>
+  );
+}
+
+
+function ComplianceChecklistSection({ checklist }: { checklist: ComplianceChecklistV2D }) {
+  // Group items by category
+  const byCategory: Record<string, ComplianceItemV2D[]> = {};
+  for (const it of checklist.checklist_items) {
+    (byCategory[it.category] ||= []).push(it);
+  }
+  return (
+    <div className="lane-section">
+      <div className="lane-head">
+        <span className={`lane-status-badge lane-status--${checklist.status}`}>
+          {checklist.status}
+        </span>
+        {checklist.confidence && (
+          <span className={`lane-conf lane-conf--${checklist.confidence}`}>
+            confidence: {checklist.confidence}
+          </span>
+        )}
+        <span className="lane-counter">
+          {checklist.checklist_items.length} items ·
+          {' '}{checklist.missing_items.length} missing ·
+          {' '}{checklist.unknowns.length} unknown
+        </span>
+      </div>
+      {checklist.blocking_items.length > 0 && (
+        <div className="lane-warning-block" role="alert">
+          <strong>Blocking items:</strong>
+          <ul>{checklist.blocking_items.map((b, i) => <li key={i}>{b}</li>)}</ul>
+        </div>
+      )}
+      <div className="compliance-items">
+        {Object.entries(byCategory).map(([cat, items]) => (
+          <div key={cat} className="compliance-category">
+            <div className="compliance-category-head">
+              <code>{cat}</code>
+            </div>
+            {items.map(it => (
+              <div key={it.item_id} className={`compliance-item compliance-item--${it.status}`}>
+                <div className="compliance-item-head">
+                  <span className={`compliance-status-badge compliance-status--${it.status}`}>
+                    {it.status}
+                  </span>
+                  <span className="compliance-item-req">{it.requirement}</span>
+                  {it.source_status && (
+                    <span className="compliance-source">src: {it.source_status}</span>
+                  )}
+                </div>
+                {it.notes && <p className="compliance-item-notes">{it.notes}</p>}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      {checklist.warnings.length > 0 && (
+        <div className="lane-list-block">
+          <strong>Warnings:</strong>
+          <ul>{checklist.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
+        </div>
+      )}
+      {checklist.unknowns.length > 0 && (
+        <div className="lane-unknowns">
+          <strong>Unknowns ({checklist.unknowns.length}):</strong>
+          <ul>{checklist.unknowns.map((u, i) => <li key={i}>{u}</li>)}</ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function SubmissionPackSection({ pack }: { pack: SubmissionPackV2D }) {
+  return (
+    <div className="lane-section">
+      <div className="lane-head">
+        <span className={`lane-status-badge lane-status--${pack.status}`}>
+          {pack.status}
+        </span>
+        <span className={`pack-ready-badge pack-ready--${pack.ready_status}`}>
+          ready: {pack.ready_status}
+        </span>
+        {pack.depends_on.length > 0 && (
+          <span className="lane-created-from">
+            depends on: {pack.depends_on.join(', ')}
+          </span>
+        )}
+      </div>
+      <p className="lane-disclaimer">
+        <em>
+          ⚠ This is a readiness skeleton, not final submission automation.
+          No portal-specific fields, no auto-generated cover letter.
+        </em>
+      </p>
+      {pack.blocking_issues.length > 0 && (
+        <div className="lane-warning-block" role="alert">
+          <strong>Blocking issues ({pack.blocking_issues.length}):</strong>
+          <ul>{pack.blocking_issues.map((b, i) => <li key={i}>{b}</li>)}</ul>
+        </div>
+      )}
+      {pack.missing_items.length > 0 && (
+        <div className="lane-list-block">
+          <strong>Missing items ({pack.missing_items.length}):</strong>
+          <ul>{pack.missing_items.map((m, i) => <li key={i}>{m}</li>)}</ul>
+        </div>
+      )}
+      {pack.warnings.length > 0 && (
+        <div className="lane-list-block">
+          <strong>Warnings ({pack.warnings.length}):</strong>
+          <ul>{pack.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
+        </div>
+      )}
+      {pack.next_actions.length > 0 && (
+        <div className="lane-list-block">
+          <strong>Next actions ({pack.next_actions.length}):</strong>
+          <ol>{pack.next_actions.map((a, i) => <li key={i}>{a}</li>)}</ol>
+        </div>
+      )}
+      {pack.statements.length > 0 && (
+        <div className="lane-list-block">
+          <strong>Statements (operator-prepared):</strong>
+          <ul>{pack.statements.map((s, i) => <li key={i}>{s}</li>)}</ul>
+        </div>
+      )}
+      {pack.unknowns.length > 0 && (
+        <div className="lane-unknowns">
+          <strong>Unknowns ({pack.unknowns.length}):</strong>
+          <ul>{pack.unknowns.map((u, i) => <li key={i}>{u}</li>)}</ul>
+        </div>
+      )}
     </div>
   );
 }

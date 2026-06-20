@@ -399,12 +399,94 @@ export interface Dossier {
   mismatch_map?: MismatchMap;
   rewrite_plan?: RewritePlan;
   risk_report?: RiskReport;
-  // V2-C: optional follow-on chain outputs. Backend does not yet
-  // populate these for the prod fit chain; UI must render an honest
-  // "not built yet" placeholder rather than silently omit them.
-  citation_plan?: unknown | null;
-  compliance_checklist?: unknown | null;
-  submission_pack?: unknown | null;
+  // V2-D minimal-real lanes. When absent → V2-C placeholders render.
+  citation_plan?: CitationPlanV2D | null;
+  compliance_checklist?: ComplianceChecklistV2D | null;
+  submission_pack?: SubmissionPackV2D | null;
   decision_log: DecisionLogEntry[];
   quality_gates: Record<string, QualityGateResult>;
+}
+
+// V2-D minimal-real CitationPlan. Builder:
+// services/citation_plan_minimal.py. No invented references.
+export interface CitationPlanV2D {
+  citation_plan_id: string;
+  article_model_id?: string | null;
+  venue_model_id?: string | null;
+  fit_assessment_id?: string | null;
+  status:
+    | 'not_built' | 'draft' | 'needs_bibliography' | 'needs_venue_corpus'
+    | 'search_tasks_ready' | 'partially_ready' | 'blocked_missing_evidence'
+    | string;
+  current_bibliography_status?: string | null;
+  venue_citation_expectation_status?: string | null;
+  citation_gap_categories: string[];
+  missing_bridge_categories: string[];
+  recommended_reference_search_tasks: string[];
+  verification_tasks: string[];
+  dangerous_padding_warnings: string[];
+  risk_flags: string[];
+  unknowns: string[];
+  created_from: string[];
+  confidence?: string | null;
+}
+
+// V2-D minimal-real ComplianceChecklist.
+export interface ComplianceItemV2D {
+  item_id: string;
+  category: string;
+  requirement: string;
+  status:
+    | 'satisfied' | 'missing' | 'needs_user_input'
+    | 'unknown_not_verified' | 'not_applicable' | 'warning' | 'blocked'
+    | string;
+  source_status?: string;
+  evidence_refs?: string[];
+  user_action_needed?: boolean;
+  notes?: string;
+}
+
+export interface ComplianceChecklistV2D {
+  compliance_checklist_id: string;
+  article_model_id?: string | null;
+  venue_model_id?: string | null;
+  submission_scenario_id?: string | null;
+  status:
+    | 'not_built' | 'draft' | 'partial' | 'ready' | 'blocked' | string;
+  checklist_items: ComplianceItemV2D[];
+  missing_items: string[];
+  blocking_items: string[];
+  warnings: string[];
+  unknowns: string[];
+  created_from: string[];
+  confidence?: string | null;
+}
+
+// V2-D minimal-real SubmissionPack readiness skeleton.
+export interface SubmissionPackV2D {
+  submission_pack_id: string;
+  article_model_id?: string | null;
+  venue_model_id?: string | null;
+  submission_scenario_id?: string | null;
+  compliance_checklist_id?: string | null;
+  citation_plan_id?: string | null;
+  status:
+    | 'not_built' | 'draft' | 'partial' | 'ready_skeleton' | 'blocked'
+    | string;
+  ready_status:
+    | 'not_ready' | 'needs_user_input' | 'needs_file_update'
+    | 'needs_reference_verification' | 'needs_compliance_check'
+    | 'ready_for_manual_submission' | 'blocked_missing_evidence'
+    | string;
+  files: string[];
+  statements: string[];
+  cover_letter?: string | null;
+  metadata?: Record<string, unknown>;
+  missing_items: string[];
+  blocking_issues: string[];
+  warnings: string[];
+  next_actions: string[];
+  depends_on: string[];
+  created_from: string[];
+  unknowns: string[];
 }

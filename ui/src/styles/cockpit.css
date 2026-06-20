@@ -1102,6 +1102,91 @@ body {
 .next-action-step--pending .next-action-marker { color: #f0b429; }
 .next-action-marker { font-family: var(--font-mono, ui-monospace, monospace); }
 .next-action-note { color: var(--text-muted); font-size: 12px; }
+.next-action-pack-details { margin-top: 10px; font-size: var(--font-size-sm); }
+.next-action-pack-list { margin: 4px 0 0 18px; padding: 0; }
+
+/* V2-D minimal-real lane sections (Citation/Compliance/SubmissionPack) */
+.lane-section { font-size: var(--font-size-sm); }
+.lane-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.lane-status-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-family: var(--font-mono, ui-monospace, monospace);
+  background: rgba(160, 180, 230, 0.18); color: var(--text-primary);
+}
+.lane-status--ready, .lane-status--ready_skeleton, .lane-status--search_tasks_ready {
+  background: rgba(120, 220, 140, 0.22);
+}
+.lane-status--blocked, .lane-status--blocked_missing_evidence {
+  background: rgba(231, 76, 60, 0.22);
+}
+.lane-status--partial, .lane-status--partially_ready, .lane-status--draft {
+  background: rgba(240, 180, 41, 0.18);
+}
+.lane-status--needs_bibliography, .lane-status--needs_venue_corpus,
+.lane-status--needs_user_input, .lane-status--needs_file_update,
+.lane-status--needs_reference_verification, .lane-status--needs_compliance_check {
+  background: rgba(240, 180, 41, 0.18);
+}
+.lane-status--not_ready, .lane-status--not_built {
+  background: rgba(231, 76, 60, 0.18);
+}
+.lane-conf { font-size: 11px; color: var(--text-muted); }
+.lane-conf--low { color: #f0b429; }
+.lane-counter, .lane-created-from {
+  font-size: 11px; color: var(--text-muted); font-family: var(--font-mono, ui-monospace, monospace);
+}
+.lane-list-block { margin: 8px 0; }
+.lane-list-block ul, .lane-list-block ol { margin: 4px 0 0 18px; padding: 0; }
+.lane-warning-block {
+  border: 1px solid rgba(240, 180, 41, 0.5);
+  background: rgba(240, 180, 41, 0.08);
+  padding: 8px 10px; border-radius: 6px; margin: 8px 0;
+}
+.lane-warning-block ul { margin: 4px 0 0 18px; padding: 0; }
+.lane-unknowns {
+  background: rgba(160, 180, 230, 0.08);
+  border-left: 3px solid rgba(160, 180, 230, 0.5);
+  padding: 6px 10px; margin: 8px 0;
+}
+.lane-unknowns ul { margin: 4px 0 0 18px; padding: 0; color: var(--text-muted); }
+.lane-disclaimer { color: var(--text-muted); font-size: 12px; margin-top: 8px; }
+
+.pack-ready-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-family: var(--font-mono, ui-monospace, monospace);
+  background: rgba(160, 180, 230, 0.18);
+}
+.pack-ready--ready_for_manual_submission { background: rgba(120, 220, 140, 0.22); }
+.pack-ready--not_ready, .pack-ready--blocked_missing_evidence { background: rgba(231, 76, 60, 0.22); }
+
+.compliance-items { display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
+.compliance-category-head { font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-muted); margin-bottom: 4px; font-size: 11px; }
+.compliance-item {
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+  border-radius: 4px; padding: 6px 8px; margin: 2px 0;
+  background: var(--bg-subtle, rgba(255,255,255,0.02));
+}
+.compliance-item--satisfied { border-left: 3px solid rgb(120, 220, 140); }
+.compliance-item--missing, .compliance-item--needs_user_input { border-left: 3px solid #f0b429; }
+.compliance-item--unknown_not_verified { border-left: 3px solid rgba(160, 180, 230, 0.6); }
+.compliance-item--blocked { border-left: 3px solid #e74c3c; }
+.compliance-item--warning { border-left: 3px solid #f0b429; }
+.compliance-item-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.compliance-status-badge {
+  font-size: 10px; padding: 1px 6px; border-radius: 8px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  background: rgba(160, 180, 230, 0.15);
+}
+.compliance-status--satisfied { background: rgba(120, 220, 140, 0.22); }
+.compliance-status--missing, .compliance-status--needs_user_input,
+.compliance-status--blocked { background: rgba(231, 76, 60, 0.18); }
+.compliance-status--unknown_not_verified { background: rgba(160, 180, 230, 0.18); }
+.compliance-item-req { font-size: var(--font-size-sm); }
+.compliance-source { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono, ui-monospace, monospace); }
+.compliance-item-notes { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); }
 
 .loading-view {
   display: flex;

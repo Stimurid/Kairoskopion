@@ -422,6 +422,15 @@ class CitationPlan(_DictMixin):
     risk_flags: list[str] = _list()
     lifecycle_status: str = LifecycleStatus.DRAFT.value
     created_at: str = dc.field(default_factory=_now)
+    # V2-D minimal-real fields
+    fit_assessment_id: str | None = _field()
+    status: str = "not_built"
+    citation_gap_categories: list[str] = _list()
+    verification_tasks: list[str] = _list()
+    venue_citation_expectation_status: str | None = _field()
+    unknowns: list[str] = _list()
+    created_from: list[str] = _list()
+    confidence: str | None = _field()
 
 
 # ---------------------------------------------------------------------------
@@ -544,6 +553,12 @@ class ComplianceChecklist(_DictMixin):
     evidence_refs: list[str] = _list()
     lifecycle_status: str = LifecycleStatus.DRAFT.value
     created_at: str = dc.field(default_factory=_now)
+    # V2-D minimal-real fields
+    submission_scenario_id: str | None = _field()
+    status: str = "not_built"
+    unknowns: list[str] = _list()
+    created_from: list[str] = _list()
+    confidence: str | None = _field()
 
 
 @dc.dataclass
@@ -564,6 +579,13 @@ class SubmissionPack(_DictMixin):
     ready_status: str = SubmissionReadiness.NOT_READY.value
     created_at: str = dc.field(default_factory=_now)
     updated_at: str = dc.field(default_factory=_now)
+    # V2-D minimal-real fields
+    citation_plan_id: str | None = _field()
+    status: str = "not_built"
+    next_actions: list[str] = _list()
+    depends_on: list[str] = _list()
+    created_from: list[str] = _list()
+    unknowns: list[str] = _list()
 
 
 # ---------------------------------------------------------------------------

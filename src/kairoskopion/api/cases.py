@@ -14,6 +14,7 @@ from ..ids import generate_id
 from ..schema import (
     ArticleModel,
     ArticleSemanticProfile,
+    ComplianceChecklist,
     DisciplinaryPathway,
     EvidencePolicy,
     FieldPositionModel,
@@ -25,6 +26,7 @@ from ..schema import (
     CitationPlan,
     RiskReport,
     SourceEvidencePacket,
+    SubmissionPack,
     SubmissionScenario,
     VenueCandidatePool,
     VenueModel,
@@ -105,6 +107,9 @@ class Case:
         self.rewrite_plan: RewritePlan | None = None
         self.citation_plan: CitationPlan | None = None
         self.risk_report: RiskReport | None = None
+        # V2-D minimal-real lanes
+        self.compliance_checklist: ComplianceChecklist | None = None
+        self.submission_pack: SubmissionPack | None = None
         self.publication_regime: PublicationRegimeModel | None = None
         self.investigated_venue: VenueModel | None = None
         self.article_field_position: FieldPositionModel | None = None
@@ -1354,6 +1359,73 @@ class Case:
             except Exception:
                 pass
 
+        # V2-D: minimal-real CitationPlan / ComplianceChecklist /
+        # SubmissionPack lanes. Pure deterministic builders, no LLM,
+        # no fake content. Each builder produces honest "unknown"
+        # entries when evidence is missing.
+        try:
+            from ..services.citation_plan_minimal import (
+                build_minimal_citation_plan,
+            )
+            self.citation_plan = build_minimal_citation_plan(
+                self.article_model,
+                self.selected_venue,
+                self.fit_assessment,
+                self.mismatch_map,
+                self.risk_report,
+                self.rewrite_plan,
+            )
+            self._log_decision("citation_plan_built", {
+                "status": self.citation_plan.status,
+                "gap_categories_count": len(self.citation_plan.citation_gap_categories),
+                "search_tasks_count": len(self.citation_plan.recommended_reference_search_tasks),
+                "unknowns_count": len(self.citation_plan.unknowns),
+            })
+        except Exception as exc:
+            logger.warning("CitationPlan minimal failed (non-fatal): %s", exc)
+
+        try:
+            from ..services.compliance_checklist_minimal import (
+                build_minimal_compliance_checklist,
+            )
+            self.compliance_checklist = build_minimal_compliance_checklist(
+                self.article_model,
+                self.selected_venue,
+                scenario,
+                self.risk_report,
+            )
+            self._log_decision("compliance_checklist_built", {
+                "status": self.compliance_checklist.status,
+                "items_count": len(self.compliance_checklist.checklist_items),
+                "missing_count": len(self.compliance_checklist.missing_items),
+                "unknowns_count": len(self.compliance_checklist.unknowns),
+            })
+        except Exception as exc:
+            logger.warning("ComplianceChecklist minimal failed (non-fatal): %s", exc)
+
+        try:
+            from ..services.submission_pack_minimal import (
+                build_minimal_submission_pack,
+            )
+            self.submission_pack = build_minimal_submission_pack(
+                self.article_model,
+                self.selected_venue,
+                scenario,
+                self.fit_assessment,
+                self.risk_report,
+                self.rewrite_plan,
+                self.citation_plan,
+                self.compliance_checklist,
+            )
+            self._log_decision("submission_pack_built", {
+                "ready_status": self.submission_pack.ready_status,
+                "missing_count": len(self.submission_pack.missing_items),
+                "blocking_count": len(self.submission_pack.blocking_issues),
+                "next_actions_count": len(self.submission_pack.next_actions),
+            })
+        except Exception as exc:
+            logger.warning("SubmissionPack minimal failed (non-fatal): %s", exc)
+
         self._update_quality_gates("fit_chain")
 
     def get_fit(self) -> dict[str, Any]:
@@ -1527,6 +1599,11 @@ class Case:
             dossier["citation_plan"] = self.citation_plan.to_dict()
         if self.risk_report:
             dossier["risk_report"] = self.risk_report.to_dict()
+        # V2-D minimal-real lanes
+        if self.compliance_checklist:
+            dossier["compliance_checklist"] = self.compliance_checklist.to_dict()
+        if self.submission_pack:
+            dossier["submission_pack"] = self.submission_pack.to_dict()
         if self.article_field_position:
             dossier["article_field_position"] = self.article_field_position.to_dict()
         if self.venue_field_position:
@@ -1758,6 +1835,8 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         ("rewrite_plan", "rewrite_plan"),
         ("citation_plan", "citation_plan"),
         ("risk_report", "risk_report"),
+        ("compliance_checklist", "compliance_checklist"),
+        ("submission_pack", "submission_pack"),
         ("publication_regime", "publication_regime"),
         ("investigated_venue", "investigated_venue"),
         ("article_field_position", "article_field_position"),
@@ -1835,6 +1914,8 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
         "rewrite_plan": RewritePlan,
         "citation_plan": CitationPlan,
         "risk_report": RiskReport,
+        "compliance_checklist": ComplianceChecklist,
+        "submission_pack": SubmissionPack,
         "publication_regime": PublicationRegimeModel,
         "investigated_venue": VenueModel,
         "article_field_position": FieldPositionModel,
