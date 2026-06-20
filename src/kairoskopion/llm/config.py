@@ -174,6 +174,7 @@ def provider_status() -> dict:
         "discipline_matcher",
         "disciplinary_pathway_mapper",
         "fit_assessor",
+        "mismatch_narrator",
         "venue_profiler",
         "discipline_source_acquisition",
         "discipline_seeder",

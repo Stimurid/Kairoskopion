@@ -36,6 +36,27 @@ _SPECS: list[AgentSpec] = [
         first_workflows=["uc1_draft_to_venue_pool_positioning"],
     ),
     AgentSpec(
+        role_id="mismatch_narrator",
+        display_name="Mismatch Narrator",
+        layer="fit",
+        implementation_status="operational_now",
+        execution_mode="llm_optional",
+        prompt_family_ids=["mismatch_narrative"],
+        input_contract={
+            "entities.article": "ArticleModel dict",
+            "entities.venue": "VenueModel dict",
+            "entities.mismatches": "list of mismatch dicts from MismatchMap",
+        },
+        output_contract={
+            "MismatchNarratives": (
+                "narratives[] indexed by axis with venue_side, "
+                "description, possible_actions"
+            ),
+        },
+        mvp_phase="v0.2",
+        first_workflows=["uc1_draft_to_venue_pool_positioning"],
+    ),
+    AgentSpec(
         role_id="discipline_source_acquisition",
         display_name="Discipline Source Acquisition",
         layer="article",
@@ -487,6 +508,7 @@ def _build_agent_class_map() -> dict[str, type]:
     from .discipline_source_acquisition import DisciplineSourceAcquisitionAgent
     from .discipline_seeder import DisciplineSeederAgent
     from .input_classifier import InputClassifierAgent
+    from .mismatch_narrator import MismatchNarratorAgent
     from .semantic_profiler import ArticleSemanticProfilerAgent
     from .disciplinary_mapper import DisciplinaryPathwayMapperAgent
     from .fit_assessor import FitAssessorAgent
@@ -518,6 +540,7 @@ def _build_agent_class_map() -> dict[str, type]:
         "discipline_source_acquisition": DisciplineSourceAcquisitionAgent,
         "discipline_seeder": DisciplineSeederAgent,
         "input_classifier": InputClassifierAgent,
+        "mismatch_narrator": MismatchNarratorAgent,
         "intent_classifier": IntentClassifierAgent,
         "scenario_prober": ScenarioProberAgent,
         "research_planner": ResearchPlannerAgent,

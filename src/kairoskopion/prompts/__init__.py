@@ -11,6 +11,7 @@ from .field_positioning import (
 )
 from .fit_assessment import FIT_ASSESSMENT_FAMILY
 from .input_classification import INPUT_CLASSIFICATION_FAMILY
+from .mismatch_narrative import MISMATCH_NARRATIVE_FAMILY
 from .semantic_profiling import SEMANTIC_PROFILING_FAMILY
 from .venue_fact_extraction import VENUE_FACT_EXTRACTION_FAMILY
 
@@ -23,6 +24,7 @@ __all__ = [
     "DISCIPLINE_SOURCE_ACQUISITION_FAMILY",
     "FIT_ASSESSMENT_FAMILY",
     "INPUT_CLASSIFICATION_FAMILY",
+    "MISMATCH_NARRATIVE_FAMILY",
     "SEMANTIC_PROFILING_FAMILY",
     "VENUE_FACT_EXTRACTION_FAMILY",
     "VENUE_FIELD_POSITION_FAMILY",

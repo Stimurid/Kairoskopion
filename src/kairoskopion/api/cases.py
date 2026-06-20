@@ -1181,6 +1181,50 @@ class Case:
         except Exception:
             return
 
+        # MismatchNarratorAgent: enrich each mismatch with LLM-authored
+        # venue_side / description / possible_actions. The deterministic
+        # mismatch builder intentionally leaves venue_side empty and
+        # marks an explicit unknown (D2 fix from ee90523); this agent
+        # fills the gap in ONE batch call grounded in article + venue
+        # evidence. Honest fallback when LLM unavailable: leaves the
+        # empty venue_side intact so the UI italic "требуется LLM-
+        # комментарий" hint stays truthful.
+        try:
+            from ..agents.contract import AgentInput as _AI
+            from ..agents.mismatch_narrator import (
+                MismatchNarratorAgent,
+                enrich_mismatch_map_in_place,
+            )
+            narr_provider = _get_llm_provider("mismatch_narrator")
+            narr_agent = MismatchNarratorAgent()
+            narr_inp = _AI(
+                operation_id="mismatch_narrate",
+                agent_role_id="mismatch_narrator",
+                entities={
+                    "article": self.article_model.to_dict(),
+                    "venue": self.selected_venue.to_dict(),
+                    "mismatches": [
+                        dict(m) if isinstance(m, dict) else m
+                        for m in self.mismatch_map.mismatches
+                    ],
+                },
+            )
+            if narr_provider is not None:
+                narr_out = narr_agent.execute(narr_inp, narr_provider)
+            else:
+                narr_out = narr_agent.execute_deterministic(narr_inp)
+            if narr_out and narr_out.output_entity:
+                enriched_count = enrich_mismatch_map_in_place(
+                    self.mismatch_map,
+                    narr_out.output_entity.get("narratives") or [],
+                )
+                self._log_decision("mismatch_narrated", {
+                    "enriched_count": enriched_count,
+                    "total": len(self.mismatch_map.mismatches),
+                })
+        except Exception as exc:
+            logger.warning("Mismatch narrator failed (non-fatal): %s", exc)
+
         # Build the risk report alongside the rewrite plan so the
         # dossier has it on the same chain run. (Citation ecology
         # requires a BibliographyProfile which isn't always available
