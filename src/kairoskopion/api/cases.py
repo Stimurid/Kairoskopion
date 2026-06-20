@@ -1108,6 +1108,8 @@ class Case:
                     "fit verdict treats scenario answers as preliminary."
                 ],
             )
+            # Persist so the dossier card + UI banner surfaces it.
+            self.scenario = scenario
 
         provider = _get_llm_provider("fit_assessor")
         fit_via_llm = False
