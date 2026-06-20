@@ -41,9 +41,16 @@ class TestBuildVenueModel:
         assert venue.language_policy is not None
         assert "english" in venue.language_policy.lower()
 
-    def test_regime_classic(self):
-        _, regime = build_venue_model(_load_guidelines())
-        assert regime.regime_type == RegimeType.CLASSIC_JOURNAL_ARTICLE.value
+    def test_regime_default_is_honest_unknown(self):
+        # feature/real-cockpit-venue-fit-pass: previously the
+        # deterministic builder stamped CLASSIC_JOURNAL_ARTICLE as a
+        # silent default when no special-issue/conference/mega-journal
+        # keyword was present. That faked regime data. The fixture
+        # guidelines contain none of those markers, so the regime
+        # should now be None and an explicit unknown should be added.
+        venue, regime = build_venue_model(_load_guidelines())
+        assert regime.regime_type is None
+        assert any("publication regime" in u for u in venue.unknowns)
 
     def test_double_blind_detected(self):
         _, regime = build_venue_model(_load_guidelines())

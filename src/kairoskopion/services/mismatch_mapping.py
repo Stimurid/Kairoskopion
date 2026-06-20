@@ -46,11 +46,19 @@ def build_mismatch_map(fit: FitAssessment) -> MismatchMap:
             else FieldCoreImpact.UNKNOWN_CORE_IMPACT.value
         )
 
+        # Track D fix: ``venue_side`` was previously hardcoded to the
+        # literal string "Venue expectation on {axis_name}", which
+        # rendered in the cockpit as if it were real data. The
+        # deterministic mismatch mapper doesn't actually know what the
+        # venue expects on a given axis — that requires reading the
+        # venue text via an LLM (MismatchNarrativeAgent, backlog).
+        # Emit empty string + an unknown so the UI can label it
+        # "needs LLM narrative" instead of pretending.
         mismatches.append({
             "mismatch_id": f"mm_{idx}",
             "axis": axis_name,
             "article_side": notes,
-            "venue_side": f"Venue expectation on {axis_name}",
+            "venue_side": "",
             "description": notes,
             "severity": severity,
             "evidence_refs": ax.get("evidence_refs", []),
@@ -58,6 +66,10 @@ def build_mismatch_map(fit: FitAssessment) -> MismatchMap:
             "field_core_risk": core_impact,
             "requires_user_acceptance": is_core_sensitive and value in ("weak", "bad"),
         })
+        unknowns.append(
+            f"{axis_name}: venue-side description not available "
+            "(needs LLM MismatchNarrativeAgent — see VENUE_FIT_BACKLOG.md)"
+        )
 
     summary_parts: list[str] = []
     if critical:

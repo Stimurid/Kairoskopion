@@ -135,7 +135,17 @@ def _detect_review_model(text: str) -> str | None:
     return None
 
 
-def _detect_regime(text: str) -> str:
+def _detect_regime(text: str) -> str | None:
+    """Detect publication regime from venue guidelines text.
+
+    Honest fallback: returns ``None`` when no marker matches. The
+    previous default ``CLASSIC_JOURNAL_ARTICLE`` was a fake fact —
+    any pasted venue text with no special-issue/conference/mega-journal
+    keyword got stamped as a regular journal article, which then
+    propagated into FitAssessment regime axis as if it were a known
+    fact. Real cockpit symptom: the regime column always showed
+    "classic_journal_article" regardless of input.
+    """
     lower = text.lower()
     if "special issue" in lower:
         return RegimeType.SPECIAL_ISSUE_ARTICLE.value
@@ -143,7 +153,7 @@ def _detect_regime(text: str) -> str:
         return RegimeType.CONFERENCE_PROCEEDINGS.value
     if "mega-journal" in lower or "megajournal" in lower:
         return RegimeType.MEGA_JOURNAL.value
-    return RegimeType.CLASSIC_JOURNAL_ARTICLE.value
+    return None
 
 
 def _extract_word_limits(text: str) -> dict[str, str]:
@@ -191,10 +201,21 @@ def build_venue_model(
     # Language
     language = _extract_language_policy(text)
 
+    if regime_type is None:
+        unknowns.append(
+            "publication regime not detected — needs venue text or LLM "
+            "profiler to classify (classic journal / special issue / "
+            "conference proceedings / mega-journal)"
+        )
+    regime_description = (
+        f"Peer-reviewed journal, {review_model or 'unknown review model'}"
+        if regime_type is not None
+        else f"Publication regime unknown — review model: {review_model or 'unknown'}"
+    )
     regime = PublicationRegimeModel(
         publication_regime_id=publication_regime_id(),
         regime_type=regime_type,
-        description=f"Peer-reviewed journal, {review_model or 'unknown review model'}",
+        description=regime_description,
         review_model=review_model,
         typical_article_forms=article_types,
         evidence_refs=[source_ref] if source_ref else [],
@@ -213,10 +234,27 @@ def build_venue_model(
     data_policy = None if _text_mentions_as_unknown(text, "data") else _extract_data_policy(lower)
     ethics_policy = None if _text_mentions_as_unknown(text, "ethics") else _extract_ethics_policy(lower)
 
+    # F4: venue_type derived from regime where possible — was hardcoded
+    # JOURNAL even for conference/proceedings text.
+    if regime_type == RegimeType.CONFERENCE_PROCEEDINGS.value:
+        venue_type = VenueType.CONFERENCE_PROCEEDINGS.value
+    elif regime_type == RegimeType.SPECIAL_ISSUE_ARTICLE.value:
+        venue_type = VenueType.SPECIAL_ISSUE.value
+    else:
+        venue_type = VenueType.JOURNAL.value
+
+    # F2: truthful confidence. Previously: medium when ANY aims/scope
+    # section was extracted, even a 30-char fragment. Now: medium
+    # requires BOTH a meaningful aims/scope (≥200 chars) AND a journal
+    # name. Otherwise low.
+    has_meaningful_scope = bool(scope_text and len(scope_text.strip()) >= 200)
+    has_name = bool(journal_name)
+    venue_confidence = "medium" if (has_meaningful_scope and has_name) else "low"
+
     venue = VenueModel(
         venue_model_id=venue_model_id(),
         canonical_name=journal_name,
-        venue_type=VenueType.JOURNAL.value,
+        venue_type=venue_type,
         official_urls=[url] if url else [],
         scope_summary=scope_text,
         author_guidelines_refs=[source_ref] if source_ref else [],
@@ -226,7 +264,7 @@ def build_venue_model(
         publisher_or_owner=publisher,
         source_refs=[source_ref] if source_ref else [],
         unknowns=unknowns,
-        confidence="medium" if scope_text else "low",
+        confidence=venue_confidence,
         staleness_status=StalenessStatus.FRESH.value,
         lifecycle_status=LifecycleStatus.DRAFT.value,
         # Sprint 2: enrichment fields
@@ -301,11 +339,57 @@ def _extract_indexing_claims(lower: str) -> list[str]:
     return claims
 
 
+# Negation guard window — if a "no"/"not"/"never" appears within this
+# many characters BEFORE a policy keyword, treat the match as
+# negated (i.e. the venue is explicitly disclaiming the policy, not
+# announcing it). Real cockpit symptom: a venue saying "we do not
+# provide open access" previously got open_access_status="open_access"
+# because the keyword was present.
+_NEGATION_WINDOW = 30
+_NEGATION_RE = re.compile(r"\b(no|not|never|without|don'?t|doesn'?t)\b")
+
+
+def _negated_near(lower: str, keyword: str) -> bool:
+    """Return True if any occurrence of ``keyword`` in ``lower`` is
+    immediately preceded (within _NEGATION_WINDOW chars) by a negation
+    token. Used to suppress false-positive policy claims."""
+    idx = 0
+    while True:
+        pos = lower.find(keyword, idx)
+        if pos == -1:
+            return False
+        # window before keyword
+        start = max(0, pos - _NEGATION_WINDOW)
+        before = lower[start:pos]
+        if _NEGATION_RE.search(before):
+            idx = pos + len(keyword)
+            continue
+        # at least one non-negated occurrence
+        return False
+    # all occurrences were negated
+    # (loop never reaches here because empty find returns -1)
+
+
+def _present_unnegated(lower: str, keyword: str) -> bool:
+    """``keyword`` is present AND at least one occurrence is NOT preceded
+    by a negation token within _NEGATION_WINDOW chars."""
+    idx = 0
+    while True:
+        pos = lower.find(keyword, idx)
+        if pos == -1:
+            return False
+        start = max(0, pos - _NEGATION_WINDOW)
+        before = lower[start:pos]
+        if not _NEGATION_RE.search(before):
+            return True
+        idx = pos + len(keyword)
+
+
 def _extract_open_access(lower: str) -> str | None:
-    if "open access" in lower:
-        if "gold" in lower:
+    if _present_unnegated(lower, "open access"):
+        if _present_unnegated(lower, "gold"):
             return "gold_open_access"
-        if "hybrid" in lower:
+        if _present_unnegated(lower, "hybrid"):
             return "hybrid"
         return "open_access"
     return None
@@ -314,35 +398,43 @@ def _extract_open_access(lower: str) -> str | None:
 def _extract_apc_policy(lower: str) -> str | None:
     if "no apc" in lower or "no article processing" in lower or "no publication fee" in lower:
         return "no_apc"
-    if "apc" in lower or "article processing charge" in lower:
+    if _present_unnegated(lower, "apc") or _present_unnegated(lower, "article processing charge"):
         return "apc_required"
     return None
 
 
 def _extract_anonymization(lower: str) -> str | None:
-    if "double-blind" in lower or "double blind" in lower:
+    if _present_unnegated(lower, "double-blind") or _present_unnegated(lower, "double blind"):
         return "double_blind"
-    if "single-blind" in lower or "single blind" in lower:
+    if _present_unnegated(lower, "single-blind") or _present_unnegated(lower, "single blind"):
         return "single_blind"
-    if "open review" in lower:
+    if _present_unnegated(lower, "open review"):
         return "open_review"
     return None
 
 
 def _extract_ai_policy(lower: str) -> str | None:
-    if "ai disclosure" in lower or "ai writing" in lower or "generative ai" in lower:
+    if (
+        _present_unnegated(lower, "ai disclosure")
+        or _present_unnegated(lower, "ai writing")
+        or _present_unnegated(lower, "generative ai")
+    ):
         return "ai_policy_present"
     return None
 
 
 def _extract_data_policy(lower: str) -> str | None:
-    if "data availability" in lower or "data sharing" in lower:
+    if _present_unnegated(lower, "data availability") or _present_unnegated(lower, "data sharing"):
         return "data_policy_present"
     return None
 
 
 def _extract_ethics_policy(lower: str) -> str | None:
-    if "ethics approval" in lower or "ethics committee" in lower or "irb" in lower:
+    if (
+        _present_unnegated(lower, "ethics approval")
+        or _present_unnegated(lower, "ethics committee")
+        or _present_unnegated(lower, "irb")
+    ):
         return "ethics_policy_present"
     return None
 

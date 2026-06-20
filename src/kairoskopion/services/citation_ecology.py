@@ -201,7 +201,19 @@ def _detect_bridge_references(
     article: ArticleModel,
     venue: VenueModel,
 ) -> list[str]:
-    """Detect references that might serve as discipline bridges."""
+    """Detect references that might serve as discipline bridges.
+
+    Track D fix: previous logic matched any reference whose ``raw_text``
+    contained ANY >3-char word from either article_discipline or
+    venue_scope. Cockpit symptom: common words like "social" matched
+    every reference in social-anything venues, producing a "bridge
+    references" list of mostly irrelevant authors.
+
+    New rule: require BOTH overlaps to be on ≥6-char tokens AND at
+    least 2 distinct discipline tokens must appear in the reference.
+    Anything weaker is honest-unknown — real bridge detection needs
+    CitationBridgeAgent (backlog).
+    """
     bridges: list[str] = []
     venue_scope = (venue.scope_summary or "").lower()
     article_discipline = (article.disciplinary_register_current or "").lower()
@@ -209,15 +221,23 @@ def _detect_bridge_references(
     if not venue_scope or not article_discipline:
         return bridges
 
+    discipline_tokens = {w for w in article_discipline.replace("-", " ").split()
+                          if len(w) >= 6}
+    venue_tokens = {w for w in venue_scope.replace("-", " ").split()
+                     if len(w) >= 6}
+    if not discipline_tokens or not venue_tokens:
+        return bridges
+
     for ref_dict in bib.references:
         raw = ref_dict.get("raw_text", "").lower()
         venue_name = ref_dict.get("venue_fragment", "") or ""
-        combined = raw + " " + venue_name.lower()
+        combined_tokens = set((raw + " " + venue_name.lower()).split())
 
-        in_article_field = any(w in combined for w in article_discipline.split() if len(w) > 3)
-        in_venue_scope = any(w in combined for w in venue_scope.split() if len(w) > 3)
+        article_hits = discipline_tokens & combined_tokens
+        venue_hits = venue_tokens & combined_tokens
 
-        if in_article_field and in_venue_scope:
+        # Require ≥2 distinct discipline tokens AND ≥1 venue token.
+        if len(article_hits) >= 2 and venue_hits:
             author = ref_dict.get("author_fragment", "")
             year = ref_dict.get("year", "")
             if author:

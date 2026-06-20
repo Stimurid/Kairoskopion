@@ -173,11 +173,20 @@ def _assess_discipline_fit(
                   for t in topics]
     disciplines = [d.lower() for d in profile.get("disciplinary_registers", [])]
 
-    for d in disciplines:
-        for t in topic_strs:
-            if d in t or t in d:
-                return "match"
+    # Track D fix: previous logic was ``d in t or t in d`` over raw
+    # lowercased strings — substring match. Cockpit symptom: candidate
+    # topic "cartography" matched discipline "art" (art ⊂ cartography),
+    # producing false "discipline: match". Now require token-level
+    # equality on whitespace-split tokens with min length 4.
+    def _tokens(s: str) -> set[str]:
+        return {tok for tok in s.replace("-", " ").split() if len(tok) >= 4}
 
+    d_token_sets = [_tokens(d) for d in disciplines]
+    for t in topic_strs:
+        t_tokens = _tokens(t)
+        for d_tokens in d_token_sets:
+            if d_tokens & t_tokens:
+                return "match"
     return "unknown"
 
 
@@ -212,11 +221,20 @@ def _assess_regime_fit(
     candidate: dict[str, Any],
     raw_data: dict[str, Any],
 ) -> str:
+    """Track D fix: previous logic returned ``"likely"`` whenever a
+    candidate had ANY works in any adapter — i.e. virtually every
+    indexed venue. Cockpit symptom: every venue showed
+    ``publication_regime: likely`` regardless of actual regime mismatch,
+    masking real regime problems.
+
+    Honest behaviour: only return ``"likely"`` when adapter-provided
+    ``type`` field is the explicit string ``"journal"``. ``works_count``
+    alone is not regime information. Otherwise ``"unknown"`` — real
+    regime fit needs VenueProfilingAgent output.
+    """
     for src_data in raw_data.values():
         if isinstance(src_data, dict):
             if src_data.get("type") == "journal":
-                return "likely"
-            if src_data.get("works_count") and src_data["works_count"] > 0:
                 return "likely"
     return "unknown"
 

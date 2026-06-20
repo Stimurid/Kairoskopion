@@ -689,9 +689,33 @@ class Case:
         import logging
         logger = logging.getLogger(__name__)
 
+        # F3: minimum-text guard. Real cockpit symptom: pasting 50
+        # chars of "Journal of X" produced a VenueModel with
+        # canonical_name=None, fake regime, fake confidence — UI
+        # rendered blanks as if a profile had been built. Reject early
+        # with an honest hint so the operator can paste full aims/scope
+        # or supply a URL/ISSN.
+        stripped_len = len(text.strip())
+        if stripped_len < 200:
+            self._log_decision("investigate_venue_skipped", {
+                "reason": "needs_more_venue_text",
+                "received_chars": stripped_len,
+            })
+            return {
+                "status": "needs_more_venue_text",
+                "received_chars": stripped_len,
+                "min_chars": 200,
+                "hint": (
+                    "Текста слишком мало для разбора площадки. Вставьте "
+                    "aims/scope, типы статей и submission policies — "
+                    "или приложите ссылку/ISSN."
+                ),
+            }
+
         provider = _get_llm_provider("venue_profiler")
         venue = None
         regime = None
+        used_llm = False
 
         if provider is not None:
             from ..agents.venue_profiler import VenueProfilerAgent
@@ -710,6 +734,7 @@ class Case:
                     venue = VenueModel.from_dict(entity)
                     if regime_dict:
                         regime = PublicationRegimeModel.from_dict(regime_dict)
+                    used_llm = True
                     logger.info("Venue profiled via LLM")
             except Exception as exc:
                 logger.warning("LLM venue profiling failed, falling back: %s", exc)
@@ -724,9 +749,17 @@ class Case:
         self._log_decision("investigate_venue", {
             "venue_name": venue.canonical_name,
         })
+        # F5: surface venue_field_position + used_llm flag so the UI can
+        # render the field-positioner unknown banner and a "deterministic
+        # fallback ran" warning when the LLM was unavailable.
         return {
             "venue": venue.to_dict(),
-            "publication_regime": regime.to_dict(),
+            "publication_regime": regime.to_dict() if regime else None,
+            "venue_field_position": (
+                self.venue_field_position.to_dict()
+                if self.venue_field_position else None
+            ),
+            "used_llm": used_llm,
         }
 
     def _build_venue_field_position(

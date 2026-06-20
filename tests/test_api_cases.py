@@ -207,14 +207,26 @@ class TestCaseDossier(unittest.TestCase):
 
 class TestCaseVenueInvestigation(unittest.TestCase):
     def test_investigate_venue_text(self):
+        # feature/real-cockpit-venue-fit-pass added a ≥200-char minimum-
+        # text guard on investigate_venue (F3) — pasting a 4-line seed
+        # used to silently produce a blank venue with fake confidence.
+        # Pass meaningful text for the pipeline to run.
         case = Case(title="Venue test")
         result = case.investigate_venue(
             "# Venue Seed Profile: Philosophy & Technology\n"
             "- **ISSN:** 1234-5678\n"
-            "- **Scope:** Philosophy of technology and engineering\n"
-            "- **Review type:** Double-blind peer review\n"
+            "- **Publisher:** Test Press\n"
+            "## Aims and Scope\n"
+            "This journal publishes peer-reviewed research on the "
+            "philosophy of technology and engineering practice. We accept "
+            "theoretical essays, conceptual articles, and systematic "
+            "reviews that address technology as a philosophical object. "
+            "Authors are encouraged to submit work spanning STS, "
+            "postphenomenology, and philosophy of mind.\n"
+            "## Review\nDouble-blind peer review.\n"
         )
         self.assertIn("venue", result)
+        self.assertNotIn("status", result)  # not the needs_more_venue_text path
         self.assertIsNotNone(case.investigated_venue)
         self.assertEqual(len(case.decision_log), 1)
         self.assertEqual(case.decision_log[0]["action"], "investigate_venue")

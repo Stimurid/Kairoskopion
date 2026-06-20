@@ -115,10 +115,17 @@ class TestCaseIntakeBuildsArticleFPM(unittest.TestCase):
         self.assertEqual(case.article_field_position.entity_type, "article")
 
     def test_intake_venue_populates_venue_fpm(self):
+        # feature/real-cockpit-venue-fit-pass added a ≥200-char
+        # minimum-text guard on investigate_venue. Provide enough text
+        # for the pipeline (and venue_field_positioner) to run.
         case = Case(title="t")
         text = (
             "Author guidelines for the journal. The scope of the journal: "
-            "philosophy, ISSN: 1234-5678. Editorial board: ..."
+            "philosophy of technology and engineering. ISSN: 1234-5678. "
+            "Editorial board: Smith, Brown, Jones. We publish theoretical "
+            "essays, conceptual articles, and systematic reviews on "
+            "philosophy of technology, postphenomenology, STS, and "
+            "engineering ethics. Submissions undergo double-blind review."
         )
         case.intake_text(text, input_type="venue", search_depth="none")
         self.assertIsNotNone(case.investigated_venue)
