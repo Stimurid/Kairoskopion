@@ -39,12 +39,25 @@ function MismatchRow({ item }: { item: MismatchItem }) {
       <div className="mismatch-sides">
         <div className="mismatch-side">
           <span className="side-label">Article</span>
-          <span className="side-value">{item.article_side || '—'}</span>
+          <span className="side-value">
+            {item.article_side || (
+              <em className="side-value--unknown">сторона статьи не определена</em>
+            )}
+          </span>
         </div>
         <span className="mismatch-arrow" aria-hidden="true">&harr;</span>
         <div className="mismatch-side">
           <span className="side-label">Venue</span>
-          <span className="side-value">{item.venue_side || '—'}</span>
+          <span className="side-value">
+            {item.venue_side || (
+              // UI4 closure: backend now intentionally emits empty
+              // venue_side when no LLM narrative is available; label
+              // it honestly instead of "—".
+              <em className="side-value--unknown">
+                требуется LLM-комментарий по площадке
+              </em>
+            )}
+          </span>
         </div>
       </div>
       {item.possible_actions.length > 0 && (

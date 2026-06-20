@@ -250,13 +250,14 @@ class Case:
             NEEDS_USER_CHOICE_TYPES,
             VENUE_PIPELINE_TYPES,
         )
+        venue_result: dict[str, Any] | None = None
         if self.effective_input_type in ARTICLE_PIPELINE_TYPES:
             self._build_article_model()
             if search_depth != "none" and self.article_model is not None:
                 enrichment_result = self._enrich_article(search_depth)
         elif self.effective_input_type in VENUE_PIPELINE_TYPES:
             try:
-                self.investigate_venue(text)
+                venue_result = self.investigate_venue(text)
             except Exception:
                 pass
         elif self.effective_input_type in NEEDS_USER_CHOICE_TYPES:
@@ -285,6 +286,26 @@ class Case:
             result["input_truncated_for_llm"] = truncation.to_dict()
         if enrichment_result:
             result["enrichment"] = enrichment_result
+        # F3/F5 (venue honesty pass): pass through the venue-investigation
+        # outcome so the UI can render the needs_more_venue_text hint,
+        # the used_llm fallback badge, and the venue_field_position
+        # unknowns. Without this propagation the UI silently saw
+        # venue_investigated=False with no hint why.
+        if venue_result is not None:
+            if venue_result.get("status") == "needs_more_venue_text":
+                result["venue_status"] = "needs_more_venue_text"
+                result["venue_hint"] = venue_result.get("hint")
+                result["venue_min_chars"] = venue_result.get("min_chars")
+                result["venue_received_chars"] = venue_result.get("received_chars")
+            else:
+                result["venue_used_llm"] = venue_result.get("used_llm")
+                if venue_result.get("venue_field_position") is not None:
+                    fpm = venue_result["venue_field_position"]
+                    # Surface only the warning fields, not full FPM —
+                    # the UI fetches the full FPM via /investigated-venue.
+                    fpm_unknowns = fpm.get("unknowns") if isinstance(fpm, dict) else None
+                    if fpm_unknowns:
+                        result["venue_field_position_unknowns"] = fpm_unknowns
         return result
 
     def apply_input_override(self, chosen_type: str) -> dict[str, Any]:
@@ -987,10 +1008,25 @@ class Case:
     # -- Select venue & fit --
 
     def select_venue(self, venue_id: str) -> dict[str, Any]:
-        # Resolve candidate from pool
-        candidate_dict = self._resolve_candidate(venue_id)
-        if candidate_dict:
-            self.selected_venue = self._venue_model_from_candidate(candidate_dict)
+        # feature/venue-fit-dossier-slice: support selecting the
+        # investigated_venue (user-pasted journal page) directly,
+        # without requiring a discovered venue pool. Special tokens:
+        #   "investigated" or the investigated_venue.venue_model_id
+        # → pick self.investigated_venue.
+        is_investigated_token = (
+            venue_id == "investigated"
+            or (
+                self.investigated_venue is not None
+                and venue_id == getattr(self.investigated_venue, "venue_model_id", None)
+            )
+        )
+        if is_investigated_token and self.investigated_venue is not None:
+            self.selected_venue = self.investigated_venue
+        else:
+            # Resolve candidate from pool
+            candidate_dict = self._resolve_candidate(venue_id)
+            if candidate_dict:
+                self.selected_venue = self._venue_model_from_candidate(candidate_dict)
         self.stage = CaseStage.VENUE_SELECTED
         self._log_decision("select_venue", {"venue_id": venue_id})
 
@@ -1057,10 +1093,21 @@ class Case:
         from ..services.mismatch_mapping import build_mismatch_map
         from ..services.rewrite_planning import build_rewrite_plan
 
-        scenario = self.scenario or SubmissionScenario(
-            article_model_id=self.article_model.article_model_id
-            if self.article_model else "",
-        )
+        # If the operator hasn't filled the scenario yet, synthesize a
+        # preliminary one so fit can still produce a verdict — but mark
+        # it explicitly. The dossier UI shows this as a banner.
+        if self.scenario is not None:
+            scenario = self.scenario
+        else:
+            scenario = SubmissionScenario(
+                article_model_id=self.article_model.article_model_id
+                if self.article_model else "",
+                scenario_preliminary=True,
+                unknowns=[
+                    "Operator has not filled the submission scenario yet — "
+                    "fit verdict treats scenario answers as preliminary."
+                ],
+            )
 
         provider = _get_llm_provider("fit_assessor")
         fit_via_llm = False
@@ -1131,6 +1178,30 @@ class Case:
             })
         except Exception:
             return
+
+        # Build the risk report alongside the rewrite plan so the
+        # dossier has it on the same chain run. (Citation ecology
+        # requires a BibliographyProfile which isn't always available
+        # at this point — it's built on-demand by /adaptation-plan;
+        # skip here to avoid fake data.)
+        try:
+            from ..services.risk_reporting import build_risk_report
+            self.risk_report = build_risk_report(
+                self.article_model,
+                self.selected_venue,
+                scenario,
+                self.fit_assessment,
+                self.mismatch_map,
+            )
+            self._log_decision("risk_report_built", {
+                "risk_count": (
+                    len(self.risk_report.risks)
+                    if self.risk_report and hasattr(self.risk_report, "risks")
+                    else 0
+                ),
+            })
+        except Exception as exc:
+            logger.warning("Risk report failed (non-fatal): %s", exc)
 
         if self.mismatch_map.mismatches:
             try:

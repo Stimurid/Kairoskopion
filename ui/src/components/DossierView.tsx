@@ -103,6 +103,16 @@ export function DossierView({ caseId }: Props) {
 
           {dossier.scenario && (
             <SectionCard title="Submission Scenario">
+              {dossier.scenario.scenario_preliminary && (
+                <div className="scenario-preliminary-banner" role="note">
+                  <strong>⚠ Сценарий публикации — предварительный</strong>
+                  <p>
+                    Оператор пока не заполнил сценарий подачи.
+                    Fit-вердикт построен на дефолтных предпосылках;
+                    после заполнения сценария результат может измениться.
+                  </p>
+                </div>
+              )}
               <KVRow label="Goal" value={dossier.scenario.goal} />
               <KVRow label="Rewrite Depth" value={dossier.scenario.rewrite_depth_allowed} />
               <KVRow label="Language" value={dossier.scenario.language} />

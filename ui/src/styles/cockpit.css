@@ -4386,3 +4386,79 @@ code.agent-detail-value {
   font-size: 0.7rem;
   color: var(--text-muted);
 }
+
+/* venue honesty hints (UI1-UI4 backlog closure) */
+.venue-needs-more-text {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border-left: 3px solid #f0b429;
+  background: rgba(240, 180, 41, 0.06);
+  border-radius: var(--radius);
+}
+
+.venue-needs-more-text strong {
+  display: block;
+  color: #f0b429;
+  margin-bottom: var(--space-xs);
+}
+
+.venue-needs-more-text p {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary, #b8bccc);
+}
+
+.venue-needs-more-text-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.venue-fpm-unknowns {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-left: 3px solid rgba(160, 180, 230, 0.6);
+  background: rgba(100, 130, 200, 0.06);
+  border-radius: var(--radius);
+}
+
+.venue-fpm-unknowns strong {
+  display: block;
+  margin-bottom: var(--space-xs);
+  font-size: 0.85rem;
+  color: rgb(180, 200, 235);
+}
+
+.venue-fpm-unknowns ul {
+  margin: 0;
+  padding-left: var(--space-md);
+  font-size: 0.8rem;
+  color: var(--text-secondary, #b8bccc);
+}
+
+.side-value--unknown {
+  font-style: italic;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* Scenario-preliminary banner */
+.scenario-preliminary-banner {
+  margin: var(--space-md) 0;
+  padding: var(--space-md);
+  border-left: 3px solid #f0b429;
+  background: rgba(240, 180, 41, 0.06);
+  border-radius: var(--radius);
+}
+
+.scenario-preliminary-banner strong {
+  color: #f0b429;
+  display: block;
+  margin-bottom: var(--space-xs);
+}
+
+.scenario-preliminary-banner p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #b8bccc);
+}

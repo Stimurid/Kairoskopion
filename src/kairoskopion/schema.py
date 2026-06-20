@@ -319,6 +319,12 @@ class SubmissionScenario(_DictMixin):
     lifecycle_status: str = LifecycleStatus.DRAFT.value
     created_at: str = dc.field(default_factory=_now)
     updated_at: str = dc.field(default_factory=_now)
+    # feature/venue-fit-dossier-slice: when fit runs without an
+    # operator-provided scenario, _run_fit_chain synthesizes a default
+    # SubmissionScenario with this flag set. The dossier UI must
+    # display a banner ("Scenario preliminary — answers from the
+    # operator missing") so the fit verdict is not read as final.
+    scenario_preliminary: bool = False
 
 
 # ---------------------------------------------------------------------------

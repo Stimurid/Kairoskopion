@@ -125,6 +125,10 @@ export interface SubmissionScenario {
   risk_tolerance: string;
   target_indexing: string[];
   language: string;
+  // feature/venue-fit-dossier-slice: when fit ran without operator-
+  // provided scenario, _run_fit_chain synthesizes a preliminary one
+  // and sets this flag. UI shows a banner so verdict reads as preliminary.
+  scenario_preliminary?: boolean;
 }
 
 // --- Pathway ---

@@ -27,6 +27,13 @@ interface IntakeResult {
   classification?: ClassificationVerdict;
   needs_user_choice?: boolean;
   override_source?: 'classifier' | 'user' | 'chip';
+  // Venue path honesty fields (F3/F5 + UI1-UI3 closure)
+  venue_status?: 'needs_more_venue_text';
+  venue_hint?: string;
+  venue_min_chars?: number;
+  venue_received_chars?: number;
+  venue_used_llm?: boolean;
+  venue_field_position_unknowns?: string[];
 }
 
 // Keep in sync with src/kairoskopion/llm/input_limits.py
@@ -317,6 +324,46 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
               {lastResult.input_truncated_for_llm.used_chars.toLocaleString('ru-RU')} симв.
             </span>
           )}
+          {lastResult.venue_used_llm === false
+            && lastResult.venue_investigated && (
+            <span
+              className="intake-result-badge intake-result-badge--warn"
+              title="Venue profile built без LLM — это детерминистский fallback. Точность ограниченa."
+            >
+              Venue: deterministic fallback
+            </span>
+          )}
+        </div>
+      )}
+      {lastResult?.venue_status === 'needs_more_venue_text' && (
+        <div
+          className="venue-needs-more-text"
+          role="alert"
+          aria-label="Слишком мало текста о площадке"
+        >
+          <strong>Слишком мало текста для разбора площадки</strong>
+          <p>{lastResult.venue_hint}</p>
+          {lastResult.venue_received_chars !== undefined && lastResult.venue_min_chars !== undefined && (
+            <p className="venue-needs-more-text-meta">
+              Получено {lastResult.venue_received_chars} симв.; минимум{' '}
+              {lastResult.venue_min_chars}.
+            </p>
+          )}
+        </div>
+      )}
+      {lastResult?.venue_field_position_unknowns
+        && lastResult.venue_field_position_unknowns.length > 0 && (
+        <div
+          className="venue-fpm-unknowns"
+          role="note"
+          aria-label="Venue field-position unknowns"
+        >
+          <strong>Что система не знает о площадке (FPM):</strong>
+          <ul>
+            {lastResult.venue_field_position_unknowns.map((u, i) => (
+              <li key={i}>{u}</li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
