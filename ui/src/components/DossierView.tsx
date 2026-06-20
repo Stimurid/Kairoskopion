@@ -142,10 +142,193 @@ export function DossierView({ caseId }: Props) {
           )}
 
           {dossier.fit_assessment && (
-            <SectionCard title="Fit Assessment">
+            <SectionCard
+              title={`Матрица соответствия — Fit matrix (${dossier.fit_assessment.axes?.length ?? 0} осей)`}
+            >
               <KVRow label="Overall" value={dossier.fit_assessment.overall_label} />
               <KVRow label="Level" value={dossier.fit_assessment.assessment_level} />
+              <KVRow label="Confidence" value={dossier.fit_assessment.confidence} />
               <KVRow label="Recommendation" value={dossier.fit_assessment.recommendation} />
+
+              {dossier.fit_assessment.axes && dossier.fit_assessment.axes.length > 0 ? (
+                <div className="fit-axes-table" role="table" aria-label="Fit matrix axes">
+                  <div className="fit-axes-head" role="row">
+                    <span className="fit-axes-col-axis">Axis</span>
+                    <span className="fit-axes-col-value">Value</span>
+                    <span className="fit-axes-col-conf">Confidence</span>
+                    <span className="fit-axes-col-notes">Reason / notes</span>
+                  </div>
+                  {dossier.fit_assessment.axes.map((ax, i) => {
+                    const valueClass =
+                      `fit-axis-value fit-axis-value--${(ax.value || 'unknown')}`;
+                    return (
+                      <div key={i} className="fit-axes-row" role="row">
+                        <span className="fit-axes-col-axis">
+                          <code>{ax.axis}</code>
+                        </span>
+                        <span className="fit-axes-col-value">
+                          <span className={valueClass}>{ax.value || 'unknown'}</span>
+                        </span>
+                        <span className="fit-axes-col-conf">
+                          {ax.confidence ? (
+                            <span className={`fit-axis-conf fit-axis-conf--${ax.confidence}`}>
+                              {ax.confidence}
+                            </span>
+                          ) : (
+                            <em className="fit-axis-muted">—</em>
+                          )}
+                        </span>
+                        <span className="fit-axes-col-notes">
+                          {ax.notes ? (
+                            ax.notes
+                          ) : ax.value === 'unknown' ? (
+                            <em className="fit-axis-muted">
+                              Неизвестно: недостаточно данных
+                            </em>
+                          ) : (
+                            <em className="fit-axis-muted">
+                              Комментарий пока не построен — reason unavailable
+                            </em>
+                          )}
+                          {ax.unknowns && ax.unknowns.length > 0 && (
+                            <ul className="fit-axis-unknowns">
+                              {ax.unknowns.map((u, j) => (
+                                <li key={j}>{u}</li>
+                              ))}
+                            </ul>
+                          )}
+                          {ax.evidence_refs && ax.evidence_refs.length > 0 && (
+                            <div className="fit-axis-evidence">
+                              evidence: {ax.evidence_refs.length}
+                            </div>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="fit-axes-empty">
+                  Fit-матрица пока не построена. Выберите площадку и запустите fit.
+                </p>
+              )}
+
+              {dossier.fit_assessment.unknowns && dossier.fit_assessment.unknowns.length > 0 && (
+                <div className="fit-overall-unknowns">
+                  <strong>Что система явно НЕ знает по этому fit-проходу:</strong>
+                  <ul>
+                    {dossier.fit_assessment.unknowns.map((u, i) => (
+                      <li key={i}>{u}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </SectionCard>
+          )}
+
+          {/* Risk report — built by Case._run_fit_chain after select_venue.
+              Backend payload at api/cases.py:1459-1460. */}
+          {dossier.risk_report ? (
+            <SectionCard
+              title={
+                `Риски подачи — Risk report` +
+                (dossier.risk_report.risk_items?.length
+                  ? ` (${dossier.risk_report.risk_items.length})`
+                  : '')
+              }
+            >
+              {dossier.risk_report.overall_risk_label && (
+                <KVRow label="Overall risk" value={dossier.risk_report.overall_risk_label} />
+              )}
+              {dossier.risk_report.blocking_risks
+                && dossier.risk_report.blocking_risks.length > 0 && (
+                <div className="risk-blocking-list" role="alert">
+                  <strong>Blocking risks ({dossier.risk_report.blocking_risks.length}):</strong>
+                  <ul>
+                    {dossier.risk_report.blocking_risks.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {dossier.risk_report.warnings
+                && dossier.risk_report.warnings.length > 0 && (
+                <div className="risk-warnings-list" role="note">
+                  <strong>Warnings ({dossier.risk_report.warnings.length}):</strong>
+                  <ul>
+                    {dossier.risk_report.warnings.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {dossier.risk_report.risk_items
+                && dossier.risk_report.risk_items.length > 0 ? (
+                <div className="risk-items">
+                  {dossier.risk_report.risk_items.map((r, i) => (
+                    <div
+                      key={i}
+                      className={`risk-item risk-item--${r.severity || 'informational'}`}
+                    >
+                      <div className="risk-item-head">
+                        <code className="risk-item-type">{r.risk_type}</code>
+                        <span className={`severity-badge severity-${r.severity || 'informational'}`}>
+                          {r.severity || 'unknown'}
+                        </span>
+                        {r.likelihood && (
+                          <span className="risk-item-likelihood">
+                            likelihood: {r.likelihood}
+                          </span>
+                        )}
+                        {r.requires_user_action && (
+                          <span className="risk-item-user-action">
+                            requires user action
+                          </span>
+                        )}
+                      </div>
+                      <p className="risk-item-desc">{r.description}</p>
+                      {r.mitigation ? (
+                        <p className="risk-item-mitigation">
+                          <strong>Mitigation:</strong> {r.mitigation}
+                        </p>
+                      ) : (
+                        <p className="risk-item-mitigation risk-item-mitigation--muted">
+                          <em>Mitigation not provided.</em>
+                        </p>
+                      )}
+                      {r.evidence_refs && r.evidence_refs.length > 0 && (
+                        <div className="risk-item-evidence">
+                          evidence: {r.evidence_refs.length}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="risk-items-empty">
+                  Список рисков пуст — система не выявила отдельных пунктов риска
+                  для этой пары статья×площадка.
+                </p>
+              )}
+              {dossier.risk_report.unknowns
+                && dossier.risk_report.unknowns.length > 0 && (
+                <div className="risk-unknowns">
+                  <strong>Risk-зоны без оценки (unknowns):</strong>
+                  <ul>
+                    {dossier.risk_report.unknowns.map((u, i) => (
+                      <li key={i}>{u}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </SectionCard>
+          ) : (
+            <SectionCard title="Риски подачи — Risk report">
+              <p className="risk-report-missing">
+                Risk report not built for this case yet.
+                Подача в анализ рисков запускается после выбора площадки
+                и запуска fit-проверки.
+              </p>
             </SectionCard>
           )}
 

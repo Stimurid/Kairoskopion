@@ -204,6 +204,9 @@ export interface FitAxis {
   evidence_refs: string[];
   confidence: string;
   notes: string;
+  // services/fit_assessment.py _axis() also emits this field; the
+  // Dossier UI's Fit matrix renders unknowns under the axis row.
+  unknowns?: string[];
 }
 
 export interface FitAssessment {
@@ -216,6 +219,34 @@ export interface FitAssessment {
   recommendation: string;
   unknowns: string[];
   extraction_attempt?: ExtractionAttempt | null;
+}
+
+// --- Risk Report (built by Case._run_fit_chain after select_venue) ---
+
+export interface RiskItem {
+  risk_id: string;
+  risk_type: string;
+  description: string;
+  severity: 'blocking' | 'major' | 'minor' | 'informational' | string;
+  likelihood?: string | null;
+  evidence_refs?: string[];
+  mitigation?: string | null;
+  requires_user_action?: boolean;
+}
+
+export interface RiskReport {
+  risk_report_id: string;
+  article_model_id?: string | null;
+  venue_model_id?: string | null;
+  submission_scenario_id?: string | null;
+  risk_items: RiskItem[];
+  overall_risk_label?: string | null;
+  blocking_risks: string[];
+  warnings: string[];
+  unknowns: string[];
+  evidence_refs: string[];
+  lifecycle_status?: string;
+  created_at?: string;
 }
 
 // --- Mismatch ---
@@ -333,6 +364,7 @@ export interface Dossier {
   fit_assessment?: FitAssessment;
   mismatch_map?: MismatchMap;
   rewrite_plan?: RewritePlan;
+  risk_report?: RiskReport;
   decision_log: DecisionLogEntry[];
   quality_gates: Record<string, QualityGateResult>;
 }

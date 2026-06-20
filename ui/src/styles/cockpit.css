@@ -4462,3 +4462,285 @@ code.agent-detail-value {
   font-size: 0.85rem;
   color: var(--text-secondary, #b8bccc);
 }
+
+/* Pass A: Fit matrix table in DossierView */
+.fit-axes-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  margin-top: var(--space-md);
+  overflow: hidden;
+}
+
+.fit-axes-head,
+.fit-axes-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 0.8fr 3fr;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  align-items: start;
+}
+
+.fit-axes-head {
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.fit-axes-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 0.85rem;
+}
+
+.fit-axes-row code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: rgb(180, 200, 235);
+}
+
+.fit-axis-value {
+  font-size: 0.78rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.fit-axis-value--strong {
+  background: rgba(80, 180, 100, 0.18);
+  color: rgb(120, 220, 140);
+  border: 1px solid rgba(80, 180, 100, 0.4);
+}
+
+.fit-axis-value--medium {
+  background: rgba(120, 160, 240, 0.15);
+  color: rgb(160, 180, 230);
+  border: 1px solid rgba(120, 160, 240, 0.4);
+}
+
+.fit-axis-value--weak {
+  background: rgba(240, 180, 41, 0.18);
+  color: #f0b429;
+  border: 1px solid rgba(240, 180, 41, 0.4);
+}
+
+.fit-axis-value--bad {
+  background: rgba(231, 76, 60, 0.18);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.4);
+}
+
+.fit-axis-value--unknown {
+  background: rgba(150, 150, 150, 0.15);
+  color: var(--text-muted);
+  border: 1px solid rgba(150, 150, 150, 0.3);
+}
+
+.fit-axis-conf {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.fit-axis-conf--high {
+  background: rgba(80, 180, 100, 0.15);
+  color: rgb(120, 220, 140);
+}
+
+.fit-axis-conf--medium {
+  background: rgba(240, 180, 41, 0.15);
+  color: #f0b429;
+}
+
+.fit-axis-conf--low {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+}
+
+.fit-axis-muted {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.fit-axis-unknowns {
+  margin: var(--space-xs) 0 0;
+  padding-left: var(--space-md);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.fit-axis-evidence {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.fit-axes-empty,
+.risk-items-empty,
+.risk-report-missing {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-style: italic;
+  padding: var(--space-sm) 0;
+}
+
+.fit-overall-unknowns {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-left: 3px solid rgba(150, 150, 150, 0.5);
+  background: rgba(150, 150, 150, 0.06);
+  border-radius: var(--radius);
+}
+
+.fit-overall-unknowns strong {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: var(--space-xs);
+  color: var(--text-secondary, #b8bccc);
+}
+
+.fit-overall-unknowns ul {
+  margin: 0;
+  padding-left: var(--space-md);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* Pass A: Risk report in DossierView */
+.risk-blocking-list {
+  margin: var(--space-md) 0;
+  padding: var(--space-md);
+  border-left: 3px solid #e74c3c;
+  background: rgba(231, 76, 60, 0.06);
+  border-radius: var(--radius);
+}
+
+.risk-blocking-list strong {
+  display: block;
+  color: #e74c3c;
+  margin-bottom: var(--space-xs);
+}
+
+.risk-blocking-list ul,
+.risk-warnings-list ul,
+.risk-unknowns ul {
+  margin: 0;
+  padding-left: var(--space-md);
+  font-size: 0.85rem;
+}
+
+.risk-warnings-list {
+  margin: var(--space-md) 0;
+  padding: var(--space-md);
+  border-left: 3px solid #f0b429;
+  background: rgba(240, 180, 41, 0.06);
+  border-radius: var(--radius);
+}
+
+.risk-warnings-list strong {
+  display: block;
+  color: #f0b429;
+  margin-bottom: var(--space-xs);
+}
+
+.risk-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.risk-item {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 3px solid rgba(255, 255, 255, 0.08);
+}
+
+.risk-item--blocking {
+  border-left-color: #e74c3c;
+  background: rgba(231, 76, 60, 0.05);
+}
+
+.risk-item--major {
+  border-left-color: #f0b429;
+  background: rgba(240, 180, 41, 0.05);
+}
+
+.risk-item--minor {
+  border-left-color: rgb(160, 180, 230);
+  background: rgba(120, 160, 240, 0.04);
+}
+
+.risk-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+  margin-bottom: var(--space-xs);
+}
+
+.risk-item-type {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  color: rgb(180, 200, 235);
+}
+
+.risk-item-likelihood {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.risk-item-user-action {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.risk-item-desc {
+  margin: 0 0 var(--space-xs);
+  font-size: 0.85rem;
+  color: var(--text-primary, #e8eaf2);
+}
+
+.risk-item-mitigation {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-secondary, #b8bccc);
+}
+
+.risk-item-mitigation--muted em {
+  color: var(--text-muted);
+}
+
+.risk-item-evidence {
+  margin-top: var(--space-xs);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.risk-unknowns {
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-left: 3px solid rgba(150, 150, 150, 0.5);
+  background: rgba(150, 150, 150, 0.06);
+  border-radius: var(--radius);
+}
+
+.risk-unknowns strong {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: var(--space-xs);
+  color: var(--text-secondary, #b8bccc);
+}
