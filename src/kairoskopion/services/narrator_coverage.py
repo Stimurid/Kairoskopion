@@ -56,6 +56,207 @@ PER_AXIS_PARSE_FAILED = "parse_failed"
 PER_AXIS_PROVIDER_ERROR = "provider_error"
 
 
+# V2-B2: parse-failure category taxonomy. Stable strings safe to ship.
+# Every value is mapped from already-redacted ``extraction_attempt``
+# fields (parse_status / validation_errors_summary / repair_steps) —
+# no raw LLM output is read or exposed.
+PARSE_FAIL_INVALID_JSON = "invalid_json"
+PARSE_FAIL_REPAIR_FAILED = "repair_failed"
+PARSE_FAIL_SCHEMA_VALIDATION_FAILED = "schema_validation_failed"
+PARSE_FAIL_MISSING_REQUIRED = "missing_required"
+PARSE_FAIL_TYPE_MISMATCH = "type_mismatch"
+PARSE_FAIL_ENUM_MISMATCH = "enum_mismatch"
+PARSE_FAIL_WRONG_TOP_LEVEL_SHAPE = "wrong_top_level_shape"
+PARSE_FAIL_MISSING_NARRATIVES_KEY = "missing_narratives_key"
+PARSE_FAIL_NARRATIVES_NOT_LIST = "narratives_not_list"
+PARSE_FAIL_NARRATIVE_ITEM_NOT_OBJECT = "narrative_item_not_object"
+PARSE_FAIL_AXIS_MISSING = "axis_missing"
+PARSE_FAIL_AXIS_NOT_STRING = "axis_not_string"
+PARSE_FAIL_EXTRA_PROPERTY = "extra_property"
+PARSE_FAIL_EMPTY_AFTER_REPAIR = "empty_after_repair"
+PARSE_FAIL_UNKNOWN = "unknown"
+
+
+_MISSING_REQUIRED_PREFIX = "missing required field:"
+_WRONG_TOP_LEVEL_MARKER = "top-level value is not an object"
+
+
+def _extract_missing_path(err: str) -> str | None:
+    """Pull the field name from a 'missing required field: X' message.
+
+    Errors come from json_repair._schema_required_present which only
+    ever emits this exact prefix — no raw model text is read.
+    """
+    if not err:
+        return None
+    low = err.lower().strip()
+    if low.startswith(_MISSING_REQUIRED_PREFIX):
+        return err[len(_MISSING_REQUIRED_PREFIX):].strip() or None
+    return None
+
+
+def classify_parse_failure(
+    attempt: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Classify narrator parse/repair/schema failure from already-safe
+    ``extraction_attempt`` metadata into the V2-B2 taxonomy.
+
+    Returns a dict with keys:
+      - ``parse_failure_category``: stable string from PARSE_FAIL_*
+      - ``parse_failure_reason``: short human-readable reason (no raw
+        LLM output)
+      - ``schema_failure_path``: field path when known (e.g.
+        "narratives"), else None
+      - ``schema_failure_rule``: rule name when knowable, else None
+      - ``repair_failure_stage``: last repair step name attempted, else
+        None
+      - ``repair_steps_attempted``: passthrough of repair_steps (already
+        safe stable names from json_repair, never raw text)
+
+    Returns all-None / empty values when attempt is None or parse
+    succeeded. Pure function. No I/O.
+    """
+    blank = {
+        "parse_failure_category": None,
+        "parse_failure_reason": None,
+        "schema_failure_path": None,
+        "schema_failure_rule": None,
+        "repair_failure_stage": None,
+        "repair_steps_attempted": [],
+    }
+    if not isinstance(attempt, dict):
+        return blank
+
+    parse_status = attempt.get("parse_status") or ""
+    fallback_reason = attempt.get("fallback_reason") or ""
+    repair_steps = list(attempt.get("repair_steps") or [])
+    errors = list(attempt.get("validation_errors_summary") or [])
+
+    # No failure to classify.
+    if parse_status in ("parsed_ok", "repaired_ok", "not_attempted"):
+        return blank
+    if not parse_status and fallback_reason in (
+        "", "not_applicable", "llm_unavailable",
+    ):
+        return blank
+
+    repair_stage = repair_steps[-1] if repair_steps else None
+
+    # 1) Schema-validation failure: extract path/rule when we can.
+    if parse_status == "schema_validation_failed" or (
+        fallback_reason == "schema_validation_failed"
+    ):
+        # Top-level shape error has a specific marker
+        for e in errors:
+            if _WRONG_TOP_LEVEL_MARKER in (e or "").lower():
+                return {
+                    **blank,
+                    "parse_failure_category": PARSE_FAIL_WRONG_TOP_LEVEL_SHAPE,
+                    "parse_failure_reason": (
+                        "narrator returned a non-object at the top level "
+                        "(schema requires an object with 'narratives')"
+                    ),
+                    "schema_failure_rule": "type",
+                    "repair_failure_stage": repair_stage,
+                    "repair_steps_attempted": repair_steps,
+                }
+        # Missing-required cases
+        for e in errors:
+            path = _extract_missing_path(e or "")
+            if path is None:
+                continue
+            if path == "narratives":
+                return {
+                    **blank,
+                    "parse_failure_category": PARSE_FAIL_MISSING_NARRATIVES_KEY,
+                    "parse_failure_reason": (
+                        "narrator output object lacked the required "
+                        "'narratives' key"
+                    ),
+                    "schema_failure_path": "narratives",
+                    "schema_failure_rule": "required",
+                    "repair_failure_stage": repair_stage,
+                    "repair_steps_attempted": repair_steps,
+                }
+            return {
+                **blank,
+                "parse_failure_category": PARSE_FAIL_MISSING_REQUIRED,
+                "parse_failure_reason": (
+                    f"narrator output missing required field '{path}'"
+                ),
+                "schema_failure_path": path,
+                "schema_failure_rule": "required",
+                "repair_failure_stage": repair_stage,
+                "repair_steps_attempted": repair_steps,
+            }
+        # Generic schema failure with no path info
+        return {
+            **blank,
+            "parse_failure_category": PARSE_FAIL_SCHEMA_VALIDATION_FAILED,
+            "parse_failure_reason": (
+                "narrator output failed JSON schema validation"
+            ),
+            "repair_failure_stage": repair_stage,
+            "repair_steps_attempted": repair_steps,
+        }
+
+    # 2) Repair failed: parser tried bounded repairs and none parsed.
+    if parse_status == "repair_failed" or fallback_reason == "repair_failed":
+        if not repair_steps:
+            # Parser saw nothing it could even attempt to repair.
+            return {
+                **blank,
+                "parse_failure_category": PARSE_FAIL_EMPTY_AFTER_REPAIR,
+                "parse_failure_reason": (
+                    "narrator output could not be parsed and no repair "
+                    "steps applied (likely empty or non-JSON content)"
+                ),
+                "repair_failure_stage": None,
+                "repair_steps_attempted": [],
+            }
+        return {
+            **blank,
+            "parse_failure_category": PARSE_FAIL_REPAIR_FAILED,
+            "parse_failure_reason": (
+                "narrator output failed JSON parsing and all bounded "
+                "repair attempts were rejected"
+            ),
+            "repair_failure_stage": repair_stage,
+            "repair_steps_attempted": repair_steps,
+        }
+
+    # 3) Invalid JSON without repair attempted
+    if parse_status == "invalid_json" or fallback_reason == "invalid_json":
+        return {
+            **blank,
+            "parse_failure_category": PARSE_FAIL_INVALID_JSON,
+            "parse_failure_reason": (
+                "narrator output was not valid JSON and no repair was "
+                "attempted"
+            ),
+            "repair_failure_stage": repair_stage,
+            "repair_steps_attempted": repair_steps,
+        }
+
+    # 4) Provider error / timeout / unknown — narrator coverage classifier
+    # already reports these at the chain level. Don't double-classify here.
+    if fallback_reason in (
+        "provider_error", "llm_timeout", "llm_unavailable",
+    ):
+        return blank
+
+    return {
+        **blank,
+        "parse_failure_category": PARSE_FAIL_UNKNOWN,
+        "parse_failure_reason": (
+            f"narrator parse failed with parse_status='{parse_status}' "
+            f"fallback_reason='{fallback_reason}'"
+        ),
+        "repair_failure_stage": repair_stage,
+        "repair_steps_attempted": repair_steps,
+    }
+
+
 def _is_filled(narrative: dict[str, Any]) -> bool:
     """A narrative counts as filled iff venue_side is a non-empty string
     AFTER stripping. This matches ``enrich_mismatch_map_in_place``'s
@@ -98,6 +299,13 @@ def classify_narrator_coverage(
             "used_model": None,
             "latency_ms": None,
             "empty_reason": None,
+            # V2-B2 redacted parse-failure detail (always absent here)
+            "parse_failure_category": None,
+            "parse_failure_reason": None,
+            "schema_failure_path": None,
+            "schema_failure_rule": None,
+            "repair_failure_stage": None,
+            "repair_steps_attempted": [],
         }
 
     attempt = narrator_output_entity.get("extraction_attempt") or {}
@@ -137,12 +345,14 @@ def classify_narrator_coverage(
     elif fallback_reason == "provider_error":
         status = STATUS_PROVIDER_ERROR
         empty_reason = "provider error during narrator call"
-    elif fallback_reason == "schema_validation_failed" or parse_status in (
-        "schema_validation_failed",
-        "parse_failed",
+    elif fallback_reason in (
+        "schema_validation_failed", "repair_failed", "invalid_json",
+    ) or parse_status in (
+        "schema_validation_failed", "parse_failed",
+        "repair_failed", "invalid_json",
     ):
         status = STATUS_PARSE_FAILED
-        empty_reason = "narrator output failed schema validation"
+        empty_reason = "narrator output failed parsing or schema validation"
     elif not narratives:
         status = STATUS_EMPTY_LLM_OUTPUT
         empty_reason = "narrator returned an empty narratives list"
@@ -173,6 +383,7 @@ def classify_narrator_coverage(
     else:
         status = STATUS_UNKNOWN
 
+    parse_failure = classify_parse_failure(attempt)
     return {
         "narrator_attempted": attempted,
         "narrator_status": status,
@@ -184,6 +395,14 @@ def classify_narrator_coverage(
         "used_model": used_model,
         "latency_ms": latency_ms,
         "empty_reason": empty_reason,
+        # V2-B2: redacted parse-failure detail. All fields derived from
+        # already-safe extraction_attempt metadata — no raw LLM output.
+        "parse_failure_category": parse_failure["parse_failure_category"],
+        "parse_failure_reason": parse_failure["parse_failure_reason"],
+        "schema_failure_path": parse_failure["schema_failure_path"],
+        "schema_failure_rule": parse_failure["schema_failure_rule"],
+        "repair_failure_stage": parse_failure["repair_failure_stage"],
+        "repair_steps_attempted": parse_failure["repair_steps_attempted"],
     }
 
 

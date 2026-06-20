@@ -1284,6 +1284,12 @@ class Case:
                     "used_model": None,
                     "latency_ms": None,
                     "empty_reason": "narrator agent raised exception",
+                    "parse_failure_category": None,
+                    "parse_failure_reason": None,
+                    "schema_failure_path": None,
+                    "schema_failure_rule": None,
+                    "repair_failure_stage": None,
+                    "repair_steps_attempted": [],
                 }
             except Exception:  # noqa: BLE001
                 pass
