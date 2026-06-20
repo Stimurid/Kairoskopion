@@ -385,6 +385,12 @@ class MismatchMap(_DictMixin):
     critical_mismatches: list[str] = _list()
     unknowns: list[str] = _list()
     created_at: str = dc.field(default_factory=_now)
+    # V2-B1 diagnostic: populated by _run_fit_chain after MismatchNarrator
+    # runs. Distinguishes "LLM returned empty" / "missing axes" / "axis
+    # mismatch" / "parser failed" / "provider error" so 0/N narrator
+    # coverage is observable instead of collapsed to one count.
+    # Never contains raw LLM output. None when chain didn't run narrator.
+    narrator_coverage: dict[str, Any] | None = None
 
 
 @dc.dataclass

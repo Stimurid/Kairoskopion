@@ -1213,17 +1213,80 @@ class Case:
                 narr_out = narr_agent.execute(narr_inp, narr_provider)
             else:
                 narr_out = narr_agent.execute_deterministic(narr_inp)
-            if narr_out and narr_out.output_entity:
+            output_entity = (
+                narr_out.output_entity if narr_out else None
+            )
+            if narr_out and output_entity:
                 enriched_count = enrich_mismatch_map_in_place(
                     self.mismatch_map,
-                    narr_out.output_entity.get("narratives") or [],
+                    output_entity.get("narratives") or [],
                 )
+                # V2-B1: structured coverage diagnostics. Distinguishes
+                # empty_llm_output / missing_axes / axis_match_failure /
+                # empty_valid_unknown / partial / filled / parse_failed
+                # / provider_error so 0-coverage is observable instead
+                # of collapsed to one count. No raw LLM output retained.
+                from ..services.narrator_coverage import (
+                    classify_narrator_coverage,
+                    per_axis_status,
+                )
+                input_axes = [
+                    (m.get("axis", "") if isinstance(m, dict)
+                     else getattr(m, "axis", ""))
+                    for m in self.mismatch_map.mismatches
+                ]
+                coverage = classify_narrator_coverage(
+                    input_axes, output_entity,
+                )
+                self.mismatch_map.narrator_coverage = coverage
+                for m in self.mismatch_map.mismatches:
+                    axis = (
+                        m.get("axis", "") if isinstance(m, dict)
+                        else getattr(m, "axis", "")
+                    )
+                    new_status = per_axis_status(
+                        axis, input_axes, output_entity,
+                        coverage["narrator_status"],
+                    )
+                    if isinstance(m, dict):
+                        m["narrative_status"] = new_status
+                    else:
+                        setattr(m, "narrative_status", new_status)
                 self._log_decision("mismatch_narrated", {
                     "enriched_count": enriched_count,
                     "total": len(self.mismatch_map.mismatches),
+                    "narrator_status": coverage["narrator_status"],
+                    "filled_count": coverage["filled_count"],
+                    "missing_axes_count": len(coverage["missing_axes"]),
+                    "unmatched_axes_count": len(coverage["unmatched_axes"]),
                 })
         except Exception as exc:
             logger.warning("Mismatch narrator failed (non-fatal): %s", exc)
+            # Even on agent exception, mark coverage as provider_error
+            # so dossier exposes the failure honestly.
+            try:
+                from ..services.narrator_coverage import (
+                    STATUS_PROVIDER_ERROR,
+                )
+                input_axes = [
+                    (m.get("axis", "") if isinstance(m, dict)
+                     else getattr(m, "axis", ""))
+                    for m in self.mismatch_map.mismatches
+                ]
+                self.mismatch_map.narrator_coverage = {
+                    "narrator_attempted": True,
+                    "narrator_status": STATUS_PROVIDER_ERROR,
+                    "filled_count": 0,
+                    "total_count": len(input_axes),
+                    "missing_axes": list(input_axes),
+                    "unmatched_axes": [],
+                    "parse_status": None,
+                    "used_model": None,
+                    "latency_ms": None,
+                    "empty_reason": "narrator agent raised exception",
+                }
+            except Exception:  # noqa: BLE001
+                pass
 
         # Build the risk report alongside the rewrite plan so the
         # dossier has it on the same chain run. (Citation ecology
