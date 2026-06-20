@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from ..schema import (
     ArticleModel,
+    BibliographyProfile,
     CitationPlan,
     ComplianceChecklist,
     FitAssessment,
@@ -65,6 +66,7 @@ def build_minimal_submission_pack(
     rewrite_plan: RewritePlan | None,
     citation_plan: CitationPlan | None,
     compliance_checklist: ComplianceChecklist | None,
+    bibliography_profile: BibliographyProfile | None = None,
 ) -> SubmissionPack:
     missing: list[str] = []
     blocking: list[str] = []
@@ -142,6 +144,44 @@ def build_minimal_submission_pack(
                 "preparing the submission pack."
             )
 
+    # ----- V2-E: Bibliography gating (highest priority after rewrite) -----
+    bp = bibliography_profile
+    bibliography_blocked = False
+    bibliography_unverified = False
+    if bp is not None:
+        created_from.append("bibliography_profile")
+        depends_on.append("bibliography_profile")
+        if bp.status in ("unknown", "not_found", "present_unparsed"):
+            bibliography_blocked = True
+            missing.append(f"bibliography: status={bp.status}")
+            next_actions.append(
+                "Provide or expose the manuscript's bibliography section "
+                "so the parser can build BibliographyProfile."
+            )
+        elif bp.status in ("parsed_structural", "partial"):
+            if bp.verification_status != "verified":
+                bibliography_unverified = True
+                warnings.append(
+                    f"BibliographyProfile structural-only: "
+                    f"{bp.reference_count} refs parsed, {bp.doi_count} "
+                    "with DOI; external metadata verification not done"
+                )
+                next_actions.append(
+                    "Verify references externally (Crossref / OpenAlex / "
+                    "OpenCitations) — no external adapter in V2-E so this "
+                    "is currently a manual task."
+                )
+        elif bp.status == "malformed":
+            bibliography_blocked = True
+            warnings.append(
+                f"BibliographyProfile.status=malformed "
+                f"({bp.malformed_count}/{bp.reference_count} suspicious)"
+            )
+            next_actions.append(
+                "Re-check bibliography formatting; some references look "
+                "malformed."
+            )
+
     # ----- Citation plan gating -----
     if citation_plan is not None:
         created_from.append("citation_plan")
@@ -151,6 +191,8 @@ def build_minimal_submission_pack(
             "needs_bibliography",
             "needs_venue_corpus",
             "blocked_missing_evidence",
+            "blocked_missing_bibliography",
+            "needs_user_input",
         ):
             warnings.append(
                 f"CitationPlan status = {cp_status} — bibliography or "
@@ -199,17 +241,22 @@ def build_minimal_submission_pack(
                 "Complete SubmissionScenario to lock down the fit verdict."
             )
 
-    # ----- Compute ready_status -----
+    # ----- Compute ready_status (V2-E: bibliography gates) -----
     if blocking:
         ready_status = READY_NOT_READY
     elif rewrite_major:
         ready_status = READY_NEEDS_USER_INPUT
+    elif bibliography_blocked:
+        ready_status = READY_NEEDS_REFERENCE_VERIFICATION
+    elif bibliography_unverified:
+        ready_status = READY_NEEDS_REFERENCE_VERIFICATION
     elif compliance_checklist is not None and compliance_checklist.missing_items:
         ready_status = READY_NEEDS_COMPLIANCE_CHECK
     elif compliance_checklist is not None and compliance_checklist.unknowns:
         ready_status = READY_NEEDS_USER_INPUT
     elif citation_plan is not None and (citation_plan.status or "") in (
         "needs_bibliography", "needs_venue_corpus", "blocked_missing_evidence",
+        "blocked_missing_bibliography", "needs_user_input",
     ):
         ready_status = READY_NEEDS_REFERENCE_VERIFICATION
     elif missing:

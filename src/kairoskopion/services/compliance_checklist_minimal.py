@@ -22,6 +22,7 @@ from typing import Any
 
 from ..schema import (
     ArticleModel,
+    BibliographyProfile,
     ComplianceChecklist,
     RiskReport,
     SubmissionScenario,
@@ -89,6 +90,7 @@ def build_minimal_compliance_checklist(
     venue: VenueModel,
     scenario: SubmissionScenario | None,
     risk_report: RiskReport | None,
+    bibliography_profile: BibliographyProfile | None = None,
 ) -> ComplianceChecklist:
     items: list[dict[str, Any]] = []
     missing: list[str] = []
@@ -229,16 +231,90 @@ def build_minimal_compliance_checklist(
             notes="Article word count not measured by intake.",
         ))
 
-    # --- References ---
-    if article.reference_count and article.reference_count > 0:
+    # --- References (V2-E: bibliography-aware) ---
+    bp = bibliography_profile
+    if bp is not None:
+        created_from.append("bibliography_profile")
+        if bp.status == "unknown":
+            items.append(_item(
+                "references",
+                "Manuscript has a parsed bibliography",
+                ITEM_UNKNOWN_NOT_VERIFIED,
+                SRC_UNKNOWN_NOT_VERIFIED,
+                notes="Raw article text unavailable to bibliography "
+                      "parser — bibliography state unknown.",
+            ))
+            unknowns.append("bibliography presence unknown")
+        elif bp.status == "not_found":
+            items.append(_item(
+                "references",
+                "Manuscript has a bibliography section",
+                ITEM_MISSING,
+                SRC_DERIVED_FROM_ARTICLE,
+                notes="No recognized bibliography heading detected in "
+                      "the supplied article text.",
+            ))
+            missing.append("bibliography section")
+        elif bp.status == "present_unparsed":
+            items.append(_item(
+                "references",
+                "Manuscript has a parseable bibliography",
+                ITEM_NEEDS_USER_INPUT,
+                SRC_DERIVED_FROM_ARTICLE,
+                notes="Bibliography heading found but no references "
+                      "could be parsed structurally.",
+            ))
+            missing.append("parseable bibliography")
+        elif bp.status == "malformed":
+            items.append(_item(
+                "references",
+                "Bibliography formatting",
+                ITEM_WARNING,
+                SRC_DERIVED_FROM_ARTICLE,
+                notes=f"{bp.malformed_count}/{bp.reference_count} "
+                      "references look malformed.",
+            ))
+            warnings.append("bibliography contains malformed references")
+        elif bp.status in ("parsed_structural", "partial"):
+            # Structural parse OK, but external verification not done.
+            if bp.verification_status == "verified":
+                items.append(_item(
+                    "references",
+                    "References parsed and externally verified",
+                    ITEM_SATISFIED,
+                    SRC_SOURCE_BACKED,
+                    notes=f"{bp.reference_count} references verified.",
+                ))
+            else:
+                items.append(_item(
+                    "references",
+                    "References parsed; external verification pending",
+                    ITEM_NEEDS_USER_INPUT,
+                    SRC_DERIVED_FROM_ARTICLE,
+                    notes=f"{bp.reference_count} parsed; "
+                          f"{bp.doi_count} have DOI; "
+                          "external metadata verification not performed.",
+                ))
+                missing.append("external reference verification")
+        else:
+            items.append(_item(
+                "references",
+                "References present in manuscript",
+                ITEM_NEEDS_USER_INPUT,
+                SRC_DERIVED_FROM_ARTICLE,
+                notes=f"BibliographyProfile.status={bp.status}",
+            ))
+    elif article.reference_count and article.reference_count > 0:
         items.append(_item(
             "references",
             "References present in manuscript",
-            ITEM_SATISFIED,
+            ITEM_NEEDS_USER_INPUT,
             SRC_DERIVED_FROM_ARTICLE,
             notes=f"Self-reported: {article.reference_count} references. "
-                  "Per-reference DOI/year verification not performed.",
+                  "BibliographyProfile not built — per-reference "
+                  "DOI/year verification not performed.",
         ))
+        missing.append("structural bibliography parse")
     else:
         items.append(_item(
             "references",

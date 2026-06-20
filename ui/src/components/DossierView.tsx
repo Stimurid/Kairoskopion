@@ -5,6 +5,7 @@ import type {
   ComplianceChecklistV2D,
   ComplianceItemV2D,
   SubmissionPackV2D,
+  BibliographyProfileV2E,
 } from '../types/domain';
 import { api } from '../api/client';
 import { DecisionLog } from './DecisionLog';
@@ -485,6 +486,25 @@ export function DossierView({ caseId }: Props) {
             </SectionCard>
           )}
 
+          {/* V2-E: BibliographyProfile (structural). Renders before
+              CitationPlan because CitationPlan/Compliance/Pack depend
+              on it. */}
+          {dossier.bibliography_profile ? (
+            <SectionCard
+              title={`Bibliography profile — статус: ${dossier.bibliography_profile.status}`}
+            >
+              <BibliographyProfileSection bp={dossier.bibliography_profile} />
+            </SectionCard>
+          ) : (
+            <SectionCard title="Bibliography profile">
+              <p className="placeholder-note">
+                <strong>Bibliography profile not built yet.</strong>{' '}
+                Будет построен автоматически из текста статьи после
+                fit-цепи.
+              </p>
+            </SectionCard>
+          )}
+
           {/* V2-D: real CitationPlan when built, V2-C placeholder otherwise */}
           {dossier.citation_plan ? (
             <SectionCard title={`Citation plan — статус: ${dossier.citation_plan.status}`}>
@@ -595,6 +615,26 @@ function NextActionBlock({ dossier }: { dossier: Dossier }) {
     label: 'Rewrite plan built',
     status: (dossier.rewrite_plan && dossier.rewrite_plan.changes.length > 0)
       ? 'done' : 'pending',
+  });
+  // V2-E bibliography step (priority — gates citation/compliance/pack)
+  const bp = dossier.bibliography_profile;
+  steps.push({
+    label: 'Bibliography profile',
+    status: (bp && ['parsed_structural', 'partial'].includes(bp.status))
+      ? 'done' : 'pending',
+    note: !bp
+      ? 'not built yet'
+      : bp.status === 'unknown'
+      ? 'raw text unavailable — provide manuscript'
+      : bp.status === 'not_found'
+      ? 'add References / Bibliography / Список литературы section'
+      : bp.status === 'present_unparsed'
+      ? 'heading found but no refs parsed — check formatting'
+      : bp.status === 'malformed'
+      ? `${bp.malformed_count}/${bp.reference_count} refs malformed`
+      : bp.verification_status !== 'verified'
+      ? `parsed (${bp.reference_count} refs, ${bp.doi_count} DOI); external verification pending`
+      : undefined,
   });
   // V2-D real lanes
   steps.push({
@@ -875,6 +915,101 @@ function SubmissionPackSection({ pack }: { pack: SubmissionPackV2D }) {
           <ul>{pack.unknowns.map((u, i) => <li key={i}>{u}</li>)}</ul>
         </div>
       )}
+    </div>
+  );
+}
+
+
+function BibliographyProfileSection({ bp }: { bp: BibliographyProfileV2E }) {
+  const preview = bp.references.slice(0, 10);
+  return (
+    <div className="lane-section">
+      <div className="lane-head">
+        <span className={`lane-status-badge lane-status--${bp.status}`}>
+          {bp.status}
+        </span>
+        <span className={`pack-ready-badge pack-ready--${bp.verification_status}`}>
+          verify: {bp.verification_status}
+        </span>
+        {bp.confidence && (
+          <span className={`lane-conf lane-conf--${bp.confidence}`}>
+            confidence: {bp.confidence}
+          </span>
+        )}
+        <span className="lane-counter">
+          {bp.reference_count} refs · {bp.doi_count} DOI · {bp.url_count} URL
+        </span>
+      </div>
+      <KVRow label="Section detected" value={String(bp.bibliography_section_detected)} />
+      <KVRow label="Raw text available" value={String(bp.bibliography_text_available)} />
+      <KVRow label="Source" value={bp.source} />
+      {(bp.year_min || bp.year_max) && (
+        <KVRow label="Year range" value={`${bp.year_min ?? '?'} – ${bp.year_max ?? '?'}`} />
+      )}
+      {bp.parsed_reference_count !== bp.reference_count && (
+        <KVRow
+          label="Parsed / total"
+          value={`${bp.parsed_reference_count} / ${bp.reference_count} (unparsed: ${bp.unparsed_reference_count})`}
+        />
+      )}
+      {bp.malformed_count > 0 && (
+        <KVRow label="Malformed" value={bp.malformed_count} />
+      )}
+      {bp.duplicate_suspect_count > 0 && (
+        <KVRow label="Duplicate suspects" value={bp.duplicate_suspect_count} />
+      )}
+      {bp.warnings.length > 0 && (
+        <div className="lane-warning-block" role="alert">
+          <strong>Warnings ({bp.warnings.length}):</strong>
+          <ul>{bp.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
+        </div>
+      )}
+      {bp.verification_tasks.length > 0 && (
+        <div className="lane-list-block">
+          <strong>Verification tasks ({bp.verification_tasks.length}):</strong>
+          <ul>{bp.verification_tasks.map((t, i) => <li key={i}>{t}</li>)}</ul>
+        </div>
+      )}
+      {bp.unknowns.length > 0 && (
+        <div className="lane-unknowns">
+          <strong>Unknowns ({bp.unknowns.length}):</strong>
+          <ul>{bp.unknowns.map((u, i) => <li key={i}>{u}</li>)}</ul>
+        </div>
+      )}
+      {preview.length > 0 && (
+        <div className="lane-list-block">
+          <strong>
+            References preview ({preview.length} of {bp.reference_count})
+          </strong>
+          <ol className="bib-reference-list">
+            {preview.map((r) => (
+              <li key={r.reference_id} className={`bib-reference bib-reference--${r.parse_status}`}>
+                <div className="bib-ref-head">
+                  <span className={`bib-id-badge bib-id--${r.identifier_status}`}>
+                    {r.identifier_status}
+                  </span>
+                  <span className={`bib-parse-badge bib-parse--${r.parse_status}`}>
+                    {r.parse_status}
+                  </span>
+                  {r.year && <span className="bib-year">{r.year}</span>}
+                  {r.doi && (
+                    <code className="bib-doi">doi:{r.doi}</code>
+                  )}
+                </div>
+                <p className="bib-raw">{r.raw_text}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+      <p className="lane-disclaimer">
+        <em>
+          Structural bibliography profile. References are not externally
+          verified unless marked so. No titles / authors / DOIs are
+          invented; only what was extractable by regex from the supplied
+          text.
+        </em>
+      </p>
     </div>
   );
 }

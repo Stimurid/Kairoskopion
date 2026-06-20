@@ -468,6 +468,25 @@ class BibliographyProfile(_DictMixin):
     unknowns: list[str] = _list()
     disclaimer: str = "Bibliography parsed heuristically from text. Not externally verified."
     created_at: str = dc.field(default_factory=_now)
+    # V2-E structural-extraction fields (per brief Track C)
+    source: str | None = _field()
+    status: str = "unknown"
+    bibliography_text_available: bool = False
+    bibliography_section_detected: bool = False
+    reference_count: int = 0
+    parsed_reference_count: int = 0
+    unparsed_reference_count: int = 0
+    detected_identifiers: dict[str, int] = _dict()
+    year_distribution: dict[str, int] = _dict()
+    url_count: int = 0
+    possibly_incomplete: bool = False
+    malformed_count: int = 0
+    duplicate_suspect_count: int = 0
+    verification_status: str = "not_verified"
+    verification_tasks: list[str] = _list()
+    warnings: list[str] = _list()
+    created_from: list[str] = _list()
+    confidence: str | None = _field()
 
 
 @dc.dataclass

@@ -18,6 +18,7 @@ from typing import Any
 
 from ..schema import (
     ArticleModel,
+    BibliographyProfile,
     CitationPlan,
     FitAssessment,
     MismatchMap,
@@ -35,15 +36,23 @@ STATUS_NEEDS_VENUE_CORPUS = "needs_venue_corpus"
 STATUS_SEARCH_TASKS_READY = "search_tasks_ready"
 STATUS_PARTIALLY_READY = "partially_ready"
 STATUS_BLOCKED_MISSING_EVIDENCE = "blocked_missing_evidence"
+# V2-E additions
+STATUS_VERIFICATION_TASKS_READY = "verification_tasks_ready"
+STATUS_BLOCKED_MISSING_BIBLIOGRAPHY = "blocked_missing_bibliography"
+STATUS_NEEDS_USER_INPUT = "needs_user_input"
 
 
-def _bibliography_status(article: ArticleModel) -> str:
-    """Determine whether parsed bibliography signal exists on the article.
-
-    We do NOT have BibliographyProfile in the production fit chain
-    today. Honest "unknown" is the right default; if the article
-    self-reports references we mark "self_reported_only".
+def _bibliography_status(
+    article: ArticleModel,
+    bp: BibliographyProfile | None = None,
+) -> str:
+    """Determine bibliography signal. V2-E: prefer BibliographyProfile
+    when available; fall back to ArticleModel hints otherwise.
     """
+    if bp is not None:
+        # Mirror BibliographyProfile.status into CitationPlan's
+        # current_bibliography_status taxonomy.
+        return f"bib_profile:{bp.status}:{bp.verification_status}"
     if (article.reference_count or 0) > 0:
         return "self_reported_only"
     if article.citation_ecology_current:
@@ -82,6 +91,7 @@ def build_minimal_citation_plan(
     mismatch_map: MismatchMap | None,
     risk_report: RiskReport | None,
     rewrite_plan: RewritePlan | None,
+    bibliography_profile: BibliographyProfile | None = None,
 ) -> CitationPlan:
     """Build a minimal-real CitationPlan from chain artefacts.
 
@@ -104,8 +114,11 @@ def build_minimal_citation_plan(
         "article_model", "venue_model", "fit_assessment",
     ]
 
-    bib_status = _bibliography_status(article)
+    bp = bibliography_profile
+    bib_status = _bibliography_status(article, bp)
     venue_exp_status = _venue_citation_expectation_status(venue)
+    if bp is not None:
+        created_from.append("bibliography_profile")
 
     # ----- Fit-axis signals -----
     cit_axis = _axis_value(fit, "citation_ecology")
@@ -193,8 +206,45 @@ def build_minimal_citation_plan(
             "kind distribution) before citation ecology can be assessed."
         )
 
-    # ----- Verification tasks -----
-    if bib_status == "absent_unknown":
+    # ----- Verification tasks (bibliography-aware) -----
+    if bp is not None:
+        # Inherit BibliographyProfile's verification tasks directly
+        for vt in bp.verification_tasks:
+            verification_tasks.append(vt)
+        # Inherit bibliography warnings into citation plan unknowns
+        for w in bp.warnings:
+            unknowns.append(f"bibliography: {w}")
+        for u in bp.unknowns:
+            unknowns.append(f"bibliography: {u}")
+        if bp.status == "not_found":
+            verification_tasks.append(
+                "Add a recognizable bibliography section to the "
+                "manuscript ('References' / 'Bibliography' / "
+                "'Список литературы') before citation work can begin."
+            )
+        if bp.status == "unknown":
+            verification_tasks.append(
+                "Provide raw article text so BibliographyProfile parser "
+                "can locate the bibliography section."
+            )
+        if bp.reference_count > 0 and bp.doi_count == 0:
+            verification_tasks.append(
+                f"None of the {bp.reference_count} parsed references "
+                "carry a DOI — per-reference metadata cannot be verified "
+                "without external lookup (Crossref/OpenAlex/OpenCitations); "
+                "no external adapter is active in V2-E."
+            )
+        if bp.malformed_count > 0:
+            verification_tasks.append(
+                f"{bp.malformed_count}/{bp.reference_count} references "
+                "look malformed; re-check formatting before submission."
+            )
+        if bp.duplicate_suspect_count > 0:
+            verification_tasks.append(
+                f"{bp.duplicate_suspect_count} duplicate-suspect "
+                "references detected; review for accidental duplicates."
+            )
+    elif bib_status == "absent_unknown":
         verification_tasks.append(
             "Provide the manuscript's bibliography (parsed or raw) — "
             "without it, no citation gap can be verified at the "
@@ -237,28 +287,47 @@ def build_minimal_citation_plan(
             "risk and an integrity risk."
         )
 
-    # ----- Status -----
-    blocked_signals = (
-        bib_status == "absent_unknown"
-        and venue_exp_status == "venue_text_absent"
-    )
-    if blocked_signals:
-        status = STATUS_BLOCKED_MISSING_EVIDENCE
-    elif bib_status == "absent_unknown":
-        status = STATUS_NEEDS_BIBLIOGRAPHY
-    elif venue_exp_status == "venue_text_absent":
-        status = STATUS_NEEDS_VENUE_CORPUS
-    elif search_tasks and missing_bridges:
-        status = STATUS_SEARCH_TASKS_READY
-    elif search_tasks or missing_bridges or gap_categories:
-        status = STATUS_PARTIALLY_READY
+    # ----- Status (V2-E bibliography-aware) -----
+    if bp is not None:
+        if bp.status == "unknown":
+            status = STATUS_BLOCKED_MISSING_EVIDENCE
+        elif bp.status == "not_found":
+            status = STATUS_NEEDS_BIBLIOGRAPHY
+        elif bp.status == "present_unparsed":
+            status = STATUS_BLOCKED_MISSING_BIBLIOGRAPHY
+        elif bp.status in ("parsed_structural", "partial"):
+            status = STATUS_VERIFICATION_TASKS_READY
+        elif bp.status == "malformed":
+            status = STATUS_NEEDS_USER_INPUT
+        elif bp.status == "needs_user_input":
+            status = STATUS_NEEDS_USER_INPUT
+        else:
+            status = STATUS_PARTIALLY_READY
+        confidence = (
+            "medium" if bp.status in ("parsed_structural", "partial")
+            else "low"
+        )
     else:
-        status = STATUS_DRAFT
-
-    confidence = "low" if (
-        bib_status == "absent_unknown"
-        or venue_exp_status == "venue_text_absent"
-    ) else "medium"
+        blocked_signals = (
+            bib_status == "absent_unknown"
+            and venue_exp_status == "venue_text_absent"
+        )
+        if blocked_signals:
+            status = STATUS_BLOCKED_MISSING_EVIDENCE
+        elif bib_status == "absent_unknown":
+            status = STATUS_NEEDS_BIBLIOGRAPHY
+        elif venue_exp_status == "venue_text_absent":
+            status = STATUS_NEEDS_VENUE_CORPUS
+        elif search_tasks and missing_bridges:
+            status = STATUS_SEARCH_TASKS_READY
+        elif search_tasks or missing_bridges or gap_categories:
+            status = STATUS_PARTIALLY_READY
+        else:
+            status = STATUS_DRAFT
+        confidence = "low" if (
+            bib_status == "absent_unknown"
+            or venue_exp_status == "venue_text_absent"
+        ) else "medium"
 
     # de-dup with order preservation
     def _uniq(xs: list[str]) -> list[str]:

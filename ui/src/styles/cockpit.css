@@ -1188,6 +1188,35 @@ body {
 .compliance-source { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono, ui-monospace, monospace); }
 .compliance-item-notes { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); }
 
+/* V2-E BibliographyProfile reference preview */
+.bib-reference-list { margin: 6px 0 0 18px; padding: 0; }
+.bib-reference {
+  margin: 4px 0; padding: 6px 8px;
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+  border-radius: 4px;
+  background: var(--bg-subtle, rgba(255,255,255,0.02));
+}
+.bib-reference--malformed, .bib-reference--empty { border-left: 3px solid #f0b429; }
+.bib-reference--duplicate_suspect { border-left: 3px solid rgba(231, 76, 60, 0.6); }
+.bib-reference--parsed_minimal { border-left: 3px solid rgb(120, 220, 140); }
+.bib-reference--raw_only { border-left: 3px solid rgba(160, 180, 230, 0.6); }
+.bib-ref-head { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.bib-id-badge, .bib-parse-badge {
+  font-size: 10px; padding: 1px 6px; border-radius: 8px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  background: rgba(160, 180, 230, 0.15);
+}
+.bib-id--doi_detected { background: rgba(120, 220, 140, 0.22); }
+.bib-id--url_detected { background: rgba(160, 180, 230, 0.22); }
+.bib-id--no_identifier_detected { background: rgba(240, 180, 41, 0.18); }
+.bib-parse--parsed_minimal { background: rgba(120, 220, 140, 0.18); }
+.bib-parse--raw_only { background: rgba(160, 180, 230, 0.18); }
+.bib-parse--malformed, .bib-parse--empty { background: rgba(240, 180, 41, 0.22); }
+.bib-parse--duplicate_suspect { background: rgba(231, 76, 60, 0.18); }
+.bib-year { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono, ui-monospace, monospace); }
+.bib-doi { font-size: 10px; color: var(--text-muted); word-break: break-all; }
+.bib-raw { margin: 0; font-size: 12px; color: var(--text-muted); word-break: break-word; }
+
 .loading-view {
   display: flex;
   align-items: center;

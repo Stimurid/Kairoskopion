@@ -14,6 +14,7 @@ from ..ids import generate_id
 from ..schema import (
     ArticleModel,
     ArticleSemanticProfile,
+    BibliographyProfile,
     ComplianceChecklist,
     DisciplinaryPathway,
     EvidencePolicy,
@@ -110,6 +111,11 @@ class Case:
         # V2-D minimal-real lanes
         self.compliance_checklist: ComplianceChecklist | None = None
         self.submission_pack: SubmissionPack | None = None
+        # V2-E: BibliographyProfile slot + preserved article raw text
+        # so the parser can read the article body after venue intake
+        # has clobbered self.input_text.
+        self.bibliography_profile: BibliographyProfile | None = None
+        self.article_input_text: str = ""
         self.publication_regime: PublicationRegimeModel | None = None
         self.investigated_venue: VenueModel | None = None
         self.article_field_position: FieldPositionModel | None = None
@@ -257,6 +263,10 @@ class Case:
         )
         venue_result: dict[str, Any] | None = None
         if self.effective_input_type in ARTICLE_PIPELINE_TYPES:
+            # V2-E: preserve raw article text so BibliographyProfile
+            # parser can read it after a later venue intake has
+            # overwritten self.input_text.
+            self.article_input_text = text
             self._build_article_model()
             if search_depth != "none" and self.article_model is not None:
                 enrichment_result = self._enrich_article(search_depth)
@@ -1359,10 +1369,36 @@ class Case:
             except Exception:
                 pass
 
-        # V2-D: minimal-real CitationPlan / ComplianceChecklist /
+        # V2-E: BibliographyProfile from preserved raw article text.
+        # Pure structural extraction; no external lookups; no invented
+        # references. Status=unknown when raw text unavailable.
+        try:
+            from ..services.bibliography_profile import (
+                build_minimal_bibliography_profile,
+            )
+            raw_article_text = self.article_input_text or None
+            self.bibliography_profile = build_minimal_bibliography_profile(
+                raw_text=raw_article_text,
+                article_model_id=(
+                    self.article_model.article_model_id
+                    if self.article_model else None
+                ),
+                source=(
+                    "article_input_text" if raw_article_text else None
+                ),
+            )
+            self._log_decision("bibliography_profile_built", {
+                "status": self.bibliography_profile.status,
+                "reference_count": self.bibliography_profile.reference_count,
+                "doi_count": self.bibliography_profile.doi_count,
+                "verification_status": self.bibliography_profile.verification_status,
+            })
+        except Exception as exc:
+            logger.warning("BibliographyProfile failed (non-fatal): %s", exc)
+
+        # V2-D + V2-E: minimal-real CitationPlan / ComplianceChecklist /
         # SubmissionPack lanes. Pure deterministic builders, no LLM,
-        # no fake content. Each builder produces honest "unknown"
-        # entries when evidence is missing.
+        # no fake content. CitationPlan is now bibliography-aware.
         try:
             from ..services.citation_plan_minimal import (
                 build_minimal_citation_plan,
@@ -1374,6 +1410,7 @@ class Case:
                 self.mismatch_map,
                 self.risk_report,
                 self.rewrite_plan,
+                bibliography_profile=self.bibliography_profile,
             )
             self._log_decision("citation_plan_built", {
                 "status": self.citation_plan.status,
@@ -1393,6 +1430,7 @@ class Case:
                 self.selected_venue,
                 scenario,
                 self.risk_report,
+                bibliography_profile=self.bibliography_profile,
             )
             self._log_decision("compliance_checklist_built", {
                 "status": self.compliance_checklist.status,
@@ -1416,6 +1454,7 @@ class Case:
                 self.rewrite_plan,
                 self.citation_plan,
                 self.compliance_checklist,
+                bibliography_profile=self.bibliography_profile,
             )
             self._log_decision("submission_pack_built", {
                 "ready_status": self.submission_pack.ready_status,
@@ -1604,6 +1643,9 @@ class Case:
             dossier["compliance_checklist"] = self.compliance_checklist.to_dict()
         if self.submission_pack:
             dossier["submission_pack"] = self.submission_pack.to_dict()
+        # V2-E BibliographyProfile
+        if self.bibliography_profile:
+            dossier["bibliography_profile"] = self.bibliography_profile.to_dict()
         if self.article_field_position:
             dossier["article_field_position"] = self.article_field_position.to_dict()
         if self.venue_field_position:
@@ -1821,6 +1863,7 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         "user_id": case.user_id,
         "input_text": case.input_text,
         "input_type": case.input_type,
+        "article_input_text": case.article_input_text,
         "decision_log": case.decision_log,
         "quality_gates": case.quality_gates,
     }
@@ -1837,6 +1880,7 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         ("risk_report", "risk_report"),
         ("compliance_checklist", "compliance_checklist"),
         ("submission_pack", "submission_pack"),
+        ("bibliography_profile", "bibliography_profile"),
         ("publication_regime", "publication_regime"),
         ("investigated_venue", "investigated_venue"),
         ("article_field_position", "article_field_position"),
@@ -1900,6 +1944,7 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
         case.stage = CaseStage.EMPTY
     case.input_text = data.get("input_text", "")
     case.input_type = data.get("input_type", "")
+    case.article_input_text = data.get("article_input_text", "")
     case.decision_log = data.get("decision_log", [])
     case.quality_gates = data.get("quality_gates", {})
 
@@ -1916,6 +1961,7 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
         "risk_report": RiskReport,
         "compliance_checklist": ComplianceChecklist,
         "submission_pack": SubmissionPack,
+        "bibliography_profile": BibliographyProfile,
         "publication_regime": PublicationRegimeModel,
         "investigated_venue": VenueModel,
         "article_field_position": FieldPositionModel,

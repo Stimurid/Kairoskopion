@@ -403,6 +403,8 @@ export interface Dossier {
   citation_plan?: CitationPlanV2D | null;
   compliance_checklist?: ComplianceChecklistV2D | null;
   submission_pack?: SubmissionPackV2D | null;
+  // V2-E structural BibliographyProfile
+  bibliography_profile?: BibliographyProfileV2E | null;
   decision_log: DecisionLogEntry[];
   quality_gates: Record<string, QualityGateResult>;
 }
@@ -456,6 +458,62 @@ export interface ComplianceChecklistV2D {
   checklist_items: ComplianceItemV2D[];
   missing_items: string[];
   blocking_items: string[];
+  warnings: string[];
+  unknowns: string[];
+  created_from: string[];
+  confidence?: string | null;
+}
+
+// V2-E minimal-real BibliographyProfile (structural-extraction).
+export interface BibliographyReferenceV2E {
+  reference_id: string;
+  raw_text: string;
+  authors_text?: string | null;
+  year?: number | null;
+  title_text?: string | null;
+  venue_text?: string | null;
+  doi?: string | null;
+  url?: string | null;
+  identifier_status:
+    | 'doi_detected' | 'url_detected' | 'no_identifier_detected'
+    | 'ambiguous_identifier' | 'unknown' | string;
+  parse_status:
+    | 'parsed_minimal' | 'raw_only' | 'malformed' | 'empty'
+    | 'duplicate_suspect' | string;
+  verification_status:
+    | 'not_verified' | 'structural_only' | 'identifiers_detected'
+    | 'needs_external_lookup' | 'partially_verified' | 'verified'
+    | string;
+  warnings: string[];
+}
+
+export interface BibliographyProfileV2E {
+  bibliography_profile_id: string;
+  article_model_id?: string | null;
+  source?: string | null;
+  status:
+    | 'not_found' | 'present_unparsed' | 'parsed_structural' | 'partial'
+    | 'malformed' | 'needs_user_input' | 'unknown' | string;
+  bibliography_text_available: boolean;
+  bibliography_section_detected: boolean;
+  reference_count: number;
+  parsed_reference_count: number;
+  unparsed_reference_count: number;
+  references: BibliographyReferenceV2E[];
+  detected_identifiers: Record<string, number>;
+  year_distribution: Record<string, number>;
+  year_min?: number | null;
+  year_max?: number | null;
+  doi_count: number;
+  url_count: number;
+  possibly_incomplete: boolean;
+  malformed_count: number;
+  duplicate_suspect_count: number;
+  verification_status:
+    | 'not_verified' | 'structural_only' | 'identifiers_detected'
+    | 'needs_external_lookup' | 'partially_verified' | 'verified'
+    | 'blocked_missing_bibliography' | string;
+  verification_tasks: string[];
   warnings: string[];
   unknowns: string[];
   created_from: string[];
