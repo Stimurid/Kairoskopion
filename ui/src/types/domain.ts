@@ -260,6 +260,39 @@ export interface MismatchItem {
   description: string;
   possible_actions: string[];
   field_core_risk: FieldCoreImpact;
+  // V2-B1 per-mismatch narrative status (written by _run_fit_chain).
+  // Distinguishes llm_filled from honestly-empty cases.
+  narrative_status?:
+    | 'llm_filled' | 'needs_llm' | 'unknown_due_to_venue_evidence'
+    | 'missing_from_llm_output' | 'axis_unmatched' | 'parse_failed'
+    | 'provider_error' | string;
+}
+
+// V2-B1/B2: structured narrator coverage diagnostic. Backend populates
+// on _run_fit_chain after MismatchNarrator runs. Distinguishes 11
+// narrator-status modes; for parse_failed, surfaces 6 redacted V2-B2
+// fields (no raw LLM output).
+export interface NarratorCoverage {
+  narrator_attempted: boolean;
+  narrator_status:
+    | 'not_attempted' | 'filled' | 'partial' | 'empty_valid_unknown'
+    | 'empty_llm_output' | 'missing_axes' | 'axis_match_failure'
+    | 'parse_failed' | 'provider_error' | 'input_insufficient'
+    | 'unknown' | string;
+  filled_count: number;
+  total_count: number;
+  missing_axes: string[];
+  unmatched_axes: string[];
+  parse_status?: string | null;
+  used_model?: string | null;
+  latency_ms?: number | null;
+  empty_reason?: string | null;
+  parse_failure_category?: string | null;
+  parse_failure_reason?: string | null;
+  schema_failure_path?: string | null;
+  schema_failure_rule?: string | null;
+  repair_failure_stage?: string | null;
+  repair_steps_attempted?: string[];
 }
 
 export interface MismatchMap {
@@ -268,6 +301,7 @@ export interface MismatchMap {
   critical_mismatches: string[];
   summary: string;
   unknowns: string[];
+  narrator_coverage?: NarratorCoverage | null;
 }
 
 // --- Rewrite Plan ---
@@ -365,6 +399,12 @@ export interface Dossier {
   mismatch_map?: MismatchMap;
   rewrite_plan?: RewritePlan;
   risk_report?: RiskReport;
+  // V2-C: optional follow-on chain outputs. Backend does not yet
+  // populate these for the prod fit chain; UI must render an honest
+  // "not built yet" placeholder rather than silently omit them.
+  citation_plan?: unknown | null;
+  compliance_checklist?: unknown | null;
+  submission_pack?: unknown | null;
   decision_log: DecisionLogEntry[];
   quality_gates: Record<string, QualityGateResult>;
 }

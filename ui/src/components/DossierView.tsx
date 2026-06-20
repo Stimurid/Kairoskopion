@@ -85,7 +85,26 @@ export function DossierView({ caseId }: Props) {
         <div className="dossier-overview">
           {dossier.article_model && (
             <SectionCard title="Article Model">
-              <KVRow label="Title" value={dossier.article_model.title} />
+              {dossier.article_model.title ? (
+                <KVRow label="Title" value={dossier.article_model.title} />
+              ) : (
+                <div className="dossier-kv">
+                  <span className="dossier-kv-label">Title</span>
+                  <em className="fit-axis-muted">
+                    Не извлечено модели — H1/title заголовок статьи не распознан
+                  </em>
+                </div>
+              )}
+              {dossier.article_model.genre ? (
+                <KVRow label="Genre" value={dossier.article_model.genre} />
+              ) : (
+                <div className="dossier-kv">
+                  <span className="dossier-kv-label">Genre</span>
+                  <em className="fit-axis-muted">
+                    Жанр не определён — article modeler не вынес решения
+                  </em>
+                </div>
+              )}
               <KVRow label="Lifecycle" value={dossier.article_model.lifecycle_status} />
               <KVRow label="Confidence" value={dossier.article_model.confidence} />
               {dossier.article_model.protected_core.length > 0 && (
@@ -96,6 +115,17 @@ export function DossierView({ caseId }: Props) {
                       <span key={i} className="core-element core-element--safe">{c}</span>
                     ))}
                   </div>
+                </div>
+              )}
+              {dossier.article_model.unknowns
+                && dossier.article_model.unknowns.length > 0 && (
+                <div className="article-model-unknowns">
+                  <strong>Unknowns ({dossier.article_model.unknowns.length}):</strong>
+                  <ul>
+                    {dossier.article_model.unknowns.slice(0, 8).map((u, i) => (
+                      <li key={i}>{u}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </SectionCard>
@@ -120,7 +150,7 @@ export function DossierView({ caseId }: Props) {
             </SectionCard>
           )}
 
-          {dossier.pathways && dossier.pathways.length > 0 && (
+          {dossier.pathways && dossier.pathways.length > 0 ? (
             <SectionCard title={`Pathways (${dossier.pathways.length})`}>
               {dossier.pathways.map((p, i) => (
                 <div key={i} className="dossier-pathway-row">
@@ -129,6 +159,13 @@ export function DossierView({ caseId }: Props) {
                   <span className={`pathway-badge fit-${p.fit_strength}`}>{p.fit_strength}</span>
                 </div>
               ))}
+            </SectionCard>
+          ) : (
+            <SectionCard title="Pathways (0)">
+              <p className="placeholder-note">
+                Дисциплинарные пути ещё не выведены — pathway mapper не вернул
+                кандидатов для этой статьи. Это не ошибка fit-проверки.
+              </p>
             </SectionCard>
           )}
 
@@ -335,12 +372,102 @@ export function DossierView({ caseId }: Props) {
           {dossier.mismatch_map && dossier.mismatch_map.mismatches.length > 0 && (
             <SectionCard title={`Mismatches (${dossier.mismatch_map.mismatches.length})`}>
               <p className="dossier-text-sm">{dossier.mismatch_map.summary}</p>
-              {dossier.mismatch_map.mismatches.map((m, i) => (
-                <div key={i} className="dossier-mismatch-row">
-                  <span className={`severity-badge severity-${m.severity}`}>{m.severity}</span>
-                  <span>{m.axis}: {m.description}</span>
+
+              {/* V2-B1/B2: structured narrator coverage diagnostic */}
+              {dossier.mismatch_map.narrator_coverage && (
+                <div className={`narrator-coverage narrator-coverage--${dossier.mismatch_map.narrator_coverage.narrator_status}`}>
+                  <div className="narrator-coverage-head">
+                    <strong>LLM mismatch narrator</strong>
+                    <span className={`narrator-status-badge narrator-status--${dossier.mismatch_map.narrator_coverage.narrator_status}`}>
+                      {dossier.mismatch_map.narrator_coverage.narrator_status}
+                    </span>
+                    <span className="narrator-coverage-count">
+                      filled: {dossier.mismatch_map.narrator_coverage.filled_count}
+                      /{dossier.mismatch_map.narrator_coverage.total_count}
+                    </span>
+                  </div>
+                  {dossier.mismatch_map.narrator_coverage.empty_reason && (
+                    <p className="narrator-coverage-reason">
+                      {dossier.mismatch_map.narrator_coverage.empty_reason}
+                    </p>
+                  )}
+                  {dossier.mismatch_map.narrator_coverage.parse_failure_category && (
+                    <div className="narrator-coverage-parse">
+                      <code>parse_failure_category:</code> {dossier.mismatch_map.narrator_coverage.parse_failure_category}
+                      {dossier.mismatch_map.narrator_coverage.schema_failure_path && (
+                        <span> · path: <code>{dossier.mismatch_map.narrator_coverage.schema_failure_path}</code></span>
+                      )}
+                      {dossier.mismatch_map.narrator_coverage.repair_failure_stage && (
+                        <span> · last repair: <code>{dossier.mismatch_map.narrator_coverage.repair_failure_stage}</code></span>
+                      )}
+                    </div>
+                  )}
+                  {dossier.mismatch_map.narrator_coverage.missing_axes
+                    && dossier.mismatch_map.narrator_coverage.missing_axes.length > 0 && (
+                    <div className="narrator-coverage-missing">
+                      missing axes: {dossier.mismatch_map.narrator_coverage.missing_axes.join(', ')}
+                    </div>
+                  )}
+                  {dossier.mismatch_map.narrator_coverage.unmatched_axes
+                    && dossier.mismatch_map.narrator_coverage.unmatched_axes.length > 0 && (
+                    <div className="narrator-coverage-unmatched">
+                      unmatched axes: {dossier.mismatch_map.narrator_coverage.unmatched_axes.join(', ')}
+                    </div>
+                  )}
+                  <p className="narrator-coverage-note">
+                    Fit, risk и rewrite строятся независимо от narrator —
+                    они уже посчитаны, даже если LLM-комментарий по площадке не дошёл.
+                  </p>
                 </div>
-              ))}
+              )}
+
+              <div className="dossier-mismatch-list">
+                {dossier.mismatch_map.mismatches.map((m, i) => (
+                  <div key={i} className={`dossier-mismatch-card narrative-${m.narrative_status || 'unknown'}`}>
+                    <div className="dossier-mismatch-head">
+                      <span className={`severity-badge severity-${m.severity}`}>{m.severity}</span>
+                      <code className="dossier-mismatch-axis">{m.axis}</code>
+                      {m.narrative_status && (
+                        <span className={`narrative-badge narrative-badge--${m.narrative_status}`}>
+                          {m.narrative_status}
+                        </span>
+                      )}
+                    </div>
+                    {m.article_side && (
+                      <p className="dossier-mismatch-side">
+                        <strong>Article:</strong> {m.article_side}
+                      </p>
+                    )}
+                    {m.venue_side ? (
+                      <p className="dossier-mismatch-side">
+                        <strong>Venue:</strong> {m.venue_side}
+                      </p>
+                    ) : (
+                      <p className="dossier-mismatch-side dossier-mismatch-side--muted">
+                        <em>
+                          {m.narrative_status === 'unknown_due_to_venue_evidence'
+                            ? 'Venue: текст площадки не задаёт явных ожиданий по этой оси.'
+                            : m.narrative_status === 'parse_failed'
+                            ? 'Venue: LLM-комментарий не прошёл проверку схемы (см. блок narrator coverage выше).'
+                            : m.narrative_status === 'provider_error'
+                            ? 'Venue: LLM-провайдер недоступен.'
+                            : 'Venue: требуется LLM-комментарий по площадке.'}
+                        </em>
+                      </p>
+                    )}
+                    {m.description && m.description !== m.article_side && (
+                      <p className="dossier-mismatch-desc">{m.description}</p>
+                    )}
+                    {m.possible_actions && m.possible_actions.length > 0 && (
+                      <ul className="dossier-mismatch-actions">
+                        {m.possible_actions.map((a, j) => (
+                          <li key={j}>{a}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
             </SectionCard>
           )}
 
@@ -349,6 +476,39 @@ export function DossierView({ caseId }: Props) {
               <KVRow label="Effort" value={dossier.rewrite_plan.estimated_effort} />
               <KVRow label="Changes" value={dossier.rewrite_plan.changes.length} />
               <KVRow label="Summary" value={dossier.rewrite_plan.summary} />
+            </SectionCard>
+          )}
+
+          {/* V2-C: honest placeholders for follow-on chain outputs */}
+          {!dossier.citation_plan && (
+            <SectionCard title="Citation plan">
+              <p className="placeholder-note">
+                <strong>Citation plan not built yet</strong> для этого case.
+                Citation gaps по площадке частично отражены в FitAssessment
+                (ось <code>citation_ecology</code>) и RewritePlan. Полноценный
+                CitationPlan строится отдельным проходом с BibliographyProfile.
+              </p>
+            </SectionCard>
+          )}
+          {!dossier.compliance_checklist && (
+            <SectionCard title="Compliance checklist">
+              <p className="placeholder-note">
+                <strong>Compliance checklist not built yet</strong> для этого case.
+                Формальные риски подачи (AI disclosure, data availability, ethics,
+                conflict of interest и т.д.) частично отражены в RiskReport
+                выше. Venue-specific compliance lane — отдельный проход.
+              </p>
+            </SectionCard>
+          )}
+          {!dossier.submission_pack && (
+            <SectionCard title="Submission pack">
+              <p className="placeholder-note">
+                <strong>Submission pack not built yet</strong> для этого case.
+                Этот dossier — pre-submission assessment: статья × площадка ×
+                сценарий → fit + mismatch + risk + rewrite. SubmissionPack
+                (cover letter, statements, ready-to-submit gate) — отдельная
+                фаза после принятия RewritePlan.
+              </p>
             </SectionCard>
           )}
 
@@ -363,10 +523,90 @@ export function DossierView({ caseId }: Props) {
               ))}
             </SectionCard>
           )}
+
+          {/* V2-C: explicit next-action block computed from dossier shape.
+              No new state on case — pure derivation. */}
+          <SectionCard title="Next action">
+            <NextActionBlock dossier={dossier} />
+          </SectionCard>
         </div>
       ) : (
         <DecisionLog caseId={caseId} />
       )}
+    </div>
+  );
+}
+
+
+function NextActionBlock({ dossier }: { dossier: Dossier }) {
+  const steps: { label: string; status: 'done' | 'pending'; note?: string }[] = [];
+  steps.push({
+    label: 'Article model built',
+    status: dossier.article_model ? 'done' : 'pending',
+  });
+  steps.push({
+    label: 'Venue selected',
+    status: dossier.selected_venue ? 'done' : 'pending',
+  });
+  steps.push({
+    label: 'Scenario provided',
+    status: (dossier.scenario && !dossier.scenario.scenario_preliminary)
+      ? 'done' : 'pending',
+    note: dossier.scenario?.scenario_preliminary
+      ? 'preliminary — заполните сценарий подачи для уточнения fit'
+      : undefined,
+  });
+  steps.push({
+    label: 'Fit matrix built',
+    status: (dossier.fit_assessment && dossier.fit_assessment.axes
+      && dossier.fit_assessment.axes.length > 0) ? 'done' : 'pending',
+  });
+  steps.push({
+    label: 'Mismatch narrator filled',
+    status: (dossier.mismatch_map?.narrator_coverage?.narrator_status === 'filled'
+      || dossier.mismatch_map?.narrator_coverage?.narrator_status === 'partial')
+      ? 'done' : 'pending',
+    note: dossier.mismatch_map?.narrator_coverage?.narrator_status === 'parse_failed'
+      ? `LLM-комментарий не прошёл проверку (${dossier.mismatch_map.narrator_coverage.parse_failure_category || 'parse_failed'}) — fit/risk/rewrite уже посчитаны`
+      : dossier.mismatch_map?.narrator_coverage?.narrator_status === 'empty_valid_unknown'
+      ? 'LLM честно отказался: текст площадки не задаёт явных ожиданий — добавьте подробный текст площадки'
+      : undefined,
+  });
+  steps.push({
+    label: 'Risk report built',
+    status: dossier.risk_report ? 'done' : 'pending',
+  });
+  steps.push({
+    label: 'Rewrite plan built',
+    status: (dossier.rewrite_plan && dossier.rewrite_plan.changes.length > 0)
+      ? 'done' : 'pending',
+  });
+
+  // First pending step is the recommended next action.
+  const firstPending = steps.find(s => s.status === 'pending');
+  let primary: string;
+  if (!firstPending) {
+    primary = 'Все основные секции построены. Откройте Risk и Rewrite plan и решите, какие изменения принять.';
+  } else if (firstPending.label === 'Scenario provided') {
+    primary = 'Заполните SubmissionScenario (цель, дедлайн, риск-толерантность, APC max) — это уточнит fit-вердикт.';
+  } else if (firstPending.label === 'Mismatch narrator filled' && firstPending.note) {
+    primary = firstPending.note;
+  } else {
+    primary = `Следующий шаг: ${firstPending.label.toLowerCase()}.`;
+  }
+
+  return (
+    <div className="next-action-block">
+      <p className="next-action-primary"><strong>{primary}</strong></p>
+      <ul className="next-action-checklist">
+        {steps.map((s, i) => (
+          <li key={i} className={`next-action-step next-action-step--${s.status}`}>
+            <span className="next-action-marker">{s.status === 'done' ? '✓' : '○'}</span>
+            <span className="next-action-label">{s.label}</span>
+            {s.note && <em className="next-action-note"> — {s.note}</em>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
