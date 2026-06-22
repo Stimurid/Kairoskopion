@@ -1307,13 +1307,25 @@ class Case:
                     and coverage["narrator_status"] in _RESCUE_TRIGGERS
                     and self.mismatch_map.mismatches
                 ):
+                    # Round III Track E: cap rescue at first 3 axes so
+                    # total chain stays under proxy timeout. Unrescued
+                    # axes keep narrative_status=needs_llm honestly.
+                    _RESCUE_CAP = 3
                     rescued = 0
                     per_axis_results: list[dict[str, Any]] = []
+                    rescued_so_far = 0
                     for m in self.mismatch_map.mismatches:
                         axis = (
                             m.get("axis", "") if isinstance(m, dict)
                             else getattr(m, "axis", "")
                         )
+                        if rescued_so_far >= _RESCUE_CAP:
+                            per_axis_results.append({
+                                "axis": axis,
+                                "narrative_status": "needs_llm",
+                            })
+                            continue
+                        rescued_so_far += 1
                         # ONE mismatch per call. If that one fails,
                         # mark this axis needs_llm and continue.
                         single_inp = _AI(
