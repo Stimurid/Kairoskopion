@@ -179,6 +179,9 @@ def provider_status() -> dict:
         "article_field_positioner",
         "venue_field_positioner",
         "venue_discovery",
+        "risk_officer",
+        "rewrite_planner",
+        "citation_planner",
         "discipline_source_acquisition",
         "discipline_seeder",
     )

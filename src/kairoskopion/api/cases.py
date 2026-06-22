@@ -1292,6 +1292,120 @@ class Case:
                     "missing_axes_count": len(coverage["missing_axes"]),
                     "unmatched_axes_count": len(coverage["unmatched_axes"]),
                 })
+
+                # Round III Track E: per-axis rescue when the batch
+                # call collapsed. If parse_failed / empty_llm_output /
+                # axis_match_failure / missing_axes AND a provider is
+                # available, retry one axis at a time. One bad axis
+                # then does not collapse the whole case.
+                _RESCUE_TRIGGERS = {
+                    "parse_failed", "empty_llm_output",
+                    "axis_match_failure", "missing_axes",
+                }
+                if (
+                    narr_provider is not None
+                    and coverage["narrator_status"] in _RESCUE_TRIGGERS
+                    and self.mismatch_map.mismatches
+                ):
+                    rescued = 0
+                    per_axis_results: list[dict[str, Any]] = []
+                    for m in self.mismatch_map.mismatches:
+                        axis = (
+                            m.get("axis", "") if isinstance(m, dict)
+                            else getattr(m, "axis", "")
+                        )
+                        # ONE mismatch per call. If that one fails,
+                        # mark this axis needs_llm and continue.
+                        single_inp = _AI(
+                            operation_id="mismatch_narrate_rescue",
+                            agent_role_id="mismatch_narrator",
+                            entities={
+                                "article": self.article_model.to_dict(),
+                                "venue": self.selected_venue.to_dict(),
+                                "mismatches": [
+                                    dict(m) if isinstance(m, dict) else m
+                                ],
+                            },
+                        )
+                        try:
+                            single_out = narr_agent.execute(
+                                single_inp, narr_provider,
+                            )
+                        except Exception:  # noqa: BLE001
+                            single_out = None
+                        if (single_out is None
+                                or not single_out.output_entity):
+                            per_axis_results.append({
+                                "axis": axis,
+                                "narrative_status": "parse_failed",
+                            })
+                            continue
+                        narratives = (
+                            single_out.output_entity.get("narratives") or []
+                        )
+                        # Find the entry for this axis (LLM may rename)
+                        n = next(
+                            (x for x in narratives
+                             if isinstance(x, dict)
+                             and x.get("axis") == axis),
+                            None,
+                        )
+                        if n and (n.get("venue_side") or "").strip():
+                            per_axis_results.append({
+                                "axis": axis,
+                                "venue_side": (n.get("venue_side") or "").strip(),
+                                "description": (n.get("description") or "").strip(),
+                                "possible_actions": list(
+                                    n.get("possible_actions") or []),
+                                "narrative_status": "llm_filled",
+                            })
+                            rescued += 1
+                        else:
+                            per_axis_results.append({
+                                "axis": axis,
+                                "narrative_status": "needs_llm",
+                            })
+
+                    # Re-enrich + reclassify if anything rescued
+                    if rescued > 0:
+                        enrich_mismatch_map_in_place(
+                            self.mismatch_map, per_axis_results,
+                        )
+                        # Update per-mismatch narrative_status
+                        by_axis_resc = {
+                            r.get("axis"): r for r in per_axis_results
+                        }
+                        for m in self.mismatch_map.mismatches:
+                            axis = (
+                                m.get("axis", "") if isinstance(m, dict)
+                                else getattr(m, "axis", "")
+                            )
+                            r = by_axis_resc.get(axis)
+                            if r:
+                                new_status = r.get("narrative_status", "needs_llm")
+                                if isinstance(m, dict):
+                                    m["narrative_status"] = new_status
+                                else:
+                                    setattr(m, "narrative_status", new_status)
+                        # Update coverage
+                        total = len(self.mismatch_map.mismatches)
+                        cov = self.mismatch_map.narrator_coverage or {}
+                        if rescued == total:
+                            cov["narrator_status"] = "filled"
+                        else:
+                            cov["narrator_status"] = "partial"
+                        cov["filled_count"] = rescued
+                        cov["total_count"] = total
+                        cov["empty_reason"] = (
+                            f"batch parse failed; per-axis rescue "
+                            f"recovered {rescued}/{total}"
+                        )
+                        self.mismatch_map.narrator_coverage = cov
+                        self._log_decision("mismatch_narrator_rescued", {
+                            "rescued": rescued,
+                            "total": total,
+                            "status_after_rescue": cov["narrator_status"],
+                        })
         except Exception as exc:
             logger.warning("Mismatch narrator failed (non-fatal): %s", exc)
             # Even on agent exception, mark coverage as provider_error
@@ -1331,50 +1445,49 @@ class Case:
         # requires a BibliographyProfile which isn't always available
         # at this point — it's built on-demand by /adaptation-plan;
         # skip here to avoid fake data.)
-        # Round II-B: route through needs_llm placeholder. Deterministic
-        # semantic risk diagnosis is forbidden by doctrine. Legacy
-        # build_risk_report stays available for tests + future LLM
-        # risk_officer fallback; production chain stops emitting
-        # deterministic semantic risk items.
+        # Round III: wire LLM risk_officer with needs_llm fallback.
+        # On LLM success → semantic_status=llm_grounded with origins=llm.
+        # On LLM failure → needs_llm placeholder. Deterministic
+        # semantic build_risk_report is NEVER called from the chain.
         try:
-            from ..services.risk_report_needs_llm import (
-                build_needs_llm_risk_report,
-            )
-            self.risk_report = build_needs_llm_risk_report(
+            from ..services.llm_semantic_organs import try_llm_risk_officer
+            risk_provider = _get_llm_provider("risk_officer")
+            self.risk_report = try_llm_risk_officer(
                 self.article_model,
                 self.selected_venue,
                 scenario,
                 self.fit_assessment,
                 self.mismatch_map,
+                risk_provider,
             )
             self._log_decision("risk_report_built", {
                 "semantic_status": self.risk_report.semantic_status,
-                "risk_count": 0,
-                "round2b_doctrine": "needs_llm_placeholder",
+                "risk_count": len(self.risk_report.risk_items),
+                "round3_organ": "llm_risk_officer" if (
+                    risk_provider is not None
+                    and self.risk_report.semantic_status == "llm_grounded"
+                ) else "needs_llm_placeholder",
             })
         except Exception as exc:
             logger.warning("Risk report failed (non-fatal): %s", exc)
 
         if self.mismatch_map.mismatches:
             try:
-                # Round II-B: needs_llm placeholder. Legacy
-                # build_rewrite_plan stays for tests + future LLM
-                # rewrite_planner agent fallback; production chain
-                # stops emitting deterministic semantic rewrite changes
-                # and field_core_risk assessments.
-                from ..services.rewrite_plan_needs_llm import (
-                    build_needs_llm_rewrite_plan,
+                # Round III: wire LLM rewrite_planner with needs_llm
+                # fallback. Deterministic build_rewrite_plan is NEVER
+                # called from the chain. Core-touching changes require
+                # user acceptance.
+                from ..services.llm_semantic_organs import (
+                    try_llm_rewrite_planner,
                 )
-                self.rewrite_plan = build_needs_llm_rewrite_plan(
+                rewrite_provider = _get_llm_provider("rewrite_planner")
+                self.rewrite_plan = try_llm_rewrite_planner(
+                    self.article_model,
+                    self.selected_venue,
+                    self.fit_assessment,
                     self.mismatch_map,
-                    article_model_id=(
-                        self.article_model.article_model_id
-                        if self.article_model else None
-                    ),
-                    venue_model_id=(
-                        self.selected_venue.venue_model_id
-                        if self.selected_venue else None
-                    ),
+                    self.risk_report,
+                    rewrite_provider,
                 )
                 self.stage = CaseStage.ADAPTING
                 self._log_decision("rewrite_planned", {
@@ -1443,11 +1556,33 @@ class Case:
                 self.rewrite_plan,
                 bibliography_profile=self.bibliography_profile,
             )
+            # Round III: upgrade with LLM CitationPlanner if provider
+            # available. Augments semantic fields (gap_categories /
+            # missing_bridges / search_tasks / padding_warnings) and
+            # marks origin=llm. Anti-fake filter strips invented DOIs
+            # / author-year. Failure: keep structural plan unchanged.
+            from ..services.llm_semantic_organs import (
+                upgrade_citation_plan_with_llm,
+            )
+            cit_provider = _get_llm_provider("citation_planner")
+            self.citation_plan = upgrade_citation_plan_with_llm(
+                self.citation_plan,
+                self.article_model,
+                self.selected_venue,
+                self.bibliography_profile,
+                cit_provider,
+            )
             self._log_decision("citation_plan_built", {
                 "status": self.citation_plan.status,
+                "semantic_status": self.citation_plan.semantic_status,
                 "gap_categories_count": len(self.citation_plan.citation_gap_categories),
                 "search_tasks_count": len(self.citation_plan.recommended_reference_search_tasks),
                 "unknowns_count": len(self.citation_plan.unknowns),
+                "round3_organ": "llm_citation_planner" if (
+                    cit_provider is not None
+                    and "llm_citation_planner"
+                    in self.citation_plan.created_from
+                ) else "structural_minimal_only",
             })
         except Exception as exc:
             logger.warning("CitationPlan minimal failed (non-fatal): %s", exc)
