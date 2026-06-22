@@ -142,6 +142,44 @@ def classify_parse_failure(
 
     repair_stage = repair_steps[-1] if repair_steps else None
 
+    # Round-II precedence: prefer concrete parse_status over hardcoded
+    # fallback_reason. When the two disagree (older narrator hardcoded
+    # fallback_reason=schema_validation_failed but parse_status reports
+    # the true repair_failed / invalid_json), trust parse_status.
+    if parse_status in ("repair_failed",):
+        if not repair_steps:
+            return {
+                **blank,
+                "parse_failure_category": PARSE_FAIL_EMPTY_AFTER_REPAIR,
+                "parse_failure_reason": (
+                    "narrator output could not be parsed and no repair "
+                    "steps applied (likely empty or non-JSON content)"
+                ),
+                "repair_failure_stage": None,
+                "repair_steps_attempted": [],
+            }
+        return {
+            **blank,
+            "parse_failure_category": PARSE_FAIL_REPAIR_FAILED,
+            "parse_failure_reason": (
+                "narrator output failed JSON parsing and all bounded "
+                "repair attempts were rejected"
+            ),
+            "repair_failure_stage": repair_stage,
+            "repair_steps_attempted": repair_steps,
+        }
+    if parse_status in ("invalid_json",):
+        return {
+            **blank,
+            "parse_failure_category": PARSE_FAIL_INVALID_JSON,
+            "parse_failure_reason": (
+                "narrator output was not valid JSON and no repair was "
+                "attempted"
+            ),
+            "repair_failure_stage": repair_stage,
+            "repair_steps_attempted": repair_steps,
+        }
+
     # 1) Schema-validation failure: extract path/rule when we can.
     if parse_status == "schema_validation_failed" or (
         fallback_reason == "schema_validation_failed"

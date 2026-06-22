@@ -297,6 +297,25 @@ def build_minimal_bibliography_profile(
     - refs parsed → status=parsed_structural (or partial if some
       malformed).
     """
+    # Round-II: BibliographyProfile is structural-only by construction.
+    from .semantic_provenance import (
+        ORIGIN_STRUCTURAL_EXTRACTION,
+        SEMANTIC_STATUS_STRUCTURAL_ONLY,
+    )
+    _STRUCTURAL_ORIGINS = {
+        "status": ORIGIN_STRUCTURAL_EXTRACTION,
+        "reference_count": ORIGIN_STRUCTURAL_EXTRACTION,
+        "doi_count": ORIGIN_STRUCTURAL_EXTRACTION,
+        "url_count": ORIGIN_STRUCTURAL_EXTRACTION,
+        "references": ORIGIN_STRUCTURAL_EXTRACTION,
+        "year_distribution": ORIGIN_STRUCTURAL_EXTRACTION,
+        "verification_status": ORIGIN_STRUCTURAL_EXTRACTION,
+        "verification_tasks": ORIGIN_STRUCTURAL_EXTRACTION,
+        "warnings": ORIGIN_STRUCTURAL_EXTRACTION,
+        "unknowns": ORIGIN_STRUCTURAL_EXTRACTION,
+        "malformed_count": ORIGIN_STRUCTURAL_EXTRACTION,
+        "duplicate_suspect_count": ORIGIN_STRUCTURAL_EXTRACTION,
+    }
     if raw_text is None:
         return BibliographyProfile(
             article_model_id=article_model_id,
@@ -315,6 +334,8 @@ def build_minimal_bibliography_profile(
             unknowns=["bibliography presence unknown — no raw text supplied"],
             created_from=["unavailable_raw_text"],
             confidence="low",
+            field_origins=dict(_STRUCTURAL_ORIGINS),
+            semantic_status=SEMANTIC_STATUS_STRUCTURAL_ONLY,
         )
 
     block, _ = _extract_bibliography_block(raw_text)
@@ -343,6 +364,8 @@ def build_minimal_bibliography_profile(
             ],
             created_from=["raw_text_heading_scan"],
             confidence="medium",
+            field_origins=dict(_STRUCTURAL_ORIGINS),
+            semantic_status=SEMANTIC_STATUS_STRUCTURAL_ONLY,
         )
 
     candidates = _split_into_reference_candidates(block)
@@ -481,4 +504,6 @@ def build_minimal_bibliography_profile(
         confidence=(
             "medium" if status == STATUS_PARSED_STRUCTURAL else "low"
         ),
+        field_origins=dict(_STRUCTURAL_ORIGINS),
+        semantic_status=SEMANTIC_STATUS_STRUCTURAL_ONLY,
     )

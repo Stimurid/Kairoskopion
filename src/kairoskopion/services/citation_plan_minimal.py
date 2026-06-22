@@ -120,47 +120,38 @@ def build_minimal_citation_plan(
     if bp is not None:
         created_from.append("bibliography_profile")
 
-    # ----- Fit-axis signals -----
+    # ----- Fit-axis signals (Round II: NO semantic emission) -----
+    # Deterministic code may NOT author citation gap categories,
+    # missing bridges, search tasks, or padding warnings. These are
+    # semantic claims about article × venue citation ecology and
+    # belong to a future LLM citation-ecologist organ (agent
+    # `fit/citation_planner.py` is the contract holder, deferred).
+    # Per Round II doctrine, when LLM organ is absent the fields stay
+    # empty with origin=needs_llm.
     cit_axis = _axis_value(fit, "citation_ecology")
     disc_axis = _axis_value(fit, "discipline")
     novelty_axis = _axis_value(fit, "novelty_positioning")
     method_axis = _axis_value(fit, "method")
-
-    if cit_axis in ("bad", "weak", "unknown"):
-        gap_categories.append(
-            f"citation ecology fit = {cit_axis or 'unknown'}"
-        )
+    # Structural risk_flag aggregation only (axis label string is a
+    # structural verdict from FitAssessor, not a new semantic claim).
+    if cit_axis in ("bad", "weak"):
+        risk_flags.append(f"fit_axis_citation_ecology={cit_axis}")
     if disc_axis in ("bad", "weak"):
-        gap_categories.append(
-            "disciplinary citation bridging may be insufficient"
-        )
-        missing_bridges.append(
-            "disciplinary bridge references between article's "
-            "disciplinary register and venue's primary discipline"
-        )
+        risk_flags.append(f"fit_axis_discipline={disc_axis}")
     if novelty_axis in ("bad", "weak"):
-        gap_categories.append(
-            "novelty-positioning citation work may be needed"
-        )
-        missing_bridges.append(
-            "recent-debate-marker references for the venue's "
-            "current conversation on this topic"
-        )
+        risk_flags.append(f"fit_axis_novelty_positioning={novelty_axis}")
     if method_axis in ("bad", "weak"):
-        gap_categories.append(
-            "method-justification citation gap (theoretical method "
-            "in a venue with empirical expectations)"
-        )
+        risk_flags.append(f"fit_axis_method={method_axis}")
 
-    # ----- Mismatch-map signals -----
+    # ----- Mismatch-map signals (structural only) -----
     if mismatch_map is not None:
         for m in mismatch_map.mismatches:
             axis = m.get("axis", "") if isinstance(m, dict) else getattr(m, "axis", "")
             if axis == "citation_ecology":
-                gap_categories.append("citation mismatch flagged in MismatchMap")
+                risk_flags.append("mismatch_axis_citation_ecology")
                 created_from.append("mismatch_map")
 
-    # ----- Risk-report signals -----
+    # ----- Risk-report signals (structural aggregation) -----
     if risk_report is not None:
         created_from.append("risk_report")
         for r in risk_report.risk_items:
@@ -169,7 +160,7 @@ def build_minimal_citation_plan(
                          "scope_mismatch"):
                 risk_flags.append(rtype)
 
-    # ----- Rewrite-plan signals -----
+    # ----- Rewrite-plan signals (structural flag only) -----
     if rewrite_plan is not None:
         for ch in rewrite_plan.changes:
             tgt = (ch.get("target_block") if isinstance(ch, dict) else "") or ""
@@ -180,31 +171,15 @@ def build_minimal_citation_plan(
                           "literature")
             ):
                 created_from.append("rewrite_plan")
-                gap_categories.append(
-                    "rewrite plan requests citation/literature work"
-                )
+                risk_flags.append("rewrite_plan_requests_citation_work")
                 break
 
-    # ----- Search tasks (no concrete references invented) -----
-    if disc_axis in ("bad", "weak", "unknown"):
-        search_tasks.append(
-            "Identify 5-8 recent articles from the target venue that "
-            "engage the article's disciplinary tradition; extract the "
-            "theoretical anchors they recur to. Do not cite venue-local "
-            "papers cosmetically — only add a citation when it supports "
-            "a real argumentative bridge in your article."
-        )
-    if novelty_axis in ("bad", "weak"):
-        search_tasks.append(
-            "Identify the current debate markers in the venue's recent "
-            "issues on this topic; position the article's novelty "
-            "claim against the most recent counter-argument."
-        )
-    if cit_axis == "unknown":
-        search_tasks.append(
-            "Parse the manuscript's bibliography (count, recency, source "
-            "kind distribution) before citation ecology can be assessed."
-        )
+    # ----- Search tasks: NO deterministic semantic emission (Round II) -----
+    # Search tasks describe semantic strategy ("identify recent
+    # articles", "position novelty against counter-arguments"). Per
+    # doctrine these must come from an LLM citation-ecologist organ
+    # consuming BibliographyProfile + venue source corpus +
+    # ArticleSemanticProfile. Left empty here with origin=needs_llm.
 
     # ----- Verification tasks (bibliography-aware) -----
     if bp is not None:
@@ -278,14 +253,11 @@ def build_minimal_citation_plan(
             "preferred bridges) are unknown."
         )
 
-    # ----- Dangerous-padding warning (always present when expansion suggested) -----
-    if missing_bridges or search_tasks:
-        padding_warnings.append(
-            "Do not add references only to imitate venue metrics. Every "
-            "added reference must support an actual argumentative bridge "
-            "in the article. Cosmetic citation padding is a desk-reject "
-            "risk and an integrity risk."
-        )
+    # ----- Dangerous-padding warning: NO deterministic emission (Round II) -----
+    # The padding warning is editorial semantic advice. It belongs to
+    # an LLM citation-ecologist organ. Empty list here; origin=needs_llm.
+    # (Even when LLM is absent, the empty list is honest — no fake
+    # advice authored by code.)
 
     # ----- Status (V2-E bibliography-aware) -----
     if bp is not None:
@@ -339,20 +311,52 @@ def build_minimal_citation_plan(
                 out.append(x)
         return out
 
+    # Round-II provenance: per-field origins. Semantic content fields
+    # are intentionally empty (needs_llm); structural fields use
+    # structural_extraction / deterministic_aggregation.
+    from .semantic_provenance import (
+        ORIGIN_DETERMINISTIC_AGGREGATION,
+        ORIGIN_NEEDS_LLM,
+        ORIGIN_STRUCTURAL_EXTRACTION,
+        SEMANTIC_STATUS_NEEDS_LLM,
+        SEMANTIC_STATUS_STRUCTURAL_ONLY,
+        aggregate_semantic_status,
+    )
+    field_origins: dict[str, str] = {
+        "status": ORIGIN_STRUCTURAL_EXTRACTION,
+        "current_bibliography_status": ORIGIN_STRUCTURAL_EXTRACTION,
+        "venue_citation_expectation_status": ORIGIN_STRUCTURAL_EXTRACTION,
+        "verification_tasks": ORIGIN_STRUCTURAL_EXTRACTION,
+        "risk_flags": ORIGIN_DETERMINISTIC_AGGREGATION,
+        "unknowns": ORIGIN_STRUCTURAL_EXTRACTION,
+        "created_from": ORIGIN_STRUCTURAL_EXTRACTION,
+        "confidence": ORIGIN_DETERMINISTIC_AGGREGATION,
+        # Semantic fields: intentionally empty, awaiting LLM organ.
+        "citation_gap_categories": ORIGIN_NEEDS_LLM,
+        "missing_bridge_categories": ORIGIN_NEEDS_LLM,
+        "recommended_reference_search_tasks": ORIGIN_NEEDS_LLM,
+        "dangerous_padding_warnings": ORIGIN_NEEDS_LLM,
+    }
+    semantic_status = aggregate_semantic_status(field_origins)
+
     return CitationPlan(
         article_model_id=article.article_model_id,
         venue_model_id=venue.venue_model_id,
         fit_assessment_id=fit.fit_assessment_id,
         current_bibliography_status=bib_status,
         venue_citation_expectation_status=venue_exp_status,
-        citation_gap_categories=_uniq(gap_categories),
-        missing_bridge_categories=_uniq(missing_bridges),
-        recommended_reference_search_tasks=_uniq(search_tasks),
+        # Round II: semantic content fields stay empty; LLM organ owns them.
+        citation_gap_categories=[],
+        missing_bridge_categories=[],
+        recommended_reference_search_tasks=[],
+        dangerous_padding_warnings=[],
+        # Structural-only fields remain populated.
         verification_tasks=_uniq(verification_tasks),
-        dangerous_padding_warnings=padding_warnings,
         risk_flags=_uniq(risk_flags),
         unknowns=_uniq(unknowns),
         created_from=_uniq(created_from),
         confidence=confidence,
         status=status,
+        field_origins=field_origins,
+        semantic_status=semantic_status,
     )

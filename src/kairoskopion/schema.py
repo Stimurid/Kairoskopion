@@ -431,6 +431,9 @@ class CitationPlan(_DictMixin):
     unknowns: list[str] = _list()
     created_from: list[str] = _list()
     confidence: str | None = _field()
+    # Round-II semantic provenance
+    field_origins: dict[str, str] = _dict()
+    semantic_status: str = "not_built"
 
 
 # ---------------------------------------------------------------------------
@@ -487,6 +490,10 @@ class BibliographyProfile(_DictMixin):
     warnings: list[str] = _list()
     created_from: list[str] = _list()
     confidence: str | None = _field()
+    # Round-II semantic provenance — BibliographyProfile is always
+    # structural-only by construction.
+    field_origins: dict[str, str] = _dict()
+    semantic_status: str = "structural_only"
 
 
 @dc.dataclass
@@ -578,6 +585,9 @@ class ComplianceChecklist(_DictMixin):
     unknowns: list[str] = _list()
     created_from: list[str] = _list()
     confidence: str | None = _field()
+    # Round-II semantic provenance
+    field_origins: dict[str, str] = _dict()
+    semantic_status: str = "not_built"
 
 
 @dc.dataclass
@@ -605,6 +615,9 @@ class SubmissionPack(_DictMixin):
     depends_on: list[str] = _list()
     created_from: list[str] = _list()
     unknowns: list[str] = _list()
+    # Round-II semantic provenance
+    field_origins: dict[str, str] = _dict()
+    semantic_status: str = "not_built"
 
 
 # ---------------------------------------------------------------------------

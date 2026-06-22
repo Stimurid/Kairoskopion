@@ -461,6 +461,26 @@ def build_minimal_compliance_checklist(
                 out.append(x)
         return out
 
+    from .semantic_provenance import (
+        ORIGIN_DETERMINISTIC_AGGREGATION,
+        ORIGIN_SOURCE_FACT_DIRECT,
+        ORIGIN_STRUCTURAL_EXTRACTION,
+        SEMANTIC_STATUS_STRUCTURAL_ONLY,
+        aggregate_semantic_status,
+    )
+    # All ComplianceChecklist fields are structural cross-references
+    # of article-fields × venue-policy-field presence. Per-item
+    # status (satisfied/missing/needs_user_input/unknown_not_verified)
+    # is structural; per-item notes are structural-status prose
+    # (e.g. "AI policy not verified"), not venue-content interpretation.
+    field_origins = {
+        "checklist_items": ORIGIN_STRUCTURAL_EXTRACTION,
+        "missing_items": ORIGIN_STRUCTURAL_EXTRACTION,
+        "blocking_items": ORIGIN_DETERMINISTIC_AGGREGATION,
+        "warnings": ORIGIN_DETERMINISTIC_AGGREGATION,
+        "unknowns": ORIGIN_STRUCTURAL_EXTRACTION,
+        "status": ORIGIN_DETERMINISTIC_AGGREGATION,
+    }
     return ComplianceChecklist(
         article_model_id=article.article_model_id,
         venue_model_id=venue.venue_model_id,
@@ -477,4 +497,6 @@ def build_minimal_compliance_checklist(
         created_from=_uniq(created_from),
         confidence="low" if unknowns else "medium",
         status=status,
+        field_origins=field_origins,
+        semantic_status=aggregate_semantic_status(field_origins),
     )

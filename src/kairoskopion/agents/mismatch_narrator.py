@@ -158,13 +158,33 @@ class MismatchNarratorAgent(AgentRole):
         if not isinstance(parsed, dict):
             outcome = repair_and_parse(response.content, schema=family["output_schema"])
             if outcome.status not in (PARSE_STATUS_PARSED_OK, PARSE_STATUS_REPAIRED_OK):
+                # Round-II: derive fallback_reason from outcome.status
+                # so V2-B2 narrator_coverage surfaces the correct
+                # category (invalid_json / repair_failed /
+                # schema_validation_failed) instead of always reporting
+                # schema_validation_failed.
+                from ..llm.attempt_metadata import (
+                    FALLBACK_REASON_INVALID_JSON,
+                    FALLBACK_REASON_REPAIR_FAILED,
+                )
+                _reason_map = {
+                    "schema_validation_failed": FALLBACK_REASON_SCHEMA_VALIDATION_FAILED,
+                    "repair_failed": FALLBACK_REASON_REPAIR_FAILED,
+                    "invalid_json": FALLBACK_REASON_INVALID_JSON,
+                }
+                reason = _reason_map.get(
+                    outcome.status,
+                    FALLBACK_REASON_SCHEMA_VALIDATION_FAILED,
+                )
                 meta = LLMAttemptMetadata.fallback(
-                    reason=FALLBACK_REASON_SCHEMA_VALIDATION_FAILED,
+                    reason=reason,
                     provider="openai_compatible",
                     model=response.model,
                     latency_ms=response.latency_ms,
                     validation_errors=outcome.validation_errors,
                     parse_status=outcome.status,
+                    repair_attempted=bool(outcome.repair_steps),
+                    repair_steps=outcome.repair_steps,
                 )
                 return self._honest_fallback(mismatches, meta)
             parsed = outcome.parsed

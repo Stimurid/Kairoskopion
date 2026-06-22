@@ -142,17 +142,20 @@ class TestCitationPlanNoFakeReferences(unittest.TestCase):
             or any("not parsed" in u for u in cp.unknowns)
         )
 
-    def test_padding_warning_always_present_when_expansion_recommended(self):
+    def test_padding_warning_not_emitted_by_code_round2(self):
+        """Round II doctrine: padding warnings are editorial semantic
+        advice. Deterministic code MUST NOT author them. Field stays
+        empty with origin=needs_llm until LLM citation organ is wired."""
         cp = build_minimal_citation_plan(
             _article(refs=20),
             _venue(scope="philosophy of technology, bibliography expected"),
             _fit_with({"discipline": "weak", "novelty_positioning": "weak"}),
             mismatch_map=None, risk_report=None, rewrite_plan=None,
         )
-        self.assertTrue(cp.dangerous_padding_warnings)
-        warning = cp.dangerous_padding_warnings[0].lower()
-        self.assertIn("padding", warning)
-        self.assertIn("argument", warning)
+        self.assertEqual(cp.dangerous_padding_warnings, [])
+        self.assertEqual(
+            cp.field_origins.get("dangerous_padding_warnings"), "needs_llm",
+        )
 
 
 # ------------------ COMPLIANCE CHECKLIST ------------------

@@ -416,6 +416,9 @@ export interface CitationPlanV2D {
   article_model_id?: string | null;
   venue_model_id?: string | null;
   fit_assessment_id?: string | null;
+  // Round-II semantic provenance
+  field_origins?: Record<string, string>;
+  semantic_status?: string;
   status:
     | 'not_built' | 'draft' | 'needs_bibliography' | 'needs_venue_corpus'
     | 'search_tasks_ready' | 'partially_ready' | 'blocked_missing_evidence'
@@ -453,6 +456,8 @@ export interface ComplianceChecklistV2D {
   article_model_id?: string | null;
   venue_model_id?: string | null;
   submission_scenario_id?: string | null;
+  field_origins?: Record<string, string>;
+  semantic_status?: string;
   status:
     | 'not_built' | 'draft' | 'partial' | 'ready' | 'blocked' | string;
   checklist_items: ComplianceItemV2D[];
@@ -491,6 +496,8 @@ export interface BibliographyProfileV2E {
   bibliography_profile_id: string;
   article_model_id?: string | null;
   source?: string | null;
+  field_origins?: Record<string, string>;
+  semantic_status?: string;
   status:
     | 'not_found' | 'present_unparsed' | 'parsed_structural' | 'partial'
     | 'malformed' | 'needs_user_input' | 'unknown' | string;
@@ -528,6 +535,8 @@ export interface SubmissionPackV2D {
   submission_scenario_id?: string | null;
   compliance_checklist_id?: string | null;
   citation_plan_id?: string | null;
+  field_origins?: Record<string, string>;
+  semantic_status?: string;
   status:
     | 'not_built' | 'draft' | 'partial' | 'ready_skeleton' | 'blocked'
     | string;

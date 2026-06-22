@@ -500,6 +500,23 @@ class Case:
                 except Exception:  # noqa: BLE001
                     pass
 
+        # Round-II: structural H1 title fallback. Title is direct
+        # source fact; deterministic extraction from H1 is allowed
+        # when the modeler returned None.
+        if self.article_model is not None and not self.article_model.title_current:
+            try:
+                import re as _re
+                src = self.article_input_text or self.input_text or ""
+                m = _re.search(r"^\s*#\s+(.+?)\s*$", src, _re.MULTILINE)
+                if m:
+                    self.article_model.title_current = m.group(1).strip()[:240]
+                    self._log_decision("structural_title_extracted", {
+                        "length": len(self.article_model.title_current),
+                        "origin": "source_fact_direct",
+                    })
+            except Exception:  # noqa: BLE001
+                pass
+
         self.stage = CaseStage.ARTICLE_MODEL
 
         # Phase B2: route through DisciplineMatcherAgent BEFORE

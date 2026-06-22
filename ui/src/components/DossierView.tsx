@@ -715,6 +715,11 @@ function CitationPlanSection({ plan }: { plan: CitationPlanV2D }) {
         <span className={`lane-status-badge lane-status--${plan.status}`}>
           {plan.status}
         </span>
+        {plan.semantic_status && (
+          <span className={`semantic-status-badge semantic-status--${plan.semantic_status}`}>
+            semantic: {plan.semantic_status}
+          </span>
+        )}
         {plan.confidence && (
           <span className={`lane-conf lane-conf--${plan.confidence}`}>
             confidence: {plan.confidence}
@@ -726,6 +731,16 @@ function CitationPlanSection({ plan }: { plan: CitationPlanV2D }) {
           </span>
         )}
       </div>
+      {plan.semantic_status === 'needs_llm' && (
+        <div className="round2-needs-llm-banner" role="note">
+          <strong>Семантические поля пусты — нужен LLM citation-organ.</strong>{' '}
+          Категории gap, missing bridges, search tasks и padding-warnings
+          намеренно не генерируются детерминированным кодом (Round II doctrine):
+          они появятся только когда будет подключён LLM-агент citation_planner.
+          Структурные поля (status, bibliography_status, verification tasks) —
+          уже доступны.
+        </div>
+      )}
       <KVRow label="Bibliography status" value={plan.current_bibliography_status} />
       <KVRow label="Venue citation expectation" value={plan.venue_citation_expectation_status} />
 

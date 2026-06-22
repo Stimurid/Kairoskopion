@@ -299,6 +299,27 @@ def build_minimal_submission_pack(
                 out.append(x)
         return out
 
+    from .semantic_provenance import (
+        ORIGIN_DETERMINISTIC_AGGREGATION,
+        ORIGIN_STRUCTURAL_EXTRACTION,
+        aggregate_semantic_status,
+    )
+    # SubmissionPack fields are all derived from upstream object
+    # statuses by pure rules. next_actions are aggregation prose that
+    # reports upstream missing/blocking state — no interpretation of
+    # article/venue content beyond aggregation.
+    field_origins = {
+        "ready_status": ORIGIN_DETERMINISTIC_AGGREGATION,
+        "status": ORIGIN_DETERMINISTIC_AGGREGATION,
+        "files": ORIGIN_STRUCTURAL_EXTRACTION,
+        "statements": ORIGIN_STRUCTURAL_EXTRACTION,
+        "missing_items": ORIGIN_DETERMINISTIC_AGGREGATION,
+        "blocking_issues": ORIGIN_DETERMINISTIC_AGGREGATION,
+        "warnings": ORIGIN_DETERMINISTIC_AGGREGATION,
+        "next_actions": ORIGIN_DETERMINISTIC_AGGREGATION,
+        "depends_on": ORIGIN_STRUCTURAL_EXTRACTION,
+        "unknowns": ORIGIN_STRUCTURAL_EXTRACTION,
+    }
     return SubmissionPack(
         article_model_id=article.article_model_id,
         venue_model_id=venue.venue_model_id,
@@ -325,4 +346,6 @@ def build_minimal_submission_pack(
         unknowns=_uniq(unknowns),
         ready_status=ready_status,
         status=status,
+        field_origins=field_origins,
+        semantic_status=aggregate_semantic_status(field_origins),
     )
