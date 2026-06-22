@@ -131,13 +131,13 @@ MISMATCH_NARRATIVE_OUTPUT_SCHEMA = {
                         "maxItems": 5,
                     },
                 },
-                "required": ["axis", "venue_side", "description", "possible_actions"],
-                "additionalProperties": False,
+                "required": ["axis"],
+                "additionalProperties": True,
             },
         },
     },
     "required": ["narratives"],
-    "additionalProperties": False,
+    "additionalProperties": True,
 }
 
 

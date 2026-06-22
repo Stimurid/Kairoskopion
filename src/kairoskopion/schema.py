@@ -411,6 +411,9 @@ class RewritePlan(_DictMixin):
     field_origins: dict[str, str] = _dict()
     semantic_status: str = "not_built"
     unknowns: list[str] = _list()
+    # Locomotive pass: redacted LLM attempt diagnostics
+    attempt_diagnostics: dict[str, Any] = _dict()
+    rubric_sources: list[str] = _list()
 
 
 @dc.dataclass
@@ -438,6 +441,9 @@ class CitationPlan(_DictMixin):
     # Round-II semantic provenance
     field_origins: dict[str, str] = _dict()
     semantic_status: str = "not_built"
+    # Locomotive pass: redacted LLM attempt diagnostics
+    attempt_diagnostics: dict[str, Any] = _dict()
+    rubric_sources: list[str] = _list()
 
 
 # ---------------------------------------------------------------------------
@@ -570,6 +576,9 @@ class RiskReport(_DictMixin):
     # Round II-B semantic provenance
     field_origins: dict[str, str] = _dict()
     semantic_status: str = "not_built"
+    # Locomotive pass: redacted LLM attempt diagnostics (no raw output)
+    attempt_diagnostics: dict[str, Any] = _dict()
+    rubric_sources: list[str] = _list()
 
 
 @dc.dataclass

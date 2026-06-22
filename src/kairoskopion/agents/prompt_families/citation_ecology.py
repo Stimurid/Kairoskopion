@@ -85,6 +85,8 @@ Analyze citation ecology fit between this article and venue.
 {bibliography_json}
 ```
 
+{rubric_context}
+
 Return a JSON object with citation ecology analysis.
 """
 
@@ -118,8 +120,8 @@ OUTPUT_SCHEMA: dict = {
         "unknowns": {"type": "array", "items": {"type": "string"}},
         "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
     },
-    "required": ["unknowns", "confidence"],
-    "additionalProperties": False,
+    "required": [],
+    "additionalProperties": True,
 }
 
 FORBIDDEN_BEHAVIORS = [

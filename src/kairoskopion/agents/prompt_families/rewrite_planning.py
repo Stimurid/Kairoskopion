@@ -78,6 +78,8 @@ Generate a rewrite/reframe plan for this article-venue pair.
 {venue_json}
 ```
 
+{rubric_context}
+
 Return a JSON object with the ordered adaptation plan.
 """
 
@@ -112,8 +114,8 @@ OUTPUT_SCHEMA: dict = {
         "unknowns": {"type": "array", "items": {"type": "string"}},
         "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
     },
-    "required": ["overall_depth", "actions", "unknowns", "confidence"],
-    "additionalProperties": False,
+    "required": ["actions"],
+    "additionalProperties": True,
 }
 
 FORBIDDEN_BEHAVIORS = [

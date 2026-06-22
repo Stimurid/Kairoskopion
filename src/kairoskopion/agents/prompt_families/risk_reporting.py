@@ -91,6 +91,8 @@ Assess publication risks for this article-venue pair.
 {mismatch_json}
 ```
 
+{rubric_context}
+
 Return a JSON object with categorized risk items.
 """
 
@@ -133,8 +135,8 @@ OUTPUT_SCHEMA: dict = {
         "unknowns": {"type": "array", "items": {"type": "string"}},
         "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
     },
-    "required": ["risk_items", "overall_risk_level", "unknowns", "confidence"],
-    "additionalProperties": False,
+    "required": ["risk_items"],
+    "additionalProperties": True,
 }
 
 FORBIDDEN_BEHAVIORS = [

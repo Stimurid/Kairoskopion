@@ -98,12 +98,33 @@ def try_llm_risk_officer(
     mismatch_map: MismatchMap | None,
     provider: Any | None,
 ) -> RiskReport:
-    """Wire LLM risk_officer. On failure → needs_llm placeholder."""
+    """Wire LLM risk_officer. On failure → needs_llm with diagnostics."""
+    from .llm_attempt_diagnostics import (
+        diagnostics_provider_unavailable,
+        diagnostics_exception,
+        diagnostics_parse_or_schema_failed,
+        diagnostics_ok,
+        FALLBACK_NO_MISMATCH,
+        SEMANTIC_LLM_GROUNDED_PARTIAL,
+    )
+    from .writing_rubric import (
+        rubric_applies_to_article,
+        rubric_id,
+        render_prompt_block,
+    )
     placeholder = build_needs_llm_risk_report(
         article, venue, scenario, fit, mismatch_map,
     )
     if provider is None or article is None or venue is None:
+        placeholder.attempt_diagnostics = diagnostics_provider_unavailable(
+            "risk_officer", "risk_officer",
+        )
         return placeholder
+
+    rubric_block = (
+        render_prompt_block() if rubric_applies_to_article(article) else ""
+    )
+    rubric_active = bool(rubric_block)
 
     try:
         result = try_llm_call(provider, RISK_REPORTING_FAMILY, {
@@ -112,16 +133,29 @@ def try_llm_risk_officer(
             "fit_json": _safe_json(fit.to_dict() if fit else {}),
             "mismatch_json": _safe_json(
                 mismatch_map.to_dict() if mismatch_map else {}),
+            "rubric_context": rubric_block,
         })
     except Exception as exc:  # noqa: BLE001
         logger.warning("RiskOfficer LLM call failed: %s", exc)
+        placeholder.attempt_diagnostics = diagnostics_exception(
+            "risk_officer", "risk_officer", exc,
+        )
         return placeholder
 
     if result is None:
+        placeholder.attempt_diagnostics = diagnostics_parse_or_schema_failed(
+            "risk_officer", "risk_officer",
+            parse_status="schema_validation_failed",
+            repair_steps=None,
+        )
         return placeholder
 
     parsed, _meta = result
     if not isinstance(parsed, dict):
+        placeholder.attempt_diagnostics = diagnostics_parse_or_schema_failed(
+            "risk_officer", "risk_officer",
+            parse_status="invalid_json", repair_steps=None,
+        )
         return placeholder
 
     raw_items = parsed.get("risk_items") or []
@@ -163,6 +197,7 @@ def try_llm_risk_officer(
         "unknowns": ORIGIN_LLM,
     }
 
+    sem = SEMANTIC_STATUS_LLM_GROUNDED if risk_items else SEMANTIC_LLM_GROUNDED_PARTIAL
     return RiskReport(
         article_model_id=(article.article_model_id if article else None),
         venue_model_id=(venue.venue_model_id if venue else None),
@@ -175,7 +210,12 @@ def try_llm_risk_officer(
         warnings=warnings,
         unknowns=unknowns,
         field_origins=field_origins,
-        semantic_status=SEMANTIC_STATUS_LLM_GROUNDED,
+        semantic_status=sem,
+        attempt_diagnostics=diagnostics_ok(
+            "risk_officer", "risk_officer", semantic_status=sem,
+            extra={"items_count": len(risk_items), "rubric_active": rubric_active},
+        ),
+        rubric_sources=([rubric_id()] if rubric_active and rubric_id() else []),
     )
 
 
@@ -196,6 +236,19 @@ def try_llm_rewrite_planner(
     field_core uncertainty → unknown_core_impact (not silently
     core_preserving).
     """
+    from .llm_attempt_diagnostics import (
+        diagnostics_provider_unavailable,
+        diagnostics_exception,
+        diagnostics_parse_or_schema_failed,
+        diagnostics_ok,
+        FALLBACK_NO_MISMATCH,
+        SEMANTIC_LLM_GROUNDED_PARTIAL,
+    )
+    from .writing_rubric import (
+        rubric_applies_to_article,
+        rubric_id,
+        render_prompt_block,
+    )
     placeholder = build_needs_llm_rewrite_plan(
         mismatch_map,
         article_model_id=(article.article_model_id if article else None),
@@ -203,23 +256,43 @@ def try_llm_rewrite_planner(
     )
     if (provider is None or article is None or venue is None
             or mismatch_map is None):
+        placeholder.attempt_diagnostics = diagnostics_provider_unavailable(
+            "rewrite_planner", "rewrite_planner",
+        )
         return placeholder
+
+    rubric_block = (
+        render_prompt_block() if rubric_applies_to_article(article) else ""
+    )
+    rubric_active = bool(rubric_block)
 
     try:
         result = try_llm_call(provider, REWRITE_PLANNING_FAMILY, {
             "mismatch_json": _safe_json(mismatch_map.to_dict()),
             "article_json": _safe_json(article.to_dict()),
             "venue_json": _safe_json(venue.to_dict()),
+            "rubric_context": rubric_block,
         })
     except Exception as exc:  # noqa: BLE001
         logger.warning("RewritePlanner LLM call failed: %s", exc)
+        placeholder.attempt_diagnostics = diagnostics_exception(
+            "rewrite_planner", "rewrite_planner", exc,
+        )
         return placeholder
 
     if result is None:
+        placeholder.attempt_diagnostics = diagnostics_parse_or_schema_failed(
+            "rewrite_planner", "rewrite_planner",
+            parse_status="schema_validation_failed", repair_steps=None,
+        )
         return placeholder
 
     parsed, _meta = result
     if not isinstance(parsed, dict):
+        placeholder.attempt_diagnostics = diagnostics_parse_or_schema_failed(
+            "rewrite_planner", "rewrite_planner",
+            parse_status="invalid_json", repair_steps=None,
+        )
         return placeholder
 
     actions = parsed.get("actions") or []
@@ -284,6 +357,22 @@ def try_llm_rewrite_planner(
         "unknowns": ORIGIN_LLM,
     }
 
+    sem = (
+        SEMANTIC_STATUS_LLM_GROUNDED if changes
+        else SEMANTIC_LLM_GROUNDED_PARTIAL
+    )
+    # If no changes, ensure unknowns contains the reason — never silent.
+    if not changes:
+        depth_note = (
+            depth_raw or "none"
+        )
+        unknowns.append(
+            f"LLM rewrite_planner returned no actions "
+            f"(overall_depth={depth_note!r}). Either fit truly needs no "
+            "rewrite, or LLM refused to plan changes with provided "
+            "evidence. See attempt_diagnostics for confirmation that the "
+            "LLM call completed cleanly."
+        )
     return RewritePlan(
         article_model_id=(article.article_model_id if article else None),
         target_venue_id=(venue.venue_model_id if venue else None),
@@ -295,7 +384,13 @@ def try_llm_rewrite_planner(
         requires_user_acceptance=has_core_touching,
         unknowns=unknowns,
         field_origins=field_origins,
-        semantic_status=SEMANTIC_STATUS_LLM_GROUNDED,
+        semantic_status=sem,
+        attempt_diagnostics=diagnostics_ok(
+            "rewrite_planner", "rewrite_planner", semantic_status=sem,
+            extra={"changes_count": len(changes), "rubric_active": rubric_active,
+                   "core_touching": has_core_touching},
+        ),
+        rubric_sources=([rubric_id()] if rubric_active and rubric_id() else []),
     )
 
 
@@ -319,8 +414,35 @@ def upgrade_citation_plan_with_llm(
     NEVER produces concrete reference titles, DOIs, or author names —
     the prompt forbids it and we additionally filter for them.
     """
+    from .llm_attempt_diagnostics import (
+        diagnostics_provider_unavailable,
+        diagnostics_exception,
+        diagnostics_parse_or_schema_failed,
+        diagnostics_ok,
+        SEMANTIC_LLM_GROUNDED_PARTIAL,
+    )
+    from .writing_rubric import (
+        rubric_applies_to_article,
+        rubric_id,
+        render_prompt_block,
+    )
+    import dataclasses as _dc
+
+    def _attach_diag(plan, diag):
+        return _dc.replace(plan, attempt_diagnostics=diag)
+
     if provider is None or article is None or venue is None:
-        return citation_plan
+        return _attach_diag(
+            citation_plan,
+            diagnostics_provider_unavailable(
+                "citation_planner", "citation_planner",
+            ),
+        )
+
+    rubric_block = (
+        render_prompt_block() if rubric_applies_to_article(article) else ""
+    )
+    rubric_active = bool(rubric_block)
 
     try:
         result = try_llm_call(provider, CITATION_ECOLOGY_FAMILY, {
@@ -328,17 +450,36 @@ def upgrade_citation_plan_with_llm(
             "venue_json": _safe_json(venue.to_dict()),
             "bibliography_json": _safe_json(
                 bib_profile.to_dict() if bib_profile else {}),
+            "rubric_context": rubric_block,
         })
     except Exception as exc:  # noqa: BLE001
         logger.warning("CitationPlanner LLM call failed: %s", exc)
-        return citation_plan
+        return _attach_diag(
+            citation_plan,
+            diagnostics_exception(
+                "citation_planner", "citation_planner", exc,
+            ),
+        )
 
     if result is None:
-        return citation_plan
+        return _attach_diag(
+            citation_plan,
+            diagnostics_parse_or_schema_failed(
+                "citation_planner", "citation_planner",
+                parse_status="schema_validation_failed",
+                repair_steps=None,
+            ),
+        )
 
     parsed, _meta = result
     if not isinstance(parsed, dict):
-        return citation_plan
+        return _attach_diag(
+            citation_plan,
+            diagnostics_parse_or_schema_failed(
+                "citation_planner", "citation_planner",
+                parse_status="invalid_json", repair_steps=None,
+            ),
+        )
 
     bridges = [b for b in (parsed.get("bridge_references_needed") or [])
                if isinstance(b, str) and b.strip()]
@@ -399,8 +540,29 @@ def upgrade_citation_plan_with_llm(
     )
     new_semantic_status = aggregate_semantic_status(new_origins)
 
-    # Return a new CitationPlan with augmented fields
-    import dataclasses as _dc
+    has_semantic = bool(gaps or bridges or new_search_tasks
+                        != list(citation_plan.recommended_reference_search_tasks))
+    sem = (
+        new_semantic_status if has_semantic
+        else SEMANTIC_LLM_GROUNDED_PARTIAL
+    )
+    # If LLM produced nothing usable (empty after anti-fake filter),
+    # add an explicit unknown so the operator sees the reason.
+    if not has_semantic:
+        new_unknowns.append(
+            "LLM citation_planner returned no usable bridges/gaps after "
+            "anti-fake filter. Either bibliography evidence was too "
+            "sparse or LLM refused to invent references (correct "
+            "doctrine behaviour). See attempt_diagnostics."
+        )
+    diag = diagnostics_ok(
+        "citation_planner", "citation_planner", semantic_status=sem,
+        extra={
+            "bridges_count": len(bridges),
+            "gaps_count": len(gaps),
+            "rubric_active": rubric_active,
+        },
+    )
     return _dc.replace(
         citation_plan,
         citation_gap_categories=new_gap_categories,
@@ -410,6 +572,8 @@ def upgrade_citation_plan_with_llm(
         unknowns=new_unknowns,
         risk_flags=list(citation_plan.risk_flags) + risks,
         field_origins=new_origins,
-        semantic_status=new_semantic_status,
+        semantic_status=sem,
+        attempt_diagnostics=diag,
+        rubric_sources=([rubric_id()] if rubric_active and rubric_id() else []),
         created_from=list(citation_plan.created_from) + ["llm_citation_planner"],
     )
