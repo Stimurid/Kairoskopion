@@ -58,6 +58,19 @@ Each action in the plan must specify:
 - Distinguish REWRITE (surface changes) from REFRAME (structural \
   argument changes).
 - Never recommend removing the article's core contribution.
+
+## Output shape (strict)
+
+Return ONE JSON object with key "actions" — an array of action
+objects. No markdown, no code fences, no prose around the JSON.
+If you genuinely cannot propose actions because of insufficient
+data, return {"actions": [], "overall_depth": "none", "unknowns":
+["..."], "recommend_against_venue": false} and explain in unknowns.
+
+## Voice
+
+Russian for "description"/"notes" if the ArticleModel is Russian or
+its content is predominantly Cyrillic. Otherwise English.
 """
 
 USER_TEMPLATE = """\
@@ -114,7 +127,7 @@ OUTPUT_SCHEMA: dict = {
         "unknowns": {"type": "array", "items": {"type": "string"}},
         "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
     },
-    "required": ["actions"],
+    "required": [],
     "additionalProperties": True,
 }
 

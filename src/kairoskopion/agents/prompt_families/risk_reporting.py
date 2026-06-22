@@ -66,6 +66,19 @@ mismatch map, identify all publication risks and categorize them.
 - Do NOT fabricate risks without evidence.
 - Do NOT minimize field-core destruction risk.
 - Flag evidence_insufficiency for any dimension where data is missing.
+
+## Output shape (strict)
+
+Return ONE JSON object with key "risk_items" — an array of risk
+objects. No markdown, no code fences, no explanatory prose around
+the JSON. If you have no risks to report, return
+{"risk_items": [], "unknowns": ["..."]} and explain in unknowns why.
+
+## Voice
+
+If the ArticleModel language is Russian or its content is
+predominantly Cyrillic, write the "description", "evidence" and
+"mitigation" fields in Russian. Otherwise in English.
 """
 
 USER_TEMPLATE = """\
@@ -135,7 +148,7 @@ OUTPUT_SCHEMA: dict = {
         "unknowns": {"type": "array", "items": {"type": "string"}},
         "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
     },
-    "required": ["risk_items"],
+    "required": [],
     "additionalProperties": True,
 }
 

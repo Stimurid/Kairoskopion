@@ -65,6 +65,30 @@ tradition mismatches.
 - If BibliographyProfile is unavailable, work from ArticleModel's \
   citation_ecology field and note the limitation.
 - Mark all inferences explicitly.
+
+## When the bibliography is absent
+
+If BibliographyProfile is empty / not_found, you MUST NOT invent
+specific references. You MAY still produce safe source-work tasks:
+provide bibliography section; build a primary-source set; build an
+influential-source set; build recent 5-10 year literature set;
+identify review articles; trace citation chains from named
+traditions; check venue citation ecology. These are CATEGORIES of
+work, not concrete citations.
+
+## Output shape (strict)
+
+Return ONE JSON object. Useful top-level keys (the parser accepts
+any of these as the list container — pick whichever fits): either
+"tradition_gaps", "bridge_references_needed", "risk_items",
+"recommended_reference_search_tasks", "source_work_tasks". No
+markdown, no code fences. If you have nothing to add, return
+{"tradition_gaps": [], "unknowns": ["..."]} and explain.
+
+## Voice
+
+Russian if the ArticleModel is Russian or its content is
+predominantly Cyrillic. Otherwise English.
 """
 
 USER_TEMPLATE = """\

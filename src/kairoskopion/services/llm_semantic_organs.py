@@ -158,7 +158,15 @@ def try_llm_risk_officer(
         )
         return placeholder
 
-    raw_items = parsed.get("risk_items") or []
+    # Round III-E: container normalization — Sonnet may put items under
+    # alternative top-level keys; adapter finds the list mechanically.
+    from .llm_contract_normalizer import (
+        find_list_under_aliases, RISK_ITEM_ALIASES, shape_summary,
+    )
+    raw_items, _match_key = find_list_under_aliases(parsed, RISK_ITEM_ALIASES)
+    if raw_items is None:
+        raw_items = []
+    _risk_shape = shape_summary(parsed)
     risk_items: list[dict[str, Any]] = []
     blocking: list[str] = []
     warnings: list[str] = []
@@ -295,7 +303,14 @@ def try_llm_rewrite_planner(
         )
         return placeholder
 
-    actions = parsed.get("actions") or []
+    # Round III-E: accept alternative top-level keys for the actions list.
+    from .llm_contract_normalizer import (
+        find_list_under_aliases, REWRITE_ITEM_ALIASES, shape_summary,
+    )
+    actions, _match_key = find_list_under_aliases(parsed, REWRITE_ITEM_ALIASES)
+    if actions is None:
+        actions = []
+    _rewrite_shape = shape_summary(parsed)
     changes: list[dict[str, Any]] = []
     has_core_touching = False
     for a in actions:
@@ -481,12 +496,26 @@ def upgrade_citation_plan_with_llm(
             ),
         )
 
-    bridges = [b for b in (parsed.get("bridge_references_needed") or [])
+    # Round III-E: accept alternative top-level keys
+    from .llm_contract_normalizer import (
+        find_list_under_aliases, CITATION_BRIDGE_ALIASES,
+        CITATION_GAP_ALIASES, CITATION_TASK_ALIASES, CITATION_RISK_ALIASES,
+    )
+    _br, _ = find_list_under_aliases(parsed, CITATION_BRIDGE_ALIASES)
+    _gp, _ = find_list_under_aliases(parsed, CITATION_GAP_ALIASES)
+    _tk, _ = find_list_under_aliases(parsed, CITATION_TASK_ALIASES)
+    _rk, _ = find_list_under_aliases(parsed, CITATION_RISK_ALIASES)
+    bridges = [b for b in (_br or [])
                if isinstance(b, str) and b.strip()]
-    gaps = [g for g in (parsed.get("tradition_gaps") or [])
+    gaps = [g for g in (_gp or [])
             if isinstance(g, str) and g.strip()]
-    risks = [r for r in (parsed.get("risk_items") or [])
+    risks = [r for r in (_rk or [])
              if isinstance(r, str) and r.strip()]
+    # Allow LLM-emitted source-work tasks as search_tasks even when
+    # bibliography is absent (Track E: missing bibliography → safe
+    # source-work tasks are allowed, concrete refs forbidden).
+    llm_search_tasks = [t for t in (_tk or [])
+                        if isinstance(t, str) and t.strip()]
     unknowns_llm = [u for u in (parsed.get("unknowns") or [])
                     if isinstance(u, str) and u.strip()]
 
@@ -507,11 +536,14 @@ def upgrade_citation_plan_with_llm(
     new_missing_bridges = list(citation_plan.missing_bridge_categories) + bridges
     # Search tasks: LLM produces tradition_gaps + bridge_references_needed
     # implicitly imply search work; we surface them as search tasks here.
+    # Round III-E: include LLM-emitted source-work tasks too (anti-fake
+    # filter already stripped fake refs above).
+    _safe_llm_tasks = [t for t in llm_search_tasks if _safe(t)]
     new_search_tasks = list(citation_plan.recommended_reference_search_tasks) + [
         f"Search for references that bridge: {b}" for b in bridges
     ] + [
         f"Address tradition gap: {g}" for g in gaps
-    ]
+    ] + _safe_llm_tasks
     # Padding warning is always added when expansion is recommended;
     # this is editorial advice that the LLM agent's prompt produces.
     padding_warnings = list(citation_plan.dangerous_padding_warnings)

@@ -70,15 +70,72 @@ def rubric_id() -> str | None:
     return r.get("rubric_id") if r else None
 
 
-def rubric_applies_to_article(article: Any) -> bool:
-    """The rubric applies when the article is in Russian and is a
-    philosophical genre. Deterministic gate (structural decision —
-    OK by doctrine — it is selection, not semantic claim).
+def _cyrillic_ratio(text: str | None) -> float:
+    """Structural language hint — share of Cyrillic letters in the
+    supplied raw text. Pure mechanical extraction, not semantic.
+    """
+    if not text:
+        return 0.0
+    cyr = 0
+    letters = 0
+    for ch in text:
+        if ch.isalpha():
+            letters += 1
+            if "Ѐ" <= ch <= "ӿ":
+                cyr += 1
+    return (cyr / letters) if letters else 0.0
+
+
+def _article_concat_for_cyrillic_probe(article: Any) -> str:
+    """Concatenate text fields from ArticleModel for structural
+    Cyrillic-ratio detection. No semantic interpretation.
+    """
+    parts: list[str] = []
+    for f in (
+        "title_current", "abstract_current",
+        "problem_statement", "research_question", "object_of_inquiry",
+        "method_description", "citation_ecology_current",
+    ):
+        v = getattr(article, f, None)
+        if isinstance(v, str):
+            parts.append(v)
+    for f in ("core_claims", "theoretical_shoulders",
+              "protected_core", "mutable_zones"):
+        v = getattr(article, f, None)
+        if isinstance(v, list):
+            for x in v:
+                if isinstance(x, str):
+                    parts.append(x)
+    return " ".join(parts)
+
+
+def rubric_applies_to_article(
+    article: Any, raw_article_text: str | None = None,
+) -> bool:
+    """Round III-E: structural gate.
+
+    Rubric applies when (a) article language is explicitly Russian, OR
+    (b) the supplied raw text is predominantly Cyrillic (≥30% of
+    alphabetic chars), OR (c) the concatenated ArticleModel text
+    fields are predominantly Cyrillic. AND (d) the genre/register has
+    any philosophical/humanities marker OR is unknown (rubric still
+    safe as academic-writing context for philosophical humanities).
+
+    Deterministic structural gate — selection, not semantic claim.
     """
     if article is None:
         return False
     lang = (getattr(article, "language", "") or "").lower()
-    if lang and lang != "ru" and "ru" not in lang and "russ" not in lang:
+    fallback_text = (
+        raw_article_text if raw_article_text
+        else _article_concat_for_cyrillic_probe(article)
+    )
+    is_ru = (
+        lang.startswith("ru")
+        or "russ" in lang
+        or _cyrillic_ratio(fallback_text) >= 0.30
+    )
+    if not is_ru:
         return False
     genre = (getattr(article, "genre_current", "") or "").lower()
     register = getattr(article, "disciplinary_register_current", "") or ""
@@ -88,12 +145,13 @@ def rubric_applies_to_article(article: Any) -> bool:
     phil_markers = (
         "philosophy", "философ", "philosoph", "phenomenolog", "феномено",
         "postphenomen", "постфеномено", "ethics", "этик",
+        "humanit", "гуманитар",
     )
     is_phil = any(m in genre or m in register for m in phil_markers)
-    # If language is empty/unknown but register clearly philosophical,
-    # still apply the rubric (it covers academic philosophical writing
-    # broadly).
-    return bool(is_phil)
+    # If Russian + unknown genre/register, still apply the rubric — it
+    # is general academic-writing-quality rubric for the philosophical
+    # humanities. Doctrine intact: not venue policy.
+    return bool(is_phil) or (is_ru and (not genre or genre == "unknown"))
 
 
 def render_prompt_block(rubric: dict[str, Any] | None = None) -> str:
