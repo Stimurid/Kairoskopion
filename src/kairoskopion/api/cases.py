@@ -1471,6 +1471,7 @@ class Case:
                 self.fit_assessment,
                 self.mismatch_map,
                 risk_provider,
+                raw_article_text=getattr(self, "article_input_text", None),
             )
             self._log_decision("risk_report_built", {
                 "semantic_status": self.risk_report.semantic_status,
@@ -1500,6 +1501,7 @@ class Case:
                     self.mismatch_map,
                     self.risk_report,
                     rewrite_provider,
+                    raw_article_text=getattr(self, "article_input_text", None),
                 )
                 self.stage = CaseStage.ADAPTING
                 self._log_decision("rewrite_planned", {
@@ -1583,6 +1585,7 @@ class Case:
                 self.selected_venue,
                 self.bibliography_profile,
                 cit_provider,
+                raw_article_text=getattr(self, "article_input_text", None),
             )
             self._log_decision("citation_plan_built", {
                 "status": self.citation_plan.status,

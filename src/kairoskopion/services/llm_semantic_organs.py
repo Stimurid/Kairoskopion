@@ -97,6 +97,7 @@ def try_llm_risk_officer(
     fit: FitAssessment | None,
     mismatch_map: MismatchMap | None,
     provider: Any | None,
+    raw_article_text: str | None = None,
 ) -> RiskReport:
     """Wire LLM risk_officer. On failure → needs_llm with diagnostics."""
     from .llm_attempt_diagnostics import (
@@ -122,7 +123,7 @@ def try_llm_risk_officer(
         return placeholder
 
     rubric_block = (
-        render_prompt_block() if rubric_applies_to_article(article) else ""
+        render_prompt_block() if rubric_applies_to_article(article, raw_article_text=raw_article_text) else ""
     )
     rubric_active = bool(rubric_block)
 
@@ -242,6 +243,7 @@ def try_llm_rewrite_planner(
     mismatch_map: MismatchMap | None,
     risk_report: RiskReport | None,
     provider: Any | None,
+    raw_article_text: str | None = None,
 ) -> RewritePlan:
     """Wire LLM rewrite_planner. On failure → needs_llm placeholder.
 
@@ -276,7 +278,7 @@ def try_llm_rewrite_planner(
         return placeholder
 
     rubric_block = (
-        render_prompt_block() if rubric_applies_to_article(article) else ""
+        render_prompt_block() if rubric_applies_to_article(article, raw_article_text=raw_article_text) else ""
     )
     rubric_active = bool(rubric_block)
 
@@ -428,6 +430,7 @@ def upgrade_citation_plan_with_llm(
     venue: VenueModel | None,
     bib_profile: BibliographyProfile | None,
     provider: Any | None,
+    raw_article_text: str | None = None,
 ) -> CitationPlan:
     """Augment the structural CitationPlan with LLM semantic fields.
 
@@ -466,7 +469,7 @@ def upgrade_citation_plan_with_llm(
         )
 
     rubric_block = (
-        render_prompt_block() if rubric_applies_to_article(article) else ""
+        render_prompt_block() if rubric_applies_to_article(article, raw_article_text=raw_article_text) else ""
     )
     rubric_active = bool(rubric_block)
 

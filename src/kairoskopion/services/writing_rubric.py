@@ -148,10 +148,17 @@ def rubric_applies_to_article(
         "humanit", "гуманитар",
     )
     is_phil = any(m in genre or m in register for m in phil_markers)
-    # If Russian + unknown genre/register, still apply the rubric — it
-    # is general academic-writing-quality rubric for the philosophical
-    # humanities. Doctrine intact: not venue policy.
-    return bool(is_phil) or (is_ru and (not genre or genre == "unknown"))
+    # If Russian + unknown OR humanities-leaning genre, still apply
+    # the rubric — it is a general academic-writing-quality rubric for
+    # the philosophical humanities. Doctrine intact: not venue policy.
+    _phil_friendly_genres = (
+        "", "unknown",
+        "theoretical_essay", "theoretical",
+        "conceptual_article", "conceptual",
+        "essay", "humanities", "humanity",
+        "review_article", "systematic_review",
+    )
+    return bool(is_phil) or (is_ru and (genre in _phil_friendly_genres))
 
 
 def render_prompt_block(rubric: dict[str, Any] | None = None) -> str:

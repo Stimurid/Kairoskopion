@@ -397,15 +397,100 @@ def repair_and_parse(
     if parsed is not None:
         return _validate_and_return(parsed, schema, steps, repaired=True)
 
-    # Try extracting the first balanced {…} or […] from prose
-    for opener, closer in (("{", "}"), ("[", "]")):
-        candidate = _extract_first_balanced(s2, opener, closer)
-        if candidate is None:
+    # Round III-G: JSON-island repair — exhaustively find ALL fenced
+    # JSON blocks + ALL balanced {...} / [...] candidates, try each
+    # one, pick the largest valid candidate. Sonnet sometimes returns
+    # prose + multiple JSON blocks or <thinking>...</thinking>{json};
+    # the single-balanced-extract above stops at the first candidate.
+    candidates: list[tuple[str, str]] = []  # (kind, text)
+
+    # All fenced ```json ... ``` blocks
+    fence_pat = re.compile(
+        r"```(?:json|JSON)?\s*\n(.*?)\n?```",
+        re.DOTALL,
+    )
+    for m in fence_pat.finditer(s):
+        candidates.append(("fenced_json", m.group(1).strip()))
+
+    # All top-level balanced {…} regions (non-overlapping)
+    def _all_balanced(text: str, opener: str, closer: str) -> list[str]:
+        out: list[str] = []
+        i = 0
+        n = len(text)
+        while i < n:
+            lo = text.find(opener, i)
+            if lo == -1:
+                break
+            depth = 0
+            in_str = False
+            qch = ""
+            esc = False
+            end_idx = -1
+            for j in range(lo, n):
+                ch = text[j]
+                if in_str:
+                    if esc:
+                        esc = False
+                        continue
+                    if ch == "\\":
+                        esc = True
+                        continue
+                    if ch == qch:
+                        in_str = False
+                    continue
+                if ch in ('"', "'"):
+                    in_str = True
+                    qch = ch
+                    continue
+                if ch == opener:
+                    depth += 1
+                elif ch == closer:
+                    depth -= 1
+                    if depth == 0:
+                        end_idx = j
+                        break
+            if end_idx == -1:
+                break
+            out.append(text[lo:end_idx + 1])
+            i = end_idx + 1
+        return out
+
+    for region in _all_balanced(s2, "{", "}"):
+        candidates.append(("object_root", region))
+    for region in _all_balanced(s2, "[", "]"):
+        candidates.append(("array_root", region))
+
+    # Try each candidate; pick the LARGEST valid one
+    best_parsed: Any | None = None
+    best_size = 0
+    best_kind = ""
+    rejected: list[str] = []
+    for kind, text in candidates:
+        parsed_c = _try_parse_with_repairs(text, [])
+        if parsed_c is None:
+            rejected.append(f"{kind}:repair_failed")
             continue
-        steps.append(f"extracted_balanced_{opener}")
-        parsed = _try_parse_with_repairs(candidate, steps)
-        if parsed is not None:
-            return _validate_and_return(parsed, schema, steps, repaired=True)
+        size = len(text)
+        if size > best_size:
+            best_parsed = parsed_c
+            best_size = size
+            best_kind = kind
+    if best_parsed is not None:
+        steps.append(f"island_selected:{best_kind}:size={best_size}")
+        # Backward-compat trace tokens for older tests
+        if best_kind in ("object_root", "fenced_json"):
+            steps.append("extracted_balanced_{")
+        elif best_kind == "array_root":
+            steps.append("extracted_balanced_[")
+        if rejected:
+            steps.append(f"island_rejected:{','.join(rejected[:6])}")
+        return _validate_and_return(best_parsed, schema, steps, repaired=True)
+
+    if candidates:
+        steps.append(
+            f"island_no_valid:{len(candidates)}_candidates:"
+            + ",".join(c[0] for c in candidates[:6])
+        )
 
     return RepairOutcome(
         parsed=None,
