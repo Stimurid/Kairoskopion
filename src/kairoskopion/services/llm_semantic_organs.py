@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..agents.base_shell import try_llm_call
+from ..agents.base_shell import LLMAttemptOutcome, try_llm_call, try_llm_call_with_outcome
 from ..agents.prompt_families.citation_ecology import CITATION_ECOLOGY_FAMILY
 from ..agents.prompt_families.rewrite_planning import REWRITE_PLANNING_FAMILY
 from ..agents.prompt_families.risk_reporting import RISK_REPORTING_FAMILY
@@ -126,37 +126,43 @@ def try_llm_risk_officer(
     )
     rubric_active = bool(rubric_block)
 
+    # Round III-F: outcome-envelope path.
     try:
-        result = try_llm_call(provider, RISK_REPORTING_FAMILY, {
-            "article_json": _safe_json(article.to_dict()),
-            "venue_json": _safe_json(venue.to_dict()),
-            "fit_json": _safe_json(fit.to_dict() if fit else {}),
-            "mismatch_json": _safe_json(
-                mismatch_map.to_dict() if mismatch_map else {}),
-            "rubric_context": rubric_block,
-        })
+        outcome = try_llm_call_with_outcome(
+            provider, RISK_REPORTING_FAMILY,
+            {
+                "article_json": _safe_json(article.to_dict()),
+                "venue_json": _safe_json(venue.to_dict()),
+                "fit_json": _safe_json(fit.to_dict() if fit else {}),
+                "mismatch_json": _safe_json(
+                    mismatch_map.to_dict() if mismatch_map else {}),
+                "rubric_context": rubric_block,
+            },
+            strict_schema=False,
+            agent_role="risk_officer", model_role="risk_officer",
+        )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("RiskOfficer LLM call failed: %s", exc)
         placeholder.attempt_diagnostics = diagnostics_exception(
             "risk_officer", "risk_officer", exc,
         )
         return placeholder
 
-    if result is None:
+    if outcome is None:
         placeholder.attempt_diagnostics = diagnostics_parse_or_schema_failed(
             "risk_officer", "risk_officer",
-            parse_status="schema_validation_failed",
-            repair_steps=None,
+            parse_status="schema_validation_failed", repair_steps=None,
         )
         return placeholder
 
-    parsed, _meta = result
-    if not isinstance(parsed, dict):
-        placeholder.attempt_diagnostics = diagnostics_parse_or_schema_failed(
-            "risk_officer", "risk_officer",
-            parse_status="invalid_json", repair_steps=None,
-        )
+    parsed = outcome.parsed or outcome.loose_parsed
+    if not isinstance(parsed, (dict, list)):
+        placeholder.attempt_diagnostics = {
+            **outcome.to_dict(),
+            "semantic_status": "needs_llm",
+        }
         return placeholder
+    if isinstance(parsed, list):
+        parsed = {"risk_items": parsed}
 
     # Round III-E: container normalization — Sonnet may put items under
     # alternative top-level keys; adapter finds the list mechanically.
@@ -274,34 +280,39 @@ def try_llm_rewrite_planner(
     )
     rubric_active = bool(rubric_block)
 
+    # Round III-F: outcome-envelope path
     try:
-        result = try_llm_call(provider, REWRITE_PLANNING_FAMILY, {
-            "mismatch_json": _safe_json(mismatch_map.to_dict()),
-            "article_json": _safe_json(article.to_dict()),
-            "venue_json": _safe_json(venue.to_dict()),
-            "rubric_context": rubric_block,
-        })
+        outcome = try_llm_call_with_outcome(
+            provider, REWRITE_PLANNING_FAMILY,
+            {
+                "mismatch_json": _safe_json(mismatch_map.to_dict()),
+                "article_json": _safe_json(article.to_dict()),
+                "venue_json": _safe_json(venue.to_dict()),
+                "rubric_context": rubric_block,
+            },
+            strict_schema=False,
+            agent_role="rewrite_planner", model_role="rewrite_planner",
+        )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("RewritePlanner LLM call failed: %s", exc)
         placeholder.attempt_diagnostics = diagnostics_exception(
             "rewrite_planner", "rewrite_planner", exc,
         )
         return placeholder
-
-    if result is None:
+    if outcome is None:
         placeholder.attempt_diagnostics = diagnostics_parse_or_schema_failed(
             "rewrite_planner", "rewrite_planner",
             parse_status="schema_validation_failed", repair_steps=None,
         )
         return placeholder
-
-    parsed, _meta = result
-    if not isinstance(parsed, dict):
-        placeholder.attempt_diagnostics = diagnostics_parse_or_schema_failed(
-            "rewrite_planner", "rewrite_planner",
-            parse_status="invalid_json", repair_steps=None,
-        )
+    parsed = outcome.parsed or outcome.loose_parsed
+    if not isinstance(parsed, (dict, list)):
+        placeholder.attempt_diagnostics = {
+            **outcome.to_dict(),
+            "semantic_status": "needs_llm",
+        }
         return placeholder
+    if isinstance(parsed, list):
+        parsed = {"actions": parsed}
 
     # Round III-E: accept alternative top-level keys for the actions list.
     from .llm_contract_normalizer import (
@@ -459,42 +470,37 @@ def upgrade_citation_plan_with_llm(
     )
     rubric_active = bool(rubric_block)
 
+    # Round III-F: outcome-envelope path
     try:
-        result = try_llm_call(provider, CITATION_ECOLOGY_FAMILY, {
-            "article_json": _safe_json(article.to_dict()),
-            "venue_json": _safe_json(venue.to_dict()),
-            "bibliography_json": _safe_json(
-                bib_profile.to_dict() if bib_profile else {}),
-            "rubric_context": rubric_block,
-        })
+        outcome = try_llm_call_with_outcome(
+            provider, CITATION_ECOLOGY_FAMILY,
+            {
+                "article_json": _safe_json(article.to_dict()),
+                "venue_json": _safe_json(venue.to_dict()),
+                "bibliography_json": _safe_json(
+                    bib_profile.to_dict() if bib_profile else {}),
+                "rubric_context": rubric_block,
+            },
+            strict_schema=False,
+            agent_role="citation_planner", model_role="citation_planner",
+        )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("CitationPlanner LLM call failed: %s", exc)
-        return _attach_diag(
-            citation_plan,
-            diagnostics_exception(
-                "citation_planner", "citation_planner", exc,
-            ),
-        )
-
-    if result is None:
-        return _attach_diag(
-            citation_plan,
-            diagnostics_parse_or_schema_failed(
-                "citation_planner", "citation_planner",
-                parse_status="schema_validation_failed",
-                repair_steps=None,
-            ),
-        )
-
-    parsed, _meta = result
-    if not isinstance(parsed, dict):
-        return _attach_diag(
-            citation_plan,
-            diagnostics_parse_or_schema_failed(
-                "citation_planner", "citation_planner",
-                parse_status="invalid_json", repair_steps=None,
-            ),
-        )
+        return _attach_diag(citation_plan, diagnostics_exception(
+            "citation_planner", "citation_planner", exc,
+        ))
+    if outcome is None:
+        return _attach_diag(citation_plan, diagnostics_parse_or_schema_failed(
+            "citation_planner", "citation_planner",
+            parse_status="schema_validation_failed", repair_steps=None,
+        ))
+    parsed = outcome.parsed or outcome.loose_parsed
+    if not isinstance(parsed, (dict, list)):
+        return _attach_diag(citation_plan, {
+            **outcome.to_dict(),
+            "semantic_status": "needs_llm",
+        })
+    if isinstance(parsed, list):
+        parsed = {"source_work_tasks": parsed}
 
     # Round III-E: accept alternative top-level keys
     from .llm_contract_normalizer import (

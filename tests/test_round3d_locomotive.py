@@ -7,6 +7,16 @@ silent. Schema relaxation does not let deterministic prose leak.
 
 from __future__ import annotations
 
+
+def _ok_outcome(parsed_dict):
+    """Round III-F outcome envelope mock helper."""
+    from kairoskopion.agents.base_shell import LLMAttemptOutcome
+    return LLMAttemptOutcome(
+        ok=True, parsed=parsed_dict, content_present=True,
+        parse_status="parsed_ok",
+    )
+
+
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -76,7 +86,7 @@ class TestDiagnosticsAlwaysAttached(unittest.TestCase):
         self.assertEqual(cp2.attempt_diagnostics["fallback_reason"],
                          FALLBACK_PROVIDER_UNAVAILABLE)
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_risk_exception_has_diagnostics(self, mock):
         mock.side_effect = RuntimeError("provider exploded")
         rr = try_llm_risk_officer(_a(), _v(), None, _f(), _mm(), MagicMock())
@@ -88,7 +98,7 @@ class TestDiagnosticsAlwaysAttached(unittest.TestCase):
         flat = str(rr.attempt_diagnostics)
         self.assertNotIn("Traceback", flat)
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_risk_parse_failed_has_diagnostics(self, mock):
         mock.return_value = None
         rr = try_llm_risk_officer(_a(), _v(), None, _f(), _mm(), MagicMock())
@@ -96,13 +106,13 @@ class TestDiagnosticsAlwaysAttached(unittest.TestCase):
             rr.attempt_diagnostics["parse_status"], "schema_validation_failed",
         )
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_risk_success_diagnostics_show_called_ok(self, mock):
-        mock.return_value = ({
+        mock.return_value = _ok_outcome({
             "risk_items": [{"risk_type": "scope_mismatch", "severity": "high",
                             "description": "X", "evidence": "fit_axes"}],
             "unknowns": [], "confidence": "medium",
-        }, MagicMock())
+        })
         rr = try_llm_risk_officer(_a(), _v(), None, _f(), _mm(), MagicMock())
         self.assertEqual(rr.attempt_diagnostics["provider_status"],
                          PROVIDER_CALLED_OK)
@@ -112,12 +122,12 @@ class TestDiagnosticsAlwaysAttached(unittest.TestCase):
 # ----------- Rewrite no-changes is explained -----------
 
 class TestRewriteNoChangesExplained(unittest.TestCase):
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_zero_actions_has_explicit_unknown(self, mock):
-        mock.return_value = ({
+        mock.return_value = _ok_outcome({
             "overall_depth": "none", "actions": [],
             "unknowns": [], "confidence": "medium",
-        }, MagicMock())
+        })
         rp = try_llm_rewrite_planner(_a(), _v(), _f(), _mm(), None, MagicMock())
         joined = " ".join(rp.unknowns).lower()
         self.assertTrue(
@@ -130,9 +140,9 @@ class TestRewriteNoChangesExplained(unittest.TestCase):
 # ----------- Citation safe-task path when bibliography missing -----------
 
 class TestCitationSafeWhenBibliographyMissing(unittest.TestCase):
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_bridges_and_gaps_populate_search_tasks(self, mock):
-        mock.return_value = ({
+        mock.return_value = _ok_outcome({
             "tradition_match": "weak",
             "canonical_coverage": "missing",
             "bridge_references_needed": [
@@ -142,16 +152,16 @@ class TestCitationSafeWhenBibliographyMissing(unittest.TestCase):
             "tradition_gaps": ["postphenomenological turn references missing"],
             "risk_items": ["scope_mismatch_risk"],
             "unknowns": [], "confidence": "medium",
-        }, MagicMock())
+        })
         cp = build_minimal_citation_plan(_a(), _v(), _f(), _mm(), None, None)
         cp2 = upgrade_citation_plan_with_llm(cp, _a(), _v(), None, MagicMock())
         self.assertGreater(len(cp2.missing_bridge_categories), 0)
         self.assertGreater(len(cp2.recommended_reference_search_tasks), 0)
         self.assertIn("llm_citation_planner", cp2.created_from)
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_no_fake_doi_or_authoryear(self, mock):
-        mock.return_value = ({
+        mock.return_value = _ok_outcome({
             "tradition_match": "weak",
             "bridge_references_needed": [
                 "good category",
@@ -159,7 +169,7 @@ class TestCitationSafeWhenBibliographyMissing(unittest.TestCase):
                 "https://doi.org/10.1234/x",   # filtered
             ],
             "unknowns": [], "confidence": "low",
-        }, MagicMock())
+        })
         cp = build_minimal_citation_plan(_a(), _v(), _f(), _mm(), None, None)
         cp2 = upgrade_citation_plan_with_llm(cp, _a(), _v(), None, MagicMock())
         joined = " ".join(cp2.missing_bridge_categories)
@@ -176,13 +186,13 @@ class TestRubricIntegration(unittest.TestCase):
         self.assertTrue(r["not_a_venue_profile"])
         self.assertTrue(r["not_journal_policy"])
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_rubric_active_records_as_source_on_llm_grounded(self, mock):
-        mock.return_value = ({
+        mock.return_value = _ok_outcome({
             "risk_items": [{"risk_type": "scope_mismatch", "severity": "high",
                             "description": "X", "evidence": "fit"}],
             "unknowns": [], "confidence": "low",
-        }, MagicMock())
+        })
         rr = try_llm_risk_officer(_a(), _v(), None, _f(), _mm(), MagicMock())
         # Russian + philosophy → rubric should apply
         self.assertIn(rubric_id(), rr.rubric_sources)

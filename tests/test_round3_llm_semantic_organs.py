@@ -6,6 +6,16 @@ placeholders on provider failure — NEVER to deterministic prose.
 
 from __future__ import annotations
 
+def _ok_outcome(parsed_dict):
+    """Helper for Round III-F outcome envelope mock."""
+    from kairoskopion.agents.base_shell import LLMAttemptOutcome
+    o = LLMAttemptOutcome(
+        ok=True, parsed=parsed_dict, content_present=True,
+        parse_status="parsed_ok",
+    )
+    return o
+
+
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -50,9 +60,9 @@ class TestRiskOfficerWiring(unittest.TestCase):
         self.assertEqual(rr.semantic_status, SEMANTIC_STATUS_NEEDS_LLM)
         self.assertEqual(rr.risk_items, [])
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_llm_success_yields_llm_grounded(self, mock_call):
-        mock_call.return_value = ({
+        mock_call.return_value = _ok_outcome({
             "risk_items": [
                 {"risk_type": "scope_mismatch", "severity": "high",
                  "description": "out of scope", "evidence": "scope doesn't match"},
@@ -61,7 +71,7 @@ class TestRiskOfficerWiring(unittest.TestCase):
             ],
             "unknowns": ["author eligibility unknown"],
             "confidence": "medium",
-        }, MagicMock())
+        })
         rr = try_llm_risk_officer(_a(), _v(), None, _f(), _mm(), MagicMock())
         self.assertEqual(rr.semantic_status, SEMANTIC_STATUS_LLM_GROUNDED)
         self.assertEqual(len(rr.risk_items), 2)
@@ -73,22 +83,22 @@ class TestRiskOfficerWiring(unittest.TestCase):
                   "overall_risk_label", "unknowns"):
             self.assertEqual(rr.field_origins.get(f), ORIGIN_LLM)
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_llm_returns_none_yields_needs_llm(self, mock_call):
         mock_call.return_value = None
         rr = try_llm_risk_officer(_a(), _v(), None, _f(), _mm(), MagicMock())
         self.assertEqual(rr.semantic_status, SEMANTIC_STATUS_NEEDS_LLM)
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_llm_exception_yields_needs_llm(self, mock_call):
         mock_call.side_effect = RuntimeError("provider fail")
         rr = try_llm_risk_officer(_a(), _v(), None, _f(), _mm(), MagicMock())
         self.assertEqual(rr.semantic_status, SEMANTIC_STATUS_NEEDS_LLM)
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_no_deterministic_prose_present(self, mock_call):
         """Empty risk_items from LLM must NOT trigger deterministic fallback."""
-        mock_call.return_value = ({"risk_items": [], "unknowns": [], "confidence": "low"}, MagicMock())
+        mock_call.return_value = _ok_outcome({"risk_items": [], "unknowns": [], "confidence": "low"})
         rr = try_llm_risk_officer(_a(), _v(), None, _f(), _mm(), MagicMock())
         import json as _json
         flat = _json.dumps(rr.to_dict(), ensure_ascii=False).lower()
@@ -105,9 +115,9 @@ class TestRewritePlannerWiring(unittest.TestCase):
         self.assertEqual(rp.semantic_status, SEMANTIC_STATUS_NEEDS_LLM)
         self.assertEqual(rp.changes, [])
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_llm_success_marks_core_touching(self, mock_call):
-        mock_call.return_value = ({
+        mock_call.return_value = _ok_outcome({
             "overall_depth": "major",
             "actions": [
                 {"action_id": 1, "target_mismatch": "topic",
@@ -116,7 +126,7 @@ class TestRewritePlannerWiring(unittest.TestCase):
             ],
             "unknowns": [],
             "confidence": "medium",
-        }, MagicMock())
+        })
         rp = try_llm_rewrite_planner(_a(), _v(), _f(), _mm(), None, MagicMock())
         self.assertEqual(rp.semantic_status, SEMANTIC_STATUS_LLM_GROUNDED)
         self.assertTrue(rp.requires_user_acceptance)
@@ -124,9 +134,9 @@ class TestRewritePlannerWiring(unittest.TestCase):
         # Unknowns should mention core-touching consent requirement
         self.assertTrue(any("user acceptance" in u.lower() for u in rp.unknowns))
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_unknown_field_core_normalized(self, mock_call):
-        mock_call.return_value = ({
+        mock_call.return_value = _ok_outcome({
             "overall_depth": "medium",
             "actions": [
                 {"action_id": 1, "target_mismatch": "method",
@@ -135,11 +145,11 @@ class TestRewritePlannerWiring(unittest.TestCase):
             ],
             "unknowns": [],
             "confidence": "low",
-        }, MagicMock())
+        })
         rp = try_llm_rewrite_planner(_a(), _v(), _f(), _mm(), None, MagicMock())
         self.assertEqual(rp.changes[0]["field_core_risk"], "unknown_core_impact")
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_llm_exception_yields_needs_llm(self, mock_call):
         mock_call.side_effect = RuntimeError("fail")
         rp = try_llm_rewrite_planner(_a(), _v(), _f(), _mm(), None, MagicMock())
@@ -163,9 +173,9 @@ class TestCitationPlannerWiring(unittest.TestCase):
         self.assertEqual(cp.semantic_status, SEMANTIC_STATUS_NEEDS_LLM)
         self.assertEqual(cp.citation_gap_categories, [])
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_llm_success_populates_semantic_fields(self, mock_call):
-        mock_call.return_value = ({
+        mock_call.return_value = _ok_outcome({
             "tradition_match": "weak",
             "canonical_coverage": "partial",
             "bridge_references_needed": [
@@ -176,7 +186,7 @@ class TestCitationPlannerWiring(unittest.TestCase):
             "risk_items": ["scope_mismatch_risk"],
             "unknowns": ["venue corpus not available"],
             "confidence": "medium",
-        }, MagicMock())
+        })
         cp = upgrade_citation_plan_with_llm(
             self._base_plan(), _a(), _v(), None, MagicMock(),
         )
@@ -187,11 +197,11 @@ class TestCitationPlannerWiring(unittest.TestCase):
         self.assertEqual(cp.field_origins["missing_bridge_categories"], ORIGIN_LLM)
         self.assertIn("llm_citation_planner", cp.created_from)
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_llm_dois_filtered(self, mock_call):
         """Anti-fake: any LLM-emitted bridge/gap containing DOI or
         author-year is stripped."""
-        mock_call.return_value = ({
+        mock_call.return_value = _ok_outcome({
             "tradition_match": "weak",
             "bridge_references_needed": [
                 "philosophy bridges",         # safe
@@ -201,7 +211,7 @@ class TestCitationPlannerWiring(unittest.TestCase):
             "tradition_gaps": ["safe gap category"],
             "unknowns": [],
             "confidence": "low",
-        }, MagicMock())
+        })
         cp = upgrade_citation_plan_with_llm(
             self._base_plan(), _a(), _v(), None, MagicMock(),
         )
@@ -210,7 +220,7 @@ class TestCitationPlannerWiring(unittest.TestCase):
         self.assertNotIn("10.1234", joined)
         self.assertIn("philosophy bridges", joined)
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_llm_failure_keeps_needs_llm(self, mock_call):
         mock_call.return_value = None
         cp = upgrade_citation_plan_with_llm(

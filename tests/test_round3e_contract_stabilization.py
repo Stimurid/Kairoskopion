@@ -9,6 +9,16 @@ Pins the new doctrine:
 
 from __future__ import annotations
 
+def _ok_outcome(parsed_dict):
+    """Helper for Round III-F outcome envelope mock."""
+    from kairoskopion.agents.base_shell import LLMAttemptOutcome
+    o = LLMAttemptOutcome(
+        ok=True, parsed=parsed_dict, content_present=True,
+        parse_status="parsed_ok",
+    )
+    return o
+
+
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -105,27 +115,27 @@ class TestNormalizer(unittest.TestCase):
 # ---------------- Risk: alternative top-level key ----------------
 
 class TestRiskOfficerAlternativeKey(unittest.TestCase):
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_risks_instead_of_risk_items(self, mock_call):
-        mock_call.return_value = ({
+        mock_call.return_value = _ok_outcome({
             "risks": [  # alternative top-level key
                 {"risk_type": "scope_mismatch", "severity": "high",
                  "description": "x", "evidence": "y"},
             ],
             "unknowns": [], "confidence": "medium",
-        }, MagicMock())
+        })
         rr = try_llm_risk_officer(_a(), _v(), None, _f(), _mm(), MagicMock())
         self.assertEqual(rr.semantic_status, SEMANTIC_STATUS_LLM_GROUNDED)
         self.assertEqual(len(rr.risk_items), 1)
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_nested_risk_report_envelope(self, mock_call):
-        mock_call.return_value = ({
+        mock_call.return_value = _ok_outcome({
             "risk_report": {"risk_items": [
                 {"risk_type": "method_gap", "severity": "medium",
                  "description": "x", "evidence": "y"},
             ]},
-        }, MagicMock())
+        })
         rr = try_llm_risk_officer(_a(), _v(), None, _f(), _mm(), MagicMock())
         self.assertEqual(rr.semantic_status, SEMANTIC_STATUS_LLM_GROUNDED)
         self.assertEqual(len(rr.risk_items), 1)
@@ -134,16 +144,16 @@ class TestRiskOfficerAlternativeKey(unittest.TestCase):
 # ---------------- Rewrite: alternative top-level key ----------------
 
 class TestRewritePlannerAlternativeKey(unittest.TestCase):
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_changes_instead_of_actions(self, mock_call):
-        mock_call.return_value = ({
+        mock_call.return_value = _ok_outcome({
             "changes": [
                 {"action_id": 1, "target_mismatch": "topic",
                  "description": "reframe intro",
                  "field_core_impact": "core_touching"},
             ],
             "unknowns": [], "confidence": "medium",
-        }, MagicMock())
+        })
         rp = try_llm_rewrite_planner(_a(), _v(), _f(), _mm(), None, MagicMock())
         self.assertEqual(rp.semantic_status, SEMANTIC_STATUS_LLM_GROUNDED)
         self.assertEqual(len(rp.changes), 1)
@@ -159,30 +169,30 @@ class TestCitationPlannerAlternativeKeys(unittest.TestCase):
             bibliography_profile=None,
         )
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_gaps_instead_of_tradition_gaps(self, mock_call):
-        mock_call.return_value = ({
+        mock_call.return_value = _ok_outcome({
             "gaps": ["postphenomenological turn missing"],
             "bridges": ["postphenomenology + russian tradition"],
             "unknowns": [],
             "confidence": "low",
-        }, MagicMock())
+        })
         cp = upgrade_citation_plan_with_llm(
             self._base_plan(), _a(), _v(), None, MagicMock(),
         )
         self.assertGreater(len(cp.citation_gap_categories), 0)
         self.assertGreater(len(cp.missing_bridge_categories), 0)
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_search_tasks_emitted_when_bibliography_missing(self, mock_call):
-        mock_call.return_value = ({
+        mock_call.return_value = _ok_outcome({
             "tradition_gaps": ["gap1"],
             "source_work_tasks": [
                 "Provide a bibliography section in the manuscript",
                 "Build a primary-source set of 5 anchors",
             ],
             "unknowns": [], "confidence": "low",
-        }, MagicMock())
+        })
         cp = upgrade_citation_plan_with_llm(
             self._base_plan(), _a(), _v(), None, MagicMock(),
         )
@@ -243,16 +253,16 @@ class TestAntiFakeStillStripsRefs(unittest.TestCase):
             bibliography_profile=None,
         )
 
-    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call")
+    @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_doi_in_alternative_key_still_filtered(self, mock_call):
-        mock_call.return_value = ({
+        mock_call.return_value = _ok_outcome({
             "gaps": [
                 "safe gap category",                # safe
                 "10.1234/example-doi",              # DOI → filtered
                 "Smith 2024 reference",             # author-year → filtered
             ],
             "unknowns": [],
-        }, MagicMock())
+        })
         cp = upgrade_citation_plan_with_llm(
             self._base_plan(), _a(), _v(), None, MagicMock(),
         )
