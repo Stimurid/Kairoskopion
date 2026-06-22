@@ -142,16 +142,37 @@ def _extract_docx_text(path: Path) -> tuple[str, str, list[str]]:
     except Exception as exc:
         return "", "failed", [f"DOCX read error: {exc}"]
 
+    # Round II-B Track F: extract Title / Heading 1 paragraph style
+    # so the article modeler (and structural title fallback) can read
+    # the real title as a direct source fact instead of guessing.
+    docx_title: str | None = None
     paragraphs: list[str] = []
     for para in doc.paragraphs:
         text = para.text.strip()
-        if text:
-            paragraphs.append(text)
+        if not text:
+            continue
+        try:
+            style_name = (para.style.name if para.style is not None else "") or ""
+        except Exception:  # noqa: BLE001
+            style_name = ""
+        sl = style_name.lower()
+        if docx_title is None and (
+            sl == "title"
+            or sl.startswith("heading 1")
+            or sl == "heading1"
+        ):
+            docx_title = text[:240]
+        paragraphs.append(text)
 
     full_text = "\n\n".join(paragraphs).strip()
 
     if not full_text:
         return "", "partially_extracted", ["DOCX contained no paragraph text"]
+
+    # Prepend an H1 markdown line so existing markdown-H1 detectors
+    # (article modeler, structural-title fallback) pick it up.
+    if docx_title and not full_text.lstrip().startswith("# "):
+        full_text = f"# {docx_title}\n\n{full_text}"
 
     return full_text, "extracted", []
 

@@ -247,6 +247,9 @@ export interface RiskReport {
   evidence_refs: string[];
   lifecycle_status?: string;
   created_at?: string;
+  // Round II-B
+  field_origins?: Record<string, string>;
+  semantic_status?: string;
 }
 
 // --- Mismatch ---
@@ -320,10 +323,14 @@ export interface RewriteChange {
 export interface RewritePlan {
   rewrite_plan_id: string;
   changes: RewriteChange[];
-  estimated_effort: string;
+  estimated_effort: string | null;
   field_core_risk: FieldCoreImpact;
   requires_user_acceptance: boolean;
-  summary: string;
+  summary: string | null;
+  // Round II-B
+  field_origins?: Record<string, string>;
+  semantic_status?: string;
+  unknowns?: string[];
 }
 
 // --- Quality Gate ---

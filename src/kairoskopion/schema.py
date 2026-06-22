@@ -407,6 +407,10 @@ class RewritePlan(_DictMixin):
     requires_user_acceptance: bool = True
     lifecycle_status: str = LifecycleStatus.DRAFT.value
     created_at: str = dc.field(default_factory=_now)
+    # Round II-B semantic provenance
+    field_origins: dict[str, str] = _dict()
+    semantic_status: str = "not_built"
+    unknowns: list[str] = _list()
 
 
 @dc.dataclass
@@ -563,6 +567,9 @@ class RiskReport(_DictMixin):
     evidence_refs: list[str] = _list()
     lifecycle_status: str = LifecycleStatus.DRAFT.value
     created_at: str = dc.field(default_factory=_now)
+    # Round II-B semantic provenance
+    field_origins: dict[str, str] = _dict()
+    semantic_status: str = "not_built"
 
 
 @dc.dataclass

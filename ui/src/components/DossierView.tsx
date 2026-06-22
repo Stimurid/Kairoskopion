@@ -281,6 +281,22 @@ export function DossierView({ caseId }: Props) {
                   : '')
               }
             >
+              {dossier.risk_report.semantic_status && (
+                <div className="lane-head">
+                  <span className={`semantic-status-badge semantic-status--${dossier.risk_report.semantic_status}`}>
+                    semantic: {dossier.risk_report.semantic_status}
+                  </span>
+                </div>
+              )}
+              {dossier.risk_report.semantic_status === 'needs_llm' && (
+                <div className="round2-needs-llm-banner" role="note">
+                  <strong>Семантика рисков пуста — нужен LLM risk_officer organ (Round II-B).</strong>{' '}
+                  Детерминированный код больше не диагностирует риски подачи (scope/method/citation/field-core/strategic).
+                  Эти claims появятся только после подключения LLM-агента
+                  <code> agents/submission/risk_officer.py</code>.
+                  Структурные поля (overall_risk_label, unknowns) — доступны.
+                </div>
+              )}
               {dossier.risk_report.overall_risk_label && (
                 <KVRow label="Overall risk" value={dossier.risk_report.overall_risk_label} />
               )}
@@ -480,9 +496,31 @@ export function DossierView({ caseId }: Props) {
 
           {dossier.rewrite_plan && (
             <SectionCard title="Rewrite Plan">
+              {dossier.rewrite_plan.semantic_status && (
+                <div className="lane-head">
+                  <span className={`semantic-status-badge semantic-status--${dossier.rewrite_plan.semantic_status}`}>
+                    semantic: {dossier.rewrite_plan.semantic_status}
+                  </span>
+                </div>
+              )}
+              {dossier.rewrite_plan.semantic_status === 'needs_llm' && (
+                <div className="round2-needs-llm-banner" role="note">
+                  <strong>Семантика рерайта пуста — нужен LLM rewrite_planner organ (Round II-B).</strong>{' '}
+                  Детерминированный код больше не предлагает конкретные edits ("revise introduction",
+                  "strengthen literature review", "core_touching" и пр.). Конкретные изменения и
+                  field-core-risk появятся только после подключения LLM-агента
+                  <code> agents/fit/rewrite_planner.py</code> (с protected-core gate).
+                </div>
+              )}
               <KVRow label="Effort" value={dossier.rewrite_plan.estimated_effort} />
               <KVRow label="Changes" value={dossier.rewrite_plan.changes.length} />
               <KVRow label="Summary" value={dossier.rewrite_plan.summary} />
+              {dossier.rewrite_plan.unknowns && dossier.rewrite_plan.unknowns.length > 0 && (
+                <div className="lane-unknowns">
+                  <strong>Unknowns ({dossier.rewrite_plan.unknowns.length}):</strong>
+                  <ul>{dossier.rewrite_plan.unknowns.map((u, i) => <li key={i}>{u}</li>)}</ul>
+                </div>
+              )}
             </SectionCard>
           )}
 

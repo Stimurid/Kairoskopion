@@ -1331,9 +1331,16 @@ class Case:
         # requires a BibliographyProfile which isn't always available
         # at this point — it's built on-demand by /adaptation-plan;
         # skip here to avoid fake data.)
+        # Round II-B: route through needs_llm placeholder. Deterministic
+        # semantic risk diagnosis is forbidden by doctrine. Legacy
+        # build_risk_report stays available for tests + future LLM
+        # risk_officer fallback; production chain stops emitting
+        # deterministic semantic risk items.
         try:
-            from ..services.risk_reporting import build_risk_report
-            self.risk_report = build_risk_report(
+            from ..services.risk_report_needs_llm import (
+                build_needs_llm_risk_report,
+            )
+            self.risk_report = build_needs_llm_risk_report(
                 self.article_model,
                 self.selected_venue,
                 scenario,
@@ -1341,18 +1348,24 @@ class Case:
                 self.mismatch_map,
             )
             self._log_decision("risk_report_built", {
-                "risk_count": (
-                    len(self.risk_report.risks)
-                    if self.risk_report and hasattr(self.risk_report, "risks")
-                    else 0
-                ),
+                "semantic_status": self.risk_report.semantic_status,
+                "risk_count": 0,
+                "round2b_doctrine": "needs_llm_placeholder",
             })
         except Exception as exc:
             logger.warning("Risk report failed (non-fatal): %s", exc)
 
         if self.mismatch_map.mismatches:
             try:
-                self.rewrite_plan = build_rewrite_plan(
+                # Round II-B: needs_llm placeholder. Legacy
+                # build_rewrite_plan stays for tests + future LLM
+                # rewrite_planner agent fallback; production chain
+                # stops emitting deterministic semantic rewrite changes
+                # and field_core_risk assessments.
+                from ..services.rewrite_plan_needs_llm import (
+                    build_needs_llm_rewrite_plan,
+                )
+                self.rewrite_plan = build_needs_llm_rewrite_plan(
                     self.mismatch_map,
                     article_model_id=(
                         self.article_model.article_model_id
@@ -1367,6 +1380,7 @@ class Case:
                 self._log_decision("rewrite_planned", {
                     "changes_count": len(self.rewrite_plan.changes),
                     "effort": self.rewrite_plan.estimated_effort,
+                    "round2b_doctrine": "needs_llm_placeholder",
                 })
                 # Sprint α B3: pass the plan through the policy gate
                 try:
@@ -1438,6 +1452,10 @@ class Case:
         except Exception as exc:
             logger.warning("CitationPlan minimal failed (non-fatal): %s", exc)
 
+        # Round II-B Track D: ComplianceChecklist must NEVER disappear
+        # silently from the dossier. If the builder throws, emit a
+        # visible error-placeholder so operator sees the failure
+        # instead of an absent section.
         try:
             from ..services.compliance_checklist_minimal import (
                 build_minimal_compliance_checklist,
@@ -1456,7 +1474,55 @@ class Case:
                 "unknowns_count": len(self.compliance_checklist.unknowns),
             })
         except Exception as exc:
-            logger.warning("ComplianceChecklist minimal failed (non-fatal): %s", exc)
+            logger.warning(
+                "ComplianceChecklist minimal failed — emitting visible "
+                "error placeholder (Round II-B Track D): %s", exc,
+            )
+            # Visible error placeholder so the section is not hidden.
+            from ..schema import ComplianceChecklist as _CC
+            from ..services.semantic_provenance import (
+                ORIGIN_STRUCTURAL_EXTRACTION,
+            )
+            self.compliance_checklist = _CC(
+                article_model_id=(
+                    self.article_model.article_model_id
+                    if self.article_model else None
+                ),
+                venue_model_id=(
+                    self.selected_venue.venue_model_id
+                    if self.selected_venue else None
+                ),
+                submission_scenario_id=(
+                    scenario.submission_scenario_id if scenario else None
+                ),
+                checklist_items=[],
+                missing_items=[],
+                blocking_items=[],
+                warnings=[
+                    "ComplianceChecklist builder raised an exception "
+                    "during fit chain. Section preserved as visible "
+                    "error placeholder so the operator sees the "
+                    "failure instead of a silently absent section."
+                ],
+                unknowns=[
+                    f"builder_exception_type={type(exc).__name__}",
+                    "compliance items are not available for this case "
+                    "until the builder issue is resolved",
+                ],
+                status="error",
+                created_from=["error_placeholder"],
+                confidence="low",
+                field_origins={
+                    "checklist_items": ORIGIN_STRUCTURAL_EXTRACTION,
+                    "status": ORIGIN_STRUCTURAL_EXTRACTION,
+                    "warnings": ORIGIN_STRUCTURAL_EXTRACTION,
+                    "unknowns": ORIGIN_STRUCTURAL_EXTRACTION,
+                },
+                semantic_status="error",
+            )
+            self._log_decision("compliance_checklist_error_placeholder", {
+                "exception_type": type(exc).__name__,
+            })
 
         try:
             from ..services.submission_pack_minimal import (
