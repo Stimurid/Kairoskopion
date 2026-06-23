@@ -260,15 +260,23 @@ def _normalize_entry(item: Any) -> str:
 
 def _ru_safe_line(text: str, *, max_quote: int = 360) -> str:
     """Take a possibly-English line and return a Russian-safe rendering:
-    Russian text unchanged; English text wrapped as `(англ.) «…»`. Never
-    drops content, never invents translation.
+    fully-English lines are wrapped as `(англ.) «…»`; mostly-Russian
+    lines pass through but any embedded ≥40-char English run is wrapped
+    in place. Never drops content, never invents translation.
     """
     s = _normalize_entry(text).strip()
     if not s:
         return ""
     if _looks_english(s):
         return f"(англ.) «{_quote_block(s, max_quote)}»"
-    return s
+
+    # Mostly Russian: catch embedded English runs (e.g. the "(Heidegger
+    # 'Question Concerning Technology', …)" tail after a Russian gloss).
+    def _wrap(m):
+        eng = m.group(0).strip()
+        return f"(англ.) «{eng}»"
+
+    return re.sub(r"[A-Za-z][A-Za-z' ,;.\-]{40,}", _wrap, s)
 
 
 def _normalize_list(value: Any) -> list[str]:
@@ -741,7 +749,7 @@ def _section_what_understood(dossier: dict[str, Any]) -> HumanSection:
     if mzones:
         bullets.append(_MUTABLE_HINT)
         bullets.append("Гибкие зоны для доработки:")
-        bullets.extend(f"— {z}" for z in mzones)
+        bullets.extend(f"— {_ru_safe_line(z)}" for z in mzones)
 
     unknowns = _normalize_list(_safe_get(am, "unknowns"))
     if unknowns:
@@ -1151,10 +1159,7 @@ def _section_sources(dossier: dict[str, Any]) -> HumanSection:
     unknowns = _normalize_list(cp.get("unknowns"))
 
     def _ru_bullet(s: str) -> str:
-        s = _normalize_entry(s)
-        if _looks_english(s):
-            return f"— (англ.) «{_quote_block(s, 360)}»"
-        return f"— {s}"
+        return f"— {_ru_safe_line(s)}"
 
     subsections: list[HumanSubsection] = []
     if gaps:
