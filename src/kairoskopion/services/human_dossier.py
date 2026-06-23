@@ -258,6 +258,19 @@ def _normalize_entry(item: Any) -> str:
     return str(item)
 
 
+def _ru_safe_line(text: str, *, max_quote: int = 360) -> str:
+    """Take a possibly-English line and return a Russian-safe rendering:
+    Russian text unchanged; English text wrapped as `(англ.) «…»`. Never
+    drops content, never invents translation.
+    """
+    s = _normalize_entry(text).strip()
+    if not s:
+        return ""
+    if _looks_english(s):
+        return f"(англ.) «{_quote_block(s, max_quote)}»"
+    return s
+
+
 def _normalize_list(value: Any) -> list[str]:
     """Normalize an arbitrary list-shaped semantic field to a list of
     Russian-renderable strings. Drops empty / repr-shaped entries.
@@ -725,7 +738,7 @@ def _section_what_understood(dossier: dict[str, Any]) -> HumanSection:
             "Чего система про статью пока не знает (поля, которые "
             "ArticleModeler пометил как unknown):"
         )
-        bullets.extend(f"— {u}" for u in unknowns[:8])
+        bullets.extend(f"— {_ru_safe_line(u)}" for u in unknowns[:8])
 
     if not paragraphs and not bullets:
         paragraphs.append(
@@ -751,7 +764,15 @@ def _section_field_position(dossier: dict[str, Any]) -> HumanSection:
     disc_code = _safe_get(sp, "primary_discipline")
     disc_ru = _ru_term(disc_code) if disc_code else ""
     regs_raw = _normalize_list(_safe_get(sp, "disciplinary_registers"))
-    regs_ru = [_ru_term(r) for r in regs_raw]
+    # Map each register to its Russian display; if no mapping known and the
+    # raw value is English, wrap it as (англ.) «…» to keep the surface clean.
+    regs_ru: list[str] = []
+    for r in regs_raw:
+        mapped = _ru_term(r)
+        if mapped == r and _looks_english(r):
+            regs_ru.append(f"(англ.) «{_quote_block(r, 120)}»")
+        else:
+            regs_ru.append(mapped)
     if disc_code or regs_ru:
         parts = []
         if disc_code:
@@ -931,7 +952,7 @@ def _section_fit(dossier: dict[str, Any]) -> HumanSection:
             bucket = "weak"
         line = f"{axis_ru} — {_FIT_VALUE_RU.get(value, value or 'не определено')}"
         if notes:
-            line += f". {notes}"
+            line += f". {_ru_safe_line(notes)}"
         groups[bucket].append(line)
 
     subsections: list[HumanSubsection] = []
