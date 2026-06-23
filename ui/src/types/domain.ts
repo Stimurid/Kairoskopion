@@ -416,6 +416,34 @@ export interface Dossier {
   quality_gates: Record<string, QualityGateResult>;
 }
 
+// --- Round III-H: human-readable Russian author dossier ---
+// Presentation layer only; built by services/human_dossier.py from the
+// same case object — no LLM, no fabrication.
+export interface HumanSubsection {
+  title_ru: string;
+  paragraphs: string[];
+  bullets: string[];
+  status_ru?: string | null;
+  badge?: string | null;
+}
+
+export interface HumanSection {
+  id: string;
+  title_ru: string;
+  paragraphs: string[];
+  bullets: string[];
+  subsections: HumanSubsection[];
+}
+
+export interface HumanDossier {
+  case_id: string;
+  title_ru: string;
+  venue_name_ru: string;
+  stage_ru: string;
+  generated_at?: string | null;
+  sections: HumanSection[];
+}
+
 // V2-D minimal-real CitationPlan. Builder:
 // services/citation_plan_minimal.py. No invented references.
 export interface CitationPlanV2D {

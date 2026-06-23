@@ -647,6 +647,16 @@ def get_dossier(case: Case = Depends(_user_case)):
     return case.build_dossier()
 
 
+@app.get("/cases/{case_id}/human-dossier")
+def get_human_dossier(case: Case = Depends(_user_case)):
+    """Russian author-facing dossier built on top of build_dossier().
+
+    Pure presentation layer: no LLM, no network, no new claims.
+    """
+    from kairoskopion.services.human_dossier import build_human_dossier
+    return build_human_dossier(case.build_dossier()).to_dict()
+
+
 # ---------------------------------------------------------------------------
 # Decision log
 # ---------------------------------------------------------------------------

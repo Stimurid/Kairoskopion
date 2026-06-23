@@ -9,6 +9,7 @@ import type {
 } from '../types/domain';
 import { api } from '../api/client';
 import { DecisionLog } from './DecisionLog';
+import { HumanDossierView } from './HumanDossierView';
 
 interface Props {
   caseId: string;
@@ -41,6 +42,9 @@ export function DossierView({ caseId }: Props) {
   const [dossier, setDossier] = useState<Dossier | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Default to the Russian human-readable author view; technical
+  // sections remain available for developers via the toggle.
+  const [mode, setMode] = useState<'human' | 'technical'>('human');
   const [activeTab, setActiveTab] = useState<'overview' | 'decisions'>('overview');
 
   useEffect(() => {
@@ -73,6 +77,25 @@ export function DossierView({ caseId }: Props) {
         <span className="dossier-generated">Generated: {dossier.generated_at}</span>
       </div>
 
+      <div className="dossier-mode-toggle">
+        <button
+          className={`type-chip ${mode === 'human' ? 'type-chip--active' : ''}`}
+          onClick={() => setMode('human')}
+        >
+          Человеческое досье
+        </button>
+        <button
+          className={`type-chip ${mode === 'technical' ? 'type-chip--active' : ''}`}
+          onClick={() => setMode('technical')}
+        >
+          Технические данные
+        </button>
+      </div>
+
+      {mode === 'human' ? (
+        <HumanDossierView caseId={caseId} />
+      ) : (
+      <>
       <div className="dossier-tabs">
         <button
           className={`type-chip ${activeTab === 'overview' ? 'type-chip--active' : ''}`}
@@ -605,6 +628,8 @@ export function DossierView({ caseId }: Props) {
         </div>
       ) : (
         <DecisionLog caseId={caseId} />
+      )}
+      </>
       )}
     </div>
   );

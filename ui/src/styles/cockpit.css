@@ -4994,3 +4994,97 @@ code.agent-detail-value {
   margin-bottom: var(--space-xs);
   color: var(--text-secondary, #b8bccc);
 }
+
+/* --- Round III-H: human-readable Russian author dossier --- */
+.dossier-mode-toggle {
+  display: flex;
+  gap: var(--space-sm, 8px);
+  margin-bottom: var(--space-md, 16px);
+  padding-bottom: var(--space-sm, 8px);
+  border-bottom: 1px solid var(--border-color, #2a2d3a);
+}
+.human-dossier-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg, 20px);
+  max-width: 920px;
+  line-height: 1.6;
+}
+.human-dossier-header h2 {
+  margin: 0 0 var(--space-xs, 6px) 0;
+}
+.human-dossier-subtitle {
+  margin: 0;
+  color: var(--text-secondary, #b8bccc);
+  font-size: 0.95rem;
+}
+.human-dossier-generated {
+  margin: var(--space-xs, 6px) 0;
+  color: var(--text-tertiary, #8a8d9a);
+  font-size: 0.85rem;
+}
+.human-dossier-disclaimer {
+  margin-top: var(--space-sm, 8px);
+  padding: var(--space-sm, 8px) var(--space-md, 12px);
+  background: var(--surface-2, #1a1d28);
+  border-left: 3px solid var(--accent, #4f8cff);
+  border-radius: 4px;
+  color: var(--text-secondary, #b8bccc);
+  font-size: 0.9rem;
+}
+.human-section {
+  padding: var(--space-md, 14px) var(--space-lg, 18px);
+  background: var(--surface-1, #14171f);
+  border: 1px solid var(--border-color, #2a2d3a);
+  border-radius: 6px;
+}
+.human-section-title {
+  margin: 0 0 var(--space-sm, 10px) 0;
+  font-size: 1.05rem;
+  color: var(--text-primary, #e6e8ef);
+}
+.human-paragraph {
+  margin: 0 0 var(--space-sm, 10px) 0;
+  color: var(--text-primary, #e6e8ef);
+}
+.human-bullets {
+  margin: 0 0 var(--space-sm, 10px) 0;
+  padding-left: 1.4em;
+  color: var(--text-primary, #e6e8ef);
+}
+.human-bullets li {
+  margin-bottom: 4px;
+}
+.human-subsection {
+  margin-top: var(--space-md, 12px);
+  padding: var(--space-sm, 10px) var(--space-md, 14px);
+  background: var(--surface-2, #1a1d28);
+  border-radius: 4px;
+}
+.human-subsection-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  margin-bottom: var(--space-xs, 6px);
+}
+.human-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 0.75rem;
+  background: var(--surface-3, #232734);
+  border-radius: 3px;
+  color: var(--text-secondary, #b8bccc);
+}
+.human-badge--blocking, .human-badge--major {
+  background: #4a1f1f;
+  color: #ffb3b3;
+}
+.human-badge--needs_llm, .human-badge--parse_failed, .human-badge--provider_error {
+  background: #3a2f1f;
+  color: #ffd9a3;
+}
+.human-subsection-status {
+  color: var(--text-tertiary, #8a8d9a);
+  font-size: 0.85rem;
+}

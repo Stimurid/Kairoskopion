@@ -81,6 +81,7 @@ import type {
   EvidenceDetail,
   DecisionLogEntry,
   Dossier,
+  HumanDossier,
   VenueInvestigationResult,
 } from '../types/domain';
 
@@ -229,6 +230,7 @@ export const api = {
 
   // Dossier
   getDossier: (id: string) => get<Dossier>(`/cases/${id}/dossier`),
+  getHumanDossier: (id: string) => get<HumanDossier>(`/cases/${id}/human-dossier`),
 
   // Decision log
   getDecisionLog: (id: string) => get<DecisionLogEntry[]>(`/cases/${id}/decision-log`),
