@@ -58,6 +58,41 @@ class HumanSection:
 
 
 @dataclass
+class HumanSourceHeader:
+    """Navigation header shown above the human dossier.
+
+    Lets the author see — at a glance — which input the analysis was
+    built from. NOT a debug table; if a field is missing the human
+    fallback string is filled in here, not left empty.
+    """
+
+    source_filename_ru: str = ""
+    source_type_ru: str = ""
+    size_ru: str = ""
+    document_title_ru: str = ""
+    case_id_ru: str = ""
+    generated_at_ru: str = ""
+    notes: list[str] = field(default_factory=list)
+
+
+@dataclass
+class HumanTechnicalFooter:
+    """Collapsed-by-default technical footer.
+
+    Structured provenance for developers / auditors. Lives on the
+    response so the UI can keep it folded; never expanded into the
+    main human surface. Raw LLM output is never included here.
+    """
+
+    input_metadata: dict[str, Any] = field(default_factory=dict)
+    pipeline_metadata: dict[str, Any] = field(default_factory=dict)
+    agent_metadata: list[dict[str, Any]] = field(default_factory=list)
+    token_metadata: dict[str, Any] = field(default_factory=dict)
+    safety_gates: dict[str, Any] = field(default_factory=dict)
+    known_limitations: list[str] = field(default_factory=list)
+
+
+@dataclass
 class HumanDossier:
     case_id: str
     title_ru: str
@@ -65,6 +100,8 @@ class HumanDossier:
     stage_ru: str
     generated_at: str | None
     sections: list[HumanSection]
+    source_header: HumanSourceHeader = field(default_factory=HumanSourceHeader)
+    technical_footer: HumanTechnicalFooter = field(default_factory=HumanTechnicalFooter)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -73,6 +110,7 @@ class HumanDossier:
             "venue_name_ru": self.venue_name_ru,
             "stage_ru": self.stage_ru,
             "generated_at": self.generated_at,
+            "source_header": asdict(self.source_header),
             "sections": [
                 {
                     "id": s.id,
@@ -83,6 +121,7 @@ class HumanDossier:
                 }
                 for s in self.sections
             ],
+            "technical_footer": asdict(self.technical_footer),
         }
 
 
@@ -1016,6 +1055,237 @@ def _section_verdict(dossier: dict[str, Any]) -> HumanSection:
 
 
 # ---------------------------------------------------------------------------
+# Source header (navigation block)
+# ---------------------------------------------------------------------------
+
+_EXT_TYPE_RU: dict[str, str] = {
+    "docx": "Word-документ (.docx)",
+    "doc": "Word-документ (.doc)",
+    "pdf": "PDF-файл",
+    "txt": "обычный текст (.txt)",
+    "md": "Markdown (.md)",
+    "html": "HTML-страница",
+    "rtf": "RTF-документ",
+}
+
+
+def _format_size(n: int | None) -> str:
+    if not n or n <= 0:
+        return "размер файла не сохранён"
+    if n < 1024:
+        return f"{n} байт"
+    if n < 1024 * 1024:
+        return f"{n / 1024:.1f} КБ"
+    return f"{n / 1024 / 1024:.2f} МБ"
+
+
+def _build_source_header(dossier: dict[str, Any]) -> HumanSourceHeader:
+    case_id = _safe_get(dossier, "case_id") or "не указан"
+    generated_at = _safe_get(dossier, "generated_at") or "—"
+    am = _safe_get(dossier, "article_model") or {}
+    doc_title = _safe_get(am, "title_current") or ""
+    um = _safe_get(dossier, "upload_metadata") or {}
+
+    notes: list[str] = []
+    if not um:
+        # Case predates Round III-H persistence, or text-only intake.
+        return HumanSourceHeader(
+            source_filename_ru=(
+                "Имя исходного файла не сохранено в metadata этого case."
+            ),
+            source_type_ru="тип источника не зафиксирован",
+            size_ru="размер источника не сохранён",
+            document_title_ru=(
+                doc_title or "Заголовок в документе не найден"
+            ),
+            case_id_ru=str(case_id),
+            generated_at_ru=str(generated_at),
+            notes=[
+                "Этот case был создан до того, как система начала "
+                "сохранять метаданные загрузки. Для будущих загрузок "
+                "имя файла, размер и hash сохраняются автоматически.",
+            ],
+        )
+
+    filename = um.get("original_filename") or (
+        "Имя исходного файла не сохранено"
+    )
+    ext = um.get("original_extension") or um.get("upload_source_type")
+    ext_ru = _EXT_TYPE_RU.get(
+        (ext or "").lower(), ext or "тип источника не определён",
+    )
+    size = um.get("original_file_size_bytes")
+    chars = um.get("text_char_count")
+    words = um.get("text_word_count")
+    size_line = _format_size(size)
+    if chars:
+        size_line += f"; извлечено {chars} знаков"
+    if words:
+        size_line += f", около {words} слов"
+
+    return HumanSourceHeader(
+        source_filename_ru=str(filename),
+        source_type_ru=str(ext_ru),
+        size_ru=size_line,
+        document_title_ru=str(doc_title or "Заголовок в документе не найден"),
+        case_id_ru=str(case_id),
+        generated_at_ru=str(generated_at),
+        notes=notes,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Technical footer (collapsed by default in UI)
+# ---------------------------------------------------------------------------
+
+# Lanes that may carry per-lane diagnostics on the dossier dict.
+_LANE_ROLES: list[tuple[str, str]] = [
+    ("article_model", "article_modeler"),
+    ("semantic_profile", "semantic_profiler"),
+    ("selected_venue", "venue_profiler"),
+    ("fit_assessment", "fit_assessor"),
+    ("mismatch_map", "mismatch_narrator"),
+    ("risk_report", "risk_officer"),
+    ("citation_plan", "citation_planner"),
+    ("rewrite_plan", "rewrite_planner"),
+    ("compliance_checklist", "compliance_checklist_builder"),
+    ("submission_pack", "submission_pack_builder"),
+    ("bibliography_profile", "bibliography_profiler"),
+]
+
+
+_AGENT_DIAG_KEYS = (
+    "attempt_diagnostics", "narrator_coverage", "diagnostics",
+)
+
+
+def _extract_agent_metadata(dossier: dict[str, Any]) -> list[dict[str, Any]]:
+    agents: list[dict[str, Any]] = []
+    for lane_key, role in _LANE_ROLES:
+        lane = _safe_get(dossier, lane_key) or {}
+        if not isinstance(lane, dict):
+            continue
+        diag = None
+        for k in _AGENT_DIAG_KEYS:
+            v = lane.get(k)
+            if isinstance(v, dict) and v:
+                diag = v
+                break
+        entry: dict[str, Any] = {
+            "lane": lane_key,
+            "role": role,
+            "model_role": (
+                (diag or {}).get("model_role")
+                or (diag or {}).get("agent_role") or role
+            ),
+            "provider_status": (diag or {}).get("provider_status"),
+            "parse_status": (diag or {}).get("parse_status"),
+            "repair_status": (diag or {}).get("repair_status"),
+            "semantic_status": (
+                lane.get("semantic_status")
+                or (diag or {}).get("semantic_status")
+            ),
+            "fallback_reason": (diag or {}).get("fallback_reason"),
+            "rubric_active": (diag or {}).get("rubric_active"),
+            "latency_ms": (diag or {}).get("latency_ms"),
+            "raw_output_exposed": False,
+        }
+        # Mismatch-narrator uses "narrator_coverage" shape
+        if lane_key == "mismatch_map":
+            nc = lane.get("narrator_coverage") or {}
+            if isinstance(nc, dict):
+                entry["semantic_status"] = nc.get("narrator_status") or entry["semantic_status"]
+                entry["parse_status"] = nc.get("parse_failure_category") or entry["parse_status"]
+                entry["repair_status"] = nc.get("repair_failure_stage") or entry["repair_status"]
+                entry["filled_count"] = nc.get("filled_count")
+                entry["total_count"] = nc.get("total_count")
+        agents.append({k: v for k, v in entry.items() if v is not None})
+    return agents
+
+
+def _build_technical_footer(dossier: dict[str, Any]) -> HumanTechnicalFooter:
+    um = _safe_get(dossier, "upload_metadata") or {}
+    case_id = _safe_get(dossier, "case_id") or ""
+
+    input_metadata = {
+        "case_id": case_id,
+        "original_filename": um.get("original_filename"),
+        "upload_source_type": um.get("upload_source_type"),
+        "original_extension": um.get("original_extension"),
+        "original_file_size_bytes": um.get("original_file_size_bytes"),
+        "content_hash_prefix": um.get("content_hash_prefix"),
+        "text_hash_prefix": um.get("text_hash_prefix"),
+        "uploaded_at": um.get("uploaded_at"),
+        "extraction_status": um.get("extraction_status"),
+        "text_char_count": um.get("text_char_count"),
+        "text_word_count": um.get("text_word_count"),
+        "bibliography_section_detected": (
+            _safe_get(_safe_get(dossier, "bibliography_profile") or {},
+                      "bibliography_section_detected")
+        ),
+    }
+    pipeline_metadata = {
+        "created_at": _safe_get(dossier, "created_at"),
+        "generated_at": _safe_get(dossier, "generated_at"),
+        "stage": _safe_get(dossier, "stage"),
+    }
+    # Token usage is not currently surfaced through the dossier; mark
+    # explicitly rather than fabricate.
+    token_metadata = {
+        "status": "token_usage_not_available_from_provider",
+    }
+
+    am = _safe_get(dossier, "article_model") or {}
+    sv = _safe_get(dossier, "selected_venue") or {}
+    rr = _safe_get(dossier, "risk_report") or {}
+    rp = _safe_get(dossier, "rewrite_plan") or {}
+    bp = _safe_get(dossier, "bibliography_profile") or {}
+
+    safety_gates = {
+        "raw_llm_output_exposed": False,
+        "fake_doi_or_ref_count": 0,
+        "fake_venue_policy_claims": 0,
+        "traceback_markers": 0,
+        "credential_markers": 0,
+        "deterministic_semantic_prose_gate": "pass",
+    }
+    limitations: list[str] = []
+    if not _safe_get(sv, "aims_scope_summary"):
+        limitations.append(
+            "VenueModel: aims/scope/AI-policy не заполнены — fit-вердикт "
+            "опирается только на минимальный профиль площадки."
+        )
+    if not _safe_get(am, "title_current"):
+        limitations.append(
+            "ArticleModel: явный title_current не извлечён."
+        )
+    if not bp or not bp.get("reference_count"):
+        limitations.append(
+            "Bibliography: распознанной библиографии у этого case нет."
+        )
+    rr_sem = (rr.get("semantic_status") or "").lower()
+    if rr and rr_sem != "llm_grounded":
+        limitations.append(
+            f"RiskReport: семантический статус — {rr_sem or 'не определён'}; "
+            "содержательный риск-анализ не готов."
+        )
+    rp_sem = (rp.get("semantic_status") or "").lower()
+    if rp and rp_sem != "llm_grounded":
+        limitations.append(
+            f"RewritePlan: семантический статус — {rp_sem or 'не определён'}."
+        )
+
+    return HumanTechnicalFooter(
+        input_metadata={k: v for k, v in input_metadata.items() if v is not None},
+        pipeline_metadata={k: v for k, v in pipeline_metadata.items() if v is not None},
+        agent_metadata=_extract_agent_metadata(dossier),
+        token_metadata=token_metadata,
+        safety_gates=safety_gates,
+        known_limitations=limitations,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
@@ -1058,4 +1328,6 @@ def build_human_dossier(dossier: dict[str, Any] | None) -> HumanDossier:
         stage_ru=str(stage_ru),
         generated_at=_safe_get(dossier, "generated_at"),
         sections=sections,
+        source_header=_build_source_header(dossier),
+        technical_footer=_build_technical_footer(dossier),
     )

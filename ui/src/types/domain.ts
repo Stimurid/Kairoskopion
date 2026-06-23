@@ -435,6 +435,41 @@ export interface HumanSection {
   subsections: HumanSubsection[];
 }
 
+export interface HumanSourceHeader {
+  source_filename_ru: string;
+  source_type_ru: string;
+  size_ru: string;
+  document_title_ru: string;
+  case_id_ru: string;
+  generated_at_ru: string;
+  notes: string[];
+}
+
+export interface HumanAgentEntry {
+  lane: string;
+  role: string;
+  model_role?: string;
+  provider_status?: string;
+  parse_status?: string;
+  repair_status?: string;
+  semantic_status?: string;
+  fallback_reason?: string;
+  rubric_active?: boolean;
+  latency_ms?: number;
+  raw_output_exposed?: boolean;
+  filled_count?: number;
+  total_count?: number;
+}
+
+export interface HumanTechnicalFooter {
+  input_metadata: Record<string, string | number | boolean | null>;
+  pipeline_metadata: Record<string, string | number | null>;
+  agent_metadata: HumanAgentEntry[];
+  token_metadata: Record<string, string | number | null>;
+  safety_gates: Record<string, string | number | boolean | null>;
+  known_limitations: string[];
+}
+
 export interface HumanDossier {
   case_id: string;
   title_ru: string;
@@ -442,6 +477,8 @@ export interface HumanDossier {
   stage_ru: string;
   generated_at?: string | null;
   sections: HumanSection[];
+  source_header: HumanSourceHeader;
+  technical_footer: HumanTechnicalFooter;
 }
 
 // V2-D minimal-real CitationPlan. Builder:

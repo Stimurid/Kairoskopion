@@ -116,6 +116,11 @@ class Case:
         # has clobbered self.input_text.
         self.bibliography_profile: BibliographyProfile | None = None
         self.article_input_text: str = ""
+        # Round III-H: upload metadata persisted on the case so the
+        # human dossier source header and technical footer can show
+        # what file the analysis was built from. Set by the intake/file
+        # route; remains None for text-only intakes.
+        self.upload_metadata: dict[str, Any] | None = None
         self.publication_regime: PublicationRegimeModel | None = None
         self.investigated_venue: VenueModel | None = None
         self.article_field_position: FieldPositionModel | None = None
@@ -1879,6 +1884,8 @@ class Case:
         # V2-E BibliographyProfile
         if self.bibliography_profile:
             dossier["bibliography_profile"] = self.bibliography_profile.to_dict()
+        if self.upload_metadata:
+            dossier["upload_metadata"] = dict(self.upload_metadata)
         if self.article_field_position:
             dossier["article_field_position"] = self.article_field_position.to_dict()
         if self.venue_field_position:
@@ -2097,6 +2104,7 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         "input_text": case.input_text,
         "input_type": case.input_type,
         "article_input_text": case.article_input_text,
+        "upload_metadata": case.upload_metadata,
         "decision_log": case.decision_log,
         "quality_gates": case.quality_gates,
     }
@@ -2178,6 +2186,7 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
     case.input_text = data.get("input_text", "")
     case.input_type = data.get("input_type", "")
     case.article_input_text = data.get("article_input_text", "")
+    case.upload_metadata = data.get("upload_metadata") or None
     case.decision_log = data.get("decision_log", [])
     case.quality_gates = data.get("quality_gates", {})
 

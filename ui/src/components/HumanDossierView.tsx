@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { HumanDossier, HumanSubsection } from '../types/domain';
+import type {
+  HumanDossier,
+  HumanSubsection,
+  HumanSourceHeader,
+  HumanTechnicalFooter,
+} from '../types/domain';
 import { api } from '../api/client';
 
 interface Props {
@@ -31,6 +36,125 @@ function Subsection({ sub }: { sub: HumanSubsection }) {
         </ul>
       )}
     </div>
+  );
+}
+
+function SourceHeader({ h }: { h: HumanSourceHeader }) {
+  return (
+    <div className="human-source-header">
+      <div className="human-source-row">
+        <span className="human-source-label">Источник:</span>
+        <span className="human-source-value">{h.source_filename_ru}</span>
+      </div>
+      <div className="human-source-row">
+        <span className="human-source-label">Тип:</span>
+        <span className="human-source-value">{h.source_type_ru}</span>
+      </div>
+      <div className="human-source-row">
+        <span className="human-source-label">Объём:</span>
+        <span className="human-source-value">{h.size_ru}</span>
+      </div>
+      <div className="human-source-row">
+        <span className="human-source-label">Заголовок в документе:</span>
+        <span className="human-source-value">{h.document_title_ru}</span>
+      </div>
+      <div className="human-source-row">
+        <span className="human-source-label">Case:</span>
+        <span className="human-source-value">
+          <code>{h.case_id_ru}</code>
+        </span>
+      </div>
+      <div className="human-source-row">
+        <span className="human-source-label">Собрано:</span>
+        <span className="human-source-value">{h.generated_at_ru}</span>
+      </div>
+      {h.notes.map((n, i) => (
+        <p key={i} className="human-source-note">{n}</p>
+      ))}
+    </div>
+  );
+}
+
+function renderKVBlock(
+  title: string,
+  data: Record<string, string | number | boolean | null | undefined>,
+) {
+  const rows = Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== '');
+  if (rows.length === 0) return null;
+  return (
+    <div className="tech-footer-block">
+      <h4>{title}</h4>
+      <table className="tech-footer-table">
+        <tbody>
+          {rows.map(([k, v]) => (
+            <tr key={k}>
+              <td><code>{k}</code></td>
+              <td>{String(v)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TechnicalFooter({ f }: { f: HumanTechnicalFooter }) {
+  return (
+    <details className="human-technical-footer">
+      <summary>Технические сведения (для разработчика — свёрнуто)</summary>
+      <div className="tech-footer-disclaimer">
+        Этот блок не предназначен для авторского чтения. Он содержит
+        provenance / диагностику / quality gates. Сырой ответ LLM здесь не
+        хранится и не показывается.
+      </div>
+      {renderKVBlock('Input metadata', f.input_metadata)}
+      {renderKVBlock('Pipeline metadata', f.pipeline_metadata)}
+      {renderKVBlock('Token usage', f.token_metadata)}
+      {renderKVBlock('Safety / quality gates', f.safety_gates)}
+      {f.agent_metadata.length > 0 && (
+        <div className="tech-footer-block">
+          <h4>Agent / organ metadata</h4>
+          <table className="tech-footer-table">
+            <thead>
+              <tr>
+                <th>lane</th>
+                <th>role</th>
+                <th>provider</th>
+                <th>parse</th>
+                <th>repair</th>
+                <th>semantic</th>
+                <th>fallback</th>
+                <th>rubric</th>
+                <th>raw exposed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {f.agent_metadata.map((a, i) => (
+                <tr key={i}>
+                  <td><code>{a.lane}</code></td>
+                  <td><code>{a.role}</code></td>
+                  <td>{a.provider_status ?? '—'}</td>
+                  <td>{a.parse_status ?? '—'}</td>
+                  <td>{a.repair_status ?? '—'}</td>
+                  <td>{a.semantic_status ?? '—'}</td>
+                  <td>{a.fallback_reason ?? '—'}</td>
+                  <td>{a.rubric_active == null ? '—' : String(a.rubric_active)}</td>
+                  <td>{String(a.raw_output_exposed ?? false)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {f.known_limitations.length > 0 && (
+        <div className="tech-footer-block">
+          <h4>Known limitations</h4>
+          <ul>
+            {f.known_limitations.map((l, i) => <li key={i}>{l}</li>)}
+          </ul>
+        </div>
+      )}
+    </details>
   );
 }
 
@@ -78,11 +202,6 @@ export function HumanDossierView({ caseId }: Props) {
           Статья: «{data.title_ru}» — площадка: {data.venue_name_ru}
           {data.stage_ru ? ` — стадия: ${data.stage_ru}` : ''}
         </p>
-        {data.generated_at && (
-          <p className="human-dossier-generated">
-            Собрано: {data.generated_at}
-          </p>
-        )}
         <p className="human-dossier-disclaimer">
           Этот разбор — человеческое изложение того, что система знает про
           эту пару статья × площадка. Он не заменяет рецензента и не
@@ -90,6 +209,8 @@ export function HumanDossierView({ caseId }: Props) {
           данных, она говорит об этом прямо, а не дописывает за себя.
         </p>
       </div>
+
+      <SourceHeader h={data.source_header} />
 
       {data.sections.map(section => (
         <section
@@ -110,6 +231,8 @@ export function HumanDossierView({ caseId }: Props) {
           ))}
         </section>
       ))}
+
+      <TechnicalFooter f={data.technical_footer} />
     </div>
   );
 }

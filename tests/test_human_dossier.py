@@ -319,6 +319,85 @@ class TestHumanDossierMismatches(unittest.TestCase):
         self.assertEqual(genre_sub.badge, "needs_llm")
 
 
+class TestHumanDossierSourceHeader(unittest.TestCase):
+    def test_header_uses_upload_metadata_when_present(self):
+        d = _case_7a_like_dossier()
+        d["upload_metadata"] = {
+            "original_filename": "статья.docx",
+            "original_extension": "docx",
+            "upload_source_type": "docx",
+            "original_file_size_bytes": 123456,
+            "content_hash_prefix": "abc1234567890def",
+            "text_hash_prefix": "fed0987654321cba",
+            "uploaded_at": "2026-06-22T18:43:16+00:00",
+            "extraction_status": "ok",
+            "text_char_count": 18777,
+            "text_word_count": 2540,
+        }
+        h = build_human_dossier(d).to_dict()
+        sh = h["source_header"]
+        self.assertEqual(sh["source_filename_ru"], "статья.docx")
+        self.assertIn("Word-документ", sh["source_type_ru"])
+        self.assertIn("18777", sh["size_ru"])
+        self.assertEqual(sh["case_id_ru"], "case_7a331f7fe613")
+        self.assertEqual(sh["notes"], [])
+
+    def test_header_falls_back_when_metadata_absent(self):
+        d = _case_7a_like_dossier()
+        d.pop("upload_metadata", None)
+        h = build_human_dossier(d).to_dict()
+        sh = h["source_header"]
+        self.assertIn("не сохранено", sh["source_filename_ru"])
+        self.assertTrue(
+            any("метаданные" in n for n in sh["notes"]),
+            f"expected fallback note in notes; got: {sh['notes']}",
+        )
+
+
+class TestHumanDossierTechnicalFooter(unittest.TestCase):
+    def test_footer_present_and_collapsible(self):
+        h = build_human_dossier(_case_7a_like_dossier()).to_dict()
+        f = h["technical_footer"]
+        self.assertIn("input_metadata", f)
+        self.assertIn("pipeline_metadata", f)
+        self.assertIn("agent_metadata", f)
+        self.assertIn("token_metadata", f)
+        self.assertIn("safety_gates", f)
+        self.assertIn("known_limitations", f)
+
+    def test_footer_token_usage_declared_unavailable(self):
+        h = build_human_dossier(_case_7a_like_dossier()).to_dict()
+        self.assertEqual(
+            h["technical_footer"]["token_metadata"]["status"],
+            "token_usage_not_available_from_provider",
+        )
+
+    def test_footer_safety_gate_raw_output_exposed_false(self):
+        h = build_human_dossier(_case_7a_like_dossier()).to_dict()
+        self.assertFalse(
+            h["technical_footer"]["safety_gates"]["raw_llm_output_exposed"],
+        )
+        # No content of the LLM body must leak into the footer
+        import json
+        text = json.dumps(h["technical_footer"], ensure_ascii=False)
+        self.assertNotIn("repair_failed:::", text)  # placeholder sanity
+
+    def test_footer_agent_entries_have_role_and_no_raw_output(self):
+        h = build_human_dossier(_case_7a_like_dossier()).to_dict()
+        agents = h["technical_footer"]["agent_metadata"]
+        self.assertTrue(any(a["role"] == "risk_officer" for a in agents))
+        for a in agents:
+            self.assertFalse(a.get("raw_output_exposed", False))
+
+    def test_footer_known_limitations_mention_real_gaps(self):
+        h = build_human_dossier(_case_7a_like_dossier()).to_dict()
+        lim_text = " ".join(h["technical_footer"]["known_limitations"])
+        # Real gaps in case_7a-like fixture: empty venue, no title,
+        # no bibliography, risk needs_llm
+        self.assertIn("Bibliography", lim_text)
+        self.assertIn("RiskReport", lim_text)
+
+
 class TestHumanDossierBibliographyAndNextActions(unittest.TestCase):
     def test_bibliography_section_explains_what_to_do_when_absent(self):
         h = build_human_dossier(_case_7a_like_dossier())

@@ -312,11 +312,15 @@ async def intake_file(
             f"Supported: {', '.join(sorted(_SUPPORTED_UPLOAD_EXTENSIONS))}",
         )
 
-    import tempfile
+    import tempfile, hashlib
+    from datetime import datetime, timezone
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         content = await file.read()
         tmp.write(content)
         tmp_path = Path(tmp.name)
+    original_size = len(content)
+    content_hash_prefix = hashlib.sha256(content).hexdigest()[:16]
+    uploaded_at = datetime.now(timezone.utc).isoformat()
 
     try:
         from .source_intake_util import extract_text_from_file
@@ -350,6 +354,24 @@ async def intake_file(
         result = case.intake_text(text, input_type, search_depth, region=region)
         result["filename"] = filename
         result["extraction_status"] = extraction_status
+        # Round III-H: persist upload metadata for human-dossier source
+        # header and technical footer. No raw text is duplicated here —
+        # only file-level structural facts and short hashes.
+        text_hash_prefix = hashlib.sha256(
+            text.encode("utf-8", errors="ignore"),
+        ).hexdigest()[:16]
+        case.upload_metadata = {
+            "original_filename": filename,
+            "original_extension": suffix.lstrip(".") or None,
+            "upload_source_type": (suffix.lstrip(".") or "unknown"),
+            "original_file_size_bytes": original_size,
+            "content_hash_prefix": content_hash_prefix,
+            "text_hash_prefix": text_hash_prefix,
+            "uploaded_at": uploaded_at,
+            "extraction_status": extraction_status,
+            "text_char_count": len(text),
+            "text_word_count": len(text.split()),
+        }
         store.save(case)
         return result
     finally:
