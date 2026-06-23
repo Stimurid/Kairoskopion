@@ -213,6 +213,28 @@ def _ru_intro_for_english(field_label_ru: str, text: str) -> str:
     )
 
 
+def _try_parse_list_literal(s: str) -> list[str] | None:
+    """Safely unpack a stringified Python/JSON list like
+    ``"['a', 'b']"`` or ``'["a", "b"]'``.  Returns None if *s* is not
+    a recognisable list literal.
+    """
+    t = s.strip()
+    if not (t.startswith("[") and t.endswith("]")):
+        return None
+    import ast
+    try:
+        parsed = ast.literal_eval(t)
+    except Exception:  # noqa: BLE001
+        import json as _json
+        try:
+            parsed = _json.loads(t)
+        except Exception:  # noqa: BLE001
+            return None
+    if isinstance(parsed, list) and all(isinstance(x, str) for x in parsed):
+        return [x.strip() for x in parsed if x.strip()]
+    return None
+
+
 def _normalize_entry(item: Any) -> str:
     """Convert one semantic-list entry (str OR dict OR list-of-str) into
     a single human-readable line. NEVER returns a Python dict repr.
@@ -220,6 +242,9 @@ def _normalize_entry(item: Any) -> str:
     if item is None:
         return ""
     if isinstance(item, str):
+        unpacked = _try_parse_list_literal(item)
+        if unpacked is not None:
+            return _ru_join(unpacked, "; ")
         return item.strip()
     if isinstance(item, (int, float, bool)):
         return str(item)
@@ -821,10 +846,20 @@ def _render_list_with_cache(
     """
     if not isinstance(raw, list) or not raw:
         return []
+    # Expand stringified list literals into individual items so they
+    # render as separate bullets instead of one "['..','..','..]" line.
+    expanded: list[Any] = []
+    for item in raw:
+        if isinstance(item, str):
+            unpacked = _try_parse_list_literal(item)
+            if unpacked is not None:
+                expanded.extend(unpacked)
+                continue
+        expanded.append(item)
     bullets: list[str] = [label_ru]
     unresolved_count = 0
     rendered_any = False
-    for idx, item in enumerate(raw):
+    for idx, item in enumerate(expanded):
         line, _used = _ru_line_for_item(dossier, base_path, idx, item)
         if line:
             bullets.append(f"— {line}")
@@ -913,20 +948,21 @@ def _section_what_understood(dossier: dict[str, Any]) -> HumanSection:
     )
     register = _safe_get(am, "disciplinary_register_current")
     if isinstance(register, list):
-        # Map each register code to its Russian display; wrap any
-        # remaining English term so the bullet stays clean.
-        register_str = _ru_join([
-            _ru_safe_line(_ru_term(_normalize_entry(r)))
+        mapped = [
+            _ru_term(_normalize_entry(r))
             for r in register if _normalize_entry(r)
-        ])
+        ]
+        register_str = _ru_join(mapped) if mapped else ""
     elif register:
-        register_str = _ru_safe_line(_ru_term(_normalize_entry(register)))
+        register_str = _ru_term(_normalize_entry(register))
     else:
         register_str = ""
     if genre or register_str:
         line = f"Жанр и дисциплинарный регистр: {genre}"
         if register_str:
             line += f"; регистр — {register_str}"
+        else:
+            line += "; регистр не определён"
         paragraphs.append(line + ".")
 
     pcore_raw = _safe_get(am, "protected_core") or []
@@ -2005,12 +2041,16 @@ def _compute_surface_metrics(dossier: dict[str, Any]) -> dict[str, int]:
         "русская переформулировка не построена"
     ) + text.count("русский перенос не построен")
     long_english_runs = re.findall(r"[A-Za-z][A-Za-z' ,;.\-]{79,}", text)
+    list_literal_repr_count = len(re.findall(
+        r"\[(['\"])[^\]]{2,}\1(?:\s*,\s*\1[^\]]*\1)*\]", text,
+    ))
     return {
         "fallback_placeholder_count": fallback_placeholder_count,
         "technical_data_redirect_count": technical_data_redirect_count,
         "search_for_raw_count": search_for_raw_count,
         "address_tradition_gap_raw_count": address_tradition_gap_raw_count,
         "unresolved_surface_fallback_count": unresolved_surface_fallback_count,
+        "list_literal_repr_count": list_literal_repr_count,
         "long_english_semantic_prose_count": len(long_english_runs),
     }
 
