@@ -1886,6 +1886,30 @@ class Case:
             dossier["bibliography_profile"] = self.bibliography_profile.to_dict()
         if self.upload_metadata:
             dossier["upload_metadata"] = dict(self.upload_metadata)
+        # Round III-J: surface enough state for an evidence-based
+        # human-dossier renderer. None of these introduce new facts —
+        # they expose what is already persisted on the case.
+        if self.investigated_venue is not None:
+            dossier["investigated_venue"] = self.investigated_venue.to_dict()
+        # Operator-supplied venue text lives on self.input_text after a
+        # venue-typed intake. Surface a truncated preview + the
+        # input_type marker so the renderer can label the venue as
+        # "supplied by operator" without LLM-confirmed VenueModel.
+        _venue_input_types = (
+            "journal_or_venue", "venue", "submission_venue",
+        )
+        if (
+            self.input_text
+            and (self.input_type or "").lower() in _venue_input_types
+        ):
+            dossier["venue_input_text_preview"] = self.input_text[:600]
+            dossier["venue_input_type"] = self.input_type
+        # First-paragraph preview of the article text — purely
+        # structural; renderer uses this only as a TITLE CANDIDATE with
+        # explicit source/confidence, never as canonical title.
+        if self.article_input_text:
+            first_chunk = self.article_input_text.split("\n\n", 1)[0]
+            dossier["article_first_paragraph"] = first_chunk[:400]
         if self.article_field_position:
             dossier["article_field_position"] = self.article_field_position.to_dict()
         if self.venue_field_position:

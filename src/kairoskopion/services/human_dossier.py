@@ -126,6 +126,157 @@ class HumanDossier:
 
 
 # ---------------------------------------------------------------------------
+# Round III-J helpers — render English / dict-shaped semantic fields
+# into Russian author-facing prose WITHOUT inventing new claims and
+# WITHOUT leaving Python dict reprs in the surface.
+# ---------------------------------------------------------------------------
+
+_DISCIPLINE_RU: dict[str, str] = {
+    "philosophy_of_technology": "философия техники",
+    "philosophy of technology": "философия техники",
+    "philosophy_of_ai": "философия искусственного интеллекта",
+    "philosophy of ai": "философия искусственного интеллекта",
+    "philosophy of artificial intelligence":
+        "философия искусственного интеллекта",
+    "actor_network_theory": "акторно-сетевая теория (ANT)",
+    "actor network theory": "акторно-сетевая теория (ANT)",
+    "science and technology studies": "наука, технология, общество (STS)",
+    "science and technology studies (sts)":
+        "наука, технология, общество (STS)",
+    "sts": "STS — наука, технология, общество",
+    "management_studies": "исследования менеджмента",
+    "management studies": "исследования менеджмента",
+    "business strategy": "стратегический менеджмент",
+    "organizational_theory": "теория организаций",
+    "organizational studies": "организационные исследования",
+    "organizational theory": "теория организаций",
+    "organizational psychology": "организационная психология",
+    "organizational discourse theory": "теория организационного дискурса",
+    "organizational_discourse_theory": "теория организационного дискурса",
+    "organizational_semiotics": "организационная семиотика",
+    "cognitive_science_of_organizations":
+        "когнитивная наука об организациях",
+    "phenomenology": "феноменология",
+    "post-phenomenology": "пост-феноменология",
+    "post-phenomenological technology studies":
+        "пост-феноменология техники",
+    "xenopsychology": "ксенопсихология",
+    "schumpeterian_entrepreneurship":
+        "шумпетерианская теория предпринимательства",
+    "tofflerian_futures_studies":
+        "тоффлеровская футурология / теория волн",
+}
+
+
+def _ru_term(code: str | None) -> str:
+    if not code:
+        return ""
+    key = str(code).strip().lower()
+    return _DISCIPLINE_RU.get(key, str(code).replace("_", " "))
+
+
+def _looks_english(text: str | None, threshold: float = 0.18) -> bool:
+    """Heuristic: a Russian-author field reads as English when its
+    Cyrillic share is below ``threshold``. Used only to decide whether
+    to wrap the value with a Russian framing line — never to drop the
+    content.
+    """
+    if not text or not isinstance(text, str):
+        return False
+    cyr = 0
+    letters = 0
+    for ch in text:
+        if ch.isalpha():
+            letters += 1
+            if "Ѐ" <= ch <= "ӿ":
+                cyr += 1
+    if letters < 8:
+        return False
+    return (cyr / letters) < threshold
+
+
+def _quote_block(text: str, max_chars: int = 600) -> str:
+    """Trim a long quoted block to a safe length."""
+    s = str(text).strip()
+    if len(s) > max_chars:
+        s = s[: max_chars - 1].rstrip() + "…"
+    return s
+
+
+def _ru_intro_for_english(field_label_ru: str, text: str) -> str:
+    """Frame an English semantic field with a Russian intro line plus a
+    quoted reconstruction. Adds no new facts.
+    """
+    return (
+        f"{field_label_ru} (поле сохранено в исходной англоязычной "
+        f"формулировке): «{_quote_block(text)}»"
+    )
+
+
+def _normalize_entry(item: Any) -> str:
+    """Convert one semantic-list entry (str OR dict OR list-of-str) into
+    a single human-readable line. NEVER returns a Python dict repr.
+    """
+    if item is None:
+        return ""
+    if isinstance(item, str):
+        return item.strip()
+    if isinstance(item, (int, float, bool)):
+        return str(item)
+    if isinstance(item, list):
+        return _ru_join([_normalize_entry(x) for x in item if x], "; ")
+    if isinstance(item, dict):
+        # Common human-name fields (in priority order)
+        for k in ("scholar", "author", "name", "tradition", "school",
+                 "title", "label", "key"):
+            v = item.get(k)
+            if isinstance(v, str) and v.strip():
+                head = v.strip()
+                break
+        else:
+            head = ""
+        secondary_parts: list[str] = []
+        for k in ("role", "debt", "contribution", "evidence",
+                 "weight", "confidence", "summary"):
+            v = item.get(k)
+            if isinstance(v, str) and v.strip():
+                secondary_parts.append(v.strip())
+        secondary = "; ".join(secondary_parts)
+        if head and secondary:
+            return f"{head} — {secondary}"
+        if head:
+            return head
+        if secondary:
+            return secondary
+        # Fallback: extract just the string values, never a dict repr
+        stringy = [
+            v.strip() for v in item.values()
+            if isinstance(v, str) and v.strip()
+        ]
+        return "; ".join(stringy) or "<запись без человекочитаемых полей>"
+    # Unknown shape — never serialize as repr
+    return str(item)
+
+
+def _normalize_list(value: Any) -> list[str]:
+    """Normalize an arbitrary list-shaped semantic field to a list of
+    Russian-renderable strings. Drops empty / repr-shaped entries.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value.strip()] if value.strip() else []
+    if not isinstance(value, list):
+        return [_normalize_entry(value)]
+    out: list[str] = []
+    for x in value:
+        s = _normalize_entry(x)
+        if s and s != "<запись без человекочитаемых полей>":
+            out.append(s)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Russian glossaries (presentation only — no semantic claims)
 # ---------------------------------------------------------------------------
 
@@ -282,30 +433,171 @@ def _is_doi_like(text: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Title and target venue extractors (Round III-J)
+# ---------------------------------------------------------------------------
+
+def _extract_title_candidate(dossier: dict[str, Any]) -> dict[str, Any]:
+    """Decide a display title from persisted state. Never mutates the
+    canonical ArticleModel.title_current. Returns:
+      - display_title: str  (always non-empty; falls back to placeholder)
+      - title_source:  str  ("article_model" / "first_paragraph" / "none")
+      - title_confidence: "high" / "medium" / "low" / "none"
+      - title_note: str (operator-facing one-liner)
+    """
+    am = _safe_get(dossier, "article_model") or {}
+    canonical = _safe_get(am, "title_current")
+    if isinstance(canonical, str) and canonical.strip():
+        return {
+            "display_title": canonical.strip(),
+            "title_source": "article_model",
+            "title_confidence": "high",
+            "title_note": "Канонический заголовок из ArticleModel.",
+        }
+    first = _safe_get(dossier, "article_first_paragraph")
+    if isinstance(first, str) and first.strip():
+        head = first.strip()
+        head_one_line = " ".join(head.split())
+        # Title heuristic: short-ish, no terminal period, often has ":"
+        looks_like_title = (
+            len(head_one_line) <= 220
+            and not head_one_line.endswith(".")
+        )
+        if looks_like_title:
+            return {
+                "display_title": head_one_line,
+                "title_source": "probable_title_from_first_paragraph",
+                "title_confidence": "medium",
+                "title_note": (
+                    "Вероятный заголовок, извлечён эвристикой из первого "
+                    "абзаца исходного текста. Канонический "
+                    "ArticleModel.title_current не заполнен."
+                ),
+            }
+    return {
+        "display_title": "Заголовок не удалось уверенно извлечь",
+        "title_source": "none",
+        "title_confidence": "none",
+        "title_note": (
+            "Ни ArticleModel.title_current, ни эвристика по первому "
+            "абзацу не дали безопасного кандидата."
+        ),
+    }
+
+
+def _extract_target_venue(dossier: dict[str, Any]) -> dict[str, Any]:
+    """Decide what to render in the venue section. Three branches:
+
+    1) selected_venue has a canonical_name → use it.
+    2) investigated_venue or operator-supplied venue text exists →
+       label "supplied by operator, profile incomplete".
+    3) Nothing → "не восстановлена из metadata этого case".
+
+    Never invents a label. Never claims selection when none is persisted.
+    """
+    sv = _safe_get(dossier, "selected_venue") or {}
+    iv = _safe_get(dossier, "investigated_venue") or {}
+    sv_name = (sv.get("canonical_name") if isinstance(sv, dict) else None)
+    iv_name = (iv.get("canonical_name") if isinstance(iv, dict) else None)
+    venue_text = _safe_get(dossier, "venue_input_text_preview")
+
+    if isinstance(sv_name, str) and sv_name.strip():
+        return {
+            "label": sv_name.strip(),
+            "label_source": "selected_venue.canonical_name",
+            "confidence": (sv.get("confidence") or "не указана"),
+            "scope": (sv.get("aims_scope_summary") or sv.get("scope_summary")),
+            "completeness": "selected",
+            "note": (
+                "Площадка выбрана в case как `selected_venue` с каноническим "
+                "именем."
+            ),
+        }
+    if isinstance(iv_name, str) and iv_name.strip():
+        return {
+            "label": iv_name.strip(),
+            "label_source": "investigated_venue.canonical_name",
+            "confidence": (iv.get("confidence") or "не указана"),
+            "scope": (iv.get("aims_scope_summary") or iv.get("scope_summary")),
+            "completeness": "investigated_incomplete",
+            "note": (
+                "Площадка была исследована (`investigated_venue`), но не "
+                "промоутирована в `selected_venue`."
+            ),
+        }
+    # Operator-supplied label via /intake/text payload — extract a label
+    # from the preview text *only* if the preview looks like a venue
+    # description (first quoted phrase, or first capitalized phrase
+    # before " — ").
+    if isinstance(venue_text, str) and venue_text.strip():
+        head = venue_text.strip()
+        # Quoted phrase: «...»
+        m = re.search(r"[«\"]([^»\"]{3,80})[»\"]", head)
+        label = None
+        if m:
+            label = m.group(1).strip()
+        else:
+            # First "Name — ..." pattern at the start
+            m2 = re.match(
+                r"^\s*([^\n—\-]{3,80}?)\s*[—\-]\s",
+                head,
+            )
+            if m2:
+                label = m2.group(1).strip()
+        if label:
+            return {
+                "label": label,
+                "label_source": "venue_input_text_preview",
+                "confidence": "low",
+                "scope": None,
+                "completeness": "operator_supplied_profile_incomplete",
+                "note": (
+                    "Целевая площадка указана автором в payload-е "
+                    "/intake/text. VenueModel её не подтвердил "
+                    "(canonical_name отсутствует, confidence низкий)."
+                ),
+            }
+    return {
+        "label": None,
+        "label_source": "none",
+        "confidence": "не определена",
+        "scope": None,
+        "completeness": "unrecoverable",
+        "note": (
+            "Целевая площадка не восстановлена из metadata этого case."
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Section builders
 # ---------------------------------------------------------------------------
 
 def _section_passport(dossier: dict[str, Any]) -> HumanSection:
     am = _safe_get(dossier, "article_model") or {}
-    sv = _safe_get(dossier, "selected_venue") or {}
     genre_code = _safe_get(am, "genre_current") or "unknown"
     genre_ru = _GENRE_RU.get(genre_code, genre_code)
     lang = _safe_get(am, "language") or "не указан"
     conf = _safe_get(am, "confidence") or "не указана"
-    venue_name = _safe_get(sv, "canonical_name") or "площадка не выбрана"
-    venue_conf = _safe_get(sv, "confidence") or "не указана"
-    venue_aims = _safe_get(sv, "aims_scope_summary") or _safe_get(sv, "scope_summary")
+    venue = _extract_target_venue(dossier)
+    title_cand = _extract_title_candidate(dossier)
 
     p1 = (
         f"Перед нами {genre_ru}. Язык статьи: {lang}. "
         f"Уверенность модели в реконструкции статьи: {conf}."
     )
-    p2 = (
-        f"Статья примеряется на площадку «{venue_name}». "
-        f"Уверенность в профиле площадки: {venue_conf}."
-    )
-    notes = []
-    if not venue_aims:
+    if venue["label"]:
+        p2 = (
+            f"Целевая площадка для подачи: «{venue['label']}». "
+            f"Уверенность в профиле площадки: {venue['confidence']}. "
+            f"{venue['note']}"
+        )
+    else:
+        p2 = (
+            "Целевая площадка не восстановлена из metadata этого case. "
+            f"{venue['note']}"
+        )
+    notes: list[str] = []
+    if not venue.get("scope"):
         notes.append(
             "Главная оговорка: подробного описания журнала в системе сейчас "
             "недостаточно — fit-проверка предварительная. Чтобы сделать "
@@ -313,7 +605,7 @@ def _section_passport(dossier: dict[str, Any]) -> HumanSection:
             "(scope, типы статей, языковая политика, требования к объёму "
             "и оформлению)."
         )
-    bullets = []
+    bullets: list[str] = []
     fa = _safe_get(dossier, "fit_assessment") or {}
     overall = _safe_get(fa, "overall_label")
     if overall:
@@ -321,14 +613,24 @@ def _section_passport(dossier: dict[str, Any]) -> HumanSection:
             f"Текущий общий вердикт fit-проверки: «{overall}» "
             f"(см. раздел 5)."
         )
-    if _safe_get(am, "title_current"):
-        bullets.append(f"Заголовок статьи: «{am['title_current']}».")
-    else:
+    # Evidence-based title display (never overwrites canonical title)
+    src_map = {
+        "article_model": "канонический заголовок ArticleModel",
+        "probable_title_from_first_paragraph":
+            "вероятный заголовок (эвристика по первому абзацу)",
+        "none": "источник не определён",
+    }
+    src_ru = src_map.get(title_cand["title_source"], title_cand["title_source"])
+    if title_cand["title_source"] != "none":
         bullets.append(
-            "Заголовок статьи системой не извлечён — это значит, что "
-            "распознанный article-модель пока без официального title; "
-            "автору стоит проверить, есть ли в тексте явный заголовок."
+            f"Заголовок (для отображения): «{title_cand['display_title']}» "
+            f"— источник: {src_ru}; уверенность: "
+            f"{title_cand['title_confidence']}."
         )
+        bullets.append(title_cand["title_note"])
+    else:
+        bullets.append("Заголовок не удалось уверенно извлечь.")
+        bullets.append(title_cand["title_note"])
     return HumanSection(
         id="passport",
         title_ru="1. Паспорт",
@@ -337,32 +639,53 @@ def _section_passport(dossier: dict[str, Any]) -> HumanSection:
     )
 
 
+def _render_semantic_field(label_ru: str, value: Any) -> str | None:
+    """Render a possibly-English / possibly-dict semantic field as a
+    single Russian-framed line. Never leaks Python dict repr.
+    """
+    if value is None:
+        return None
+    text = _normalize_entry(value)
+    if not text:
+        return None
+    if _looks_english(text):
+        return _ru_intro_for_english(label_ru, text)
+    return f"{label_ru}: {text}"
+
+
 def _section_what_understood(dossier: dict[str, Any]) -> HumanSection:
     am = _safe_get(dossier, "article_model") or {}
     paragraphs: list[str] = []
-    if _safe_get(am, "problem_statement"):
-        paragraphs.append(
-            "Центральная проблема, как её зафиксировала система: "
-            f"{am['problem_statement']}"
-        )
-    if _safe_get(am, "research_question"):
-        paragraphs.append(
-            f"Исследовательский вопрос: {am['research_question']}"
-        )
-    if _safe_get(am, "object_of_inquiry"):
-        paragraphs.append(
-            f"Объект рассмотрения: {am['object_of_inquiry']}"
-        )
-    if _safe_get(am, "method_description"):
-        paragraphs.append(
-            f"Метод, как он описан: {am['method_description']}"
-        )
+
+    line = _render_semantic_field(
+        "Центральная проблема, как её зафиксировала система",
+        _safe_get(am, "problem_statement"),
+    )
+    if line: paragraphs.append(line)
+    line = _render_semantic_field(
+        "Исследовательский вопрос", _safe_get(am, "research_question"),
+    )
+    if line: paragraphs.append(line)
+    line = _render_semantic_field(
+        "Объект рассмотрения", _safe_get(am, "object_of_inquiry"),
+    )
+    if line: paragraphs.append(line)
+    line = _render_semantic_field(
+        "Метод, как он описан", _safe_get(am, "method_description"),
+    )
+    if line: paragraphs.append(line)
 
     bullets: list[str] = []
-    claims = _nonempty_list(_safe_get(am, "core_claims"))
+    claims = _normalize_list(_safe_get(am, "core_claims"))
     if claims:
         bullets.append("Основные тезисы статьи (как их видит система):")
-        bullets.extend(f"— {c}" for c in claims)
+        for c in claims:
+            if _looks_english(c):
+                bullets.append(
+                    f"— (англ. реконструкция) «{_quote_block(c)}»"
+                )
+            else:
+                bullets.append(f"— {c}")
 
     genre = _GENRE_RU.get(
         _safe_get(am, "genre_current") or "unknown",
@@ -370,27 +693,33 @@ def _section_what_understood(dossier: dict[str, Any]) -> HumanSection:
     )
     register = _safe_get(am, "disciplinary_register_current")
     if isinstance(register, list):
-        register_str = _ru_join(register)
+        register_str = _ru_join([_normalize_entry(r) for r in register])
     else:
-        register_str = register or ""
+        register_str = _normalize_entry(register) if register else ""
     if genre or register_str:
         line = f"Жанр и дисциплинарный регистр: {genre}"
         if register_str:
             line += f"; регистр — {register_str}"
         paragraphs.append(line + ".")
 
-    pcore = _nonempty_list(_safe_get(am, "protected_core"))
+    pcore = _normalize_list(_safe_get(am, "protected_core"))
     if pcore:
         bullets.append(_PROTECTED_CORE_HINT)
         bullets.append("Защищаемое ядро статьи:")
-        bullets.extend(f"— {c}" for c in pcore)
-    mzones = _nonempty_list(_safe_get(am, "mutable_zones"))
+        for c in pcore:
+            if _looks_english(c):
+                bullets.append(
+                    f"— (англ. реконструкция) «{_quote_block(c)}»"
+                )
+            else:
+                bullets.append(f"— {c}")
+    mzones = _normalize_list(_safe_get(am, "mutable_zones"))
     if mzones:
         bullets.append(_MUTABLE_HINT)
         bullets.append("Гибкие зоны для доработки:")
         bullets.extend(f"— {z}" for z in mzones)
 
-    unknowns = _nonempty_list(_safe_get(am, "unknowns"))
+    unknowns = _normalize_list(_safe_get(am, "unknowns"))
     if unknowns:
         bullets.append(
             "Чего система про статью пока не знает (поля, которые "
@@ -416,35 +745,52 @@ def _section_what_understood(dossier: dict[str, Any]) -> HumanSection:
 
 def _section_field_position(dossier: dict[str, Any]) -> HumanSection:
     sp = _safe_get(dossier, "semantic_profile") or {}
-    afp = _safe_get(dossier, "article_field_position") or {}
     paragraphs: list[str] = []
     bullets: list[str] = []
 
-    disc = _safe_get(sp, "primary_discipline")
-    regs = _nonempty_list(_safe_get(sp, "disciplinary_registers"))
-    if disc or regs:
-        line = "Где статья располагается в академическом поле: "
+    disc_code = _safe_get(sp, "primary_discipline")
+    disc_ru = _ru_term(disc_code) if disc_code else ""
+    regs_raw = _normalize_list(_safe_get(sp, "disciplinary_registers"))
+    regs_ru = [_ru_term(r) for r in regs_raw]
+    if disc_code or regs_ru:
         parts = []
-        if disc:
-            parts.append(f"основная дисциплина — {disc}")
-        if regs:
-            parts.append("задействованные регистры — " + _ru_join(regs))
-        paragraphs.append(line + "; ".join(parts) + ".")
+        if disc_code:
+            parts.append(f"основная дисциплина — {disc_ru} (`{disc_code}`)")
+        if regs_ru:
+            parts.append(
+                "задействованные регистры — " + _ru_join(regs_ru)
+            )
+        paragraphs.append(
+            "Где статья располагается в академическом поле: "
+            + "; ".join(parts) + "."
+        )
 
-    schools = _nonempty_list(_safe_get(sp, "schools_and_traditions"))
+    schools = _normalize_list(_safe_get(sp, "schools_and_traditions"))
     if schools:
         bullets.append("Школы и традиции, на которые опирается статья:")
-        bullets.extend(f"— {s}" for s in schools)
-    shoulders = _nonempty_list(_safe_get(sp, "theoretical_shoulders"))
+        for s in schools:
+            if _looks_english(s):
+                bullets.append(f"— (англ.) «{_quote_block(s, 300)}»")
+            else:
+                bullets.append(f"— {s}")
+    shoulders = _normalize_list(_safe_get(sp, "theoretical_shoulders"))
     if shoulders:
         bullets.append("Теоретические «плечи» — на ком статья стоит:")
-        bullets.extend(f"— {s}" for s in shoulders)
-    foils = _nonempty_list(_safe_get(sp, "opponents_or_foils"))
+        for s in shoulders:
+            if _looks_english(s):
+                bullets.append(f"— (англ.) «{_quote_block(s, 300)}»")
+            else:
+                bullets.append(f"— {s}")
+    foils = _normalize_list(_safe_get(sp, "opponents_or_foils"))
     if foils:
         bullets.append("Оппоненты или фоновые контр-позиции:")
-        bullets.extend(f"— {s}" for s in foils)
+        for s in foils:
+            if _looks_english(s):
+                bullets.append(f"— (англ.) «{_quote_block(s, 300)}»")
+            else:
+                bullets.append(f"— {s}")
 
-    bridges = _nonempty_list(_safe_get(sp, "citation_bridges_needed"))
+    bridges = _normalize_list(_safe_get(sp, "citation_bridges_needed"))
     if bridges:
         bullets.append(
             "Какие мосты к традициям системе кажутся необходимыми, "
@@ -452,16 +798,24 @@ def _section_field_position(dossier: dict[str, Any]) -> HumanSection:
             "рамке (это карта направлений, а не список обязательных "
             "цитат):"
         )
-        bullets.extend(f"— {b}" for b in bridges)
+        for b in bridges:
+            if _looks_english(b):
+                bullets.append(f"— (англ.) «{_quote_block(b, 300)}»")
+            else:
+                bullets.append(f"— {b}")
 
     move = _safe_get(sp, "argument_move_type")
     move_desc = _safe_get(sp, "argument_move_description")
     if move or move_desc:
         line = "Тип аргументативного хода"
         if move:
-            line += f": {move}"
+            line += f": `{move}`"
         if move_desc:
-            line += f" — {move_desc}"
+            md = _normalize_entry(move_desc)
+            if _looks_english(md):
+                line += f" — (англ.) «{_quote_block(md, 300)}»"
+            else:
+                line += f" — {md}"
         paragraphs.append(line + ".")
 
     if not paragraphs and not bullets:
@@ -480,16 +834,27 @@ def _section_field_position(dossier: dict[str, Any]) -> HumanSection:
 
 
 def _section_venue_state(dossier: dict[str, Any]) -> HumanSection:
-    sv = _safe_get(dossier, "selected_venue") or {}
-    name = _safe_get(sv, "canonical_name") or "площадка не выбрана"
-    conf = _safe_get(sv, "confidence") or "не указана"
-    aims = _safe_get(sv, "aims_scope_summary") or _safe_get(sv, "scope_summary")
-    p = [
-        f"Площадка для подачи: «{name}». "
-        f"Уверенность системы в профиле этой площадки: {conf}."
-    ]
-    if aims:
-        p.append(f"Что сейчас известно про scope: {aims}")
+    v = _extract_target_venue(dossier)
+    p: list[str] = []
+    if v["label"]:
+        head = (
+            f"Целевая площадка: «{v['label']}». "
+            f"Источник метки: `{v['label_source']}`; "
+            f"уверенность системы в профиле: {v['confidence']}."
+        )
+        p.append(head)
+        if v["completeness"] != "selected":
+            p.append(v["note"])
+    else:
+        p.append(v["note"])
+    if v.get("scope"):
+        scope_text = _normalize_entry(v["scope"])
+        if _looks_english(scope_text):
+            p.append(_ru_intro_for_english(
+                "Что сейчас известно про scope площадки", scope_text,
+            ))
+        else:
+            p.append(f"Что сейчас известно про scope площадки: {scope_text}.")
     else:
         p.append(
             "Содержательного описания scope, типов принимаемых статей, "
@@ -588,11 +953,11 @@ def _section_fit(dossier: dict[str, Any]) -> HumanSection:
 
     # Pull out the genre × unknown-venue risk explicitly
     am = _safe_get(dossier, "article_model") or {}
-    sv = _safe_get(dossier, "selected_venue") or {}
+    venue_info = _extract_target_venue(dossier)
     if (_safe_get(am, "genre_current") or "").lower() in (
         "theoretical_essay", "theoretical_argument",
         "conceptual_article", "essay",
-    ) and not _safe_get(sv, "aims_scope_summary"):
+    ) and not venue_info.get("scope"):
         paragraphs.append(
             "Главный реальный риск этой пары прямо сейчас: статья — "
             "теоретическая, а политика журнала по теоретическим статьям "
@@ -638,16 +1003,26 @@ def _section_mismatches(dossier: dict[str, Any]) -> HumanSection:
         sev_ru = _SEVERITY_RU.get(sev, sev or "")
         narr_status = (m.get("narrative_status") or "").lower()
         narr_ru = _NARRATIVE_STATUS_RU.get(narr_status, narr_status or "")
-        article_side = (m.get("article_side") or "").strip()
-        venue_side = (m.get("venue_side") or "").strip()
-        descr = (m.get("description") or "").strip()
-        actions = _nonempty_list(m.get("possible_actions"))
+        article_side = _normalize_entry(m.get("article_side")).strip()
+        venue_side = _normalize_entry(m.get("venue_side")).strip()
+        descr = _normalize_entry(m.get("description")).strip()
+        actions = _normalize_list(m.get("possible_actions"))
         core_risk = (m.get("field_core_risk") or "").lower()
         sub_paragraphs: list[str] = []
         if article_side:
-            sub_paragraphs.append(f"На стороне статьи: {article_side}")
+            if _looks_english(article_side):
+                sub_paragraphs.append(
+                    _ru_intro_for_english("На стороне статьи", article_side),
+                )
+            else:
+                sub_paragraphs.append(f"На стороне статьи: {article_side}")
         if venue_side:
-            sub_paragraphs.append(f"На стороне площадки: {venue_side}")
+            if _looks_english(venue_side):
+                sub_paragraphs.append(
+                    _ru_intro_for_english("На стороне площадки", venue_side),
+                )
+            else:
+                sub_paragraphs.append(f"На стороне площадки: {venue_side}")
         elif narr_status in (
             "unknown_due_to_venue_evidence", "empty_valid_unknown",
         ):
@@ -663,7 +1038,12 @@ def _section_mismatches(dossier: dict[str, Any]) -> HumanSection:
                 "посчитаны независимо от него."
             )
         if descr and descr not in (article_side, venue_side):
-            sub_paragraphs.append(descr)
+            if _looks_english(descr):
+                sub_paragraphs.append(_ru_intro_for_english(
+                    "Описание несовпадения", descr,
+                ))
+            else:
+                sub_paragraphs.append(descr)
         if core_risk and core_risk not in (
             "unknown_core_impact", "no_core_impact",
         ):
@@ -731,18 +1111,24 @@ def _section_sources(dossier: dict[str, Any]) -> HumanSection:
             "удалось зафиксировать."
         )
 
-    gaps = _nonempty_list(cp.get("citation_gap_categories"))
-    bridges = _nonempty_list(cp.get("missing_bridge_categories"))
-    tasks = _nonempty_list(cp.get("recommended_reference_search_tasks"))
-    verif = _nonempty_list(cp.get("verification_tasks"))
-    danger = _nonempty_list(cp.get("dangerous_padding_warnings"))
-    unknowns = _nonempty_list(cp.get("unknowns"))
+    gaps = _normalize_list(cp.get("citation_gap_categories"))
+    bridges = _normalize_list(cp.get("missing_bridge_categories"))
+    tasks = _normalize_list(cp.get("recommended_reference_search_tasks"))
+    verif = _normalize_list(cp.get("verification_tasks"))
+    danger = _normalize_list(cp.get("dangerous_padding_warnings"))
+    unknowns = _normalize_list(cp.get("unknowns"))
+
+    def _ru_bullet(s: str) -> str:
+        s = _normalize_entry(s)
+        if _looks_english(s):
+            return f"— (англ.) «{_quote_block(s, 360)}»"
+        return f"— {s}"
 
     subsections: list[HumanSubsection] = []
     if gaps:
         subsections.append(HumanSubsection(
             title_ru=f"Категории лакун ({len(gaps)})",
-            bullets=[f"— {g}" for g in gaps],
+            bullets=[_ru_bullet(g) for g in gaps],
         ))
     if bridges:
         subsections.append(HumanSubsection(
@@ -753,7 +1139,7 @@ def _section_sources(dossier: dict[str, Any]) -> HumanSection:
                 "нужно навести мост, чтобы её читали в нужной "
                 "дисциплинарной рамке."
             ],
-            bullets=[f"— {b}" for b in bridges],
+            bullets=[_ru_bullet(b) for b in bridges],
         ))
     if tasks:
         subsections.append(HumanSubsection(
@@ -766,12 +1152,12 @@ def _section_sources(dossier: dict[str, Any]) -> HumanSection:
                 "поиска и возможные корпуса, а не проверенный список "
                 "обязательных цитат. Список ссылок собирает автор."
             ],
-            bullets=[f"— {_translate_search_task(t)}" for t in tasks],
+            bullets=[_ru_bullet(_translate_search_task(t)) for t in tasks],
         ))
     if verif:
         subsections.append(HumanSubsection(
             title_ru=f"Проверочные задачи ({len(verif)})",
-            bullets=[f"— {_translate_search_task(v)}" for v in verif],
+            bullets=[_ru_bullet(_translate_search_task(v)) for v in verif],
         ))
     if danger:
         subsections.append(HumanSubsection(
@@ -782,12 +1168,12 @@ def _section_sources(dossier: dict[str, Any]) -> HumanSection:
                 "поля заметит. Источники должны быть мостами к традиции "
                 "и идти от содержания, а не от формы."
             ],
-            bullets=[f"— {w}" for w in danger],
+            bullets=[_ru_bullet(w) for w in danger],
         ))
     if unknowns:
         subsections.append(HumanSubsection(
             title_ru="Чего система про источники прямо не знает",
-            bullets=[f"— {u}" for u in unknowns[:8]],
+            bullets=[_ru_bullet(u) for u in unknowns[:8]],
         ))
 
     return HumanSection(
@@ -1005,14 +1391,29 @@ def _section_next_actions(dossier: dict[str, Any]) -> HumanSection:
 
 def _section_verdict(dossier: dict[str, Any]) -> HumanSection:
     am = _safe_get(dossier, "article_model") or {}
-    sv = _safe_get(dossier, "selected_venue") or {}
+    sp = _safe_get(dossier, "semantic_profile") or {}
     bp = _safe_get(dossier, "bibliography_profile") or {}
     fa = _safe_get(dossier, "fit_assessment") or {}
-    has_pcore = bool(_nonempty_list(am.get("protected_core")))
+    cp = _safe_get(dossier, "citation_plan") or {}
+    rr = _safe_get(dossier, "risk_report") or {}
+    rp = _safe_get(dossier, "rewrite_plan") or {}
+    venue = _extract_target_venue(dossier)
+    has_pcore = bool(_normalize_list(am.get("protected_core")))
     has_bib = bool(bp) and bool(bp.get("reference_count"))
     overall = (fa.get("overall_label") or "").lower()
+    primary_disc = sp.get("primary_discipline")
+    primary_disc_ru = _ru_term(primary_disc) if primary_disc else None
 
     lines: list[str] = []
+
+    # Discipline-grounded opening — built from THIS case, not template
+    if primary_disc_ru:
+        lines.append(
+            f"Система прочитывает статью в первую очередь как работу в "
+            f"поле «{primary_disc_ru}» (`{primary_disc}`). "
+            "Это след именно этого case — не предзаданная рамка."
+        )
+
     if has_pcore:
         lines.append(
             "У статьи есть содержательное защищаемое ядро — это её "
@@ -1025,24 +1426,66 @@ def _section_verdict(dossier: dict[str, Any]) -> HumanSection:
             "Это первое, что стоит зафиксировать перед подачей: что "
             "именно в статье не подлежит перепаковке."
         )
+
     if not has_bib:
         lines.append(
             "Главный текущий дефицит — библиографический. Без явного "
             "раздела источников ни план работы с источниками, ни "
             "compliance не могут быть закрыты."
         )
-    if not _safe_get(sv, "aims_scope_summary"):
+
+    # Venue-aware sentence — three branches, all evidence-based
+    if venue["completeness"] == "selected":
+        if not venue.get("scope"):
+            lines.append(
+                f"Площадка «{venue['label']}» выбрана, но её профиль "
+                "в системе пуст по scope — fit-вердикт сейчас опирается "
+                "на минимальный профиль площадки."
+            )
+    elif venue["completeness"] in (
+        "investigated_incomplete",
+        "operator_supplied_profile_incomplete",
+    ):
         lines.append(
-            "Журнал оценить трудно: его профиль слишком пустой, чтобы "
-            "построить уверенный fit. Это не вердикт против журнала; "
-            "это вердикт о наличии сведений о нём."
+            f"Целевая площадка указана: «{venue['label']}». "
+            "Профиль площадки системой не собран — fit-вердикт сейчас "
+            "опирается на минимальный профиль. Это не вердикт против "
+            "журнала, а вердикт о наличии сведений о нём."
         )
+    else:
+        lines.append(
+            "Целевая площадка не восстановлена из metadata этого case — "
+            "невозможно говорить о соответствии конкретному журналу."
+        )
+
     if overall == "not_enough_data":
         lines.append(
             "Текущий fit — «not_enough_data»: это честный отказ "
             "сделать сильный вывод там, где данных нет. Не нужно "
             "читать его как «статья не подходит»."
         )
+
+    # Plan-status awareness — follow actual case lanes
+    cp_sem = (cp.get("semantic_status") or "").lower() if cp else ""
+    rp_sem = (rp.get("semantic_status") or "").lower() if rp else ""
+    rr_sem = (rr.get("semantic_status") or "").lower() if rr else ""
+    plan_notes = []
+    if cp_sem == "llm_grounded":
+        plan_notes.append(
+            "план работы с источниками собран содержательно (раздел 7)"
+        )
+    if rp_sem in ("llm_grounded", "llm_grounded_partial"):
+        plan_notes.append(
+            "план переработки начат на уровне семантики "
+            f"(`{rp_sem}`, см. SubmissionPack)"
+        )
+    if rr_sem not in ("", "llm_grounded"):
+        plan_notes.append(
+            "содержательный риск-анализ не готов (см. раздел 10)"
+        )
+    if plan_notes:
+        lines.append("Текущая траектория case: " + "; ".join(plan_notes) + ".")
+
     lines.append(
         "Полезнее всего сейчас: source-work (раздел 7), оформление "
         "библиографии (раздел 8) и сбор материала про журнал "
