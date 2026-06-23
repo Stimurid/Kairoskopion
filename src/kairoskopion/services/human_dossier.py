@@ -725,9 +725,16 @@ def _section_what_understood(dossier: dict[str, Any]) -> HumanSection:
     )
     register = _safe_get(am, "disciplinary_register_current")
     if isinstance(register, list):
-        register_str = _ru_join([_normalize_entry(r) for r in register])
+        # Map each register code to its Russian display; wrap any
+        # remaining English term so the bullet stays clean.
+        register_str = _ru_join([
+            _ru_safe_line(_ru_term(_normalize_entry(r)))
+            for r in register if _normalize_entry(r)
+        ])
+    elif register:
+        register_str = _ru_safe_line(_ru_term(_normalize_entry(register)))
     else:
-        register_str = _normalize_entry(register) if register else ""
+        register_str = ""
     if genre or register_str:
         line = f"Жанр и дисциплинарный регистр: {genre}"
         if register_str:
@@ -953,7 +960,7 @@ def _section_fit(dossier: dict[str, Any]) -> HumanSection:
         f"Уверенность системы: {conf}."
     ]
     if rec:
-        paragraphs.append(f"Рекомендация системы: {rec}")
+        paragraphs.append(f"Рекомендация системы: {_ru_safe_line(rec)}")
 
     axes = _safe_get(fa, "axes") or []
     groups: dict[str, list[str]] = {"ok": [], "weak": [], "unknown": []}
