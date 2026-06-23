@@ -438,6 +438,17 @@ def _translate_search_task(text: str) -> str:
         r"^\s*Close the gap\s*:?\s*",
         "Закрыть лакуну: ", out, flags=re.IGNORECASE,
     )
+    # After the prefix swap, if a Russian-prefix + English-body shape
+    # remains (e.g. "Найти источники, которые связывают: <english>"),
+    # wrap the English tail so it doesn't leak past «»-stripping.
+    m = re.match(
+        r"^(Найти[^:]{0,80}:|Проверить:|Закрыть лакуну:)\s*(.+)$",
+        out, flags=re.DOTALL,
+    )
+    if m:
+        prefix, body = m.group(1).strip(), m.group(2).strip()
+        if body and _looks_english(body):
+            return f"{prefix} (англ.) «{_quote_block(body, 360)}»"
     return out
 
 
@@ -1290,7 +1301,10 @@ def _section_compliance(dossier: dict[str, Any]) -> HumanSection:
             req = (it.get("requirement") or "").strip()
             status = (it.get("status") or "").strip()
             cat = (it.get("category") or "").strip()
-            line = f"— {req}" if req else "— требование без явной формулировки"
+            req_safe = _ru_safe_line(req) if req else (
+                "требование без явной формулировки"
+            )
+            line = f"— {req_safe}"
             if status:
                 line += f" (статус: {status})"
             if cat:
@@ -1388,7 +1402,7 @@ def _section_next_actions(dossier: dict[str, Any]) -> HumanSection:
             "Шаги, которые предлагает система, исходя из текущего "
             "состояния submission-пакета:"
         )
-        bullets.extend(f"— {a}" for a in explicit)
+        bullets.extend(f"— {_ru_safe_line(a)}" for a in explicit)
     else:
         bullets.extend([
             "— добавить распознаваемый заголовок статьи;",
