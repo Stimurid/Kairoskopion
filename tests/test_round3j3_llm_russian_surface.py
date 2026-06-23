@@ -165,10 +165,10 @@ class TestRendererUsesCache(unittest.TestCase):
             "Organizations are encountering AI not as a tool", text,
         )
 
-    def test_cache_miss_falls_back_to_stub(self):
+    def test_cache_miss_falls_back_to_gentle_stub(self):
         d = _english_case_with_cache()
-        # Drop one cache entry; renderer must fall back to a stub for it
-        # but keep using cache for the others.
+        # Drop one cache entry; renderer must fall back to a gentle
+        # stub for it but keep using cache for the others.
         del d["russian_surface_cache"][
             cache_key(
                 "article_model.problem_statement",
@@ -177,9 +177,11 @@ class TestRendererUsesCache(unittest.TestCase):
         ]
         h = build_human_dossier(d).to_dict()
         text = _flatten_author_text(h)
-        # The problem_statement field — no Russian translation; stub
-        # appears (Russian honesty stub from Round III-J2).
-        self.assertIn("системная реконструкция этого поля доступна", text)
+        # J3.1: gentle fallback (no "см. технические данные")
+        self.assertIn("русская переформулировка не построена", text)
+        # Forbidden J2 stubs must NOT appear
+        self.assertNotIn("системная реконструкция этого поля доступна", text)
+        self.assertNotIn("см. вкладку «Технические данные»", text)
         # Other cached fields still resolve to Russian:
         self.assertIn("Рамка ксенопсихологии", text)
 

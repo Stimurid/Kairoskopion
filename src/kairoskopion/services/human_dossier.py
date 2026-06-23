@@ -258,28 +258,27 @@ def _normalize_entry(item: Any) -> str:
     return str(item)
 
 
-def _ru_safe_line(text: str, *, max_quote: int = 360) -> str:
-    """Round III-J2: surface-clean Russian line.
-    Fully-English lines are replaced with a Russian honesty stub
-    (without exposing the English content in the author surface).
-    Mostly-Russian lines pass through; embedded ≥40-char English runs
-    are dropped from the surface and replaced with a brief Russian
-    marker, with the full original content remaining accessible via
-    the technical view.
+def _ru_safe_line(
+    text: str, *, max_quote: int = 360,
+    dossier: dict[str, Any] | None = None,
+    field_path: str | None = None,
+) -> str:
+    """Round III-J3.1: surface-clean Russian line with cache support.
+
+    Fully-English lines → cache lookup → gentle fallback (never
+    "см. технические данные"). Mostly-Russian lines pass through;
+    embedded long English runs are kept verbatim (structural terms).
     """
     s = _normalize_entry(text).strip()
     if not s:
         return ""
     if _looks_english(s):
-        return (
-            "формулировка модели — англоязычная; см. вкладку "
-            "«Технические данные»"
-        )
-
-    def _drop(m):
-        return "[англоязычный фрагмент — см. технические данные]"
-
-    return re.sub(r"[A-Za-z][A-Za-z' ,;.\-]{40,}", _drop, s)
+        if dossier and field_path:
+            ru = _lookup_ru_in_cache(dossier, field_path, s)
+            if ru:
+                return ru
+        return "русская переформулировка не построена"
+    return s
 
 
 def _normalize_list(value: Any) -> list[str]:
@@ -414,15 +413,28 @@ def _ru_join(items: list[str], sep: str = ", ") -> str:
     return sep.join(str(x).strip() for x in items if str(x).strip())
 
 
-def _translate_search_task(text: str) -> str:
+def _translate_search_task(
+    text: str, *,
+    dossier: dict[str, Any] | None = None,
+    field_path: str | None = None,
+) -> str:
     """Rewrite English upstream organ template prefixes into Russian.
 
-    Pure mechanical substitution — does not introduce new semantic
-    claims, does not invent references. Only the framing changes.
+    Round III-J3.1: tries cache for the whole string first; then
+    translates prefixes mechanically. English body (names/directions)
+    is preserved verbatim — no ``(англ.)`` wrappers.
     """
     if not isinstance(text, str):
         return ""
-    out = text.strip()
+    s = text.strip()
+    if not s:
+        return ""
+    # Try whole-string cache lookup first
+    if dossier and field_path and _looks_english(s):
+        ru = _lookup_ru_in_cache(dossier, field_path, s)
+        if ru:
+            return ru
+    out = s
     # Common templates emitted by the citation_planner organ
     out = re.sub(
         r"^\s*Search for references that bridge\s*:\s*",
@@ -437,6 +449,10 @@ def _translate_search_task(text: str) -> str:
         r"^\s*Search for ", "Найти ", out, flags=re.IGNORECASE,
     )
     out = re.sub(
+        r"^\s*Address\s+(?:the\s+)?tradition\s+gap\s*:?\s*",
+        "Закрыть лакуну традиции: ", out, flags=re.IGNORECASE,
+    )
+    out = re.sub(
         r"^\s*Look up\s*:?\s*", "Проверить: ", out, flags=re.IGNORECASE,
     )
     out = re.sub(
@@ -449,17 +465,6 @@ def _translate_search_task(text: str) -> str:
         r"^\s*Close the gap\s*:?\s*",
         "Закрыть лакуну: ", out, flags=re.IGNORECASE,
     )
-    # After the prefix swap, if a Russian-prefix + English-body shape
-    # remains (e.g. "Найти источники, которые связывают: <english>"),
-    # wrap the English tail so it doesn't leak past «»-stripping.
-    m = re.match(
-        r"^(Найти[^:]{0,80}:|Проверить:|Закрыть лакуну:)\s*(.+)$",
-        out, flags=re.DOTALL,
-    )
-    if m:
-        prefix, body = m.group(1).strip(), m.group(2).strip()
-        if body and _looks_english(body):
-            return f"{prefix} (англ.) «{_quote_block(body, 360)}»"
     return out
 
 
@@ -693,16 +698,11 @@ def _lookup_ru_in_cache(
 
 
 def _ru_stub_for_english_field(label_ru: str) -> str:
-    """Round III-J2: when an upstream semantic field is in English, do
-    NOT surface the English content (translation drift risk) and do NOT
-    leave a `(англ.)`-wrapped block in the author section. Show a
-    Russian honesty stub that names the field and points to the
-    technical view where the original formulation lives.
+    """Round III-J3.1: gentle fallback when Russian surface cache has
+    no entry for an English field. Never redirects to technical data.
     """
     return (
-        f"{label_ru}: системная реконструкция этого поля доступна во "
-        "вкладке «Технические данные» (исходная формулировка модели — "
-        "англоязычная)."
+        f"{label_ru}: русская переформулировка не построена."
     )
 
 
@@ -721,9 +721,9 @@ def _ru_stub_for_english_list(
         "элемент", "элемента", "элементов",
     ),
 ) -> str:
-    """Russian honesty stub for a list whose items are predominantly
-    English. Names extracted from dict items (scholar/author/tradition)
-    are preserved as allowed English remnants.
+    """Round III-J3.1: gentle fallback for a list whose items are
+    predominantly English. Names extracted from dict items are preserved
+    as allowed English remnants. Never redirects to technical data.
     """
     n = len(items)
     names: list[str] = []
@@ -737,8 +737,7 @@ def _ru_stub_for_english_list(
     word = _ru_count_word(n, item_forms)
     base = (
         f"{label_ru}: модель зафиксировала {n} {word}; "
-        "формулировки сохранены в технических данных в исходной "
-        "англоязычной форме."
+        "русские формулировки не построены."
     )
     if names:
         base += " Имена/традиции, упомянутые моделью: " + ", ".join(
@@ -841,8 +840,7 @@ def _render_list_with_cache(
         bullets.append(
             f"— ещё {unresolved_count} "
             + _ru_count_word(unresolved_count, item_forms)
-            + " — формулировка модели на английском, русский перенос "
-              "не построен (см. технические данные)."
+            + " — русский перенос не построен."
         )
     return bullets
 
@@ -987,10 +985,7 @@ def _section_field_position(dossier: dict[str, Any]) -> HumanSection:
     regs_ru: list[str] = []
     for r in regs_raw:
         mapped = _ru_term(r)
-        if mapped == r and _looks_english(r):
-            regs_ru.append(f"(англ.) «{_quote_block(r, 120)}»")
-        else:
-            regs_ru.append(mapped)
+        regs_ru.append(mapped)
     if disc_code or regs_ru:
         parts = []
         if disc_code:
@@ -1041,7 +1036,14 @@ def _section_field_position(dossier: dict[str, Any]) -> HumanSection:
         if move_desc:
             md = _normalize_entry(move_desc)
             if _looks_english(md):
-                line += f" — (англ.) «{_quote_block(md, 300)}»"
+                ru = _lookup_ru_in_cache(
+                    dossier,
+                    "semantic_profile.argument_move_description", md,
+                )
+                if ru:
+                    line += f" — {ru}"
+                else:
+                    line += " — русская переформулировка не построена"
             else:
                 line += f" — {md}"
         paragraphs.append(line + ".")
@@ -1078,9 +1080,10 @@ def _section_venue_state(dossier: dict[str, Any]) -> HumanSection:
     if v.get("scope"):
         scope_text = _normalize_entry(v["scope"])
         if _looks_english(scope_text):
-            p.append(_ru_stub_for_english_field(
-                "Что сейчас известно про scope площадки",
-            ))
+            p.append(
+                "Что сейчас известно про scope площадки: "
+                "русская переформулировка не построена."
+            )
         else:
             p.append(f"Что сейчас известно про scope площадки: {scope_text}.")
     else:
@@ -1141,11 +1144,15 @@ def _section_fit(dossier: dict[str, Any]) -> HumanSection:
         f"Уверенность системы: {conf}."
     ]
     if rec:
-        paragraphs.append(f"Рекомендация системы: {_ru_safe_line(rec)}")
+        paragraphs.append(
+            "Рекомендация системы: "
+            + _ru_safe_line(rec, dossier=dossier,
+                            field_path="fit_assessment.recommendation")
+        )
 
     axes = _safe_get(fa, "axes") or []
     groups: dict[str, list[str]] = {"ok": [], "weak": [], "unknown": []}
-    for ax in axes:
+    for ax_idx, ax in enumerate(axes):
         if not isinstance(ax, dict):
             continue
         axis = ax.get("axis") or ""
@@ -1159,7 +1166,12 @@ def _section_fit(dossier: dict[str, Any]) -> HumanSection:
             bucket = "weak"
         line = f"{axis_ru} — {_FIT_VALUE_RU.get(value, value or 'не определено')}"
         if notes:
-            line += f". {_ru_safe_line(notes)}"
+            line += (
+                ". " + _ru_safe_line(
+                    notes, dossier=dossier,
+                    field_path=f"fit_assessment.axes[{ax_idx}].notes",
+                )
+            )
         groups[bucket].append(line)
 
     subsections: list[HumanSubsection] = []
@@ -1374,14 +1386,23 @@ def _section_sources(dossier: dict[str, Any]) -> HumanSection:
     danger = _normalize_list(cp.get("dangerous_padding_warnings"))
     unknowns = _normalize_list(cp.get("unknowns"))
 
-    def _ru_bullet(s: str) -> str:
-        return f"— {_ru_safe_line(s)}"
+    def _ru_bullet(s: str, fp: str) -> str:
+        return f"— {_ru_safe_line(s, dossier=dossier, field_path=fp)}"
+
+    def _task_bullet(s: str, fp: str) -> str:
+        translated = _translate_search_task(
+            s, dossier=dossier, field_path=fp,
+        )
+        return f"— {translated}"
 
     subsections: list[HumanSubsection] = []
     if gaps:
         subsections.append(HumanSubsection(
             title_ru=f"Категории лакун ({len(gaps)})",
-            bullets=[_ru_bullet(g) for g in gaps],
+            bullets=[
+                _ru_bullet(g, f"citation_plan.citation_gap_categories[{i}]")
+                for i, g in enumerate(gaps)
+            ],
         ))
     if bridges:
         subsections.append(HumanSubsection(
@@ -1392,7 +1413,10 @@ def _section_sources(dossier: dict[str, Any]) -> HumanSection:
                 "нужно навести мост, чтобы её читали в нужной "
                 "дисциплинарной рамке."
             ],
-            bullets=[_ru_bullet(b) for b in bridges],
+            bullets=[
+                _ru_bullet(b, f"citation_plan.missing_bridge_categories[{i}]")
+                for i, b in enumerate(bridges)
+            ],
         ))
     if tasks:
         subsections.append(HumanSubsection(
@@ -1405,12 +1429,20 @@ def _section_sources(dossier: dict[str, Any]) -> HumanSection:
                 "поиска и возможные корпуса, а не проверенный список "
                 "обязательных цитат. Список ссылок собирает автор."
             ],
-            bullets=[_ru_bullet(_translate_search_task(t)) for t in tasks],
+            bullets=[
+                _task_bullet(
+                    t, f"citation_plan.recommended_reference_search_tasks[{i}]",
+                )
+                for i, t in enumerate(tasks)
+            ],
         ))
     if verif:
         subsections.append(HumanSubsection(
             title_ru=f"Проверочные задачи ({len(verif)})",
-            bullets=[_ru_bullet(_translate_search_task(v)) for v in verif],
+            bullets=[
+                _task_bullet(v, f"citation_plan.verification_tasks[{i}]")
+                for i, v in enumerate(verif)
+            ],
         ))
     if danger:
         subsections.append(HumanSubsection(
@@ -1421,12 +1453,18 @@ def _section_sources(dossier: dict[str, Any]) -> HumanSection:
                 "поля заметит. Источники должны быть мостами к традиции "
                 "и идти от содержания, а не от формы."
             ],
-            bullets=[_ru_bullet(w) for w in danger],
+            bullets=[
+                _ru_bullet(w, f"citation_plan.dangerous_padding_warnings[{i}]")
+                for i, w in enumerate(danger)
+            ],
         ))
     if unknowns:
         subsections.append(HumanSubsection(
             title_ru="Чего система про источники прямо не знает",
-            bullets=[_ru_bullet(u) for u in unknowns[:8]],
+            bullets=[
+                _ru_bullet(u, f"citation_plan.unknowns[{i}]")
+                for i, u in enumerate(unknowns[:8])
+            ],
         ))
 
     return HumanSection(
@@ -1516,13 +1554,16 @@ def _section_compliance(dossier: dict[str, Any]) -> HumanSection:
             f"Чек-лист формальных требований содержит {len(items)} пунктов. "
             "Каждый пункт — это конкретный вопрос к статье или к редакции."
         )
-        for it in items[:20]:
+        for it_idx, it in enumerate(items[:20]):
             if not isinstance(it, dict):
                 continue
             req = (it.get("requirement") or "").strip()
             status = (it.get("status") or "").strip()
             cat = (it.get("category") or "").strip()
-            req_safe = _ru_safe_line(req) if req else (
+            req_safe = _ru_safe_line(
+                req, dossier=dossier,
+                field_path=f"compliance_checklist.items[{it_idx}].requirement",
+            ) if req else (
                 "требование без явной формулировки"
             )
             line = f"— {req_safe}"
@@ -1623,7 +1664,10 @@ def _section_next_actions(dossier: dict[str, Any]) -> HumanSection:
             "Шаги, которые предлагает система, исходя из текущего "
             "состояния submission-пакета:"
         )
-        bullets.extend(f"— {_ru_safe_line(a)}" for a in explicit)
+        bullets.extend(
+            f"— {_ru_safe_line(a, dossier=dossier, field_path=f'submission_pack.next_actions[{i}]')}"
+            for i, a in enumerate(explicit)
+        )
     else:
         bullets.extend([
             "— добавить распознаваемый заголовок статьи;",
@@ -1913,6 +1957,64 @@ def _extract_agent_metadata(dossier: dict[str, Any]) -> list[dict[str, Any]]:
     return agents
 
 
+def _compute_surface_metrics(dossier: dict[str, Any]) -> dict[str, int]:
+    """Scan the rendered author surface for forbidden strings."""
+    h = build_human_dossier.__wrapped__(dossier) if hasattr(build_human_dossier, '__wrapped__') else None
+    # Build a flat text from the dossier rendering (excluding technical
+    # footer itself). We re-render section text to count metrics.
+    text_chunks: list[str] = []
+    for builder in (
+        _section_passport, _section_what_understood, _section_field_position,
+        _section_venue_state, _section_fit, _section_mismatches,
+        _section_sources, _section_bibliography, _section_compliance,
+        _section_risk, _section_next_actions, _section_verdict,
+    ):
+        try:
+            sec = builder(dossier)
+            text_chunks.extend(sec.paragraphs)
+            text_chunks.extend(sec.bullets)
+            for sub in sec.subsections:
+                text_chunks.extend(sub.paragraphs)
+                text_chunks.extend(sub.bullets)
+        except Exception:  # noqa: BLE001
+            pass
+    text = "\n".join(c for c in text_chunks if c)
+    _FORBIDDEN_PLACEHOLDER = (
+        "формулировка модели — англоязычная",
+        "см. вкладку «Технические данные»",
+    )
+    _TECH_DATA_REDIRECT = (
+        "[англоязычный фрагмент — см. технические данные]",
+        "см. технические данные",
+        "доступна во вкладке «Технические данные»",
+        "сохранены в технических данных",
+    )
+    fallback_placeholder_count = sum(
+        text.count(fp) for fp in _FORBIDDEN_PLACEHOLDER
+    )
+    technical_data_redirect_count = sum(
+        text.count(tr) for tr in _TECH_DATA_REDIRECT
+    )
+    search_for_raw_count = len(re.findall(
+        r"\bSearch for\b", text, flags=re.IGNORECASE,
+    ))
+    address_tradition_gap_raw_count = len(re.findall(
+        r"\bAddress\s+(?:the\s+)?tradition\s+gap\b", text, flags=re.IGNORECASE,
+    ))
+    unresolved_surface_fallback_count = text.count(
+        "русская переформулировка не построена"
+    ) + text.count("русский перенос не построен")
+    long_english_runs = re.findall(r"[A-Za-z][A-Za-z' ,;.\-]{79,}", text)
+    return {
+        "fallback_placeholder_count": fallback_placeholder_count,
+        "technical_data_redirect_count": technical_data_redirect_count,
+        "search_for_raw_count": search_for_raw_count,
+        "address_tradition_gap_raw_count": address_tradition_gap_raw_count,
+        "unresolved_surface_fallback_count": unresolved_surface_fallback_count,
+        "long_english_semantic_prose_count": len(long_english_runs),
+    }
+
+
 def _build_technical_footer(dossier: dict[str, Any]) -> HumanTechnicalFooter:
     um = _safe_get(dossier, "upload_metadata") or {}
     case_id = _safe_get(dossier, "case_id") or ""
@@ -1951,6 +2053,7 @@ def _build_technical_footer(dossier: dict[str, Any]) -> HumanTechnicalFooter:
     rp = _safe_get(dossier, "rewrite_plan") or {}
     bp = _safe_get(dossier, "bibliography_profile") or {}
 
+    surface_metrics = _compute_surface_metrics(dossier)
     safety_gates = {
         "raw_llm_output_exposed": False,
         "fake_doi_or_ref_count": 0,
@@ -1958,6 +2061,7 @@ def _build_technical_footer(dossier: dict[str, Any]) -> HumanTechnicalFooter:
         "traceback_markers": 0,
         "credential_markers": 0,
         "deterministic_semantic_prose_gate": "pass",
+        **surface_metrics,
     }
     limitations: list[str] = []
     if not _safe_get(sv, "aims_scope_summary"):

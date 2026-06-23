@@ -495,11 +495,172 @@ def collect_translation_items(dossier: dict[str, Any]) -> list[dict[str, str]]:
     return items
 
 
+# --------------------------------------------------------------------------
+# Atomic single-field retry (Round III-J3.1)
+# --------------------------------------------------------------------------
+
+_ATOMIC_SYSTEM_PROMPT = (
+    "Вы — русскоязычный редактор. Ваша единственная задача — "
+    "переформулировать одно поле из англоязычной upstream-реконструкции в "
+    "ясную русскую академическую формулировку. ЗАПРЕЩЕНО добавлять "
+    "новые факты, источники, авторов, годы, DOI, утверждения о журнале "
+    "или какие бы то ни было новые аналитические выводы, которых нет в "
+    "входном значении. Имена авторов, названия работ и устойчивые "
+    "аббревиатуры (AI, STS, DOI, LLM, API) сохраняйте дословно. "
+    "Сохраняйте маркеры неопределённости, если они есть. Возвращайте "
+    "СТРОГИЙ JSON, ничего вокруг."
+)
+
+_ATOMIC_USER_TEMPLATE = (
+    "Переведите/переформулируйте ОДНО ПОЛЕ в русскую формулировку. "
+    "Если поле содержит структурные пометки (например, role / weight / "
+    "confidence), разверните их в естественный русский. Имена и работы "
+    "оставьте verbatim.\n\n"
+    "Контракт ответа:\n"
+    "{{\"text_ru\": \"<русский текст>\", "
+    "\"confidence\": \"high|medium|low\", \"notes\": []}}\n\n"
+    "Поле:\n"
+    "field_path: {field_path}\n"
+    "value: {value}\n"
+)
+
+_ATOMIC_FAMILY = {
+    "agent_role_id": "russian_surface_narrator_atomic",
+    "system_prompt": _ATOMIC_SYSTEM_PROMPT,
+    "user_prompt_template": _ATOMIC_USER_TEMPLATE,
+    "output_schema": {
+        "type": "object",
+        "properties": {
+            "text_ru": {"type": "string"},
+            "confidence": {"type": "string"},
+            "notes": {"type": "array"},
+        },
+        "required": ["text_ru"],
+        "additionalProperties": True,
+    },
+}
+
+
+def russianize_field_atomic(
+    provider: Any,
+    field_path: str,
+    value: str,
+    *,
+    cache: dict[str, Any] | None = None,
+    cyrillic_threshold: float = 0.40,
+) -> RussianSurfaceResult:
+    """Single-field retry pass. Looser Cyrillic threshold than the batch
+    validator (a name-heavy translation can still be valid). Writes to
+    cache on success; never persists raw LLM body.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return RussianSurfaceResult(
+            text_ru="", source_language_detected="unknown",
+            method="already_russian",
+        )
+    if not needs_russian_surface(value):
+        return RussianSurfaceResult(
+            text_ru=value.strip(),
+            source_language_detected="ru",
+            method="already_russian",
+        )
+    cached = cache_get(cache, field_path, value)
+    if cached:
+        return RussianSurfaceResult(
+            text_ru=cached, source_language_detected="en",
+            method="llm_surface_translation",
+            diagnostics={"cache": "hit"},
+        )
+    if provider is None:
+        return RussianSurfaceResult(
+            text_ru="", source_language_detected="en",
+            method="safe_fallback",
+            diagnostics={"reason": "provider_unavailable"},
+        )
+
+    from ..agents.base_shell import try_llm_call_with_outcome
+
+    outcome = try_llm_call_with_outcome(
+        provider, _ATOMIC_FAMILY,
+        {
+            "field_path": field_path,
+            "value": _strip_meta(value)[:4000],
+        },
+        temperature=0.2, max_tokens=1024,
+        agent_role="russian_surface_narrator_atomic",
+        model_role="russian_surface_narrator",
+    )
+    parsed = outcome.parsed or outcome.loose_parsed
+    if not isinstance(parsed, dict):
+        return RussianSurfaceResult(
+            text_ru="", source_language_detected="en",
+            method="safe_fallback",
+            diagnostics={
+                "reason": "llm_parse_failed",
+                "provider_status": outcome.provider_status,
+                "parse_status": outcome.parse_status,
+                "content_length": outcome.content_length,
+                "content_hash_prefix": outcome.content_hash_prefix,
+            },
+        )
+    text_ru = (parsed.get("text_ru") or "").strip()
+    text_ru = _strip_meta(text_ru)
+    # Apply a slightly looser Cyrillic threshold for atomic retry —
+    # name-rich entries (e.g. "Latour 'Reassembling the Social'") can
+    # carry many Latin letters and still be a faithful Russian
+    # rendering.
+    if not text_ru:
+        return RussianSurfaceResult(
+            text_ru="", source_language_detected="en",
+            method="safe_fallback",
+            diagnostics={"reason": "empty_translation"},
+        )
+    cyr = _cyrillic_ratio(text_ru)
+    if cyr < cyrillic_threshold:
+        return RussianSurfaceResult(
+            text_ru="", source_language_detected="en",
+            method="safe_fallback",
+            diagnostics={
+                "reason": "not_russian_dominant",
+                "cyrillic_ratio": round(cyr, 3),
+            },
+        )
+    # Reuse the batch validator for the rest of the checks
+    ok, diag = _validate_translation(value, text_ru)
+    # If only "not_russian_dominant" fails, we already passed it above
+    if not ok and diag.get("reason") != "not_russian_dominant":
+        return RussianSurfaceResult(
+            text_ru="", source_language_detected="en",
+            method="safe_fallback",
+            diagnostics={"reason": diag.get("reason"), "validation": diag},
+        )
+    if isinstance(cache, dict):
+        cache[cache_key(field_path, value)] = {
+            "text_ru": text_ru,
+            "prompt_version": PROMPT_VERSION,
+        }
+    return RussianSurfaceResult(
+        text_ru=text_ru,
+        source_language_detected="en",
+        method="llm_surface_translation",
+        diagnostics={
+            **diag,
+            "cyrillic_ratio": round(cyr, 3),
+            "confidence": parsed.get("confidence"),
+            "cache": "miss_written",
+            "atomic": True,
+            "content_length": outcome.content_length,
+            "content_hash_prefix": outcome.content_hash_prefix,
+        },
+    )
+
+
 __all__ = (
     "RussianSurfaceResult",
     "PROMPT_VERSION",
     "needs_russian_surface",
     "cache_key", "cache_get",
     "russianize_fields_batch",
+    "russianize_field_atomic",
     "collect_translation_items",
 )
