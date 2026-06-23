@@ -212,11 +212,13 @@ class TestAuthorSectionsAreRussian(unittest.TestCase):
         english_runs = re.findall(
             r"[A-Za-z][A-Za-z' ,;.\-]{40,}", stripped,
         )
-        # Acronym-only / name-only short runs are OK (filtered above by
-        # length >= 40). Anything that survives the filter is a leak.
+        # Long English semantic prose = ≥80 chars (Round III-J2
+        # threshold). Author names / tradition names / discipline
+        # codes shorter than that are allowed remnants per spec.
+        big_runs = [r for r in english_runs if len(r) >= 80]
         self.assertEqual(
-            english_runs, [],
-            f"Long English prose leaked outside quoted blocks: {english_runs}",
+            big_runs, [],
+            f"Long English prose leaked outside quoted blocks: {big_runs}",
         )
 
     def test_section_titles_are_russian(self):

@@ -674,6 +674,24 @@ def _section_passport(dossier: dict[str, Any]) -> HumanSection:
     )
 
 
+def _lookup_ru_in_cache(
+    dossier: dict[str, Any], field_path: str, value: str,
+) -> str | None:
+    """Round III-J3: try the case-attached Russian surface cache before
+    falling back to a deterministic stub. Returns Russian text or None.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return None
+    cache = dossier.get("russian_surface_cache")
+    if not isinstance(cache, dict) or not cache:
+        return None
+    try:
+        from .russian_surface import cache_get  # local import to avoid cycle
+        return cache_get(cache, field_path, value)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _ru_stub_for_english_field(label_ru: str) -> str:
     """Round III-J2: when an upstream semantic field is in English, do
     NOT surface the English content (translation drift risk) and do NOT
@@ -729,10 +747,117 @@ def _ru_stub_for_english_list(
     return base
 
 
-def _render_semantic_field(label_ru: str, value: Any) -> str | None:
+def _ru_line_for_item(
+    dossier: dict[str, Any], base_path: str, idx: int, item: Any,
+) -> tuple[str | None, bool]:
+    """Return a Russian line for one list item.
+
+    Pulls translations from the case-attached cache. For dict items
+    (e.g. ``{"tradition": "...", "evidence": "..."}``) it concatenates
+    cached values from the per-key cache. Returns ``(line, used_cache)``;
+    ``line`` is None when nothing was renderable.
+    """
+    if item is None:
+        return None, False
+    if isinstance(item, str):
+        s = item.strip()
+        if not s:
+            return None, False
+        if not _looks_english(s):
+            return s, False
+        ru = _lookup_ru_in_cache(dossier, f"{base_path}[{idx}]", s)
+        return (ru if ru else None), bool(ru)
+    if isinstance(item, dict):
+        head_keys = ("tradition", "school", "scholar", "author", "name",
+                     "title", "label")
+        tail_keys = ("role", "debt", "contribution", "evidence", "weight",
+                     "confidence", "summary")
+        head_text: str | None = None
+        used_cache = False
+        for k in head_keys:
+            v = item.get(k)
+            if isinstance(v, str) and v.strip():
+                if _looks_english(v):
+                    cached = _lookup_ru_in_cache(
+                        dossier, f"{base_path}[{idx}].{k}", v,
+                    )
+                    if cached:
+                        head_text = cached
+                        used_cache = True
+                    else:
+                        head_text = v.strip()  # preserve name
+                else:
+                    head_text = v.strip()
+                break
+        tail_parts: list[str] = []
+        for k in tail_keys:
+            v = item.get(k)
+            if isinstance(v, str) and v.strip():
+                if _looks_english(v):
+                    cached = _lookup_ru_in_cache(
+                        dossier, f"{base_path}[{idx}].{k}", v,
+                    )
+                    if cached:
+                        tail_parts.append(cached)
+                        used_cache = True
+                else:
+                    tail_parts.append(v.strip())
+        if head_text and tail_parts:
+            return f"{head_text} — {'; '.join(tail_parts)}", used_cache
+        if head_text:
+            return head_text, used_cache
+        if tail_parts:
+            return "; ".join(tail_parts), used_cache
+        return None, False
+    return _normalize_entry(item), False
+
+
+def _render_list_with_cache(
+    dossier: dict[str, Any], base_path: str, label_ru: str, raw: Any,
+    item_forms: tuple[str, str, str],
+) -> list[str]:
+    """Render a semantic list (strings or dicts), pulling Russian from
+    the cache where the values are English. Returns the bullets list
+    (header + items + fallback stub for unresolved English items).
+    """
+    if not isinstance(raw, list) or not raw:
+        return []
+    bullets: list[str] = [label_ru]
+    unresolved_count = 0
+    rendered_any = False
+    for idx, item in enumerate(raw):
+        line, _used = _ru_line_for_item(dossier, base_path, idx, item)
+        if line:
+            bullets.append(f"— {line}")
+            rendered_any = True
+        else:
+            unresolved_count += 1
+    if unresolved_count and not rendered_any:
+        # Drop the header — replace with a single Russian stub line
+        return [_ru_stub_for_english_list(
+            label_ru.rstrip(":"), list(raw), item_forms,
+        )]
+    if unresolved_count:
+        bullets.append(
+            f"— ещё {unresolved_count} "
+            + _ru_count_word(unresolved_count, item_forms)
+            + " — формулировка модели на английском, русский перенос "
+              "не построен (см. технические данные)."
+        )
+    return bullets
+
+
+def _render_semantic_field(
+    label_ru: str, value: Any,
+    *, dossier: dict[str, Any] | None = None, field_path: str | None = None,
+) -> str | None:
     """Render a possibly-English / possibly-dict semantic field as a
-    single Russian author-facing line. English content is replaced by a
-    Russian honesty stub — original formulation stays in technical view.
+    single Russian author-facing line.
+
+    Round III-J3: if a Russian-surface cache entry exists for this
+    field, use it. Otherwise fall back to the Round III-J2 honesty
+    stub. Either way: no fabricated translation, no English in the
+    author surface.
     """
     if value is None:
         return None
@@ -740,6 +865,12 @@ def _render_semantic_field(label_ru: str, value: Any) -> str | None:
     if not text:
         return None
     if _looks_english(text):
+        ru = (
+            _lookup_ru_in_cache(dossier, field_path or "", text)
+            if (dossier is not None and field_path) else None
+        )
+        if ru:
+            return f"{label_ru}: {ru}"
         return _ru_stub_for_english_field(label_ru)
     return f"{label_ru}: {text}"
 
@@ -751,36 +882,32 @@ def _section_what_understood(dossier: dict[str, Any]) -> HumanSection:
     line = _render_semantic_field(
         "Центральная проблема, как её зафиксировала система",
         _safe_get(am, "problem_statement"),
+        dossier=dossier, field_path="article_model.problem_statement",
     )
     if line: paragraphs.append(line)
     line = _render_semantic_field(
         "Исследовательский вопрос", _safe_get(am, "research_question"),
+        dossier=dossier, field_path="article_model.research_question",
     )
     if line: paragraphs.append(line)
     line = _render_semantic_field(
         "Объект рассмотрения", _safe_get(am, "object_of_inquiry"),
+        dossier=dossier, field_path="article_model.object_of_inquiry",
     )
     if line: paragraphs.append(line)
     line = _render_semantic_field(
         "Метод, как он описан", _safe_get(am, "method_description"),
+        dossier=dossier, field_path="article_model.method_description",
     )
     if line: paragraphs.append(line)
 
     bullets: list[str] = []
-    claims_raw = _safe_get(am, "core_claims") or []
-    claims = _normalize_list(claims_raw)
-    english_claims = [c for c in claims if _looks_english(c)]
-    russian_claims = [c for c in claims if not _looks_english(c)]
-    if russian_claims:
-        bullets.append("Основные тезисы статьи (как их видит система):")
-        bullets.extend(f"— {c}" for c in russian_claims)
-    if english_claims:
-        # Honest Russian stub — no `(англ.) «…»` blocks in author surface
-        bullets.append(_ru_stub_for_english_list(
-            "Основные тезисы статьи",
-            list(claims_raw) if isinstance(claims_raw, list) else [],
-            ("тезис", "тезиса", "тезисов"),
-        ))
+    bullets.extend(_render_list_with_cache(
+        dossier, "article_model.core_claims",
+        "Основные тезисы статьи (как их видит система):",
+        _safe_get(am, "core_claims"),
+        ("тезис", "тезиса", "тезисов"),
+    ))
 
     genre = _GENRE_RU.get(
         _safe_get(am, "genre_current") or "unknown",
@@ -805,43 +932,31 @@ def _section_what_understood(dossier: dict[str, Any]) -> HumanSection:
         paragraphs.append(line + ".")
 
     pcore_raw = _safe_get(am, "protected_core") or []
-    pcore = _normalize_list(pcore_raw)
-    pcore_eng = [c for c in pcore if _looks_english(c)]
-    pcore_ru = [c for c in pcore if not _looks_english(c)]
-    if pcore_ru or pcore_eng:
+    if pcore_raw:
         bullets.append(_PROTECTED_CORE_HINT)
-    if pcore_ru:
-        bullets.append("Защищаемое ядро статьи:")
-        bullets.extend(f"— {c}" for c in pcore_ru)
-    if pcore_eng:
-        bullets.append(_ru_stub_for_english_list(
-            "Защищаемое ядро статьи",
-            list(pcore_raw) if isinstance(pcore_raw, list) else [],
+        bullets.extend(_render_list_with_cache(
+            dossier, "article_model.protected_core",
+            "Защищаемое ядро статьи:", pcore_raw,
             ("элемент", "элемента", "элементов"),
         ))
     mzones_raw = _safe_get(am, "mutable_zones") or []
-    mzones = _normalize_list(mzones_raw)
-    mzones_eng = [z for z in mzones if _looks_english(z)]
-    mzones_ru = [z for z in mzones if not _looks_english(z)]
-    if mzones_ru or mzones_eng:
+    if mzones_raw:
         bullets.append(_MUTABLE_HINT)
-    if mzones_ru:
-        bullets.append("Гибкие зоны для доработки:")
-        bullets.extend(f"— {z}" for z in mzones_ru)
-    if mzones_eng:
-        bullets.append(_ru_stub_for_english_list(
-            "Гибкие зоны для доработки",
-            list(mzones_raw) if isinstance(mzones_raw, list) else [],
+        bullets.extend(_render_list_with_cache(
+            dossier, "article_model.mutable_zones",
+            "Гибкие зоны для доработки:", mzones_raw,
             ("зона", "зоны", "зон"),
         ))
 
-    unknowns = _normalize_list(_safe_get(am, "unknowns"))
-    if unknowns:
-        bullets.append(
-            "Чего система про статью пока не знает (поля, которые "
-            "ArticleModeler пометил как unknown):"
-        )
-        bullets.extend(f"— {_ru_safe_line(u)}" for u in unknowns[:8])
+    unknowns_raw = _safe_get(am, "unknowns") or []
+    if unknowns_raw:
+        bullets.extend(_render_list_with_cache(
+            dossier, "article_model.unknowns",
+            ("Чего система про статью пока не знает (поля, которые "
+             "ArticleModeler пометил как unknown):"),
+            unknowns_raw[:8] if isinstance(unknowns_raw, list) else unknowns_raw,
+            ("пункт", "пункта", "пунктов"),
+        ))
 
     if not paragraphs and not bullets:
         paragraphs.append(
@@ -889,57 +1004,33 @@ def _section_field_position(dossier: dict[str, Any]) -> HumanSection:
             + "; ".join(parts) + "."
         )
 
-    def _render_list_block(
-        head_ru: str, raw: Any, item_forms: tuple[str, str, str],
-    ) -> None:
-        items_norm = _normalize_list(raw)
-        if not items_norm:
-            return
-        eng = [s for s in items_norm if _looks_english(s)]
-        ru = [s for s in items_norm if not _looks_english(s)]
-        if ru:
-            bullets.append(head_ru)
-            bullets.extend(f"— {s}" for s in ru)
-        if eng:
-            bullets.append(_ru_stub_for_english_list(
-                head_ru.rstrip(":"),
-                list(raw) if isinstance(raw, list) else [],
-                item_forms,
-            ))
-
-    _render_list_block(
+    bullets.extend(_render_list_with_cache(
+        dossier, "semantic_profile.schools_and_traditions",
         "Школы и традиции, на которые опирается статья:",
         _safe_get(sp, "schools_and_traditions"),
         ("школа/традиция", "школы/традиции", "школ/традиций"),
-    )
-    _render_list_block(
+    ))
+    bullets.extend(_render_list_with_cache(
+        dossier, "semantic_profile.theoretical_shoulders",
         "Теоретические «плечи» — на ком статья стоит:",
         _safe_get(sp, "theoretical_shoulders"),
         ("опора", "опоры", "опор"),
-    )
-    _render_list_block(
+    ))
+    bullets.extend(_render_list_with_cache(
+        dossier, "semantic_profile.opponents_or_foils",
         "Оппоненты или фоновые контр-позиции:",
         _safe_get(sp, "opponents_or_foils"),
         ("оппонент", "оппонента", "оппонентов"),
-    )
-    bridges_raw = _safe_get(sp, "citation_bridges_needed") or []
-    bridges = _normalize_list(bridges_raw)
-    if bridges:
-        bullets.append(
-            "Какие мосты к традициям системе кажутся необходимыми, "
-            "чтобы статья читалась полноценно в этой дисциплинарной "
-            "рамке (это карта направлений, а не список обязательных "
-            "цитат):"
-        )
-        eng = [b for b in bridges if _looks_english(b)]
-        ru = [b for b in bridges if not _looks_english(b)]
-        bullets.extend(f"— {b}" for b in ru)
-        if eng:
-            bullets.append(_ru_stub_for_english_list(
-                "Недостающие мосты к традициям",
-                list(bridges_raw) if isinstance(bridges_raw, list) else [],
-                ("мост", "моста", "мостов"),
-            ))
+    ))
+    bullets.extend(_render_list_with_cache(
+        dossier, "semantic_profile.citation_bridges_needed",
+        ("Какие мосты к традициям системе кажутся необходимыми, "
+         "чтобы статья читалась полноценно в этой дисциплинарной "
+         "рамке (это карта направлений, а не список обязательных "
+         "цитат):"),
+        _safe_get(sp, "citation_bridges_needed"),
+        ("мост", "моста", "мостов"),
+    ))
 
     move = _safe_get(sp, "argument_move_type")
     move_desc = _safe_get(sp, "argument_move_description")
@@ -1131,7 +1222,7 @@ def _section_mismatches(dossier: dict[str, Any]) -> HumanSection:
         )
 
     subsections: list[HumanSubsection] = []
-    for m in mismatches:
+    for m_idx, m in enumerate(mismatches):
         if not isinstance(m, dict):
             continue
         axis = m.get("axis") or ""
@@ -1148,18 +1239,34 @@ def _section_mismatches(dossier: dict[str, Any]) -> HumanSection:
         sub_paragraphs: list[str] = []
         if article_side:
             if _looks_english(article_side):
-                sub_paragraphs.append(_ru_stub_for_english_field(
-                    "На стороне статьи",
-                ))
+                ru = _lookup_ru_in_cache(
+                    dossier,
+                    f"mismatch_map.mismatches[{m_idx}].article_side",
+                    article_side,
+                )
+                if ru:
+                    sub_paragraphs.append(f"На стороне статьи: {ru}")
+                else:
+                    sub_paragraphs.append(_ru_stub_for_english_field(
+                        "На стороне статьи",
+                    ))
             else:
                 sub_paragraphs.append(
                     f"На стороне статьи: {_ru_safe_line(article_side)}"
                 )
         if venue_side:
             if _looks_english(venue_side):
-                sub_paragraphs.append(_ru_stub_for_english_field(
-                    "На стороне площадки",
-                ))
+                ru = _lookup_ru_in_cache(
+                    dossier,
+                    f"mismatch_map.mismatches[{m_idx}].venue_side",
+                    venue_side,
+                )
+                if ru:
+                    sub_paragraphs.append(f"На стороне площадки: {ru}")
+                else:
+                    sub_paragraphs.append(_ru_stub_for_english_field(
+                        "На стороне площадки",
+                    ))
             else:
                 sub_paragraphs.append(
                     f"На стороне площадки: {_ru_safe_line(venue_side)}"
@@ -1180,9 +1287,17 @@ def _section_mismatches(dossier: dict[str, Any]) -> HumanSection:
             )
         if descr and descr not in (article_side, venue_side):
             if _looks_english(descr):
-                sub_paragraphs.append(_ru_stub_for_english_field(
-                    "Описание несовпадения",
-                ))
+                ru = _lookup_ru_in_cache(
+                    dossier,
+                    f"mismatch_map.mismatches[{m_idx}].description",
+                    descr,
+                )
+                if ru:
+                    sub_paragraphs.append(ru)
+                else:
+                    sub_paragraphs.append(_ru_stub_for_english_field(
+                        "Описание несовпадения",
+                    ))
             else:
                 sub_paragraphs.append(_ru_safe_line(descr))
         if core_risk and core_risk not in (

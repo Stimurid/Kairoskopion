@@ -121,6 +121,12 @@ class Case:
         # what file the analysis was built from. Set by the intake/file
         # route; remains None for text-only intakes.
         self.upload_metadata: dict[str, Any] | None = None
+        # Round III-J3: cache of Russian surface translations for
+        # English upstream semantic fields. Keyed by a stable
+        # sha256(field_path + value + prompt_version) hash. Populated
+        # by the russian_surface narrator pass; the renderer reads it.
+        # No raw LLM body is stored — only the validated Russian text.
+        self.russian_surface_cache: dict[str, Any] = {}
         self.publication_regime: PublicationRegimeModel | None = None
         self.investigated_venue: VenueModel | None = None
         self.article_field_position: FieldPositionModel | None = None
@@ -1886,6 +1892,8 @@ class Case:
             dossier["bibliography_profile"] = self.bibliography_profile.to_dict()
         if self.upload_metadata:
             dossier["upload_metadata"] = dict(self.upload_metadata)
+        if self.russian_surface_cache:
+            dossier["russian_surface_cache"] = dict(self.russian_surface_cache)
         # Round III-J: surface enough state for an evidence-based
         # human-dossier renderer. None of these introduce new facts —
         # they expose what is already persisted on the case.
@@ -2129,6 +2137,10 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         "input_type": case.input_type,
         "article_input_text": case.article_input_text,
         "upload_metadata": case.upload_metadata,
+        "russian_surface_cache": (
+            dict(case.russian_surface_cache)
+            if case.russian_surface_cache else {}
+        ),
         "decision_log": case.decision_log,
         "quality_gates": case.quality_gates,
     }
@@ -2211,6 +2223,8 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
     case.input_type = data.get("input_type", "")
     case.article_input_text = data.get("article_input_text", "")
     case.upload_metadata = data.get("upload_metadata") or None
+    cache = data.get("russian_surface_cache")
+    case.russian_surface_cache = cache if isinstance(cache, dict) else {}
     case.decision_log = data.get("decision_log", [])
     case.quality_gates = data.get("quality_gates", {})
 
