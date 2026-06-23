@@ -1152,14 +1152,18 @@ def _section_mismatches(dossier: dict[str, Any]) -> HumanSection:
                     "На стороне статьи",
                 ))
             else:
-                sub_paragraphs.append(f"На стороне статьи: {article_side}")
+                sub_paragraphs.append(
+                    f"На стороне статьи: {_ru_safe_line(article_side)}"
+                )
         if venue_side:
             if _looks_english(venue_side):
                 sub_paragraphs.append(_ru_stub_for_english_field(
                     "На стороне площадки",
                 ))
             else:
-                sub_paragraphs.append(f"На стороне площадки: {venue_side}")
+                sub_paragraphs.append(
+                    f"На стороне площадки: {_ru_safe_line(venue_side)}"
+                )
         elif narr_status in (
             "unknown_due_to_venue_evidence", "empty_valid_unknown",
         ):
@@ -1180,7 +1184,7 @@ def _section_mismatches(dossier: dict[str, Any]) -> HumanSection:
                     "Описание несовпадения",
                 ))
             else:
-                sub_paragraphs.append(descr)
+                sub_paragraphs.append(_ru_safe_line(descr))
         if core_risk and core_risk not in (
             "unknown_core_impact", "no_core_impact",
         ):
