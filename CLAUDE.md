@@ -183,7 +183,7 @@ For deep spec questions, read:
 | `src/kairoskopion/enums.py` | All domain enums |
 | `src/kairoskopion/cli.py` | CLI entry point |
 | `src/kairoskopion/pipelines/manuscript_venue_fit.py` | Main pipeline |
-| `src/kairoskopion/services/` | 13 domain services |
+| `src/kairoskopion/services/` | 13 domain services + venue_evidence_pack_resolver |
 | `src/kairoskopion/adapters/` | Source intake (PDF/DOCX), URL snapshot, OpenAlex/Crossref/OpenCitations (mock+real), HTTP client (fetch_json_safe/fetch_text_safe), bridge |
 | `src/kairoskopion/adapters/venue/` | 6 venue adapters: OpenAlex, Crossref, DOAJ, Unpaywall, OpenCitations, SnapshotCrawler (fixture+live+cached, authority enforcement) |
 | `src/kairoskopion/integrations/` | Litops bridge, WhiteCrow bridge, stubs |
@@ -191,10 +191,11 @@ For deep spec questions, read:
 | `src/kairoskopion/exchange.py` | Export/import storage bundles (zip) |
 | `src/kairoskopion/freshness.py` | Freshness/staleness tracking |
 | `src/kairoskopion/api/app.py` | FastAPI app (staging preview) |
-| `src/kairoskopion/api/cases.py` | Case orchestrator (19 routes) |
+| `src/kairoskopion/api/cases.py` | Case orchestrator (19 routes + investigate-venue-by-reference) |
+| `data/venue_evidence_packs/` | Top 5 venue evidence packs (ВФ, ЭФН, ФЖ, ЦУ) |
 | `ui/` | React+TypeScript cockpit (17 components) |
 | `ui/src/api/client.ts` | Typed API client |
 | `ui/src/styles/cockpit.css` | Dark theme CSS |
-| `tests/` | 1275+ tests |
+| `tests/` | 2204+ tests |
 | `tests/fixtures/` | Synthetic manuscript, venue, scenario |
 | `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` | Master spec |
