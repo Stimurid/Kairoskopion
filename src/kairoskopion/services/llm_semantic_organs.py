@@ -28,6 +28,7 @@ from ..agents.prompt_families.citation_ecology import CITATION_ECOLOGY_FAMILY
 from ..agents.prompt_families.rewrite_planning import REWRITE_PLANNING_FAMILY
 from ..agents.prompt_families.risk_reporting import RISK_REPORTING_FAMILY
 from ..enums import FieldCoreImpact
+from ..services.risk_reporting import RISK_TYPES as _CANONICAL_RISK_TYPES
 from ..ids import generate_id
 
 
@@ -69,6 +70,26 @@ _RISK_SEVERITY_MAP = {
     "low": "minor",
     "informational": "informational",
 }
+
+_CANONICAL_RISK_TYPE_SET = frozenset(_CANONICAL_RISK_TYPES)
+
+
+def _normalize_risk_type(raw: str) -> str:
+    """Normalize LLM-produced risk_type to canonical enum value.
+
+    Handles: title-case, spaces, hyphens, trailing "_risk" mismatch.
+    Unknown values pass through unchanged (honest unknown, not silent drop).
+    """
+    key = raw.strip().lower().replace(" ", "_").replace("-", "_")
+    if key in _CANONICAL_RISK_TYPE_SET:
+        return key
+    without_risk = key.removesuffix("_risk")
+    with_risk = key if key.endswith("_risk") else f"{key}_risk"
+    if without_risk in _CANONICAL_RISK_TYPE_SET:
+        return without_risk
+    if with_risk in _CANONICAL_RISK_TYPE_SET:
+        return with_risk
+    return key or "unknown"
 
 _FIELD_CORE_NORMALIZE = {
     "core_preserving": FieldCoreImpact.CORE_PRESERVING.value,
@@ -180,7 +201,7 @@ def try_llm_risk_officer(
     for raw in raw_items:
         if not isinstance(raw, dict):
             continue
-        rtype = (raw.get("risk_type") or "").strip() or "unknown"
+        rtype = _normalize_risk_type(raw.get("risk_type") or "")
         sev_raw = (raw.get("severity") or "").lower().strip()
         sev = _RISK_SEVERITY_MAP.get(sev_raw, sev_raw or "informational")
         desc = (raw.get("description") or "").strip()
