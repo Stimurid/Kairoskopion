@@ -50,6 +50,12 @@ For deep spec questions, read:
 - `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` — master spec (12665 lines, 10 waves)
 - `docs/DECISIONS.md` — architectural decisions and rationale
 
+**Before deploying to production**, read:
+- **`docs/operations/KAIROSKOPION_PRODUCTION_DEPLOY_RUNBOOK.md`** — host, SSH
+  user, app path, service name, deploy/rollback commands, env notes.
+  Do not rely on chat memory. If SSH config is missing, use the runbook
+  recovery checklist.
+
 **Before starting any venue-discovery session**, read:
 - `docs/VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md` — canonical funnel
   doctrine (8 layers, VenueProfilePackage, source allowlist A–J)
