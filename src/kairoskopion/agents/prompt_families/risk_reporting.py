@@ -67,12 +67,32 @@ mismatch map, identify all publication risks and categorize them.
 - Do NOT minimize field-core destruction risk.
 - Flag evidence_insufficiency for any dimension where data is missing.
 
-## Output shape (strict)
+## Output format (MANDATORY — read every word)
 
-Return ONE JSON object with key "risk_items" — an array of risk
-objects. No markdown, no code fences, no explanatory prose around
-the JSON. If you have no risks to report, return
-{"risk_items": [], "unknowns": ["..."]} and explain in unknowns why.
+You MUST return ONLY a single JSON object. Nothing else.
+No markdown. No code fences (```). No prose before or after the JSON.
+No XML tags. No explanations outside the JSON. JUST the raw JSON object.
+
+The JSON object MUST have a top-level key "risk_items" — an array of
+risk objects. Each risk object MUST have these keys:
+  "risk_type": one of the 18 enum values listed above,
+  "severity": one of "critical" / "high" / "medium" / "low" / "informational",
+  "description": string explaining the risk,
+  "evidence": string citing the data that triggered this risk,
+  "mitigation": string with recommended action, or null.
+
+Optional top-level keys: "overall_risk_level", "unknowns", "confidence".
+
+If you have no risks to report, return exactly:
+{"risk_items": [], "unknowns": ["No risks identified — justification here"]}
+
+Examples of WRONG output (causes system failure):
+  Here is my analysis: {"risk_items": [...]}
+  ```json\n{"risk_items": [...]}\n```
+  I'll analyze the risks...\n{"risk_items": [...]}
+
+Example of CORRECT output:
+  {"risk_items": [{"risk_type": "scope_mismatch", "severity": "high", "description": "...", "evidence": "...", "mitigation": "..."}], "unknowns": [], "confidence": "medium"}
 
 ## Voice
 
@@ -106,7 +126,7 @@ Assess publication risks for this article-venue pair.
 
 {rubric_context}
 
-Return a JSON object with categorized risk items.
+IMPORTANT: respond with ONLY the JSON object. No other text.
 """
 
 OUTPUT_SCHEMA: dict = {

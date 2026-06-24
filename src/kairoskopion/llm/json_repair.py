@@ -83,6 +83,12 @@ class RepairOutcome:
 
 _FENCE_RE = re.compile(r"^```(?:json|JSON)?\s*\n", re.MULTILINE)
 _FENCE_END_RE = re.compile(r"\n?```\s*$", re.MULTILINE)
+_XML_TAG_RE = re.compile(
+    r"<(thinking|response|answer|output|result|analysis|json)[^>]*>"
+    r"(.*?)"
+    r"</\1>",
+    re.DOTALL | re.IGNORECASE,
+)
 _SMART_QUOTES = {
     "“": '"', "”": '"',  # “ ”
     "‘": "'", "’": "'",  # ‘ ’
@@ -397,6 +403,20 @@ def repair_and_parse(
     if parsed is not None:
         return _validate_and_return(parsed, schema, steps, repaired=True)
 
+    # Round III-K2: strip XML wrapper tags (e.g. <thinking>...</thinking>)
+    # that some models emit around JSON content.
+    xml_stripped = _XML_TAG_RE.sub(r"\2", s2).strip()
+    if xml_stripped != s2:
+        steps.append("xml_tags_stripped")
+        try:
+            parsed = json.loads(xml_stripped)
+            return _validate_and_return(parsed, schema, steps, repaired=True)
+        except json.JSONDecodeError:
+            pass
+        parsed = _try_parse_with_repairs(xml_stripped, steps)
+        if parsed is not None:
+            return _validate_and_return(parsed, schema, steps, repaired=True)
+
     # Round III-G: JSON-island repair — exhaustively find ALL fenced
     # JSON blocks + ALL balanced {...} / [...] candidates, try each
     # one, pick the largest valid candidate. Sonnet sometimes returns
@@ -404,13 +424,17 @@ def repair_and_parse(
     # the single-balanced-extract above stops at the first candidate.
     candidates: list[tuple[str, str]] = []  # (kind, text)
 
-    # All fenced ```json ... ``` blocks
+    # All fenced ```json ... ``` blocks (search both original and xml-stripped)
     fence_pat = re.compile(
         r"```(?:json|JSON)?\s*\n(.*?)\n?```",
         re.DOTALL,
     )
-    for m in fence_pat.finditer(s):
-        candidates.append(("fenced_json", m.group(1).strip()))
+    _search_texts = [s]
+    if xml_stripped != s2:
+        _search_texts.append(xml_stripped)
+    for _st in _search_texts:
+        for m in fence_pat.finditer(_st):
+            candidates.append(("fenced_json", m.group(1).strip()))
 
     # All top-level balanced {…} regions (non-overlapping)
     def _all_balanced(text: str, opener: str, closer: str) -> list[str]:

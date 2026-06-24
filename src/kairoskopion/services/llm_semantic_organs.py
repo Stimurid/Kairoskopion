@@ -69,20 +69,45 @@ _RISK_SEVERITY_MAP = {
     "medium": "major",
     "low": "minor",
     "informational": "informational",
+    "moderate": "major",
+    "severe": "blocking",
+    "warning": "minor",
+    "info": "informational",
+    "minor": "minor",
+    "major": "major",
+    "blocking": "blocking",
 }
 
 _CANONICAL_RISK_TYPE_SET = frozenset(_CANONICAL_RISK_TYPES)
 
 
+_PROMPT_TO_CANONICAL_RISK_TYPE: dict[str, str] = {
+    "desk_rejection": "desk_reject_risk",
+    "method_gap": "methodology_mismatch",
+    "genre_mismatch": "scope_mismatch",
+    "language_barrier": "language_quality",
+    "novelty_concern": "scope_mismatch",
+    "compliance_gap": "formatting_violation",
+    "field_core_destruction": "core_transformation_risk",
+    "indexing_risk": "reputational_risk",
+    "review_hostility": "reviewer_pool_mismatch",
+    "regime_instability": "reputational_risk",
+    "evidence_insufficiency": "scope_mismatch",
+}
+
+
 def _normalize_risk_type(raw: str) -> str:
     """Normalize LLM-produced risk_type to canonical enum value.
 
-    Handles: title-case, spaces, hyphens, trailing "_risk" mismatch.
+    Handles: title-case, spaces, hyphens, trailing "_risk" mismatch,
+    and prompt-family enum names that differ from canonical service types.
     Unknown values pass through unchanged (honest unknown, not silent drop).
     """
     key = raw.strip().lower().replace(" ", "_").replace("-", "_")
     if key in _CANONICAL_RISK_TYPE_SET:
         return key
+    if key in _PROMPT_TO_CANONICAL_RISK_TYPE:
+        return _PROMPT_TO_CANONICAL_RISK_TYPE[key]
     without_risk = key.removesuffix("_risk")
     with_risk = key if key.endswith("_risk") else f"{key}_risk"
     if without_risk in _CANONICAL_RISK_TYPE_SET:
@@ -178,10 +203,25 @@ def try_llm_risk_officer(
 
     parsed = outcome.parsed or outcome.loose_parsed
     if not isinstance(parsed, (dict, list)):
+        # Round III-K2: specific failure categories instead of generic
+        _fc = outcome.parse_failure_category or outcome.parse_status or "unknown"
+        if not outcome.content_present:
+            _fc = "no_content_returned"
+        elif outcome.parse_status == "repair_failed":
+            _fc = "json_repair_exhausted"
+        elif outcome.parse_status == "invalid_json":
+            _fc = "no_json_found"
         placeholder.attempt_diagnostics = {
             **outcome.to_dict(),
             "semantic_status": "needs_llm",
+            "parse_failure_category": _fc,
         }
+        logger.warning(
+            "RiskOfficer LLM parse failed: category=%s content_length=%d "
+            "hash=%s top_keys=%s",
+            _fc, outcome.content_length, outcome.content_hash_prefix,
+            outcome.redacted_top_level_keys,
+        )
         return placeholder
     if isinstance(parsed, list):
         parsed = {"risk_items": parsed}
