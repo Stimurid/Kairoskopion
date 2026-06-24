@@ -31,7 +31,6 @@ def _evidence_pack_dirs(project_root: Path | None = None) -> list[Path]:
         project_root = Path(__file__).resolve().parents[3]
     return [
         project_root / "data" / "venue_evidence_packs",
-        project_root / "private_inputs" / "logos_trial",
     ]
 
 

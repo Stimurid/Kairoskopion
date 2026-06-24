@@ -142,9 +142,9 @@ class TestResolveFromRealPacks(unittest.TestCase):
 
     def test_logos_resolvable(self):
         pack = resolve(issn="0869-5377")
-        if pack is None:
-            self.skipTest("Logos evidence pack not found in expected location")
+        self.assertIsNotNone(pack, "Logos evidence pack must resolve from data/venue_evidence_packs/")
         self.assertIn("Логос", pack.canonical_name or "")
+        self.assertNotIn("private_inputs", str(pack.path))
 
     def test_voprosy_filosofii_resolvable(self):
         pack = resolve(issn="0042-8744")

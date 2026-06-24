@@ -39,6 +39,9 @@ data/
 !data/disciplinary_landscape/
 !data/disciplinary_landscape/**
 data/disciplinary_landscape/registry/
+# Top 5 venue evidence packs — tracked, deployable
+!data/venue_evidence_packs/
+!data/venue_evidence_packs/**
 registry/
 vault/
 
