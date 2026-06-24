@@ -826,6 +826,32 @@ class Case:
             "used_llm": used_llm,
         }
 
+    def investigate_venue_by_reference(
+        self,
+        *,
+        issn: str | None = None,
+        name: str | None = None,
+    ) -> dict[str, Any]:
+        """Resolve a venue evidence pack by ISSN or name, then profile it."""
+        from ..services.venue_evidence_pack_resolver import resolve
+        pack = resolve(issn=issn, name=name)
+        if pack is None:
+            return {
+                "status": "evidence_pack_not_found",
+                "issn": issn,
+                "name": name,
+                "hint": (
+                    "Нет evidence pack для этого журнала. "
+                    "Используйте investigate-venue с текстом aims/scope."
+                ),
+            }
+        self._log_decision("investigate_venue_by_reference", {
+            "source_file": str(pack.path),
+            "issn": pack.issn,
+            "canonical_name": pack.canonical_name,
+        })
+        return self.investigate_venue(pack.text)
+
     def _build_venue_field_position(
         self,
         venue: VenueModel,

@@ -386,11 +386,28 @@ class InvestigateVenueRequest(BaseModel):
     text: str
 
 
+class InvestigateVenueByReferenceRequest(BaseModel):
+    issn: str | None = None
+    name: str | None = None
+
+
 @app.post("/cases/{case_id}/investigate-venue")
 def investigate_venue(
     req: InvestigateVenueRequest, case: Case = Depends(_user_case),
 ):
     return case.investigate_venue(req.text)
+
+
+@app.post("/cases/{case_id}/investigate-venue-by-reference")
+def investigate_venue_by_reference(
+    req: InvestigateVenueByReferenceRequest,
+    case: Case = Depends(_user_case),
+):
+    if not req.issn and not req.name:
+        raise HTTPException(400, "Provide issn or name")
+    return case.investigate_venue_by_reference(
+        issn=req.issn, name=req.name,
+    )
 
 
 @app.get("/cases/{case_id}/investigated-venue")
