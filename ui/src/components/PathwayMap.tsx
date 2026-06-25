@@ -3,17 +3,17 @@ import { LLMAttemptBadge } from './LLMAttemptBadge';
 import { LLMAttemptWarning } from './LLMAttemptWarning';
 
 const FIT_CONFIG: Record<string, { label: string; className: string }> = {
-  strong: { label: 'Strong', className: 'fit-strong' },
-  moderate: { label: 'Moderate', className: 'fit-moderate' },
-  weak: { label: 'Weak', className: 'fit-weak' },
+  strong: { label: 'Сильное', className: 'fit-strong' },
+  moderate: { label: 'Среднее', className: 'fit-moderate' },
+  weak: { label: 'Слабое', className: 'fit-weak' },
 };
 
 const CORE_RISK_CONFIG: Record<string, { label: string; className: string }> = {
-  core_preserving: { label: 'Core safe', className: 'core-preserving' },
-  core_touching: { label: 'Core touched', className: 'core-touching' },
-  core_transforming: { label: 'Core at risk', className: 'core-transforming' },
-  core_destroying_risk: { label: 'Core threat', className: 'core-destroying' },
-  unknown_core_impact: { label: 'Unknown', className: 'core-unknown' },
+  core_preserving: { label: 'Ядро в безопасности', className: 'core-preserving' },
+  core_touching: { label: 'Ядро затронуто', className: 'core-touching' },
+  core_transforming: { label: 'Ядро под угрозой', className: 'core-transforming' },
+  core_destroying_risk: { label: 'Угроза ядру', className: 'core-destroying' },
+  unknown_core_impact: { label: 'Неизвестно', className: 'core-unknown' },
 };
 
 interface Props {
@@ -32,8 +32,8 @@ export function PathwayMap({ pathways, onSelectPathway, selectedPathwayId }: Pro
   return (
     <div className="pathway-map">
       <div className="pathway-map-header">
-        <h2>Disciplinary Pathways</h2>
-        <span className="pathway-count">{pathways.length} pathways mapped</span>
+        <h2>Дисциплинарные пути</h2>
+        <span className="pathway-count">{pathways.length} путей построено</span>
       </div>
 
       <LLMAttemptWarning
@@ -62,7 +62,7 @@ export function PathwayMap({ pathways, onSelectPathway, selectedPathwayId }: Pro
               </div>
 
               <div className="pathway-badges">
-                <span className={`pathway-badge ${fit.className}`}>{fit.label} fit</span>
+                <span className={`pathway-badge ${fit.className}`}>{fit.label}</span>
                 <span className={`pathway-badge ${core.className}`}>{core.label}</span>
                 {p.confidence && (
                   <span className="pathway-badge pathway-badge--confidence">
@@ -77,7 +77,7 @@ export function PathwayMap({ pathways, onSelectPathway, selectedPathwayId }: Pro
 
               {p.required_adaptations.length > 0 && (
                 <div className="pathway-adaptations">
-                  <span className="pathway-section-label">Adaptations needed:</span>
+                  <span className="pathway-section-label">Необходимые адаптации:</span>
                   <ul>
                     {p.required_adaptations.map((a, i) => (
                       <li key={i}>{a}</li>
@@ -92,7 +92,7 @@ export function PathwayMap({ pathways, onSelectPathway, selectedPathwayId }: Pro
 
               {p.example_venue_names.length > 0 && (
                 <div className="pathway-venues">
-                  <span className="pathway-section-label">Example venues:</span>
+                  <span className="pathway-section-label">Примеры площадок:</span>
                   <div className="pathway-venue-chips">
                     {p.example_venue_names.map((v, i) => (
                       <span key={i} className="venue-chip">{v}</span>

@@ -74,6 +74,33 @@ After assessing all axes, assign ONE overall label:
 - Do NOT ignore protected core risks.
 - Do NOT rank multiple venues (this is one article × one venue).
 - Do NOT predict acceptance probability.
+
+## Output format (MANDATORY — read every word)
+
+You MUST return ONLY a single JSON object. No other text before or after.
+
+WRONG (will break the system):
+- ```json { ... } ```  ← code fences
+- <thinking>reasoning</thinking>{ ... }  ← XML tags
+- Here is my analysis: { ... }  ← prose before JSON
+
+CORRECT (the ONLY accepted format):
+{
+  "overall_label": "possible_but_costly",
+  "axes": [
+    {"axis": "topic_fit", "value": "weak", "reasoning": "...", "evidence_refs": [], "unknowns": []},
+    {"axis": "discipline_fit", "value": "moderate", "reasoning": "...", "evidence_refs": [], "unknowns": []}
+  ],
+  "recommendation": "...",
+  "critical_issues": ["..."],
+  "strengths": ["..."],
+  "unknowns": ["..."],
+  "questions_for_user": [],
+  "confidence": "medium"
+}
+
+All 16 axes listed in "Axes to assess" MUST appear in the axes array. \
+Use "unknown" for axes you cannot assess. Every field must be present.
 """
 
 FIT_ASSESSMENT_USER_TEMPLATE = """\
@@ -94,8 +121,8 @@ Assess the fit between the following article and venue.
 {scenario_json}
 ```
 
-Return a JSON object matching the required schema with multi-axis assessment. \
-Every axis must be present. Use "unknown" for axes you cannot assess.
+IMPORTANT: respond with ONLY the JSON object. No markdown fences, no XML \
+tags, no prose before or after. Every field from the schema must be present.
 """
 
 FIT_ASSESSMENT_OUTPUT_SCHEMA: dict = {
@@ -137,10 +164,8 @@ FIT_ASSESSMENT_OUTPUT_SCHEMA: dict = {
             "enum": ["high", "medium", "low"],
         },
     },
-    "required": [
-        "overall_label", "axes", "unknowns", "confidence",
-    ],
-    "additionalProperties": False,
+    "required": [],
+    "additionalProperties": True,
 }
 
 

@@ -229,7 +229,7 @@ class TestBug8FitAxesDictToList(unittest.TestCase):
         fit = _build_fit(parsed, article_id="a", venue_id="v", scenario_id="s")
         self.assertEqual(len(fit.axes), 3)
         names = {a["axis"] for a in fit.axes}
-        self.assertEqual(names, {"topic_fit", "discipline_fit", "method_fit"})
+        self.assertEqual(names, {"topic", "discipline", "method"})
 
     def test_axes_as_list_still_works(self):
         parsed = {

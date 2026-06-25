@@ -51,11 +51,11 @@ export function AdaptationStudio({
     <div className="adaptation-studio">
       <div className="adapt-header">
         <div className="adapt-header-left">
-          <h2>Adaptation Studio</h2>
-          <span className="adapt-effort">Effort: {rewritePlan.estimated_effort}</span>
+          <h2>Студия адаптации</h2>
+          <span className="adapt-effort">Трудоёмкость: {rewritePlan.estimated_effort}</span>
         </div>
         {rewritePlan.requires_user_acceptance && (
-          <span className="adapt-gate-badge">User acceptance required</span>
+          <span className="adapt-gate-badge">Требуется подтверждение пользователя</span>
         )}
       </div>
 
@@ -65,7 +65,7 @@ export function AdaptationStudio({
 
       {protectedCore.length > 0 && (
         <div className="protected-core-gate">
-          <h3>Protected Core</h3>
+          <h3>Неприкосновенное ядро</h3>
           <div className="core-elements">
             {protectedCore.map((el, i) => {
               const touched = changes.some(c =>
@@ -103,14 +103,14 @@ export function AdaptationStudio({
         </div>
 
         <div className="adapt-counts">
-          <span>{changes.length} changes total</span>
+          <span>{changes.length} изменений всего</span>
         </div>
       </div>
 
       <div className="adapt-task-list">
         {sorted.length === 0 ? (
           <div className="adapt-empty">
-            <p>No changes match the current filter.</p>
+            <p>Нет изменений, соответствующих текущему фильтру.</p>
           </div>
         ) : (
           sorted.map(c => (
@@ -126,13 +126,13 @@ export function AdaptationStudio({
 
       {pendingCount === 0 && acceptedCount > 0 && onApplyAll && (
         <div className="adapt-apply-bar">
-          <span>{acceptedCount} changes accepted, {rejectedCount} rejected</span>
+          <span>{acceptedCount} принято, {rejectedCount} отклонено</span>
           <button
             className="btn btn-primary"
             onClick={onApplyAll}
             disabled={isLoading}
           >
-            {isLoading ? 'Applying...' : 'Apply Accepted Changes'}
+            {isLoading ? 'Применение…' : 'Применить принятые изменения'}
           </button>
         </div>
       )}

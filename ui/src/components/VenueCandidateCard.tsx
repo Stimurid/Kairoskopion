@@ -1,17 +1,17 @@
 import type { VenueCandidate } from '../types/domain';
 
 const CONFIDENCE_CONFIG: Record<string, { label: string; className: string }> = {
-  high: { label: 'High', className: 'conf-high' },
-  medium: { label: 'Medium', className: 'conf-medium' },
-  low: { label: 'Low', className: 'conf-low' },
+  high: { label: 'Высокая', className: 'conf-high' },
+  medium: { label: 'Средняя', className: 'conf-medium' },
+  low: { label: 'Низкая', className: 'conf-low' },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  discovered: { label: 'Discovered', className: 'status-discovered' },
-  screened: { label: 'Screened', className: 'status-screened' },
-  profiled: { label: 'Profiled', className: 'status-profiled' },
-  selected: { label: 'Selected', className: 'status-selected' },
-  rejected: { label: 'Rejected', className: 'status-rejected' },
+  discovered: { label: 'Найден', className: 'status-discovered' },
+  screened: { label: 'Отфильтрован', className: 'status-screened' },
+  profiled: { label: 'Профилирован', className: 'status-profiled' },
+  selected: { label: 'Выбран', className: 'status-selected' },
+  rejected: { label: 'Отклонён', className: 'status-rejected' },
 };
 
 interface Props {
@@ -31,7 +31,7 @@ export function VenueCandidateCard({ candidate, isSelected, onSelect }: Props) {
       type="button"
     >
       <div className="vc-header">
-        <h3 className="vc-name">{candidate.canonical_name || 'Unknown venue'}</h3>
+        <h3 className="vc-name">{candidate.canonical_name || 'Площадка без названия'}</h3>
         <span className={`vc-status ${status.className}`}>{status.label}</span>
       </div>
 
@@ -40,12 +40,12 @@ export function VenueCandidateCard({ candidate, isSelected, onSelect }: Props) {
       )}
 
       <div className="vc-badges">
-        <span className={`vc-badge ${conf.className}`}>{conf.label} confidence</span>
+        <span className={`vc-badge ${conf.className}`}>{conf.label} уверенность</span>
       </div>
 
       {candidate.discovery_reasons.length > 0 && (
         <div className="vc-reasons">
-          <span className="vc-section-label">Discovery reasons:</span>
+          <span className="vc-section-label">Причины обнаружения:</span>
           <ul>
             {candidate.discovery_reasons.map((r, i) => (
               <li key={i}>{r}</li>
@@ -56,7 +56,7 @@ export function VenueCandidateCard({ candidate, isSelected, onSelect }: Props) {
 
       {candidate.authority_assessments.length > 0 && (
         <div className="vc-authority">
-          <span className="vc-section-label">Authority:</span>
+          <span className="vc-section-label">Авторитет:</span>
           <div className="vc-authority-list">
             {candidate.authority_assessments.map((a, i) => {
               const scope = (a as Record<string, unknown>).scope as string | undefined;

@@ -86,7 +86,7 @@ class Case:
         user_id: str | None = None,
     ):
         self.case_id = case_id or generate_id("case")
-        self.title = title or "Untitled case"
+        self.title = title or "Новый кейс"
         self.created_at = _now()
         self.stage = CaseStage.EMPTY
         self.user_id: str | None = user_id
@@ -139,6 +139,8 @@ class Case:
 
         self.decision_log: list[dict[str, Any]] = []
         self.quality_gates: dict[str, dict[str, Any]] = {}
+        # M-8: LLM refinement chat history
+        self.refinement_chat: list[dict[str, Any]] = []
 
         # Track A (intake-choice-and-routing-seam): user-choice override
         # state. ``classifier_input_type`` / ``classifier_confidence`` /
@@ -511,22 +513,48 @@ class Case:
                 except Exception:  # noqa: BLE001
                     pass
 
-        # Round-II: structural H1 title fallback. Title is direct
-        # source fact; deterministic extraction from H1 is allowed
+        # Round-II: structural title fallback. Title is direct
+        # source fact; deterministic extraction is allowed
         # when the modeler returned None.
         if self.article_model is not None and not self.article_model.title_current:
             try:
                 import re as _re
                 src = self.article_input_text or self.input_text or ""
+                title_found = None
+                # Try markdown heading first
                 m = _re.search(r"^\s*#\s+(.+?)\s*$", src, _re.MULTILINE)
                 if m:
-                    self.article_model.title_current = m.group(1).strip()[:240]
+                    title_found = m.group(1).strip()[:240]
+                else:
+                    # Try bold title: **Title**
+                    m_bold = _re.search(r"^\s*\*\*(.+?)\*\*\s*$", src, _re.MULTILINE)
+                    if m_bold:
+                        candidate = m_bold.group(1).strip()
+                        if 5 <= len(candidate) <= 300:
+                            title_found = candidate[:240]
+                    else:
+                        # Try first non-empty line
+                        for line in src.split("\n"):
+                            line = line.strip()
+                            if not line:
+                                continue
+                            if 5 <= len(line) <= 300 and not line.endswith(('.', ',', ';', ':', '!', '?')):
+                                title_found = line[:240]
+                            break
+                if title_found:
+                    self.article_model.title_current = title_found
                     self._log_decision("structural_title_extracted", {
                         "length": len(self.article_model.title_current),
                         "origin": "source_fact_direct",
                     })
             except Exception:  # noqa: BLE001
                 pass
+
+        # Auto-name the case from the article title when it's still default.
+        if self.article_model and self.article_model.title_current:
+            default_titles = {"Untitled case", "New case", ""}
+            if self.title in default_titles:
+                self.title = self.article_model.title_current[:80]
 
         self.stage = CaseStage.ARTICLE_MODEL
 
@@ -904,24 +932,185 @@ class Case:
         if protected_core is not None:
             self.article_model.protected_core = protected_core
 
+        # M-7: compute ModelDelta before applying corrections
+        model_delta: list[dict[str, Any]] = []
+        meta_corrections: dict[str, str] = {}
+        text_evidence: dict[str, str] = {}
+
         if corrections:
             for field, value in corrections.items():
-                if hasattr(self.article_model, field):
+                if field.startswith("_block_rejected_") or field.startswith("_block_comment_"):
+                    meta_corrections[field] = value
+                elif field.startswith("_text_evidence_"):
+                    text_evidence[field] = value
+                elif hasattr(self.article_model, field):
+                    old_value = getattr(self.article_model, field, None)
+                    if old_value != value:
+                        model_delta.append({
+                            "field": field,
+                            "old": old_value,
+                            "new": value,
+                        })
                     setattr(self.article_model, field, value)
 
         self.article_model.lifecycle_status = LifecycleStatus.CONFIRMED.value
 
-        self._log_decision("confirm_article_model", {
+        decision_details: dict[str, Any] = {
             "protected_core": protected_core,
             "corrections_applied": list(corrections.keys()) if corrections else [],
-        })
+            "model_delta": model_delta,
+        }
+        if meta_corrections:
+            decision_details["block_decisions"] = meta_corrections
+        if text_evidence:
+            decision_details["text_evidence"] = text_evidence
+
+        self._log_decision("confirm_article_model", decision_details)
         self._update_quality_gates("confirm_article")
+
+        # M-7: append to CorrectionRegistry
+        if model_delta or meta_corrections or text_evidence:
+            CorrectionRegistry.append(
+                case_id=self.case_id,
+                user_id=self.user_id,
+                model_delta=model_delta,
+                meta_corrections=meta_corrections,
+                text_evidence=text_evidence,
+            )
 
         return {
             "confirmed": True,
             "protected_core": self.article_model.protected_core,
             "lifecycle_status": self.article_model.lifecycle_status,
+            "model_delta": model_delta,
         }
+
+    # -- M-8: LLM refinement dialog --
+
+    def refine_article_model(self, message: str) -> dict[str, Any]:
+        """Send a refinement message to the LLM and return suggestions."""
+        import json, logging
+        logger = logging.getLogger(__name__)
+
+        if not self.article_model:
+            return {"error": "No article model to refine"}
+
+        provider = _get_llm_provider("article_modeler")
+        if provider is None:
+            unavail_reply = (
+                "LLM не подключён — автоматический диалог недоступен. "
+                "Используйте ручную корректировку через типологию и комментарии."
+            )
+            self.refinement_chat.append({
+                "role": "user", "content": message, "timestamp": _now(),
+            })
+            self.refinement_chat.append({
+                "role": "assistant", "content": unavail_reply, "timestamp": _now(),
+            })
+            self._log_decision("refine_article_model", {
+                "user_message": message,
+                "suggestions_count": 0,
+            })
+            return {
+                "reply": unavail_reply,
+                "suggestions": [],
+                "llm_available": False,
+            }
+
+        model_summary = {}
+        for attr in [
+            "title_current", "genre_current", "novelty_mode",
+            "method_status", "problem_statement", "discipline",
+            "abstract_current", "language",
+        ]:
+            val = getattr(self.article_model, attr, None)
+            if val is not None:
+                model_summary[attr] = val
+
+        system_prompt = (
+            "You are an article model refinement assistant for the Kairoskopion system. "
+            "The user is reviewing a machine-generated article model and wants to correct or clarify specific fields. "
+            "Current article model fields:\n"
+            f"{json.dumps(model_summary, ensure_ascii=False, indent=2)}\n\n"
+            "Respond in JSON with this structure:\n"
+            '{"reply": "your explanation in Russian", "suggestions": [{"field": "field_name", "value": "new_value", "reason": "why"}]}\n'
+            "Only suggest changes the user explicitly asked for. "
+            "Use the exact field names from the model (e.g. genre_current, novelty_mode, method_status). "
+            "If the user asks a question without requesting a change, return an empty suggestions list. "
+            "Always reply in Russian."
+        )
+
+        chat_messages: list[dict[str, str]] = [
+            {"role": "system", "content": system_prompt},
+        ]
+        for entry in self.refinement_chat[-10:]:
+            chat_messages.append({
+                "role": entry["role"],
+                "content": entry["content"],
+            })
+        chat_messages.append({"role": "user", "content": message})
+
+        self.refinement_chat.append({
+            "role": "user",
+            "content": message,
+            "timestamp": _now(),
+        })
+
+        try:
+            response = provider.complete(chat_messages)
+            raw_text = response.content or ""
+        except Exception as exc:
+            logger.warning("LLM refinement call failed: %s", exc)
+            reply_text = f"Ошибка при обращении к LLM: {type(exc).__name__}"
+            self.refinement_chat.append({
+                "role": "assistant",
+                "content": reply_text,
+                "timestamp": _now(),
+            })
+            return {"reply": reply_text, "suggestions": [], "llm_available": True}
+
+        suggestions: list[dict[str, str]] = []
+        reply_text = raw_text
+
+        try:
+            from ..llm.json_repair import repair_and_parse
+            parsed = repair_and_parse(raw_text)
+            if parsed.parsed:
+                data = parsed.parsed
+                reply_text = data.get("reply", raw_text)
+                raw_suggestions = data.get("suggestions", [])
+                if isinstance(raw_suggestions, list):
+                    for s in raw_suggestions:
+                        if isinstance(s, dict) and "field" in s and "value" in s:
+                            if hasattr(self.article_model, s["field"]):
+                                suggestions.append({
+                                    "field": str(s["field"]),
+                                    "value": str(s["value"]),
+                                    "reason": str(s.get("reason", "")),
+                                })
+        except Exception:
+            pass
+
+        self.refinement_chat.append({
+            "role": "assistant",
+            "content": reply_text,
+            "suggestions": suggestions,
+            "timestamp": _now(),
+        })
+
+        self._log_decision("refine_article_model", {
+            "user_message": message,
+            "suggestions_count": len(suggestions),
+        })
+
+        return {
+            "reply": reply_text,
+            "suggestions": suggestions,
+            "llm_available": True,
+        }
+
+    def get_refinement_chat(self) -> list[dict[str, Any]]:
+        return self.refinement_chat
 
     # -- Scenario --
 
@@ -2027,6 +2216,134 @@ class Case:
         })
 
 
+class CorrectionRegistry:
+    """JSONL append-only registry of user corrections to article models.
+
+    Each line records one confirm_article_model event with its delta,
+    block decisions, and text evidence. Used by M-9 for pattern detection.
+    """
+
+    _path = None  # type: ignore[assignment]
+
+    @classmethod
+    def _registry_path(cls):
+        import os
+        from pathlib import Path
+        if cls._path is None:
+            data_dir = Path(
+                os.environ.get("KAIROSKOPION_DATA_DIR", ".kairoskopion")
+            )
+            data_dir.mkdir(parents=True, exist_ok=True)
+            cls._path = data_dir / "correction_registry.jsonl"
+        return cls._path
+
+    @classmethod
+    def append(
+        cls,
+        case_id: str,
+        user_id: str | None,
+        model_delta: list[dict[str, Any]],
+        meta_corrections: dict[str, str],
+        text_evidence: dict[str, str],
+    ) -> None:
+        import json, logging
+        entry = {
+            "case_id": case_id,
+            "user_id": user_id,
+            "timestamp": _now(),
+            "model_delta": model_delta,
+            "meta_corrections": meta_corrections,
+            "text_evidence": text_evidence,
+        }
+        try:
+            with open(cls._registry_path(), "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "CorrectionRegistry.append failed: %s", exc,
+            )
+
+    @classmethod
+    def read_all(cls) -> list[dict[str, Any]]:
+        import json
+        path = cls._registry_path()
+        if not path.exists():
+            return []
+        entries: list[dict[str, Any]] = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line:
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass
+        return entries
+
+    @classmethod
+    def analyze_signals(cls, min_occurrences: int = 3) -> list[dict[str, Any]]:
+        """Detect recurring correction patterns → PromptCorrectionSignals."""
+        from collections import Counter
+        entries = cls.read_all()
+        if not entries:
+            return []
+
+        field_change_counter: Counter[str] = Counter()
+        field_value_counter: Counter[tuple[str, str]] = Counter()
+        rejection_counter: Counter[str] = Counter()
+
+        for entry in entries:
+            for delta in entry.get("model_delta", []):
+                field = delta.get("field", "")
+                new_val = str(delta.get("new", ""))
+                if field:
+                    field_change_counter[field] += 1
+                    field_value_counter[(field, new_val)] += 1
+            for key in entry.get("meta_corrections", {}):
+                if key.startswith("_block_rejected_"):
+                    block_id = key.replace("_block_rejected_", "")
+                    rejection_counter[block_id] += 1
+
+        signals: list[dict[str, Any]] = []
+
+        for field, count in field_change_counter.items():
+            if count >= min_occurrences:
+                top_value = ""
+                top_count = 0
+                for (f, v), c in field_value_counter.items():
+                    if f == field and c > top_count:
+                        top_value = v
+                        top_count = c
+                signals.append({
+                    "type": "field_correction_pattern",
+                    "field": field,
+                    "correction_count": count,
+                    "most_common_override": top_value,
+                    "override_count": top_count,
+                    "severity": "high" if count >= min_occurrences * 2 else "medium",
+                    "message": (
+                        f"Поле «{field}» исправлялось {count} раз(а). "
+                        f"Чаще всего ставят: «{top_value}» ({top_count}x). "
+                        "Возможно, промпт систематически ошибается в этом поле."
+                    ),
+                })
+
+        for block_id, count in rejection_counter.items():
+            if count >= min_occurrences:
+                signals.append({
+                    "type": "block_rejection_pattern",
+                    "block_id": block_id,
+                    "rejection_count": count,
+                    "severity": "medium",
+                    "message": (
+                        f"Блок «{block_id}» отклонялся {count} раз(а). "
+                        "Рассмотрите пересмотр формулировки в промпте для этого блока."
+                    ),
+                })
+
+        signals.sort(key=lambda s: s.get("correction_count", 0) + s.get("rejection_count", 0), reverse=True)
+        return signals
+
+
 class CaseStore:
     """File-backed case store with user partitioning.
 
@@ -2229,6 +2546,9 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
     if case.override_at is not None:
         snap["override_at"] = case.override_at
 
+    if case.refinement_chat:
+        snap["refinement_chat"] = case.refinement_chat
+
     return snap
 
 
@@ -2314,6 +2634,10 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
         case.override_source = data["override_source"]
     if isinstance(data.get("override_at"), str):
         case.override_at = data["override_at"]
+
+    rc = data.get("refinement_chat")
+    if isinstance(rc, list):
+        case.refinement_chat = rc
 
     raw_pathways = data.get("pathways", [])
     for p in raw_pathways:

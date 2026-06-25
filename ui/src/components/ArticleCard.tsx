@@ -121,11 +121,11 @@ export function ArticleCard({ article, onConfirm, onEvidenceClick, onBack }: Pro
   return (
     <div className="article-card">
       {onBack && (
-        <button className="btn btn-back" onClick={onBack}>← Back to Intake</button>
+        <button className="btn btn-back" onClick={onBack}>← Назад к вводу</button>
       )}
 
       <div className="article-card-header">
-        <h2 className="article-title">{corrections.title || article.title || 'Untitled'}</h2>
+        <h2 className="article-title">{corrections.title || article.title || 'Без названия'}</h2>
         <span className={`lifecycle-badge lifecycle-${article.lifecycle_status}`}>
           {article.lifecycle_status}
         </span>
@@ -134,14 +134,14 @@ export function ArticleCard({ article, onConfirm, onEvidenceClick, onBack }: Pro
 
       {isShallow && !isConfirmed && (
         <div className="shallow-model-banner" role="status">
-          Extraction produced a shallow model — key fields are missing.
-          You can edit fields manually, or go back and try a shorter/cleaner input.
+          Модель получилась неглубокой — ключевые поля отсутствуют.
+          Можно редактировать вручную или вернуться и подать более чистый вход.
         </div>
       )}
 
       {hasCorrections && !isConfirmed && (
         <div className="corrections-banner" role="status">
-          {Object.keys(corrections).length} field(s) edited. Confirm to save.
+          {Object.keys(corrections).length} полей изменено. Подтвердите для сохранения.
         </div>
       )}
 
@@ -163,18 +163,18 @@ export function ArticleCard({ article, onConfirm, onEvidenceClick, onBack }: Pro
       {/* Protected Core Zone */}
       <div className="protected-core-zone">
         <div className="core-header">
-          <h3>Protected Core</h3>
+          <h3>Неприкосновенное ядро</h3>
           {!isConfirmed && (
             <button
               className="btn btn-small"
               onClick={() => setEditingCore(!editingCore)}
             >
-              {editingCore ? 'Done' : 'Edit'}
+              {editingCore ? 'Готово' : 'Редактировать'}
             </button>
           )}
         </div>
         <p className="core-description">
-          Elements that cannot be destroyed for venue fit. Confirm or edit before proceeding.
+          Элементы, которые нельзя менять ради подгонки под журнал. Проверьте перед подтверждением.
         </p>
         <ul className="core-list">
           {coreItems.map((item, i) => (
@@ -185,7 +185,7 @@ export function ArticleCard({ article, onConfirm, onEvidenceClick, onBack }: Pro
                 <button
                   className="core-remove"
                   onClick={() => handleRemoveCore(i)}
-                  aria-label={`Remove "${item}" from protected core`}
+                  aria-label={`Убрать «${item}» из ядра`}
                 >
                   &times;
                 </button>
@@ -193,7 +193,7 @@ export function ArticleCard({ article, onConfirm, onEvidenceClick, onBack }: Pro
             </li>
           ))}
           {coreItems.length === 0 && (
-            <li className="core-item core-item--empty">No protected core elements defined</li>
+            <li className="core-item core-item--empty">Элементы ядра не определены</li>
           )}
         </ul>
         {editingCore && (
@@ -202,10 +202,10 @@ export function ArticleCard({ article, onConfirm, onEvidenceClick, onBack }: Pro
               type="text"
               value={newCoreItem}
               onChange={(e) => setNewCoreItem(e.target.value)}
-              placeholder="Add core element..."
+              placeholder="Добавить элемент ядра…"
               onKeyDown={(e) => { if (e.key === 'Enter') handleAddCore(); }}
             />
-            <button className="btn btn-small" onClick={handleAddCore}>Add</button>
+            <button className="btn btn-small" onClick={handleAddCore}>Добавить</button>
           </div>
         )}
       </div>
@@ -213,7 +213,7 @@ export function ArticleCard({ article, onConfirm, onEvidenceClick, onBack }: Pro
       {/* Unknowns */}
       {article.unknowns && article.unknowns.length > 0 && (
         <div className="unknowns-section">
-          <h3>Unknowns</h3>
+          <h3>Неизвестно</h3>
           <ul className="unknowns-list">
             {article.unknowns.map((u, i) => (
               <li key={i}>
@@ -227,14 +227,14 @@ export function ArticleCard({ article, onConfirm, onEvidenceClick, onBack }: Pro
       {/* Confidence footer */}
       <div className="article-footer">
         <span className="confidence-label">
-          Confidence: <strong>{article.confidence || 'preliminary'}</strong>
+          Уверенность: <strong>{article.confidence || 'предварительная'}</strong>
         </span>
         <span className="source-count">
-          Sources: {article.evidence_refs?.length ?? 0}
+          Источники: {article.evidence_refs?.length ?? 0}
         </span>
         {!isConfirmed && (
           <button className="btn btn-primary" onClick={handleConfirm}>
-            {hasCorrections ? 'Confirm with Corrections' : 'Confirm Article Model'}
+            {hasCorrections ? 'Подтвердить с правками' : 'Подтвердить модель'}
           </button>
         )}
       </div>

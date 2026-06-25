@@ -56,7 +56,7 @@ export function DossierView({ caseId }: Props) {
   }, [caseId]);
 
   if (isLoading) {
-    return <div className="placeholder-view"><p>Building dossier...</p></div>;
+    return <div className="placeholder-view"><p>Формирование досье…</p></div>;
   }
 
   if (error) {
@@ -64,17 +64,17 @@ export function DossierView({ caseId }: Props) {
   }
 
   if (!dossier) {
-    return <div className="placeholder-view"><h2>Dossier</h2><p>No dossier data available.</p></div>;
+    return <div className="placeholder-view"><h2>Досье</h2><p>Данные досье недоступны.</p></div>;
   }
 
   return (
     <div className="dossier-view">
       <div className="dossier-header">
         <div className="dossier-header-left">
-          <h2>Dossier: {dossier.title}</h2>
+          <h2>Досье: {dossier.title}</h2>
           <span className="dossier-stage-badge">{dossier.stage}</span>
         </div>
-        <span className="dossier-generated">Generated: {dossier.generated_at}</span>
+        <span className="dossier-generated">Сформировано: {dossier.generated_at}</span>
       </div>
 
       <div className="dossier-mode-toggle">
@@ -101,45 +101,45 @@ export function DossierView({ caseId }: Props) {
           className={`type-chip ${activeTab === 'overview' ? 'type-chip--active' : ''}`}
           onClick={() => setActiveTab('overview')}
         >
-          Overview
+          Обзор
         </button>
         <button
           className={`type-chip ${activeTab === 'decisions' ? 'type-chip--active' : ''}`}
           onClick={() => setActiveTab('decisions')}
         >
-          Decision Log ({dossier.decision_log.length})
+          Журнал решений ({dossier.decision_log.length})
         </button>
       </div>
 
       {activeTab === 'overview' ? (
         <div className="dossier-overview">
           {dossier.article_model && (
-            <SectionCard title="Article Model">
+            <SectionCard title="Модель статьи">
               {dossier.article_model.title ? (
-                <KVRow label="Title" value={dossier.article_model.title} />
+                <KVRow label="Название" value={dossier.article_model.title} />
               ) : (
                 <div className="dossier-kv">
-                  <span className="dossier-kv-label">Title</span>
+                  <span className="dossier-kv-label">Название</span>
                   <em className="fit-axis-muted">
                     Не извлечено модели — H1/title заголовок статьи не распознан
                   </em>
                 </div>
               )}
               {dossier.article_model.genre ? (
-                <KVRow label="Genre" value={dossier.article_model.genre} />
+                <KVRow label="Жанр" value={dossier.article_model.genre} />
               ) : (
                 <div className="dossier-kv">
-                  <span className="dossier-kv-label">Genre</span>
+                  <span className="dossier-kv-label">Жанр</span>
                   <em className="fit-axis-muted">
                     Жанр не определён — article modeler не вынес решения
                   </em>
                 </div>
               )}
-              <KVRow label="Lifecycle" value={dossier.article_model.lifecycle_status} />
-              <KVRow label="Confidence" value={dossier.article_model.confidence} />
+              <KVRow label="Жизненный цикл" value={dossier.article_model.lifecycle_status} />
+              <KVRow label="Уверенность" value={dossier.article_model.confidence} />
               {dossier.article_model.protected_core.length > 0 && (
                 <div className="dossier-kv">
-                  <span className="dossier-kv-label">Protected Core</span>
+                  <span className="dossier-kv-label">Неприкосновенное ядро</span>
                   <div className="dossier-chip-list">
                     {dossier.article_model.protected_core.map((c, i) => (
                       <span key={i} className="core-element core-element--safe">{c}</span>
@@ -150,7 +150,7 @@ export function DossierView({ caseId }: Props) {
               {dossier.article_model.unknowns
                 && dossier.article_model.unknowns.length > 0 && (
                 <div className="article-model-unknowns">
-                  <strong>Unknowns ({dossier.article_model.unknowns.length}):</strong>
+                  <strong>Неизвестно ({dossier.article_model.unknowns.length}):</strong>
                   <ul>
                     {dossier.article_model.unknowns.slice(0, 8).map((u, i) => (
                       <li key={i}>{u}</li>
@@ -162,7 +162,7 @@ export function DossierView({ caseId }: Props) {
           )}
 
           {dossier.scenario && (
-            <SectionCard title="Submission Scenario">
+            <SectionCard title="Сценарий подачи">
               {dossier.scenario.scenario_preliminary && (
                 <div className="scenario-preliminary-banner" role="note">
                   <strong>⚠ Сценарий публикации — предварительный</strong>
@@ -173,10 +173,10 @@ export function DossierView({ caseId }: Props) {
                   </p>
                 </div>
               )}
-              <KVRow label="Goal" value={dossier.scenario.goal} />
-              <KVRow label="Rewrite Depth" value={dossier.scenario.rewrite_depth_allowed} />
-              <KVRow label="Language" value={dossier.scenario.language} />
-              <KVRow label="Risk Tolerance" value={dossier.scenario.risk_tolerance} />
+              <KVRow label="Цель" value={dossier.scenario.goal} />
+              <KVRow label="Глубина переработки" value={dossier.scenario.rewrite_depth_allowed} />
+              <KVRow label="Язык" value={dossier.scenario.language} />
+              <KVRow label="Толерантность к риску" value={dossier.scenario.risk_tolerance} />
             </SectionCard>
           )}
 
@@ -191,7 +191,7 @@ export function DossierView({ caseId }: Props) {
               ))}
             </SectionCard>
           ) : (
-            <SectionCard title="Pathways (0)">
+            <SectionCard title="Дисциплинарные пути (0)">
               <p className="placeholder-note">
                 Дисциплинарные пути ещё не выведены — pathway mapper не вернул
                 кандидатов для этой статьи. Это не ошибка fit-проверки.
@@ -200,10 +200,10 @@ export function DossierView({ caseId }: Props) {
           )}
 
           {dossier.selected_venue && (
-            <SectionCard title="Selected Venue">
-              <KVRow label="Name" value={dossier.selected_venue.canonical_name} />
-              <KVRow label="Type" value={dossier.selected_venue.venue_type} />
-              <KVRow label="Confidence" value={dossier.selected_venue.confidence} />
+            <SectionCard title="Выбранная площадка">
+              <KVRow label="Название" value={dossier.selected_venue.canonical_name} />
+              <KVRow label="Тип" value={dossier.selected_venue.venue_type} />
+              <KVRow label="Уверенность" value={dossier.selected_venue.confidence} />
               <KVRow label="APC" value={dossier.selected_venue.apc_policy} />
             </SectionCard>
           )}
@@ -212,18 +212,18 @@ export function DossierView({ caseId }: Props) {
             <SectionCard
               title={`Матрица соответствия — Fit matrix (${dossier.fit_assessment.axes?.length ?? 0} осей)`}
             >
-              <KVRow label="Overall" value={dossier.fit_assessment.overall_label} />
-              <KVRow label="Level" value={dossier.fit_assessment.assessment_level} />
-              <KVRow label="Confidence" value={dossier.fit_assessment.confidence} />
-              <KVRow label="Recommendation" value={dossier.fit_assessment.recommendation} />
+              <KVRow label="Общий вердикт" value={dossier.fit_assessment.overall_label} />
+              <KVRow label="Уровень" value={dossier.fit_assessment.assessment_level} />
+              <KVRow label="Уверенность" value={dossier.fit_assessment.confidence} />
+              <KVRow label="Рекомендация" value={dossier.fit_assessment.recommendation} />
 
               {dossier.fit_assessment.axes && dossier.fit_assessment.axes.length > 0 ? (
                 <div className="fit-axes-table" role="table" aria-label="Fit matrix axes">
                   <div className="fit-axes-head" role="row">
-                    <span className="fit-axes-col-axis">Axis</span>
-                    <span className="fit-axes-col-value">Value</span>
-                    <span className="fit-axes-col-conf">Confidence</span>
-                    <span className="fit-axes-col-notes">Reason / notes</span>
+                    <span className="fit-axes-col-axis">Ось</span>
+                    <span className="fit-axes-col-value">Значение</span>
+                    <span className="fit-axes-col-conf">Уверенность</span>
+                    <span className="fit-axes-col-notes">Причина / заметки</span>
                   </div>
                   {dossier.fit_assessment.axes.map((ax, i) => {
                     const valueClass =
@@ -321,12 +321,12 @@ export function DossierView({ caseId }: Props) {
                 </div>
               )}
               {dossier.risk_report.overall_risk_label && (
-                <KVRow label="Overall risk" value={dossier.risk_report.overall_risk_label} />
+                <KVRow label="Общий риск" value={dossier.risk_report.overall_risk_label} />
               )}
               {dossier.risk_report.blocking_risks
                 && dossier.risk_report.blocking_risks.length > 0 && (
                 <div className="risk-blocking-list" role="alert">
-                  <strong>Blocking risks ({dossier.risk_report.blocking_risks.length}):</strong>
+                  <strong>Блокирующие риски ({dossier.risk_report.blocking_risks.length}):</strong>
                   <ul>
                     {dossier.risk_report.blocking_risks.map((r, i) => (
                       <li key={i}>{r}</li>
@@ -337,7 +337,7 @@ export function DossierView({ caseId }: Props) {
               {dossier.risk_report.warnings
                 && dossier.risk_report.warnings.length > 0 && (
                 <div className="risk-warnings-list" role="note">
-                  <strong>Warnings ({dossier.risk_report.warnings.length}):</strong>
+                  <strong>Предупреждения ({dossier.risk_report.warnings.length}):</strong>
                   <ul>
                     {dossier.risk_report.warnings.map((w, i) => (
                       <li key={i}>{w}</li>
@@ -365,18 +365,18 @@ export function DossierView({ caseId }: Props) {
                         )}
                         {r.requires_user_action && (
                           <span className="risk-item-user-action">
-                            requires user action
+                            требуется действие
                           </span>
                         )}
                       </div>
                       <p className="risk-item-desc">{r.description}</p>
                       {r.mitigation ? (
                         <p className="risk-item-mitigation">
-                          <strong>Mitigation:</strong> {r.mitigation}
+                          <strong>Митигация:</strong> {r.mitigation}
                         </p>
                       ) : (
                         <p className="risk-item-mitigation risk-item-mitigation--muted">
-                          <em>Mitigation not provided.</em>
+                          <em>Митигация не указана.</em>
                         </p>
                       )}
                       {r.evidence_refs && r.evidence_refs.length > 0 && (
@@ -408,8 +408,8 @@ export function DossierView({ caseId }: Props) {
           ) : (
             <SectionCard title="Риски подачи — Risk report">
               <p className="risk-report-missing">
-                Risk report not built for this case yet.
-                Подача в анализ рисков запускается после выбора площадки
+                Отчёт о рисках ещё не построен.
+                Анализ рисков запускается после выбора площадки
                 и запуска fit-проверки.
               </p>
             </SectionCard>
@@ -518,7 +518,7 @@ export function DossierView({ caseId }: Props) {
           )}
 
           {dossier.rewrite_plan && (
-            <SectionCard title="Rewrite Plan">
+            <SectionCard title="План переработки">
               {dossier.rewrite_plan.semantic_status && (
                 <div className="lane-head">
                   <span className={`semantic-status-badge semantic-status--${dossier.rewrite_plan.semantic_status}`}>
@@ -535,9 +535,9 @@ export function DossierView({ caseId }: Props) {
                   <code> agents/fit/rewrite_planner.py</code> (с protected-core gate).
                 </div>
               )}
-              <KVRow label="Effort" value={dossier.rewrite_plan.estimated_effort} />
-              <KVRow label="Changes" value={dossier.rewrite_plan.changes.length} />
-              <KVRow label="Summary" value={dossier.rewrite_plan.summary} />
+              <KVRow label="Трудоёмкость" value={dossier.rewrite_plan.estimated_effort} />
+              <KVRow label="Изменения" value={dossier.rewrite_plan.changes.length} />
+              <KVRow label="Сводка" value={dossier.rewrite_plan.summary} />
               {dossier.rewrite_plan.unknowns && dossier.rewrite_plan.unknowns.length > 0 && (
                 <div className="lane-unknowns">
                   <strong>Unknowns ({dossier.rewrite_plan.unknowns.length}):</strong>
@@ -552,14 +552,14 @@ export function DossierView({ caseId }: Props) {
               on it. */}
           {dossier.bibliography_profile ? (
             <SectionCard
-              title={`Bibliography profile — статус: ${dossier.bibliography_profile.status}`}
+              title={`Библиографический профиль — статус: ${dossier.bibliography_profile.status}`}
             >
               <BibliographyProfileSection bp={dossier.bibliography_profile} />
             </SectionCard>
           ) : (
-            <SectionCard title="Bibliography profile">
+            <SectionCard title="Библиографический профиль">
               <p className="placeholder-note">
-                <strong>Bibliography profile not built yet.</strong>{' '}
+                <strong>Библиографический профиль ещё не построен.</strong>{' '}
                 Будет построен автоматически из текста статьи после
                 fit-цепи.
               </p>
@@ -568,13 +568,13 @@ export function DossierView({ caseId }: Props) {
 
           {/* V2-D: real CitationPlan when built, V2-C placeholder otherwise */}
           {dossier.citation_plan ? (
-            <SectionCard title={`Citation plan — статус: ${dossier.citation_plan.status}`}>
+            <SectionCard title={`Цитатный план — статус: ${dossier.citation_plan.status}`}>
               <CitationPlanSection plan={dossier.citation_plan} />
             </SectionCard>
           ) : (
-            <SectionCard title="Citation plan">
+            <SectionCard title="Цитатный план">
               <p className="placeholder-note">
-                <strong>Citation plan not built yet</strong> для этого case.
+                <strong>Цитатный план ещё не построен</strong> для этого кейса.
                 Будет построен автоматически после fit chain.
               </p>
             </SectionCard>
@@ -582,34 +582,34 @@ export function DossierView({ caseId }: Props) {
 
           {dossier.compliance_checklist ? (
             <SectionCard
-              title={`Compliance checklist — статус: ${dossier.compliance_checklist.status}`}
+              title={`Чеклист соответствия — статус: ${dossier.compliance_checklist.status}`}
             >
               <ComplianceChecklistSection checklist={dossier.compliance_checklist} />
             </SectionCard>
           ) : (
-            <SectionCard title="Compliance checklist">
+            <SectionCard title="Чеклист соответствия">
               <p className="placeholder-note">
-                <strong>Compliance checklist not built yet</strong> для этого case.
+                <strong>Чеклист соответствия ещё не построен</strong> для этого кейса.
               </p>
             </SectionCard>
           )}
 
           {dossier.submission_pack ? (
             <SectionCard
-              title={`Submission pack readiness — ${dossier.submission_pack.ready_status}`}
+              title={`Готовность пакета подачи — ${dossier.submission_pack.ready_status}`}
             >
               <SubmissionPackSection pack={dossier.submission_pack} />
             </SectionCard>
           ) : (
-            <SectionCard title="Submission pack">
+            <SectionCard title="Пакет подачи">
               <p className="placeholder-note">
-                <strong>Submission pack not built yet</strong> для этого case.
+                <strong>Пакет подачи ещё не построен</strong> для этого кейса.
               </p>
             </SectionCard>
           )}
 
           {Object.keys(dossier.quality_gates).length > 0 && (
-            <SectionCard title="Quality Gates">
+            <SectionCard title="Контрольные точки">
               {Object.entries(dossier.quality_gates).map(([gateId, gate]) => (
                 <div key={gateId} className="dossier-gate-row">
                   <span className={`gate-chip gate-${gate.status}`}>
@@ -622,7 +622,7 @@ export function DossierView({ caseId }: Props) {
 
           {/* V2-C: explicit next-action block computed from dossier shape.
               No new state on case — pure derivation. */}
-          <SectionCard title="Next action">
+          <SectionCard title="Следующее действие">
             <NextActionBlock dossier={dossier} />
           </SectionCard>
         </div>
@@ -639,15 +639,15 @@ export function DossierView({ caseId }: Props) {
 function NextActionBlock({ dossier }: { dossier: Dossier }) {
   const steps: { label: string; status: 'done' | 'pending'; note?: string }[] = [];
   steps.push({
-    label: 'Article model built',
+    label: 'Модель статьи построена',
     status: dossier.article_model ? 'done' : 'pending',
   });
   steps.push({
-    label: 'Venue selected',
+    label: 'Площадка выбрана',
     status: dossier.selected_venue ? 'done' : 'pending',
   });
   steps.push({
-    label: 'Scenario provided',
+    label: 'Сценарий задан',
     status: (dossier.scenario && !dossier.scenario.scenario_preliminary)
       ? 'done' : 'pending',
     note: dossier.scenario?.scenario_preliminary
@@ -655,12 +655,12 @@ function NextActionBlock({ dossier }: { dossier: Dossier }) {
       : undefined,
   });
   steps.push({
-    label: 'Fit matrix built',
+    label: 'Fit-матрица построена',
     status: (dossier.fit_assessment && dossier.fit_assessment.axes
       && dossier.fit_assessment.axes.length > 0) ? 'done' : 'pending',
   });
   steps.push({
-    label: 'Mismatch narrator filled',
+    label: 'Нарратив расхождений заполнен',
     status: (dossier.mismatch_map?.narrator_coverage?.narrator_status === 'filled'
       || dossier.mismatch_map?.narrator_coverage?.narrator_status === 'partial')
       ? 'done' : 'pending',
@@ -671,37 +671,37 @@ function NextActionBlock({ dossier }: { dossier: Dossier }) {
       : undefined,
   });
   steps.push({
-    label: 'Risk report built',
+    label: 'Отчёт о рисках построен',
     status: dossier.risk_report ? 'done' : 'pending',
   });
   steps.push({
-    label: 'Rewrite plan built',
+    label: 'План переработки построен',
     status: (dossier.rewrite_plan && dossier.rewrite_plan.changes.length > 0)
       ? 'done' : 'pending',
   });
   // V2-E bibliography step (priority — gates citation/compliance/pack)
   const bp = dossier.bibliography_profile;
   steps.push({
-    label: 'Bibliography profile',
+    label: 'Библиографический профиль',
     status: (bp && ['parsed_structural', 'partial'].includes(bp.status))
       ? 'done' : 'pending',
     note: !bp
-      ? 'not built yet'
+      ? 'ещё не построен'
       : bp.status === 'unknown'
-      ? 'raw text unavailable — provide manuscript'
+      ? 'исходный текст недоступен — предоставьте рукопись'
       : bp.status === 'not_found'
-      ? 'add References / Bibliography / Список литературы section'
+      ? 'добавьте раздел References / Bibliography / Список литературы'
       : bp.status === 'present_unparsed'
-      ? 'heading found but no refs parsed — check formatting'
+      ? 'заголовок найден, но ссылки не распарсены — проверьте форматирование'
       : bp.status === 'malformed'
-      ? `${bp.malformed_count}/${bp.reference_count} refs malformed`
+      ? `${bp.malformed_count}/${bp.reference_count} ссылок с ошибками`
       : bp.verification_status !== 'verified'
-      ? `parsed (${bp.reference_count} refs, ${bp.doi_count} DOI); external verification pending`
+      ? `распарсено (${bp.reference_count} ссылок, ${bp.doi_count} DOI); внешняя верификация ожидается`
       : undefined,
   });
   // V2-D real lanes
   steps.push({
-    label: 'Citation plan',
+    label: 'Цитатный план',
     status: (dossier.citation_plan
       && ['partially_ready', 'search_tasks_ready', 'draft'].includes(dossier.citation_plan.status))
       ? 'done' : 'pending',
@@ -714,14 +714,14 @@ function NextActionBlock({ dossier }: { dossier: Dossier }) {
       : undefined,
   });
   steps.push({
-    label: 'Compliance checklist',
+    label: 'Чеклист соответствия',
     status: dossier.compliance_checklist?.status === 'ready' ? 'done' : 'pending',
     note: dossier.compliance_checklist
       ? `статус ${dossier.compliance_checklist.status} (${dossier.compliance_checklist.missing_items.length} missing, ${dossier.compliance_checklist.unknowns.length} unknown)`
       : undefined,
   });
   steps.push({
-    label: 'Submission pack readiness',
+    label: 'Готовность пакета подачи',
     status: dossier.submission_pack?.ready_status === 'ready_for_manual_submission'
       ? 'done' : 'pending',
     note: dossier.submission_pack
@@ -738,9 +738,9 @@ function NextActionBlock({ dossier }: { dossier: Dossier }) {
     primary = packNext[0];
   } else if (!firstPending) {
     primary = 'Все основные секции построены. Откройте Risk и Rewrite plan и решите, какие изменения принять.';
-  } else if (firstPending.label === 'Scenario provided') {
+  } else if (firstPending.label === 'Сценарий задан') {
     primary = 'Заполните SubmissionScenario (цель, дедлайн, риск-толерантность, APC max) — это уточнит fit-вердикт.';
-  } else if (firstPending.label === 'Mismatch narrator filled' && firstPending.note) {
+  } else if (firstPending.label === 'Нарратив расхождений заполнен' && firstPending.note) {
     primary = firstPending.note;
   } else {
     primary = `Следующий шаг: ${firstPending.label.toLowerCase()}.`;
@@ -804,12 +804,12 @@ function CitationPlanSection({ plan }: { plan: CitationPlanV2D }) {
           уже доступны.
         </div>
       )}
-      <KVRow label="Bibliography status" value={plan.current_bibliography_status} />
-      <KVRow label="Venue citation expectation" value={plan.venue_citation_expectation_status} />
+      <KVRow label="Статус библиографии" value={plan.current_bibliography_status} />
+      <KVRow label="Цитатные ожидания площадки" value={plan.venue_citation_expectation_status} />
 
       {plan.citation_gap_categories.length > 0 && (
         <div className="lane-list-block">
-          <strong>Citation gap categories ({plan.citation_gap_categories.length}):</strong>
+          <strong>Категории цитатных пробелов ({plan.citation_gap_categories.length}):</strong>
           <ul>
             {plan.citation_gap_categories.map((g, i) => <li key={i}>{g}</li>)}
           </ul>
@@ -817,7 +817,7 @@ function CitationPlanSection({ plan }: { plan: CitationPlanV2D }) {
       )}
       {plan.missing_bridge_categories.length > 0 && (
         <div className="lane-list-block">
-          <strong>Missing bridge categories ({plan.missing_bridge_categories.length}):</strong>
+          <strong>Недостающие мостовые категории ({plan.missing_bridge_categories.length}):</strong>
           <ul>
             {plan.missing_bridge_categories.map((g, i) => <li key={i}>{g}</li>)}
           </ul>
@@ -825,7 +825,7 @@ function CitationPlanSection({ plan }: { plan: CitationPlanV2D }) {
       )}
       {plan.recommended_reference_search_tasks.length > 0 && (
         <div className="lane-list-block">
-          <strong>Search tasks ({plan.recommended_reference_search_tasks.length}):</strong>
+          <strong>Задачи поиска ({plan.recommended_reference_search_tasks.length}):</strong>
           <ul>
             {plan.recommended_reference_search_tasks.map((t, i) => <li key={i}>{t}</li>)}
           </ul>
@@ -833,7 +833,7 @@ function CitationPlanSection({ plan }: { plan: CitationPlanV2D }) {
       )}
       {plan.verification_tasks.length > 0 && (
         <div className="lane-list-block">
-          <strong>Verification tasks ({plan.verification_tasks.length}):</strong>
+          <strong>Задачи верификации ({plan.verification_tasks.length}):</strong>
           <ul>
             {plan.verification_tasks.map((t, i) => <li key={i}>{t}</li>)}
           </ul>
@@ -841,7 +841,7 @@ function CitationPlanSection({ plan }: { plan: CitationPlanV2D }) {
       )}
       {plan.dangerous_padding_warnings.length > 0 && (
         <div className="lane-warning-block" role="alert">
-          <strong>⚠ Padding warning:</strong>
+          <strong>⚠ Предупреждение о подтасовке:</strong>
           <ul>
             {plan.dangerous_padding_warnings.map((w, i) => <li key={i}>{w}</li>)}
           </ul>
@@ -849,7 +849,7 @@ function CitationPlanSection({ plan }: { plan: CitationPlanV2D }) {
       )}
       {plan.unknowns.length > 0 && (
         <div className="lane-unknowns">
-          <strong>Unknowns ({plan.unknowns.length}):</strong>
+          <strong>Неизвестные ({plan.unknowns.length}):</strong>
           <ul>
             {plan.unknowns.map((u, i) => <li key={i}>{u}</li>)}
           </ul>
@@ -953,8 +953,8 @@ function SubmissionPackSection({ pack }: { pack: SubmissionPackV2D }) {
       </div>
       <p className="lane-disclaimer">
         <em>
-          ⚠ This is a readiness skeleton, not final submission automation.
-          No portal-specific fields, no auto-generated cover letter.
+          ⚠ Это скелет готовности, не финальная автоматизация подачи.
+          Нет полей для конкретного портала, нет автогенерации сопроводительного письма.
         </em>
       </p>
       {pack.blocking_issues.length > 0 && (
@@ -1018,27 +1018,27 @@ function BibliographyProfileSection({ bp }: { bp: BibliographyProfileV2E }) {
           {bp.reference_count} refs · {bp.doi_count} DOI · {bp.url_count} URL
         </span>
       </div>
-      <KVRow label="Section detected" value={String(bp.bibliography_section_detected)} />
-      <KVRow label="Raw text available" value={String(bp.bibliography_text_available)} />
-      <KVRow label="Source" value={bp.source} />
+      <KVRow label="Секция найдена" value={String(bp.bibliography_section_detected)} />
+      <KVRow label="Сырой текст доступен" value={String(bp.bibliography_text_available)} />
+      <KVRow label="Источник" value={bp.source} />
       {(bp.year_min || bp.year_max) && (
-        <KVRow label="Year range" value={`${bp.year_min ?? '?'} – ${bp.year_max ?? '?'}`} />
+        <KVRow label="Диапазон годов" value={`${bp.year_min ?? '?'} – ${bp.year_max ?? '?'}`} />
       )}
       {bp.parsed_reference_count !== bp.reference_count && (
         <KVRow
-          label="Parsed / total"
-          value={`${bp.parsed_reference_count} / ${bp.reference_count} (unparsed: ${bp.unparsed_reference_count})`}
+          label="Распарсено / всего"
+          value={`${bp.parsed_reference_count} / ${bp.reference_count} (нераспарсено: ${bp.unparsed_reference_count})`}
         />
       )}
       {bp.malformed_count > 0 && (
-        <KVRow label="Malformed" value={bp.malformed_count} />
+        <KVRow label="Повреждённых" value={bp.malformed_count} />
       )}
       {bp.duplicate_suspect_count > 0 && (
-        <KVRow label="Duplicate suspects" value={bp.duplicate_suspect_count} />
+        <KVRow label="Подозрения на дубликаты" value={bp.duplicate_suspect_count} />
       )}
       {bp.warnings.length > 0 && (
         <div className="lane-warning-block" role="alert">
-          <strong>Warnings ({bp.warnings.length}):</strong>
+          <strong>Предупреждения ({bp.warnings.length}):</strong>
           <ul>{bp.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
         </div>
       )}
@@ -1082,10 +1082,10 @@ function BibliographyProfileSection({ bp }: { bp: BibliographyProfileV2E }) {
       )}
       <p className="lane-disclaimer">
         <em>
-          Structural bibliography profile. References are not externally
-          verified unless marked so. No titles / authors / DOIs are
-          invented; only what was extractable by regex from the supplied
-          text.
+          Структурный библиографический профиль. Ссылки не проверены
+          из внешних источников, если не отмечено обратное. Названия / авторы / DOI
+          не придуманы; только то, что удалось извлечь регулярными выражениями
+          из предоставленного текста.
         </em>
       </p>
     </div>

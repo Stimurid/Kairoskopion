@@ -1,19 +1,19 @@
 import type { RewriteChange } from '../types/domain';
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  pending: { label: 'Pending', className: 'rw-pending' },
-  accepted: { label: 'Accepted', className: 'rw-accepted' },
-  rejected: { label: 'Rejected', className: 'rw-rejected' },
-  deferred: { label: 'Deferred', className: 'rw-deferred' },
-  blocked: { label: 'Blocked', className: 'rw-blocked' },
+  pending: { label: 'Ожидает', className: 'rw-pending' },
+  accepted: { label: 'Принято', className: 'rw-accepted' },
+  rejected: { label: 'Отклонено', className: 'rw-rejected' },
+  deferred: { label: 'Отложено', className: 'rw-deferred' },
+  blocked: { label: 'Заблокировано', className: 'rw-blocked' },
 };
 
 const CORE_RISK_CONFIG: Record<string, { label: string; className: string }> = {
-  core_preserving: { label: 'Core safe', className: 'core-preserving' },
-  core_touching: { label: 'Core touched', className: 'core-touching' },
-  core_transforming: { label: 'Core at risk', className: 'core-transforming' },
-  core_destroying_risk: { label: 'Core threat', className: 'core-destroying' },
-  unknown_core_impact: { label: 'Unknown', className: 'core-unknown' },
+  core_preserving: { label: 'Ядро в безопасности', className: 'core-preserving' },
+  core_touching: { label: 'Ядро затронуто', className: 'core-touching' },
+  core_transforming: { label: 'Ядро под угрозой', className: 'core-transforming' },
+  core_destroying_risk: { label: 'Угроза ядру', className: 'core-destroying' },
+  unknown_core_impact: { label: 'Неизвестно', className: 'core-unknown' },
 };
 
 interface Props {
@@ -43,13 +43,13 @@ export function RewriteTaskCard({ change, onDecision, disabled }: Props) {
 
       {change._blocked_reason && (
         <div className="rw-blocked-reason">
-          Blocked: {change._blocked_reason}
+          Заблокировано: {change._blocked_reason}
         </div>
       )}
 
       {change._matched_core_elements && change._matched_core_elements.length > 0 && (
         <div className="rw-core-matches">
-          <span className="rw-core-label">Touches core:</span>
+          <span className="rw-core-label">Затрагивает ядро:</span>
           {change._matched_core_elements.map((el, i) => (
             <span key={i} className="rw-core-chip">{el}</span>
           ))}
@@ -63,21 +63,21 @@ export function RewriteTaskCard({ change, onDecision, disabled }: Props) {
             onClick={() => onDecision(change.change_id, 'accept')}
             disabled={disabled}
           >
-            Accept
+            Принять
           </button>
           <button
             className="btn btn-sm rw-btn-reject"
             onClick={() => onDecision(change.change_id, 'reject')}
             disabled={disabled}
           >
-            Reject
+            Отклонить
           </button>
           <button
             className="btn btn-sm rw-btn-defer"
             onClick={() => onDecision(change.change_id, 'defer')}
             disabled={disabled}
           >
-            Defer
+            Отложить
           </button>
         </div>
       )}

@@ -34,10 +34,10 @@ const KIND_BG: Record<AgentKind, string> = {
 };
 
 const KIND_LABELS: Record<AgentKind, string> = {
-  llm: 'LLM Agent',
-  orphaned: 'Orphaned Prompt',
-  stub: 'Contract-Only Stub',
-  deterministic: 'Deterministic',
+  llm: 'LLM-агент',
+  orphaned: 'Осиротевший промпт',
+  stub: 'Только контракт',
+  deterministic: 'Детерминированный',
 };
 
 // --- Prompt section detection (SOP / Agentum) ---
@@ -131,7 +131,7 @@ export function AgentMap() {
         setActiveWorkflow(result.workflows[0].workflow_id);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load agent map');
+      setError(e instanceof Error ? e.message : 'Не удалось загрузить карту агентов');
     } finally {
       setLoading(false);
     }
@@ -163,14 +163,14 @@ export function AgentMap() {
   }, [data]);
 
   if (loading) {
-    return <div className="agent-map-loading">Loading agent map...</div>;
+    return <div className="agent-map-loading">Загрузка карты агентов…</div>;
   }
 
   if (error) {
     return (
       <div className="agent-map-error">
         <p>{error}</p>
-        <button className="btn btn-primary" onClick={loadData}>Retry</button>
+        <button className="btn btn-primary" onClick={loadData}>Повторить</button>
       </div>
     );
   }
@@ -182,8 +182,8 @@ export function AgentMap() {
       {/* Header with stats and refresh */}
       <div className="agent-map-header">
         <div className="agent-map-title">
-          <h2>Agent Architecture Map</h2>
-          <button className="btn btn-small" onClick={loadData} title="Refresh">↻ Refresh</button>
+          <h2>Карта архитектуры агентов</h2>
+          <button className="btn btn-small" onClick={loadData} title="Обновить">↻ Обновить</button>
         </div>
         <div className="agent-map-stats">
           <span className="agent-map-stat">
@@ -203,7 +203,7 @@ export function AgentMap() {
             {data.agents.filter(a => classifyAgent(a) === 'deterministic').length} Deterministic
           </span>
           <span className="agent-map-stat agent-map-stat--llm-status">
-            LLM: {(data.llm as Record<string, string>)?.status === 'configured' ? '● Active' : '○ Off'}
+            LLM: {(data.llm as Record<string, string>)?.status === 'configured' ? '● Активен' : '○ Выкл'}
           </span>
         </div>
       </div>
@@ -225,7 +225,7 @@ export function AgentMap() {
           className={`workflow-tab ${activeWorkflow === '__all__' ? 'workflow-tab--active' : ''}`}
           onClick={() => setActiveWorkflow('__all__')}
         >
-          All Agents (by layer)
+          Все агенты (по слоям)
         </button>
       </div>
 
@@ -507,7 +507,7 @@ function AgentDetailCard({
                   className="btn btn-small btn-prompt"
                   onClick={() => onShowPrompt(p)}
                 >
-                  Show Prompt
+                  Показать промпт
                 </button>
               </div>
             ))}

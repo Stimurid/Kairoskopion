@@ -52,24 +52,24 @@ const ACCEPTED_EXTENSIONS = '.pdf,.docx,.doc,.txt,.md,.html,.htm,.rtf,.json';
 const FORMAT_LABEL = 'PDF, DOCX, TXT, MD, HTML, RTF';
 
 const TYPE_LABELS: Record<string, string> = {
-  auto: 'Auto-detect',
-  article: 'Article / Abstract',
-  venue: 'Journal / Venue',
-  review_letter: 'Review Letter',
+  auto: 'Авто',
+  article: 'Статья / Аннотация',
+  venue: 'Журнал / Площадка',
+  review_letter: 'Рецензия',
 };
 
 const TYPE_ICONS: Record<string, string> = {
-  abstract: 'Abstract detected',
-  manuscript: 'Manuscript detected',
-  article: 'Article text detected',
-  venue: 'Venue / journal text detected',
-  review_letter: 'Review letter detected',
+  abstract: 'Обнаружена аннотация',
+  manuscript: 'Обнаружена рукопись',
+  article: 'Обнаружен текст статьи',
+  venue: 'Обнаружен текст о журнале',
+  review_letter: 'Обнаружено рецензионное письмо',
 };
 
 const SEARCH_DEPTH_LABELS: Record<string, { label: string; desc: string }> = {
-  none: { label: 'No search', desc: 'LLM only, no web queries' },
-  light: { label: 'Light search', desc: '3-5 queries for top unknowns' },
-  deep: { label: 'Deep search', desc: 'Multiple rounds, verification' },
+  none: { label: 'Без поиска', desc: 'Только LLM, без веб-запросов' },
+  light: { label: 'Лёгкий поиск', desc: '3–5 запросов по главным неизвестным' },
+  deep: { label: 'Глубокий поиск', desc: 'Несколько раундов с верификацией' },
 };
 
 const REGION_LABELS: Record<string, { label: string; desc: string }> = {
@@ -137,10 +137,10 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
 
   return (
     <div className="intake-surface">
-      <h2 className="intake-title">What are you working on?</h2>
+      <h2 className="intake-title">Над чем работаете?</h2>
       <p className="intake-subtitle">
-        Paste text or upload a file ({FORMAT_LABEL}).
-        The system will classify what you provide and build the right model.
+        Вставьте текст или загрузите файл ({FORMAT_LABEL}).
+        Система классифицирует вход и построит нужную модель.
       </p>
 
       <div className="intake-type-selector" role="radiogroup" aria-label="Input type">
@@ -158,7 +158,7 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
       </div>
 
       <div className="intake-search-depth" role="radiogroup" aria-label="Web search depth">
-        <span className="intake-search-label">Web enrichment:</span>
+        <span className="intake-search-label">Веб-обогащение:</span>
         {(['none', 'light', 'deep'] as const).map((d) => (
           <button
             key={d}
@@ -199,7 +199,7 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
           <button
             className="intake-file-remove"
             onClick={() => setSelectedFile(null)}
-            aria-label="Remove file"
+            aria-label="Убрать файл"
           >
             ✕
           </button>
@@ -216,7 +216,7 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Paste your text here..."
+            placeholder="Вставьте текст сюда…"
             rows={10}
             disabled={isLoading}
             aria-label="Input text"
@@ -235,10 +235,10 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
               disabled={isLoading}
               type="button"
             >
-              Upload file
+              Загрузить файл
             </button>
             <span className="intake-file-formats">
-              or drag & drop — {FORMAT_LABEL}
+              или перетащите — {FORMAT_LABEL}
             </span>
           </div>
         </div>
@@ -257,12 +257,12 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
           {selectedFile
             ? selectedFile.name
             : text.length === 0
-              ? 'Ctrl+Enter to submit'
+              ? 'Ctrl+Enter для отправки'
               : text.length > INTAKE_HARD_CAP
                 ? `${text.length.toLocaleString('ru-RU')} символов — превышает максимум ${INTAKE_HARD_CAP.toLocaleString('ru-RU')}. Сократите вход.`
                 : text.length > LLM_SOFT_CAP
                   ? `${text.length.toLocaleString('ru-RU')} символов — LLM получит только первые ${LLM_SOFT_CAP.toLocaleString('ru-RU')}; остальное в анализ не пойдёт. Сократите вход или разбейте на части.`
-                  : `${text.length} characters`}
+                  : `${text.length} символов`}
         </span>
         <button
           className="btn btn-primary"
@@ -273,7 +273,7 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
             text.length > INTAKE_HARD_CAP
           }
         >
-          {isLoading ? 'Analyzing...' : 'Analyze'}
+          {isLoading ? 'Анализ…' : 'Анализировать'}
         </button>
       </div>
 
@@ -289,7 +289,7 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
             {lastResult.classification.reasoning}
           </div>
           <div className="intake-classification-action">
-            Выберите тип вручную чипом выше и нажмите Analyze ещё раз.
+            Выберите тип вручную чипом выше и нажмите «Анализировать» ещё раз.
           </div>
         </div>
       )}
@@ -299,7 +299,7 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
           <span className="intake-result-type">
             {TYPE_ICONS[lastResult.input_type] || `Detected: ${lastResult.input_type}`}
           </span>
-          <span className="intake-result-length">{lastResult.text_length} chars</span>
+          <span className="intake-result-length">{lastResult.text_length} симв.</span>
           {lastResult.filename && (
             <span className="intake-result-badge">
               {lastResult.filename}
@@ -307,12 +307,12 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
           )}
           {lastResult.article_model_built && (
             <span className="intake-result-badge intake-result-badge--success">
-              Article model built
+              Модель статьи построена
             </span>
           )}
           {lastResult.venue_investigated && (
             <span className="intake-result-badge intake-result-badge--success">
-              Venue profile built
+              Профиль журнала построен
             </span>
           )}
           {lastResult.input_truncated_for_llm?.truncated && (
@@ -330,7 +330,7 @@ export function IntakeSurface({ onSubmit, onFileSubmit, isLoading }: Props) {
               className="intake-result-badge intake-result-badge--warn"
               title="Venue profile built без LLM — это детерминистский fallback. Точность ограниченa."
             >
-              Venue: deterministic fallback
+              Журнал: детерминистский fallback
             </span>
           )}
         </div>

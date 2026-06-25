@@ -431,14 +431,14 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
         if (!articleModel) {
           return (
             <div className="loading-view">
-              <button className="btn btn-back" onClick={() => setActiveView('intake')}>← Back to Intake</button>
+              <button className="btn btn-back" onClick={() => setActiveView('intake')}>← Назад к вводу</button>
               <button className="btn btn-primary" onClick={async () => {
                 try {
                   const am = await api.getArticleModel(caseId);
                   setArticleModel(am);
                 } catch { setActiveView('intake'); }
               }}>
-                Load Article Model
+                Загрузить модель статьи
               </button>
             </div>
           );
@@ -470,7 +470,39 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
                 caseId={caseId}
                 kind="article"
                 onBack={() => setActiveView('intake')}
-                onConfirm={() => handleConfirmArticle(articleModel.protected_core || [], {})}
+                onConfirm={(decisions, overrides, blockComments, textEvidence) => {
+                  const corrections: Record<string, string> = {};
+                  if (decisions) {
+                    for (const [blockId, decision] of Object.entries(decisions)) {
+                      if (decision === 'rejected') {
+                        corrections[`_block_rejected_${blockId}`] = 'rejected';
+                      }
+                    }
+                  }
+                  if (overrides) {
+                    for (const [fieldPath, value] of Object.entries(overrides)) {
+                      corrections[fieldPath] = value;
+                    }
+                  }
+                  if (blockComments) {
+                    for (const [blockId, comment] of Object.entries(blockComments)) {
+                      if (comment.trim()) {
+                        corrections[`_block_comment_${blockId}`] = comment.trim();
+                      }
+                    }
+                  }
+                  if (textEvidence) {
+                    for (const ev of textEvidence) {
+                      const key = `_text_evidence_${ev.fieldPath}`;
+                      const existing = corrections[key];
+                      const snippet = ev.selectedText.slice(0, 500);
+                      corrections[key] = existing
+                        ? `${existing}\n---\n${snippet}`
+                        : snippet;
+                    }
+                  }
+                  handleConfirmArticle(articleModel.protected_core || [], corrections);
+                }}
               />
             ) : (
               <ArticleCard
@@ -495,7 +527,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
                   setPubRegime(result.publication_regime);
                 } catch { setActiveView('intake'); }
               }}>
-                Load Venue Profile
+                Загрузить профиль журнала
               </button>
             </div>
           );
@@ -553,7 +585,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
           return (
             <div className="loading-view">
               <button className="btn btn-primary" onClick={loadMismatchMap}>
-                Load Mismatch Map
+                Загрузить карту расхождений
               </button>
             </div>
           );
@@ -564,11 +596,11 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
         if (pathways.length === 0) {
           return (
             <div className="placeholder-view">
-              <button className="btn btn-back" onClick={() => setActiveView('scenario')}>← Back</button>
-              <h2>Disciplinary Pathways</h2>
-              <p>Possible academic worlds for your article.</p>
+              <button className="btn btn-back" onClick={() => setActiveView('scenario')}>← Назад</button>
+              <h2>Дисциплинарные пути</h2>
+              <p>Возможные академические миры для вашей статьи.</p>
               <button className="btn btn-primary" onClick={loadPathways} disabled={isLoading}>
-                {isLoading ? 'Mapping...' : 'Map Pathways'}
+                {isLoading ? 'Строим карту…' : 'Построить пути'}
               </button>
             </div>
           );
@@ -600,10 +632,10 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
         if (!rewritePlan) {
           return (
             <div className="placeholder-view">
-              <h2>Adaptation Studio</h2>
-              <p>Review and decide on proposed changes to your manuscript.</p>
+              <h2>Студия адаптации</h2>
+              <p>Просмотрите и примите решения по предложенным изменениям рукописи.</p>
               <button className="btn btn-primary" onClick={loadAdaptationPlan} disabled={isLoading}>
-                {isLoading ? 'Loading...' : 'Load Adaptation Plan'}
+                {isLoading ? 'Загрузка…' : 'Загрузить план адаптации'}
               </button>
             </div>
           );
@@ -621,8 +653,8 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
       case 'submission_pack':
         return (
           <div className="placeholder-view">
-            <h2>Submission Pack</h2>
-            <p>Final submission package assembly — coming in a future phase.</p>
+            <h2>Пакет подачи</h2>
+            <p>Сборка финального пакета подачи — будет в следующей фазе.</p>
             <DecisionLog caseId={caseId} />
           </div>
         );
@@ -634,7 +666,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
         return (
           <div className="placeholder-view">
             <h2>{activeView.replace(/_/g, ' ')}</h2>
-            <p>This view will be implemented in upcoming phases.</p>
+            <p>Этот раздел будет реализован в следующих фазах.</p>
           </div>
         );
     }
@@ -649,15 +681,15 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
       />
 
       <div className="preliminary-banner" role="note">
-        <strong>Preliminary positioning</strong> — this is not a submission
-        recommendation. Outputs are evidence-traceable hypotheses, not
-        decisions. Unknowns are marked explicitly.
+        <strong>Предварительное позиционирование</strong> — это не рекомендация к подаче.
+        Выходные данные — прослеживаемые гипотезы, а не решения.
+        Неизвестные отмечены явно.
       </div>
 
       {error && (
         <div className="error-banner" role="alert">
           <span>{error}</span>
-          <button onClick={() => setError(null)} aria-label="Dismiss error">&times;</button>
+          <button onClick={() => setError(null)} aria-label="Закрыть">&times;</button>
         </div>
       )}
 

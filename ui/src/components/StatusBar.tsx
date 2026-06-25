@@ -1,16 +1,16 @@
 import type { CaseStage } from '../types/domain';
 
 const STAGES: { key: string; label: string }[] = [
-  { key: 'intake',          label: 'Intake' },
-  { key: 'article_model',   label: 'Article' },
-  { key: 'scenario',        label: 'Scenario' },
-  { key: 'pathways',        label: 'Pathways' },
-  { key: 'venue_pool',      label: 'Venue Pool' },
-  { key: 'venue_selected',  label: 'Selected Venue' },
-  { key: 'fit_assessed',    label: 'Fit & Mismatch' },
-  { key: 'adapting',        label: 'Adaptation' },
-  { key: 'submission_pack', label: 'Pack' },
-  { key: 'dossier',         label: 'Dossier' },
+  { key: 'intake',          label: 'Ввод' },
+  { key: 'article_model',   label: 'Статья' },
+  { key: 'scenario',        label: 'Сценарий' },
+  { key: 'pathways',        label: 'Дисциплины' },
+  { key: 'venue_pool',      label: 'Пул журналов' },
+  { key: 'venue_selected',  label: 'Выбранный журнал' },
+  { key: 'fit_assessed',    label: 'Fit и расхождения' },
+  { key: 'adapting',        label: 'Адаптация' },
+  { key: 'submission_pack', label: 'Пакет' },
+  { key: 'dossier',         label: 'Досье' },
 ];
 
 interface Props {
@@ -23,7 +23,7 @@ export function StatusBar({ currentStage, objectsPresent, onStageClick }: Props)
   const currentIdx = STAGES.findIndex(s => s.key === currentStage);
 
   return (
-    <nav className="status-bar" aria-label="Case pipeline stages">
+    <nav className="status-bar" aria-label="Этапы пайплайна">
       {STAGES.map((s, i) => {
         const present = objectsPresent[s.key] ?? false;
         const isCurrent = currentStage === s.key;
@@ -40,7 +40,7 @@ export function StatusBar({ currentStage, objectsPresent, onStageClick }: Props)
               onClick={() => isReachable && onStageClick(s.key)}
               aria-current={isCurrent ? 'step' : undefined}
               aria-disabled={!isReachable}
-              title={present ? `${s.label}: data available` : isReachable ? s.label : `${s.label}: complete earlier stages first`}
+              title={present ? `${s.label}: данные доступны` : isReachable ? s.label : `${s.label}: сначала завершите предыдущие этапы`}
             >
               <span className="stage-indicator" aria-hidden="true">
                 {present ? '●' : '○'}

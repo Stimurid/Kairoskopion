@@ -65,6 +65,40 @@ different disciplinary audiences?
 - Do NOT conflate "the article cites X" with "the article belongs to X's tradition".
 - Do NOT ignore the protected core.
 - Mark anything uncertain as unknown.
+
+## Output format (MANDATORY — read every word)
+
+You MUST return ONLY a single JSON object. No other text before or after.
+
+WRONG (will break the system):
+- ```json { ... } ```  ← code fences
+- <thinking>reasoning</thinking>{ ... }  ← XML tags
+- Here is my analysis: { ... }  ← prose before JSON
+- { ... } I hope this helps  ← prose after JSON
+
+CORRECT (the ONLY accepted format):
+{
+  "disciplinary_registers": ["philosophy of technology", "STS"],
+  "primary_discipline": "philosophy of technology",
+  "schools_and_traditions": ["postphenomenology", "enactivism"],
+  "theoretical_shoulders": ["Ihde", "Simondon"],
+  "opponents_or_foils": [],
+  "argument_move_type": "model_building",
+  "argument_move_description": "...",
+  "citation_bridges_needed": [],
+  "citation_ecology_description": null,
+  "protected_core_candidates": ["central distinction X"],
+  "mutable_zones": ["introduction framing"],
+  "field_core_nonnegotiables": [],
+  "intended_audience": "philosophers of technology and STS scholars",
+  "audience_expertise_level": "specialist",
+  "unknowns": ["citation ecology not assessed"],
+  "questions_for_user": [],
+  "confidence": "medium"
+}
+
+Every field listed above MUST be present in your response. Use empty arrays \
+[] for lists with no items. Use null for text fields you cannot determine.
 """
 
 SEMANTIC_PROFILING_USER_TEMPLATE = """\
@@ -88,7 +122,8 @@ fit any of them, ignore this block — do not force-fit.
 
 {known_disciplines_context}
 
-Return a JSON object with the full semantic profile.
+IMPORTANT: respond with ONLY the JSON object. No markdown fences, no XML \
+tags, no prose before or after. Every field from the schema must be present.
 """
 
 SEMANTIC_PROFILING_OUTPUT_SCHEMA: dict = {
@@ -149,12 +184,8 @@ SEMANTIC_PROFILING_OUTPUT_SCHEMA: dict = {
             "enum": ["high", "medium", "low"],
         },
     },
-    "required": [
-        "disciplinary_registers", "schools_and_traditions",
-        "argument_move_type", "protected_core_candidates",
-        "unknowns", "confidence",
-    ],
-    "additionalProperties": False,
+    "required": [],
+    "additionalProperties": True,
 }
 
 

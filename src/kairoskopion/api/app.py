@@ -466,6 +466,58 @@ def confirm_article_model(
 
 
 # ---------------------------------------------------------------------------
+# Source text (for text-evidence binding in the UI)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/cases/{case_id}/source-text")
+def get_source_text(case: Case = Depends(_user_case)):
+    """Return the preserved article input text for text-evidence binding."""
+    text = case.article_input_text or case.input_text or ""
+    if not text:
+        raise HTTPException(404, "No source text available on this case")
+    return {"text": text, "char_count": len(text)}
+
+
+# ---------------------------------------------------------------------------
+# M-8: LLM refinement dialog
+# ---------------------------------------------------------------------------
+
+
+class RefineRequest(BaseModel):
+    message: str
+
+
+@app.post("/cases/{case_id}/article-model/refine")
+def refine_article_model(
+    req: RefineRequest, case: Case = Depends(_user_case),
+):
+    if not case.article_model:
+        raise HTTPException(400, "Article model not built yet")
+    result = case.refine_article_model(req.message)
+    store.save(case)
+    return result
+
+
+@app.get("/cases/{case_id}/article-model/refinement-chat")
+def get_refinement_chat(case: Case = Depends(_user_case)):
+    return case.get_refinement_chat()
+
+
+# ---------------------------------------------------------------------------
+# M-9: PromptCorrectionSignal — pattern detection from corrections
+# ---------------------------------------------------------------------------
+
+
+@app.get("/correction-signals")
+def get_correction_signals(min_occurrences: int = 3):
+    """Analyze CorrectionRegistry for recurring patterns."""
+    from .cases import CorrectionRegistry
+    signals = CorrectionRegistry.analyze_signals(min_occurrences=min_occurrences)
+    return {"signals": signals, "total": len(signals)}
+
+
+# ---------------------------------------------------------------------------
 # Human-readable model views (author-facing markdown)
 # ---------------------------------------------------------------------------
 
@@ -496,6 +548,7 @@ def get_article_model_human_view(case: Case = Depends(_user_case)):
         "markdown": article_model_human_view(
             article, pathways=pathways,
             semantic_profile=sem, fit_assessment=fit,
+            discipline_matches=case.discipline_matches,
         ),
     }
 

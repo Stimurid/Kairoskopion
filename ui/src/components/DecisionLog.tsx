@@ -64,7 +64,7 @@ export function DecisionLog({ caseId }: Props) {
   if (isLoading) {
     return (
       <div className="placeholder-view">
-        <p>Loading decision log...</p>
+        <p>Загрузка журнала решений…</p>
       </div>
     );
   }
@@ -72,8 +72,8 @@ export function DecisionLog({ caseId }: Props) {
   if (entries.length === 0) {
     return (
       <div className="decision-log-empty">
-        <h2>Decision Log</h2>
-        <p>No decisions recorded yet. Decisions are logged as you work through the case.</p>
+        <h2>Журнал решений</h2>
+        <p>Решений пока нет. Они записываются по мере работы над кейсом.</p>
       </div>
     );
   }
@@ -81,8 +81,8 @@ export function DecisionLog({ caseId }: Props) {
   return (
     <div className="decision-log">
       <div className="dlog-header">
-        <h2>Decision Log</h2>
-        <span className="dlog-count">{entries.length} decisions</span>
+        <h2>Журнал решений</h2>
+        <span className="dlog-count">{entries.length} решений</span>
       </div>
 
       <div className="dlog-timeline">

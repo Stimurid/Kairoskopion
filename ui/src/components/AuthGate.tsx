@@ -64,7 +64,7 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
       <div className="auth-card">
         <h1 className="auth-title">Kairoskopion</h1>
         <p className="auth-sub">
-          Publication-positioning cockpit — staging tester preview
+          Кокпит позиционирования публикаций — staging preview
         </p>
 
         <div className="auth-tabs" role="tablist">
@@ -75,7 +75,7 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
             className={`auth-tab ${mode === 'signup' ? 'auth-tab--active' : ''}`}
             onClick={() => { setMode('signup'); setError(null); }}
           >
-            Sign up
+            Регистрация
           </button>
           <button
             type="button"
@@ -84,20 +84,20 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
             className={`auth-tab ${mode === 'continue' ? 'auth-tab--active' : ''}`}
             onClick={() => { setMode('continue'); setError(null); }}
           >
-            Continue
+            Продолжить
           </button>
         </div>
 
         <form className="auth-form" onSubmit={onSubmit}>
           {mode === 'signup' && (
             <label className="auth-field">
-              <span className="auth-label">Display name *</span>
+              <span className="auth-label">Имя *</span>
               <input
                 className="auth-input"
                 type="text"
                 value={displayName}
                 onChange={e => setDisplayName(e.target.value)}
-                placeholder="e.g. Anna Researcher"
+                placeholder="Например: Анна Исследователь"
                 autoComplete="name"
                 disabled={busy}
                 required
@@ -107,7 +107,7 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
 
           <label className="auth-field">
             <span className="auth-label">
-              Email {mode === 'signup' ? '(optional)' : '*'}
+              Email {mode === 'signup' ? '(необязательно)' : '*'}
             </span>
             <input
               className="auth-input"
@@ -121,7 +121,7 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
             />
             {mode === 'signup' && (
               <span className="auth-hint">
-                Optional, but useful if you want to continue from another device.
+                Необязательно, но полезно если хотите продолжить с другого устройства.
               </span>
             )}
           </label>
@@ -136,15 +136,15 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
             disabled={busy}
           >
             {busy
-              ? 'Working…'
-              : mode === 'signup' ? 'Create workspace' : 'Continue'}
+              ? 'Подождите…'
+              : mode === 'signup' ? 'Создать рабочее пространство' : 'Продолжить'}
           </button>
         </form>
 
         <p className="auth-disclaimer">
-          This staging login has <strong>no password</strong> and{' '}
-          <strong>no email confirmation</strong>. Anyone who knows your email
-          can access your workspace. Use only with trusted testers.
+          Staging-вход <strong>без пароля</strong> и{' '}
+          <strong>без подтверждения email</strong>. Любой, кто знает ваш email,
+          получит доступ к рабочему пространству. Только для доверенных тестировщиков.
         </p>
       </div>
     </div>

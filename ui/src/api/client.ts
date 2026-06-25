@@ -194,6 +194,23 @@ export const api = {
       { protected_core: protectedCore, corrections },
     ),
 
+  // Refinement dialog (M-8)
+  refineArticleModel: (id: string, message: string) =>
+    post<{ reply: string; suggestions: { field: string; value: string; reason: string }[]; llm_available: boolean }>(
+      `/cases/${id}/article-model/refine`,
+      { message },
+    ),
+  getRefinementChat: (id: string) =>
+    get<{ role: string; content: string; suggestions?: { field: string; value: string; reason: string }[]; timestamp: string }[]>(
+      `/cases/${id}/article-model/refinement-chat`,
+    ),
+
+  // Correction signals (M-9)
+  getCorrectionSignals: (minOccurrences = 3) =>
+    get<{ signals: { type: string; field?: string; block_id?: string; correction_count?: number; rejection_count?: number; most_common_override?: string; severity: string; message: string }[]; total: number }>(
+      `/correction-signals?min_occurrences=${minOccurrences}`,
+    ),
+
   // Scenario
   getScenario: (id: string) => get<SubmissionScenario>(`/cases/${id}/scenario`),
   setScenario: (id: string, data: Record<string, unknown>) =>

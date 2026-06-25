@@ -42,12 +42,22 @@ GENRE_PROSE: dict[str, str] = {
         "теоретический аргумент — выстраивает конструкцию рассуждения и "
         "выводит общий тезис, а не описывает данные"
     ),
+    "research_article": (
+        "исследовательская статья — сообщает результат конкретного "
+        "исследования с методом, данными и выводами"
+    ),
     "empirical_paper": (
         "эмпирическая статья — представляет данные, метод и результат "
         "конкретного исследования"
     ),
+    "conceptual_article": (
+        "концептуальная статья — вводит или переосмысляет понятие"
+    ),
     "case_study": (
         "кейс-стади — анализ одного случая, события, объекта"
+    ),
+    "review": (
+        "обзорная статья — синтез существующей литературы по теме"
     ),
     "review_article": (
         "обзорная статья — синтез существующей литературы по теме"
@@ -56,32 +66,61 @@ GENRE_PROSE: dict[str, str] = {
         "систематический обзор — структурированный сбор и оценка "
         "опубликованных работ по протоколу"
     ),
+    "position_paper": (
+        "позиционная статья — заявление позиции автора по дискуссии"
+    ),
     "commentary": (
         "комментарий — реплика на чужую работу или событие в поле"
     ),
-    "position_paper": (
-        "позиционная статья — заявление позиции автора по дискуссии"
+    "conference_paper": (
+        "конференционный доклад — текст, подготовленный для выступления "
+        "на конференции или симпозиуме"
+    ),
+    "forum_piece": (
+        "форумная публикация — вклад в дискуссионную рубрику журнала"
+    ),
+    "book_symposium_piece": (
+        "симпозиум по книге — реплика в рамках коллективного обсуждения "
+        "одной книги"
     ),
     "methods_paper": (
         "методологическая статья — представляет метод или инструмент"
     ),
     "book_review": "рецензия на книгу",
     "short_communication": "короткое сообщение",
-    "conceptual_article": (
-        "концептуальная статья — вводит или переосмысляет понятие"
-    ),
     "essay": "эссе свободной формы",
+    "unknown": "жанр пока не определён системой",
 }
 
 METHOD_PROSE: dict[str, str] = {
+    "no_method": (
+        "методом в эмпирическом смысле не пользуется — текст не опирается "
+        "на данные или воспроизводимую процедуру"
+    ),
     "no_method_continental_argument": (
         "методом в эмпирическом смысле не пользуется — это континентальный "
         "философский аргумент, который не опирается на данные или процедуру"
+    ),
+    "implicit_method": (
+        "метод не назван явно, но угадывается из способа работы с материалом"
     ),
     "conceptual_method": (
         "использует концептуальный метод — строит понятийную работу: "
         "различения, реконструкцию, переопределение"
     ),
+    "empirical_method": (
+        "использует эмпирический метод — работает с данными, наблюдениями "
+        "или экспериментом"
+    ),
+    "case_based": (
+        "работает через разбор случаев (кейсов) — анализирует конкретные "
+        "примеры, ситуации или практики"
+    ),
+    "review_method": (
+        "обзорный метод — систематически собирает и анализирует существующую "
+        "литературу по теме"
+    ),
+    "mixed": "смешанные методы — сочетает несколько подходов",
     "textual_analysis": "опирается на работу с текстами / источниками",
     "interpretive_method": "интерпретативный метод",
     "comparative_method": "сравнительный метод",
@@ -95,6 +134,36 @@ METHOD_PROSE: dict[str, str] = {
 }
 
 NOVELTY_PROSE: dict[str, str] = {
+    "new_object": (
+        "вводит новый объект исследования — обращает внимание на то, "
+        "что ранее не рассматривалось как предмет анализа"
+    ),
+    "new_theory": (
+        "формулирует новую теорию или модель"
+    ),
+    "new_method": (
+        "предлагает новый метод или исследовательский инструмент"
+    ),
+    "new_application": (
+        "применяет существующий подход к новому материалу или области"
+    ),
+    "new_synthesis": (
+        "синтезирует существующие позиции, традиции или подходы "
+        "в новую целостную конструкцию"
+    ),
+    "critique": (
+        "критикует существующее положение, теорию или подход"
+    ),
+    "translation_between_fields": (
+        "переводит понятие или приём из одной области в другую"
+    ),
+    "case_contribution": (
+        "вносит вклад через разбор нового случая — обогащает понимание "
+        "известного явления конкретным примером"
+    ),
+    "empirical_finding": (
+        "представляет новое эмпирическое свидетельство или находку"
+    ),
     "concept_introduction": (
         "вводит новое понятие или различение"
     ),
@@ -105,14 +174,8 @@ NOVELTY_PROSE: dict[str, str] = {
         "одновременно вводит новое различение и переосмысляет смежное "
         "существующее понятие"
     ),
-    "new_theory": (
-        "формулирует новую теорию или модель"
-    ),
     "new_evidence": (
         "представляет новое эмпирическое свидетельство"
-    ),
-    "translation_between_fields": (
-        "переводит понятие или приём из одной области в другую"
     ),
     "refutation": "опровергает существующее положение",
     "synthesis": "синтезирует существующие позиции",
@@ -303,6 +366,7 @@ def _section_kind(article: dict[str, Any]) -> str:
     else:
         body += "**Жанр.** Не определён.\n\n"
 
+    body += _field_anchor("article_model.method_status")
     if method_prose:
         body += f"**Способ работы.** {method_prose}.\n\n"
     elif method:
@@ -310,6 +374,7 @@ def _section_kind(article: dict[str, Any]) -> str:
     else:
         body += "**Способ работы.** Не определён.\n\n"
 
+    body += _field_anchor("article_model.novelty_mode")
     if novelty_prose:
         body += f"**Что нового.** Система видит, что текст {novelty_prose}.\n"
     elif novelty:
@@ -322,16 +387,18 @@ def _section_kind(article: dict[str, Any]) -> str:
 def _section_disciplines(
     article: dict[str, Any],
     pathways: list[dict[str, Any]] | None,
+    discipline_matches: dict[str, Any] | None = None,
 ) -> str:
     body = _h(2, "Дисциплинарные регистры", "article_model.disciplinary_registers")
     registers = article.get("disciplinary_registers") or []
+    matched = (discipline_matches or {}).get("matched") or []
 
     # NOTE: pathway-level LLM fallback warnings live in the aggregated
     # banner at the top of `article_model_human_view`, NOT here. This
     # keeps the section quiet on success and avoids double-rendering
     # when both article-level and pathway-level fallbacks fired.
 
-    if not pathways and not registers:
+    if not pathways and not registers and not matched:
         body += (
             "Дисциплинарные регистры пока не зафиксированы. Это значит "
             "система пока не предлагает дисциплинарный мир, в котором "
@@ -364,6 +431,19 @@ def _section_disciplines(
             "«Сильный» сигнал означает, что текст хорошо ложится в этот мир по "
             "доступным признакам; не означает, что нужно туда подавать._\n"
         )
+    elif matched:
+        body += (
+            "Полные публикационные траектории пока не построены, но "
+            "дисциплинарный матчер выявил позиционирование:\n\n"
+        )
+        for m in matched[:10]:
+            did = _safe_str(m.get("discipline_id")) or "без id"
+            strength = _safe_str(m.get("strength")) or "неизвестно"
+            why = _safe_str(m.get("why"))
+            body += f"- **{did}** — сигнал: {strength}.\n"
+            if why:
+                body += f"  _Почему_: {why}\n"
+        body += "\n"
     return body
 
 
@@ -544,6 +624,7 @@ def article_model_human_view(
     pathways: list[dict[str, Any]] | None = None,
     semantic_profile: dict[str, Any] | None = None,
     fit_assessment: dict[str, Any] | None = None,
+    discipline_matches: dict[str, Any] | None = None,
 ) -> str:
     """Render the 11-section author-facing markdown view of an ArticleModel.
 
@@ -561,7 +642,7 @@ def article_model_human_view(
       storage.
     """
     article = article or {}
-    title = _safe_str(article.get("title_current")) or "Untitled article"
+    title = _safe_str(article.get("title_current")) or "Статья без названия"
     lifecycle = _safe_str(article.get("lifecycle_status")) or "preliminary"
     extraction_attempt = article.get("extraction_attempt") or {}
 
@@ -622,7 +703,7 @@ def article_model_human_view(
     lines.append(_section_problem(article))
     lines.append(_section_claims(article))
     lines.append(_section_kind(article))
-    lines.append(_section_disciplines(article, pathways))
+    lines.append(_section_disciplines(article, pathways, discipline_matches))
     lines.append(_section_theory(article))
     lines.append(_section_protected_core(article))
     lines.append(_section_unknowns(article))

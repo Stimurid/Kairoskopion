@@ -53,6 +53,25 @@ _LABEL_MAP = {
     "not_enough_data": FitLabel.NOT_ENOUGH_DATA.value,
 }
 
+_AXIS_NORMALIZE: dict[str, str] = {
+    "topic_fit": "topic",
+    "discipline_fit": "discipline",
+    "genre_fit": "genre",
+    "argument_structure_fit": "argument_structure",
+    "method_fit": "method",
+    "citation_ecology_fit": "citation_ecology",
+    "novelty_positioning_fit": "novelty_positioning",
+    "language_register_fit": "language_register",
+    "audience_fit": "audience",
+    "formal_compliance_fit": "formal_compliance",
+    "author_eligibility_fit": "author_eligibility",
+    "publication_regime_fit": "publication_regime",
+    "timeline_fit": "timeline",
+    "apc_fit": "apc",
+    "strategic_value": "strategic_value",
+    "field_core_preservation_risk": "field_core_preservation_risk",
+}
+
 
 class FitAssessorAgent(AgentRole):
     role_id = "fit_assessor"
@@ -241,8 +260,10 @@ def _build_from_llm(
         )
         if isinstance(notes, list):
             notes = "; ".join(str(x) for x in notes)
+        raw_axis_name = ax.get("axis", "") or ax.get("name", "")
+        axis_name = _AXIS_NORMALIZE.get(raw_axis_name, raw_axis_name)
         axes.append({
-            "axis": ax.get("axis", "") or ax.get("name", ""),
+            "axis": axis_name,
             "value": value,
             "notes": str(notes),
             "evidence_refs": ax.get("evidence_refs", []) or [],

@@ -17,11 +17,11 @@ const SEVERITY_LABELS: Record<string, { label: string; className: string }> = {
 };
 
 const CORE_RISK_LABELS: Record<string, { label: string; className: string }> = {
-  core_preserving: { label: 'Core safe', className: 'core-preserving' },
-  core_touching: { label: 'Core touched', className: 'core-touching' },
-  core_transforming: { label: 'Core at risk', className: 'core-transforming' },
-  core_destroying_risk: { label: 'Core threat', className: 'core-destroying' },
-  unknown_core_impact: { label: 'Unknown impact', className: 'core-unknown' },
+  core_preserving: { label: 'Ядро в безопасности', className: 'core-preserving' },
+  core_touching: { label: 'Ядро затронуто', className: 'core-touching' },
+  core_transforming: { label: 'Ядро под угрозой', className: 'core-transforming' },
+  core_destroying_risk: { label: 'Угроза ядру', className: 'core-destroying' },
+  unknown_core_impact: { label: 'Неизвестно', className: 'core-unknown' },
 };
 
 function MismatchRow({ item }: { item: MismatchItem }) {
@@ -38,7 +38,7 @@ function MismatchRow({ item }: { item: MismatchItem }) {
       <p className="mismatch-description">{item.description}</p>
       <div className="mismatch-sides">
         <div className="mismatch-side">
-          <span className="side-label">Article</span>
+          <span className="side-label">Статья</span>
           <span className="side-value">
             {item.article_side || (
               <em className="side-value--unknown">сторона статьи не определена</em>
@@ -47,7 +47,7 @@ function MismatchRow({ item }: { item: MismatchItem }) {
         </div>
         <span className="mismatch-arrow" aria-hidden="true">&harr;</span>
         <div className="mismatch-side">
-          <span className="side-label">Venue</span>
+          <span className="side-label">Площадка</span>
           <span className="side-value">
             {item.venue_side || (
               // UI4 closure: backend now intentionally emits empty
@@ -62,7 +62,7 @@ function MismatchRow({ item }: { item: MismatchItem }) {
       </div>
       {item.possible_actions.length > 0 && (
         <div className="mismatch-actions">
-          <span className="actions-label">Possible actions:</span>
+          <span className="actions-label">Возможные действия:</span>
           <ul>
             {item.possible_actions.map((a, i) => (
               <li key={i}>{a}</li>
@@ -90,15 +90,15 @@ export function MismatchMapView({ mismatchMap, fitAssessment }: Props) {
   return (
     <div className="mismatch-map-view">
       <div className="mismatch-map-header">
-        <h2>Mismatch Map</h2>
+        <h2>Карта расхождений</h2>
         <div className="mismatch-summary-badges">
           {blockingCount > 0 && (
-            <span className="severity-badge severity-blocking">{blockingCount} blocking</span>
+            <span className="severity-badge severity-blocking">{blockingCount} блокирующих</span>
           )}
           {majorCount > 0 && (
-            <span className="severity-badge severity-major">{majorCount} major</span>
+            <span className="severity-badge severity-major">{majorCount} серьёзных</span>
           )}
-          <span className="mismatch-total">{sorted.length} total</span>
+          <span className="mismatch-total">{sorted.length} всего</span>
           <LLMAttemptBadge attempt={fitAssessment?.extraction_attempt} label="Fit LLM" />
         </div>
       </div>
@@ -119,7 +119,7 @@ export function MismatchMapView({ mismatchMap, fitAssessment }: Props) {
 
       {sorted.length === 0 ? (
         <div className="mismatch-empty">
-          <p>No mismatches detected between article and venue.</p>
+          <p>Расхождений между статьёй и площадкой не обнаружено.</p>
         </div>
       ) : (
         <div className="mismatch-list">
@@ -131,7 +131,7 @@ export function MismatchMapView({ mismatchMap, fitAssessment }: Props) {
 
       {mismatchMap.unknowns && mismatchMap.unknowns.length > 0 && (
         <div className="mismatch-unknowns">
-          <h3>Unknowns</h3>
+          <h3>Неизвестно</h3>
           <ul>
             {mismatchMap.unknowns.map((u, i) => (
               <li key={i}>{u}</li>

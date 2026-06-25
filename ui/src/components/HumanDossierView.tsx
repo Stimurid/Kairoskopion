@@ -107,13 +107,13 @@ function TechnicalFooter({ f }: { f: HumanTechnicalFooter }) {
         provenance / диагностику / quality gates. Сырой ответ LLM здесь не
         хранится и не показывается.
       </div>
-      {renderKVBlock('Input metadata', f.input_metadata)}
-      {renderKVBlock('Pipeline metadata', f.pipeline_metadata)}
-      {renderKVBlock('Token usage', f.token_metadata)}
-      {renderKVBlock('Safety / quality gates', f.safety_gates)}
+      {renderKVBlock('Входные метаданные', f.input_metadata)}
+      {renderKVBlock('Метаданные пайплайна', f.pipeline_metadata)}
+      {renderKVBlock('Использование токенов', f.token_metadata)}
+      {renderKVBlock('Контрольные точки качества', f.safety_gates)}
       {f.agent_metadata.length > 0 && (
         <div className="tech-footer-block">
-          <h4>Agent / organ metadata</h4>
+          <h4>Метаданные агентов</h4>
           <table className="tech-footer-table">
             <thead>
               <tr>
@@ -148,7 +148,7 @@ function TechnicalFooter({ f }: { f: HumanTechnicalFooter }) {
       )}
       {f.known_limitations.length > 0 && (
         <div className="tech-footer-block">
-          <h4>Known limitations</h4>
+          <h4>Известные ограничения</h4>
           <ul>
             {f.known_limitations.map((l, i) => <li key={i}>{l}</li>)}
           </ul>

@@ -22,8 +22,26 @@ from ..schema import ArticleModel, ManuscriptModel
 
 
 def _extract_title(text: str) -> str | None:
-    m = re.match(r"^#\s+(.+)", text.strip())
-    return m.group(1).strip() if m else None
+    stripped = text.strip()
+    # Markdown heading: # Title
+    m = re.match(r"^#\s+(.+)", stripped)
+    if m:
+        return m.group(1).strip()
+    # Bold title on first non-empty line: **Title**
+    for line in stripped.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        m_bold = re.match(r"^\*\*(.+?)\*\*\s*$", line)
+        if m_bold:
+            candidate = m_bold.group(1).strip()
+            if 5 <= len(candidate) <= 300:
+                return candidate
+        # Plain first non-empty line if it looks like a title (no punctuation at end, reasonable length)
+        if 5 <= len(line) <= 300 and not line.endswith(('.', ',', ';', ':', '!', '?')):
+            return line
+        break
+    return None
 
 
 def _extract_abstract(text: str) -> str | None:

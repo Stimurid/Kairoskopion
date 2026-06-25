@@ -67,24 +67,24 @@ export function DisciplineMatches({ caseId }: Props) {
   }, [caseId]);
 
   if (loading) {
-    return <div className="discipline-matches discipline-matches--loading">Loading disciplines…</div>;
+    return <div className="discipline-matches discipline-matches--loading">Загрузка дисциплин…</div>;
   }
   if (error === 'pending') {
     return (
       <div className="discipline-matches discipline-matches--pending">
-        Disciplinary matcher has not run yet — submit text via Intake first.
+        Дисциплинарный матчер ещё не запускался — сначала отправьте текст через ввод.
       </div>
     );
   }
   if (error || !data) {
-    return <div className="discipline-matches discipline-matches--error">{error || 'No data'}</div>;
+    return <div className="discipline-matches discipline-matches--error">{error || 'Нет данных'}</div>;
   }
 
   const matched = data.matched || [];
   return (
     <div className="discipline-matches">
       <div className="discipline-matches-header">
-        <h3>Disciplinary positioning</h3>
+        <h3>Дисциплинарное позиционирование</h3>
         <div className="discipline-matches-meta">
           <span className="discipline-region-badge">
             Регион: {REGION_LABELS[data.region_hint] || data.region_hint}
@@ -120,7 +120,7 @@ export function DisciplineMatches({ caseId }: Props) {
       )}
       {data.new_candidate && (
         <div className="discipline-new-candidate">
-          <strong>LLM proposed new candidate:</strong> {data.new_candidate.display_name}
+          <strong>LLM предложил нового кандидата:</strong> {data.new_candidate.display_name}
           <p className="discipline-match-why">{data.new_candidate.reason}</p>
         </div>
       )}

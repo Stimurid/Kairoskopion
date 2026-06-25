@@ -47,10 +47,10 @@ export function VenuePoolBoard({
   if (candidates.length === 0) {
     return (
       <div className="venue-pool-empty">
-        <h2>Venue Pool</h2>
-        <p>No venue candidates discovered yet.</p>
+        <h2>Пул журналов</h2>
+        <p>Кандидаты площадок ещё не найдены.</p>
         {poolStatus === 'no_pathways' && (
-          <p className="pool-hint">Map disciplinary pathways first to discover venues.</p>
+          <p className="pool-hint">Сначала постройте дисциплинарные пути для поиска площадок.</p>
         )}
         {onDiscover && (
           <button
@@ -58,7 +58,7 @@ export function VenuePoolBoard({
             onClick={onDiscover}
             disabled={isLoading}
           >
-            {isLoading ? 'Discovering...' : 'Discover Venues'}
+            {isLoading ? 'Поиск…' : 'Найти площадки'}
           </button>
         )}
       </div>
@@ -72,24 +72,24 @@ export function VenuePoolBoard({
     <div className="venue-pool-board">
       <div className="pool-header">
         <div className="pool-header-left">
-          <h2>Venue Pool</h2>
+          <h2>Пул журналов</h2>
           <div className="pool-summary">
-            <span className="pool-total">{candidates.length} candidates</span>
-            {highCount > 0 && <span className="pool-badge conf-high">{highCount} high</span>}
-            {mediumCount > 0 && <span className="pool-badge conf-medium">{mediumCount} medium</span>}
+            <span className="pool-total">{candidates.length} кандидатов</span>
+            {highCount > 0 && <span className="pool-badge conf-high">{highCount} высок.</span>}
+            {mediumCount > 0 && <span className="pool-badge conf-medium">{mediumCount} средн.</span>}
           </div>
         </div>
         <div className="pool-controls">
-          <label className="sort-label" htmlFor="pool-sort">Sort:</label>
+          <label className="sort-label" htmlFor="pool-sort">Сортировка:</label>
           <select
             id="pool-sort"
             className="pool-sort-select"
             value={sortBy}
             onChange={e => setSortBy(e.target.value as SortKey)}
           >
-            <option value="confidence">Confidence</option>
-            <option value="name">Name</option>
-            <option value="status">Status</option>
+            <option value="confidence">Уверенность</option>
+            <option value="name">Название</option>
+            <option value="status">Статус</option>
           </select>
           {onDiscover && (
             <button
@@ -97,7 +97,7 @@ export function VenuePoolBoard({
               onClick={onDiscover}
               disabled={isLoading}
             >
-              Re-discover
+              Повторный поиск
             </button>
           )}
         </div>
@@ -117,14 +117,14 @@ export function VenuePoolBoard({
       {selectedId && (
         <div className="pool-action-bar">
           <span className="pool-action-label">
-            Selected: {candidates.find(c => c.venue_candidate_id === selectedId)?.canonical_name}
+            Выбрано: {candidates.find(c => c.venue_candidate_id === selectedId)?.canonical_name}
           </span>
           <button
             className="btn btn-primary"
             onClick={handleConfirmSelection}
             disabled={isLoading}
           >
-            Select for Fit Assessment
+            Выбрать для оценки соответствия
           </button>
         </div>
       )}

@@ -97,7 +97,7 @@ export default function App() {
 
   const createCase = useCallback(async () => {
     try {
-      const summary = await api.createCase('New case');
+      const summary = await api.createCase('');
       await loadCases();
       await openCase(summary.case_id);
     } catch (e) {
@@ -127,9 +127,9 @@ export default function App() {
       <div className="app-shell">
         <div className="connection-error">
           <h1>Kairoskopion</h1>
-          <p>Cannot connect to backend.</p>
+          <p>Нет подключения к серверу.</p>
           <p className="connection-hint">
-            Start the API server:<br />
+            Запустите API-сервер:<br />
             <code>uvicorn kairoskopion.api.app:app --reload</code>
           </p>
           <button className="btn btn-primary" onClick={() => {
@@ -138,7 +138,7 @@ export default function App() {
               .then(() => setIsConnected(true))
               .catch(() => setIsConnected(false));
           }}>
-            Retry
+            Повторить
           </button>
         </div>
       </div>
@@ -148,7 +148,7 @@ export default function App() {
   if (isConnected === null || !authChecked) {
     return (
       <div className="app-shell">
-        <div className="connecting">Connecting...</div>
+        <div className="connecting">Подключение…</div>
       </div>
     );
   }
@@ -162,34 +162,34 @@ export default function App() {
     <div className="app-shell">
       <header className="top-bar">
         <h1 className="app-title">Kairoskopion</h1>
-        <span className="app-subtitle">Publication Positioning Cockpit</span>
+        <span className="app-subtitle">Кокпит позиционирования публикаций</span>
         <nav className="top-bar-nav">
           <button
             className={`top-bar-link ${appView === 'cases' ? 'top-bar-link--active' : ''}`}
             onClick={() => setAppView('cases')}
           >
-            Cases
+            Кейсы
           </button>
           <button
             className={`top-bar-link ${appView === 'agents' ? 'top-bar-link--active' : ''}`}
             onClick={() => setAppView('agents')}
           >
-            System / Agents
+            Система / Агенты
           </button>
         </nav>
         <div className="top-bar-user">
           <span
             className="top-bar-user-name"
-            title={user.email ?? 'no email — workspace tied to this device only'}
+            title={user.email ?? 'email не указан — рабочее пространство привязано к устройству'}
           >
             {user.display_name}
           </span>
           <button
             className="top-bar-logout"
             onClick={handleLogout}
-            title="Sign out"
+            title="Выйти"
           >
-            Sign out
+            Выйти
           </button>
         </div>
       </header>
@@ -213,8 +213,8 @@ export default function App() {
           <>
             <nav className="case-sidebar" aria-label="Cases">
               <div className="sidebar-header">
-                <h2>Cases</h2>
-                <button className="btn btn-small" onClick={createCase}>+ New</button>
+                <h2>Кейсы</h2>
+                <button className="btn btn-small" onClick={createCase}>+ Новый</button>
               </div>
               <ul className="case-list">
                 {cases.map((c) => (
@@ -229,15 +229,15 @@ export default function App() {
                     <button
                       className="case-item-delete"
                       onClick={(e) => { e.stopPropagation(); deleteCase(c.case_id); }}
-                      aria-label={`Delete ${c.title}`}
-                      title="Delete case"
+                      aria-label={`Удалить ${c.title}`}
+                      title="Удалить кейс"
                     >
                       ✕
                     </button>
                   </li>
                 ))}
                 {cases.length === 0 && (
-                  <li className="case-list-empty">No cases yet</li>
+                  <li className="case-list-empty">Нет кейсов</li>
                 )}
               </ul>
             </nav>
@@ -251,10 +251,10 @@ export default function App() {
               />
             ) : (
               <div className="workspace-empty">
-                <h2>Publication Positioning Cockpit</h2>
-                <p>Create a new case or select an existing one to begin.</p>
+                <h2>Кокпит позиционирования</h2>
+                <p>Создайте новый кейс или выберите существующий.</p>
                 <button className="btn btn-primary btn-large" onClick={createCase}>
-                  + New Case
+                  + Новый кейс
                 </button>
               </div>
             )}

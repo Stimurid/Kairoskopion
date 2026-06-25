@@ -46,8 +46,8 @@ export function ScenarioBuilder({ onSubmit, isLoading, hasArticleModel, onBack }
   if (!hasArticleModel) {
     return (
       <div className="placeholder-view">
-        <h2>Scenario Builder</h2>
-        <p>Confirm the article model first to set your publication scenario.</p>
+        <h2>Сценарий публикации</h2>
+        <p>Сначала подтвердите модель статьи, чтобы задать сценарий публикации.</p>
       </div>
     );
   }
@@ -55,27 +55,27 @@ export function ScenarioBuilder({ onSubmit, isLoading, hasArticleModel, onBack }
   return (
     <div className="scenario-builder">
       {onBack && <button className="btn btn-back" onClick={onBack}>← Back</button>}
-      <h2>Publication Scenario</h2>
+      <h2>Сценарий публикации</h2>
       <p className="scenario-subtitle">
-        Define your publication goal and constraints. This shapes venue discovery and fit assessment.
+        Определите цель публикации и ограничения. Это определит поиск площадок и оценку соответствия.
       </p>
 
       <div className="scenario-form">
         <div className="form-group">
-          <label className="form-label" htmlFor="sc-goal">Goal</label>
+          <label className="form-label" htmlFor="sc-goal">Цель</label>
           <input
             id="sc-goal"
             className="form-input"
             type="text"
             value={goal}
             onChange={e => setGoal(e.target.value)}
-            placeholder="e.g. Q1-Q2 Scopus publication in philosophy of technology"
+            placeholder="напр. Q1-Q2 Scopus публикация в философии технологий"
           />
         </div>
 
         <div className="form-row">
           <div className="form-group">
-            <label className="form-label">Prestige priority</label>
+            <label className="form-label">Приоритет престижа</label>
             <div className="chip-group">
               {PRIORITY_OPTIONS.map(p => (
                 <button
@@ -90,7 +90,7 @@ export function ScenarioBuilder({ onSubmit, isLoading, hasArticleModel, onBack }
           </div>
 
           <div className="form-group">
-            <label className="form-label">Speed priority</label>
+            <label className="form-label">Приоритет скорости</label>
             <div className="chip-group">
               {PRIORITY_OPTIONS.map(p => (
                 <button
@@ -107,20 +107,20 @@ export function ScenarioBuilder({ onSubmit, isLoading, hasArticleModel, onBack }
 
         <div className="form-row">
           <div className="form-group">
-            <label className="form-label" htmlFor="sc-apc">Max APC (USD)</label>
+            <label className="form-label" htmlFor="sc-apc">Макс. APC (USD)</label>
             <input
               id="sc-apc"
               className="form-input form-input--narrow"
               type="number"
               value={apcMax}
               onChange={e => setApcMax(e.target.value)}
-              placeholder="No limit"
+              placeholder="Без лимита"
               min="0"
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="sc-deadline">Deadline</label>
+            <label className="form-label" htmlFor="sc-deadline">Дедлайн</label>
             <input
               id="sc-deadline"
               className="form-input form-input--narrow"
@@ -131,22 +131,22 @@ export function ScenarioBuilder({ onSubmit, isLoading, hasArticleModel, onBack }
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="sc-lang">Language</label>
+            <label className="form-label" htmlFor="sc-lang">Язык</label>
             <select
               id="sc-lang"
               className="form-input form-input--narrow"
               value={language}
               onChange={e => setLanguage(e.target.value)}
             >
-              <option value="en">English</option>
-              <option value="ru">Russian</option>
-              <option value="any">Any</option>
+              <option value="en">Английский</option>
+              <option value="ru">Русский</option>
+              <option value="any">Любой</option>
             </select>
           </div>
         </div>
 
         <div className="form-group">
-          <label className="form-label">Rewrite depth allowed</label>
+          <label className="form-label">Допустимая глубина переработки</label>
           <div className="chip-group">
             {REWRITE_DEPTH_OPTIONS.map(d => (
               <button
@@ -161,7 +161,7 @@ export function ScenarioBuilder({ onSubmit, isLoading, hasArticleModel, onBack }
         </div>
 
         <div className="form-group">
-          <label className="form-label">Risk tolerance</label>
+          <label className="form-label">Толерантность к риску</label>
           <div className="chip-group">
             {RISK_TOLERANCE_OPTIONS.map(r => (
               <button
@@ -176,7 +176,7 @@ export function ScenarioBuilder({ onSubmit, isLoading, hasArticleModel, onBack }
         </div>
 
         <div className="form-group">
-          <label className="form-label">Target indexing</label>
+          <label className="form-label">Целевая индексация</label>
           <div className="chip-group">
             {INDEXING_OPTIONS.map(idx => (
               <button
@@ -197,7 +197,7 @@ export function ScenarioBuilder({ onSubmit, isLoading, hasArticleModel, onBack }
           onClick={handleSubmit}
           disabled={!goal.trim() || isLoading}
         >
-          {isLoading ? 'Saving...' : 'Set Scenario'}
+          {isLoading ? 'Сохранение…' : 'Задать сценарий'}
         </button>
       </div>
     </div>

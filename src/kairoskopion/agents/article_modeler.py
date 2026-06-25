@@ -340,6 +340,19 @@ def _build_from_llm(
         return str(v) if v else None
 
     title_llm = _pick("title", "title_current", "title_ru", "title_en", "title_extracted")
+    # Heuristic title extraction: if LLM missed the title, try the first
+    # non-empty line of the raw text (common pattern in .md/.txt manuscripts).
+    if not _coerce_str(title_llm) and not manuscript.title and text:
+        import re as _re
+        for line in text.split("\n"):
+            candidate = line.strip().lstrip("#").strip()
+            # Strip markdown bold markers **...**
+            m_bold = _re.match(r"^\*\*(.+?)\*\*$", candidate)
+            if m_bold:
+                candidate = m_bold.group(1).strip()
+            if candidate and 5 <= len(candidate) <= 300:
+                title_llm = candidate
+                break
     abstract_llm = _pick("abstract_summary", "abstract", "abstract_current", "abstract_ru", "abstract_en")
     pcore_llm = _pick(
         "protected_core_candidate",

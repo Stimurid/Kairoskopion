@@ -42,29 +42,29 @@ export function VenueProfile({ venue, regime, onEvidenceClick }: Props) {
   return (
     <div className="venue-profile">
       <div className="venue-profile-header">
-        <h2 className="venue-name">{venue.canonical_name || 'Unknown Venue'}</h2>
+        <h2 className="venue-name">{venue.canonical_name || 'Площадка без названия'}</h2>
         <span className={`lifecycle-badge lifecycle-${venue.lifecycle_status}`}>
           {venue.lifecycle_status}
         </span>
       </div>
 
       <section className="venue-section">
-        <h3>Identity</h3>
+        <h3>Идентификация</h3>
         <div className="venue-fields">
           <VenueFieldRow
-            label="Type"
+            label="Тип"
             value={venue.venue_type}
             evidenceStatus={inferStatus('type')}
             onEvidenceClick={() => onEvidenceClick('VenueModel', 'venue_type')}
           />
           <VenueFieldRow
-            label="Scope"
+            label="Охват"
             value={venue.scope_summary}
             evidenceStatus={inferStatus('scope')}
             onEvidenceClick={() => onEvidenceClick('VenueModel', 'scope_summary')}
           />
           <VenueFieldRow
-            label="Article types"
+            label="Типы статей"
             value={venue.article_types_supported}
             evidenceStatus={inferStatus('article_types')}
             onEvidenceClick={() => onEvidenceClick('VenueModel', 'article_types_supported')}
@@ -73,10 +73,10 @@ export function VenueProfile({ venue, regime, onEvidenceClick }: Props) {
       </section>
 
       <section className="venue-section">
-        <h3>Access & Policy</h3>
+        <h3>Доступ и политика</h3>
         <div className="venue-fields">
           <VenueFieldRow
-            label="Open Access"
+            label="Открытый доступ"
             value={venue.open_access_status}
             evidenceStatus={inferStatus('open_access')}
             onEvidenceClick={() => onEvidenceClick('VenueModel', 'open_access_status')}
@@ -88,7 +88,7 @@ export function VenueProfile({ venue, regime, onEvidenceClick }: Props) {
             onEvidenceClick={() => onEvidenceClick('VenueModel', 'apc_policy')}
           />
           <VenueFieldRow
-            label="AI Policy"
+            label="Политика ИИ"
             value={venue.ai_policy}
             evidenceStatus={inferStatus('ai_policy')}
             onEvidenceClick={() => onEvidenceClick('VenueModel', 'ai_policy')}
@@ -98,7 +98,7 @@ export function VenueProfile({ venue, regime, onEvidenceClick }: Props) {
 
       {venue.indexing_claims && venue.indexing_claims.length > 0 && (
         <section className="venue-section">
-          <h3>Indexing</h3>
+          <h3>Индексация</h3>
           <div className="indexing-claims">
             {venue.indexing_claims.map((claim, i) => (
               <div key={i} className="indexing-claim">
@@ -115,20 +115,20 @@ export function VenueProfile({ venue, regime, onEvidenceClick }: Props) {
 
       {regime && (
         <section className="venue-section">
-          <h3>Publication Process</h3>
+          <h3>Процесс публикации</h3>
           <div className="venue-fields">
-            <VenueFieldRow label="Review type" value={regime.review_type} />
-            <VenueFieldRow label="Typical rounds" value={String(regime.typical_review_rounds || '—')} />
-            <VenueFieldRow label="Turnaround" value={regime.typical_turnaround_weeks} />
-            <VenueFieldRow label="Submission system" value={regime.submission_system} />
-            <VenueFieldRow label="Formatting" value={regime.formatting_strictness} />
+            <VenueFieldRow label="Тип рецензирования" value={regime.review_type} />
+            <VenueFieldRow label="Типичные раунды" value={String(regime.typical_review_rounds || '—')} />
+            <VenueFieldRow label="Срок ответа" value={regime.typical_turnaround_weeks} />
+            <VenueFieldRow label="Система подачи" value={regime.submission_system} />
+            <VenueFieldRow label="Форматирование" value={regime.formatting_strictness} />
           </div>
         </section>
       )}
 
       {venue.unknowns && venue.unknowns.length > 0 && (
         <section className="venue-section venue-unknowns">
-          <h3>Unknowns</h3>
+          <h3>Неизвестно</h3>
           <ul className="unknowns-list">
             {venue.unknowns.map((u, i) => (
               <li key={i}>
@@ -141,7 +141,7 @@ export function VenueProfile({ venue, regime, onEvidenceClick }: Props) {
 
       <div className="venue-footer">
         <span className="confidence-label">
-          Confidence: <strong>{venue.confidence || 'preliminary'}</strong>
+          Уверенность: <strong>{venue.confidence || 'предварительная'}</strong>
         </span>
       </div>
     </div>
