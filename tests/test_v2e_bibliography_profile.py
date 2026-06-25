@@ -166,6 +166,66 @@ class TestBibBuilder(unittest.TestCase):
         for ref in bp.references:
             self.assertIsNone(ref["doi"])
 
+    def test_bold_wrapped_heading_detected(self):
+        """Heading with **bold** markers must be detected (live article bug)."""
+        text = (
+            "Body text.\n\n"
+            "## **Список литературы**\n\n"
+            "###\n\n"
+            "1. Бергсон А. Материя и память. М., 1992.\n"
+            "2. Ihde D. Technology and the Lifeworld. 1990.\n"
+            "3. Verbeek P.-P. What Things Do. 2005.\n"
+        )
+        bp = build_minimal_bibliography_profile(text)
+        self.assertTrue(bp.bibliography_section_detected)
+        self.assertEqual(bp.status, STATUS_PARSED_STRUCTURAL)
+        self.assertGreaterEqual(bp.reference_count, 3)
+
+    def test_italic_wrapped_heading_detected(self):
+        """Heading with *italic* markers must also be detected."""
+        text = (
+            "Body.\n\n"
+            "## *References*\n\n"
+            "1. Foo, A. (2020). Some important research paper. Journal of X, 5(2), 100-120.\n"
+            "2. Baz, B. (2021). Another significant contribution. Journal of Y, 3(1), 50-80.\n"
+        )
+        bp = build_minimal_bibliography_profile(text)
+        self.assertTrue(bp.bibliography_section_detected)
+        self.assertGreaterEqual(bp.reference_count, 2)
+
+    def test_live_article_format_produces_references(self):
+        """Simulate the exact heading format from the live article."""
+        text = (
+            "Текст статьи.\n\n"
+            "## **Список литературы**\n\n"
+            "### \n\n"
+            "1. Бергсон А. Материя и память / А. Бергсон; пер. с фр. — М. : ИТДГК «Гнозис», 1992. — 271 с.\n"
+            "2. Бергсон А. Творческая эволюция / А. Бергсон; пер. с фр. — М., 1998. — 384 с.\n"
+            "3. Мол - Множественные тела\n"
+            "3. Berntsen J. Robust and Generalizable Embryo Selection // PLOS ONE. — 2022. — DOI: 10.1371/journal.pone.0262661.\n"
+            "5. Dimitriadis I. Artificial Intelligence in the Embryology Laboratory // Reproductive BioMedicine Online. — 2022. — Vol. 44.\n"
+            "6. Ihde D. Technology and the Lifeworld / D. Ihde. — Bloomington : Indiana University Press, 1990. — 226 p.\n"
+            "7. Ihde D. Postphenomenology and Technoscience / D. Ihde. — Albany : SUNY Press, 2009. — 135 p.\n"
+            "8. Kragh M. F. Embryo Selection with Artificial Intelligence // JARG. — 2021. — DOI: 10.1007/s10815-021-02254-6.\n"
+            "9. Liu Y. AI for Earth // Proceedings of ACM SIGKDD. — 2019. — URL: https://arxiv.org/pdf/1908.07517.\n"
+            "10. Mol A. Ontological Politics // The Sociological Review. — 1999. — DOI: 10.1111/j.1467-954X.1999.tb03483.x.\n"
+            "11. Mykhailov D. Back to the Technologies Themselves // Phenomenology. — 2023. — DOI: 10.1007/s11097-023-09905-2.\n"
+            "13. Pavanini M. Postphenomenology and Human Constitutive Technicity // JHTR. — 2024.\n"
+            "14. Rasmussen J. H. Sound Evidence for Biodiversity // Science. — 2024. — DOI: 10.1126/science.adh2716.\n"
+            "15. Rosenberger R. Postphenomenological Investigations / R. Rosenberger. — 2015. — 265 p\n"
+            "16. Stowell D. Computational Bioacoustics // PeerJ. — 2022. — DOI: 10.7717/peerj.13152.\n"
+            "17. Tahar M. Bergson's Vitalisms // Parrhesia. — 2022.\n"
+            "18. Verbeek P.-P. What Things Do / P.-P. Verbeek. — 2005. — 249 p.\n"
+            "19. Verbeek P.-P. Moralizing Technology / P.-P. Verbeek. — 2011. — 198 p.\n"
+            "20. Wahabzada M. Plant Phenotyping // Scientific Reports. — 2016. — DOI: 10.1038/srep22482.\n"
+        )
+        bp = build_minimal_bibliography_profile(text)
+        self.assertTrue(bp.bibliography_section_detected)
+        self.assertEqual(bp.status, STATUS_PARSED_STRUCTURAL)
+        self.assertGreaterEqual(bp.reference_count, 10)
+        self.assertGreaterEqual(bp.doi_count, 5)
+        self.assertGreaterEqual(bp.url_count, 1)
+
 
 class TestCitationPlanBibAware(unittest.TestCase):
     def test_no_bibliography_marks_needs_bibliography(self):

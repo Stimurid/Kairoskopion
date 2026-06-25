@@ -133,6 +133,21 @@ class TestJsonRepairRiskOfficer(unittest.TestCase):
         self.assertIsInstance(r.parsed, dict)
         self.assertEqual(len(r.parsed["risk_items"]), 1)
 
+    def test_json_with_line_comments_repaired(self):
+        """JSON with // comments → comments stripped, parsed."""
+        raw = '{"risk_items": [\n  // desk rejection risk\n  {"risk_type": "desk_rejection", "severity": "high", "description": "topic mismatch"}\n]}'
+        r = repair_and_parse(raw)
+        self.assertIn(r.status, ("repaired_ok",))
+        self.assertEqual(len(r.parsed["risk_items"]), 1)
+        self.assertIn("json_comments_stripped", r.repair_steps)
+
+    def test_json_with_block_comments_repaired(self):
+        """JSON with /* block comments */ → stripped, parsed."""
+        raw = '{"risk_items": [/* this is a risk */ {"risk_type": "scope_mismatch", "severity": "medium", "description": "test"}]}'
+        r = repair_and_parse(raw)
+        self.assertIn(r.status, ("repaired_ok",))
+        self.assertEqual(len(r.parsed["risk_items"]), 1)
+
 
 class TestRiskTypeNormalization(unittest.TestCase):
     """Test 5: risk_type normalization from prompt enum to canonical."""

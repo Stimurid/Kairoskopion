@@ -76,7 +76,9 @@ _HEADING_PATTERNS = [
     r"библиограф\w*",
 ]
 _HEADING_RE = re.compile(
-    r"^\s*(?:#{1,6}\s*)?(?:\d+\.?\s*)?(?:" + "|".join(_HEADING_PATTERNS) + r")\s*:?\s*$",
+    r"^\s*(?:#{1,6}\s*)?(?:\d+\.?\s*)?(?:\*{1,2})?\s*(?:"
+    + "|".join(_HEADING_PATTERNS)
+    + r")\s*(?:\*{1,2})?\s*:?\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 
@@ -118,7 +120,7 @@ def _extract_bibliography_block(text: str) -> tuple[str | None, int]:
     # # or ##). If none, take the rest of the document.
     after = text[start:]
     next_h = re.search(
-        r"\n\s*(?:#{1,6}\s+\S|appendix|appendices)",
+        r"\n\s*(?:#{1,6}[ \t]+\S|appendix|appendices)",
         after,
         re.IGNORECASE,
     )

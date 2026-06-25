@@ -161,6 +161,45 @@ def _strip_trailing_commas(s: str) -> str:
     return _TRAILING_COMMA_RE.sub(r"\1", s)
 
 
+def _strip_json_comments(s: str) -> str:
+    """Strip // line comments and /* block comments */ outside JSON strings."""
+    out: list[str] = []
+    i = 0
+    n = len(s)
+    in_str = False
+    esc = False
+    while i < n:
+        ch = s[i]
+        if in_str:
+            out.append(ch)
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            i += 1
+            continue
+        if ch == '"':
+            in_str = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == '/' and i + 1 < n:
+            nch = s[i + 1]
+            if nch == '/':
+                end = s.find('\n', i + 2)
+                i = end if end != -1 else n
+                continue
+            if nch == '*':
+                end = s.find('*/', i + 2)
+                i = end + 2 if end != -1 else n
+                continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def _try_parse_with_repairs(s: str, steps: list[str]) -> Any | None:
     """Try a small sequence of bounded repairs on a candidate string.
 
@@ -208,6 +247,17 @@ def _try_parse_with_repairs(s: str, steps: list[str]) -> Any | None:
             return json.loads(s4)
         except json.JSONDecodeError:
             pass
+
+    # 5. Strip // and /* */ comments (LLMs sometimes annotate JSON)
+    if "//" in s3 or "/*" in s3:
+        s5 = _strip_json_comments(s3)
+        if s5 != s3:
+            steps.append("json_comments_stripped")
+            s5 = _strip_trailing_commas(s5)
+            try:
+                return json.loads(s5)
+            except json.JSONDecodeError:
+                pass
 
     return None
 
