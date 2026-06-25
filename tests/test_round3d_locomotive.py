@@ -161,19 +161,20 @@ class TestCitationSafeWhenBibliographyMissing(unittest.TestCase):
 
     @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_no_fake_doi_or_authoryear(self, mock):
+        """DOIs filtered; author-year preserved (III-N fix)."""
         mock.return_value = _ok_outcome({
             "tradition_match": "weak",
             "bridge_references_needed": [
                 "good category",
-                "Smith 2024 paper",            # filtered
-                "https://doi.org/10.1234/x",   # filtered
+                "Smith 2024 paper",            # preserved (III-N)
+                "https://doi.org/10.1234/x",   # DOI → filtered
             ],
             "unknowns": [], "confidence": "low",
         })
         cp = build_minimal_citation_plan(_a(), _v(), _f(), _mm(), None, None)
         cp2 = upgrade_citation_plan_with_llm(cp, _a(), _v(), None, MagicMock())
         joined = " ".join(cp2.missing_bridge_categories)
-        self.assertNotIn("Smith 2024", joined)
+        self.assertIn("Smith 2024", joined)
         self.assertNotIn("10.1234", joined)
 
 

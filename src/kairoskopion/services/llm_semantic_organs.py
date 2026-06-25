@@ -589,17 +589,35 @@ def upgrade_citation_plan_with_llm(
     unknowns_llm = [u for u in (parsed.get("unknowns") or [])
                     if isinstance(u, str) and u.strip()]
 
-    # Anti-fake filter: drop any string containing an apparent DOI or
-    # author-year pattern. Bridges/gaps must be categories, not refs.
+    # Anti-fake filter: drop items that contain fabricated DOIs.
+    # Round III-N: the previous author-year regex (_AY_RE) was removed
+    # because it dropped ALL items mentioning existing bibliography
+    # entries (e.g. "Bergson 1992 is incomplete"), which are legitimate
+    # article-local gap descriptions. The prompt already forbids
+    # fabricated citations; DOI filter catches the mechanical case.
     import re as _re
     _DOI_RE = _re.compile(r"10\.\d{4,}/\S+")
-    _AY_RE = _re.compile(r"\b[A-Z][a-z]+\s+\d{4}\b")
-    def _safe(s: str) -> bool:
-        return not _DOI_RE.search(s) and not _AY_RE.search(s)
 
+    def _safe(s: str) -> bool:
+        return not _DOI_RE.search(s)
+
+    _pre_filter = {
+        "bridges": len(bridges), "gaps": len(gaps),
+        "risks": len(risks), "tasks": len(llm_search_tasks),
+    }
+    bridges_raw, gaps_raw, risks_raw = bridges[:], gaps[:], risks[:]
     bridges = [b for b in bridges if _safe(b)]
     gaps = [g for g in gaps if _safe(g)]
     risks = [r for r in risks if _safe(r)]
+    _post_filter = {
+        "bridges": len(bridges), "gaps": len(gaps),
+        "risks": len(risks),
+    }
+    _removed_items = (
+        [f"bridge:{b}" for b in bridges_raw if not _safe(b)]
+        + [f"gap:{g}" for g in gaps_raw if not _safe(g)]
+        + [f"risk:{r}" for r in risks_raw if not _safe(r)]
+    )
 
     # Map LLM ecology fields → CitationPlan semantic fields
     new_gap_categories = list(citation_plan.citation_gap_categories) + gaps
@@ -609,6 +627,8 @@ def upgrade_citation_plan_with_llm(
     # Round III-E: include LLM-emitted source-work tasks too (anti-fake
     # filter already stripped fake refs above).
     _safe_llm_tasks = [t for t in llm_search_tasks if _safe(t)]
+    _post_filter["tasks"] = len(_safe_llm_tasks)
+    _removed_items += [f"task:{t}" for t in llm_search_tasks if not _safe(t)]
     new_search_tasks = list(citation_plan.recommended_reference_search_tasks) + [
         f"Search for references that bridge: {b}" for b in bridges
     ] + [
@@ -662,7 +682,14 @@ def upgrade_citation_plan_with_llm(
         extra={
             "bridges_count": len(bridges),
             "gaps_count": len(gaps),
+            "tasks_count": len(_safe_llm_tasks),
             "rubric_active": rubric_active,
+            "anti_fake_filter": {
+                "pre": _pre_filter,
+                "post": _post_filter,
+                "removed_count": len(_removed_items),
+                "removed_items": _removed_items[:10],
+            },
         },
     )
     return _dc.replace(

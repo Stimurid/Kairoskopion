@@ -66,6 +66,22 @@ tradition mismatches.
   citation_ecology field and note the limitation.
 - Mark all inferences explicitly.
 
+## When the bibliography IS present
+
+When BibliographyProfile contains parsed references, analyze them:
+- Identify incomplete references (missing publisher, year, page \
+  numbers, or other required bibliographic data).
+- Identify placeholder or stub references (e.g. "Мол — Множественные \
+  тела" with no publisher/year/edition).
+- Identify references whose role in the argument is unclear \
+  (cited but not contextualized in the article's claims).
+- Assess whether the reference set covers the venue's expected \
+  citation traditions.
+- Note any reference count concerns relative to the venue type.
+You MAY reference existing bibliography items by name when \
+describing gaps (e.g. "the Bergson references need completion"). \
+Do NOT invent new DOIs or fabricate replacement citations.
+
 ## When the bibliography is absent
 
 If BibliographyProfile is empty / not_found, you MUST NOT invent
@@ -82,8 +98,17 @@ Return ONE JSON object. Useful top-level keys (the parser accepts
 any of these as the list container — pick whichever fits): either
 "tradition_gaps", "bridge_references_needed", "risk_items",
 "recommended_reference_search_tasks", "source_work_tasks". No
-markdown, no code fences. If you have nothing to add, return
-{"tradition_gaps": [], "unknowns": ["..."]} and explain.
+markdown, no code fences, no DOIs in output. If you have nothing
+to add, return {"tradition_gaps": [], "unknowns": ["..."]} and
+explain.
+
+Each item is a STRING describing a gap, bridge, or task. Safe
+examples:
+- "Ссылка на Мол неполная: отсутствуют выходные данные"
+- "Не хватает работ по постфеноменологии технологий"
+- "Цитатная экология не покрывает традицию STS"
+- "Источники case-study требуют уточнения роли в аргументации"
+Unsafe (will be filtered): invented DOIs like "10.1234/fake".
 
 ## Voice
 

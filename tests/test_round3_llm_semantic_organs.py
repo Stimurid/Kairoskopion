@@ -199,13 +199,12 @@ class TestCitationPlannerWiring(unittest.TestCase):
 
     @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_llm_dois_filtered(self, mock_call):
-        """Anti-fake: any LLM-emitted bridge/gap containing DOI or
-        author-year is stripped."""
+        """Anti-fake: DOIs filtered; author-year preserved (III-N fix)."""
         mock_call.return_value = _ok_outcome({
             "tradition_match": "weak",
             "bridge_references_needed": [
                 "philosophy bridges",         # safe
-                "Smith 2024 paper",            # author-year → filtered
+                "Smith 2024 paper",            # author-year → preserved
                 "https://doi.org/10.1234/x",   # DOI → filtered
             ],
             "tradition_gaps": ["safe gap category"],
@@ -216,7 +215,7 @@ class TestCitationPlannerWiring(unittest.TestCase):
             self._base_plan(), _a(), _v(), None, MagicMock(),
         )
         joined = " ".join(cp.missing_bridge_categories)
-        self.assertNotIn("Smith 2024", joined)
+        self.assertIn("Smith 2024", joined)
         self.assertNotIn("10.1234", joined)
         self.assertIn("philosophy bridges", joined)
 

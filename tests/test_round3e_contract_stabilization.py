@@ -255,11 +255,12 @@ class TestAntiFakeStillStripsRefs(unittest.TestCase):
 
     @patch("kairoskopion.services.llm_semantic_organs.try_llm_call_with_outcome")
     def test_doi_in_alternative_key_still_filtered(self, mock_call):
+        """DOIs filtered; author-year preserved (III-N fix)."""
         mock_call.return_value = _ok_outcome({
             "gaps": [
                 "safe gap category",                # safe
                 "10.1234/example-doi",              # DOI → filtered
-                "Smith 2024 reference",             # author-year → filtered
+                "Smith 2024 reference",             # preserved (III-N)
             ],
             "unknowns": [],
         })
@@ -268,7 +269,7 @@ class TestAntiFakeStillStripsRefs(unittest.TestCase):
         )
         joined = " ".join(cp.citation_gap_categories)
         self.assertNotIn("10.1234", joined)
-        self.assertNotIn("Smith 2024", joined)
+        self.assertIn("Smith 2024", joined)
         self.assertIn("safe gap category", joined)
 
 
