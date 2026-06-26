@@ -149,6 +149,10 @@ class Case:
         self.adapter_mode: str = "offline_stub"
         # Phase 2: aggregated venue profile package
         self.venue_profile_package: VenueProfilePackage | None = None
+        # Phase 3: discipline intent (standalone Track A entry)
+        self.discipline_intent: dict[str, Any] | None = None
+        # Phase 3: venue family context (cross-track)
+        self.venue_family_context: dict[str, Any] | None = None
 
         # Track A (intake-choice-and-routing-seam): user-choice override
         # state. ``classifier_input_type`` / ``classifier_confidence`` /
@@ -855,6 +859,7 @@ class Case:
                 "char_count": len(text),
             }
         self._build_venue_field_position(venue, guidelines_text=text)
+        self._build_venue_family_from_venue()
         self._log_decision("investigate_venue", {
             "venue_name": venue.canonical_name,
         })
@@ -1028,6 +1033,143 @@ class Case:
         )
         self.submission_pack = pack
         return pack.to_dict()
+
+    # -- Phase 3: Track A — Discipline to Venue Funnel --
+
+    def set_discipline_intent(
+        self, text: str, region: str = "auto",
+        constraints: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Set discipline intent for Track A venue discovery."""
+        self.discipline_intent = {
+            "text": text,
+            "region": region,
+            "constraints": constraints or [],
+            "set_at": _now(),
+        }
+        self.region_hint = region or "auto"
+        self._log_decision("set_discipline_intent", {
+            "text_preview": text[:100],
+            "region": region,
+        })
+
+        families = self._infer_venue_families(text, region)
+
+        if self.semantic_profile:
+            self.get_pathways()
+
+        return {
+            "status": "ok",
+            "discipline_intent": self.discipline_intent,
+            "venue_families": families,
+            "pathways_count": len(self.pathways),
+        }
+
+    def _infer_venue_families(
+        self, text: str, region: str = "auto",
+    ) -> list[dict[str, Any]]:
+        """Deterministic venue family inference from discipline text."""
+        text_lower = text.lower()
+        families: list[dict[str, Any]] = []
+
+        family_map = {
+            "philosophy": {
+                "family_name": "Philosophy journals",
+                "discipline_zone": "philosophy",
+                "known_venues_ru": ["Вопросы философии", "Логос", "Философский журнал", "Эпистемология и философия науки"],
+                "known_venues_intl": ["Philosophy & Technology", "Synthese", "European Journal of Philosophy"],
+            },
+            "sts": {
+                "family_name": "Science and Technology Studies",
+                "discipline_zone": "sts",
+                "known_venues_ru": ["Социология науки и технологий"],
+                "known_venues_intl": ["Social Studies of Science", "Science, Technology & Human Values"],
+            },
+            "sociology": {
+                "family_name": "Sociology journals",
+                "discipline_zone": "sociology",
+                "known_venues_ru": ["Социологические исследования"],
+                "known_venues_intl": ["European Sociological Review", "British Journal of Sociology"],
+            },
+            "media": {
+                "family_name": "Media and Communication",
+                "discipline_zone": "media_studies",
+                "known_venues_ru": ["Медиаскоп"],
+                "known_venues_intl": ["New Media & Society", "Media, Culture & Society"],
+            },
+            "technology": {
+                "family_name": "Philosophy of Technology",
+                "discipline_zone": "philosophy_of_technology",
+                "known_venues_ru": ["Логос", "Вопросы философии"],
+                "known_venues_intl": ["Philosophy & Technology", "Techné"],
+            },
+        }
+
+        for keyword, family_data in family_map.items():
+            if keyword in text_lower:
+                venues = []
+                if region in ("ru", "auto"):
+                    venues.extend(family_data["known_venues_ru"])
+                if region in ("international", "intl", "auto"):
+                    venues.extend(family_data["known_venues_intl"])
+                families.append({
+                    "family_name": family_data["family_name"],
+                    "discipline_zone": family_data["discipline_zone"],
+                    "expected_venues": venues,
+                    "region": region,
+                    "confidence": "medium",
+                })
+
+        if not families:
+            families.append({
+                "family_name": "Unknown discipline",
+                "discipline_zone": "unknown",
+                "expected_venues": [],
+                "region": region,
+                "confidence": "low",
+            })
+
+        return families
+
+    def _build_venue_family_from_venue(self) -> None:
+        """Build venue family context when starting from a concrete venue (Track B → context)."""
+        if not self.investigated_venue:
+            return
+        venue = self.investigated_venue
+        scope = getattr(venue, "scope_summary", "") or ""
+        name = venue.canonical_name or ""
+        families = self._infer_venue_families(f"{name} {scope}")
+        if families:
+            self.venue_family_context = {
+                "source_venue": name,
+                "families": families,
+                "set_at": _now(),
+            }
+
+    def get_venue_matrix(self) -> dict[str, Any]:
+        """Build a qualitative venue matrix from the venue pool."""
+        if not self.venue_pool or not self.venue_pool.candidates:
+            return {"candidates": [], "status": "no_pool"}
+        matrix_rows = []
+        for candidate in self.venue_pool.candidates:
+            c = candidate if isinstance(candidate, dict) else (
+                candidate.to_dict() if hasattr(candidate, "to_dict") else {}
+            )
+            matrix_rows.append({
+                "venue_candidate_id": c.get("venue_candidate_id", ""),
+                "canonical_name": c.get("canonical_name", ""),
+                "evidence_level": len(c.get("evidence_refs", [])),
+                "sources_count": len(c.get("sources", [])),
+                "unknowns_count": len(c.get("unknowns", [])),
+                "status": c.get("status", "discovered"),
+                "confidence": c.get("confidence", "low"),
+                "next_action": (
+                    "investigate" if c.get("status") == "discovered"
+                    else "deepen" if c.get("status") == "light_profiled"
+                    else "ready"
+                ),
+            })
+        return {"candidates": matrix_rows, "status": "ok"}
 
     def _build_venue_field_position(
         self,
@@ -2703,6 +2845,10 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         snap["venue_source_metadata"] = case.venue_source_metadata
     if case.adapter_mode and case.adapter_mode != "offline_stub":
         snap["adapter_mode"] = case.adapter_mode
+    if case.discipline_intent is not None:
+        snap["discipline_intent"] = case.discipline_intent
+    if case.venue_family_context is not None:
+        snap["venue_family_context"] = case.venue_family_context
 
     return snap
 
@@ -2801,6 +2947,12 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
     am = data.get("adapter_mode")
     if isinstance(am, str) and am:
         case.adapter_mode = am
+    di = data.get("discipline_intent")
+    if isinstance(di, dict):
+        case.discipline_intent = di
+    vfc = data.get("venue_family_context")
+    if isinstance(vfc, dict):
+        case.venue_family_context = vfc
 
     raw_pathways = data.get("pathways", [])
     for p in raw_pathways:

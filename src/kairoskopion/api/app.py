@@ -477,6 +477,39 @@ def build_submission_pack_api(case: Case = Depends(_user_case)):
 
 
 # ---------------------------------------------------------------------------
+# Phase 3: Track A — Discipline to Venue Funnel
+# ---------------------------------------------------------------------------
+
+class SetDisciplineIntentRequest(BaseModel):
+    text: str
+    region: str = "auto"
+    constraints: list[str] | None = None
+
+
+@app.post("/cases/{case_id}/set-discipline-intent")
+def set_discipline_intent(
+    req: SetDisciplineIntentRequest, case: Case = Depends(_user_case),
+):
+    result = case.set_discipline_intent(
+        text=req.text, region=req.region, constraints=req.constraints,
+    )
+    store.save(case)
+    return result
+
+
+@app.get("/cases/{case_id}/venue-matrix")
+def get_venue_matrix(case: Case = Depends(_user_case)):
+    return case.get_venue_matrix()
+
+
+@app.get("/cases/{case_id}/venue-family-context")
+def get_venue_family_context(case: Case = Depends(_user_case)):
+    if not case.venue_family_context:
+        raise HTTPException(404, "No venue family context available")
+    return case.venue_family_context
+
+
+# ---------------------------------------------------------------------------
 # Article Model
 # ---------------------------------------------------------------------------
 
