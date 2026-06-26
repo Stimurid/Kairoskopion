@@ -153,6 +153,9 @@ class Case:
         self.discipline_intent: dict[str, Any] | None = None
         # Phase 3: venue family context (cross-track)
         self.venue_family_context: dict[str, Any] | None = None
+        # Phase 5: depth mode and budget
+        self.depth_mode: str = "standard"
+        self.budget_constraints: dict[str, Any] | None = None
 
         # Track A (intake-choice-and-routing-seam): user-choice override
         # state. ``classifier_input_type`` / ``classifier_confidence`` /
@@ -1170,6 +1173,75 @@ class Case:
                 ),
             })
         return {"candidates": matrix_rows, "status": "ok"}
+
+    # ------------------------------------------------------------------
+    # Phase 5: Depth mode & budget controls
+    # ------------------------------------------------------------------
+
+    _DEPTH_MODES = ("quick", "standard", "deep", "exhaustive")
+
+    def set_depth_mode(self, mode: str) -> dict[str, Any]:
+        """Set the depth/budget mode for this case."""
+        if mode not in self._DEPTH_MODES:
+            return {
+                "status": "invalid",
+                "valid_modes": list(self._DEPTH_MODES),
+            }
+        self.depth_mode = mode
+        self._log_decision("set_depth_mode", {"mode": mode})
+        return {"status": "ok", "depth_mode": mode}
+
+    def set_budget_constraints(
+        self, max_api_calls: int | None = None, max_tokens: int | None = None,
+    ) -> dict[str, Any]:
+        self.budget_constraints = {
+            "max_api_calls": max_api_calls,
+            "max_tokens": max_tokens,
+            "set_at": _now(),
+        }
+        self._log_decision("set_budget_constraints", self.budget_constraints)
+        return {"status": "ok", "budget_constraints": self.budget_constraints}
+
+    def get_cost_estimate(self) -> dict[str, Any]:
+        """Estimate cost/effort for current depth mode."""
+        depth_profiles = {
+            "quick": {
+                "adapter_calls": 0,
+                "llm_calls": 0,
+                "estimated_seconds": 5,
+                "description": "Local-only, no external calls",
+            },
+            "standard": {
+                "adapter_calls": 3,
+                "llm_calls": 1,
+                "estimated_seconds": 30,
+                "description": "Basic adapter queries + one LLM pass",
+            },
+            "deep": {
+                "adapter_calls": 8,
+                "llm_calls": 3,
+                "estimated_seconds": 90,
+                "description": "Full adapter sweep + multi-pass LLM",
+            },
+            "exhaustive": {
+                "adapter_calls": 15,
+                "llm_calls": 5,
+                "estimated_seconds": 180,
+                "description": "All adapters + corpus analysis + full LLM chain",
+            },
+        }
+        profile = depth_profiles.get(self.depth_mode, depth_profiles["standard"])
+        budget = self.budget_constraints or {}
+        if budget.get("max_api_calls") is not None:
+            profile["adapter_calls"] = min(
+                profile["adapter_calls"], budget["max_api_calls"],
+            )
+        return {
+            "depth_mode": self.depth_mode,
+            "profile": profile,
+            "budget_constraints": self.budget_constraints,
+            "status": "ok",
+        }
 
     def _build_venue_field_position(
         self,
@@ -2849,6 +2921,10 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         snap["discipline_intent"] = case.discipline_intent
     if case.venue_family_context is not None:
         snap["venue_family_context"] = case.venue_family_context
+    if case.depth_mode and case.depth_mode != "standard":
+        snap["depth_mode"] = case.depth_mode
+    if case.budget_constraints is not None:
+        snap["budget_constraints"] = case.budget_constraints
 
     return snap
 
@@ -2953,6 +3029,12 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
     vfc = data.get("venue_family_context")
     if isinstance(vfc, dict):
         case.venue_family_context = vfc
+    dm = data.get("depth_mode")
+    if isinstance(dm, str) and dm:
+        case.depth_mode = dm
+    bc = data.get("budget_constraints")
+    if isinstance(bc, dict):
+        case.budget_constraints = bc
 
     raw_pathways = data.get("pathways", [])
     for p in raw_pathways:

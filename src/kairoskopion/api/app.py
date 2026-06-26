@@ -1015,6 +1015,39 @@ def add_venue_memory_outcome(
 
 
 # ---------------------------------------------------------------------------
+# Phase 5: Depth / budget controls
+# ---------------------------------------------------------------------------
+
+class SetDepthModeRequest(BaseModel):
+    mode: str
+
+
+@app.post("/cases/{case_id}/set-depth-mode")
+def set_depth_mode(case_id: str, req: SetDepthModeRequest, user=Depends(get_current_user)):
+    case = _get_case(case_id, user)
+    return case.set_depth_mode(req.mode)
+
+
+class SetBudgetRequest(BaseModel):
+    max_api_calls: int | None = None
+    max_tokens: int | None = None
+
+
+@app.post("/cases/{case_id}/set-budget")
+def set_budget(case_id: str, req: SetBudgetRequest, user=Depends(get_current_user)):
+    case = _get_case(case_id, user)
+    return case.set_budget_constraints(
+        max_api_calls=req.max_api_calls, max_tokens=req.max_tokens,
+    )
+
+
+@app.get("/cases/{case_id}/cost-estimate")
+def get_cost_estimate(case_id: str, user=Depends(get_current_user)):
+    case = _get_case(case_id, user)
+    return case.get_cost_estimate()
+
+
+# ---------------------------------------------------------------------------
 # Static frontend (SPA) — serves built UI if dist/ exists
 # ---------------------------------------------------------------------------
 
