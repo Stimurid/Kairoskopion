@@ -142,10 +142,15 @@ VENUE_FUNNEL_OUTPUT_SCHEMA = {
                         "enum": ["corpus_known", "evidence_pack",
                                  "user_provided"],
                     },
+                    "known_corpus_candidate": {
+                        "type": "boolean",
+                        "enum": [True],
+                    },
                     "relevance_note": {"type": "string"},
                 },
                 "required": ["venue_ref", "source_ref",
-                             "evidence_status"],
+                             "evidence_status",
+                             "known_corpus_candidate"],
                 "additionalProperties": True,
             },
         },
@@ -227,6 +232,11 @@ def validate_venue_funnel(data: dict) -> list[str]:
         if not c.get("evidence_status"):
             warnings.append(
                 f"known_corpus_candidate[{i}] missing evidence_status"
+            )
+        if c.get("known_corpus_candidate") is not True:
+            warnings.append(
+                f"known_corpus_candidate[{i}] missing or false "
+                f"known_corpus_candidate flag"
             )
     families = data.get("candidate_families", [])
     if not families and not data.get("known_corpus_candidates"):

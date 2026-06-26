@@ -32,8 +32,8 @@ class TestSemanticProfileParseTolerance:
         return {
             "disciplinary_registers": ["philosophy of technology", "STS"],
             "primary_discipline": "philosophy of technology",
-            "schools_and_traditions": ["postphenomenology"],
-            "theoretical_shoulders": ["Ihde", "Simondon"],
+            "framework_affiliations": ["postphenomenology"],
+            "foundational_anchors": ["Ihde", "Simondon"],
             "opponents_or_foils": [],
             "argument_move_type": "model_building",
             "argument_move_description": "builds a tripartite model",
@@ -92,7 +92,7 @@ class TestSemanticProfileParseTolerance:
         raw = json.dumps(data)
         out = repair_and_parse(raw, schema=self.SCHEMA)
         assert out.parsed is not None
-        assert out.parsed.get("schools_and_traditions") == []
+        assert out.parsed.get("framework_affiliations") == []
         assert out.parsed.get("unknowns") == []
 
     def test_schema_no_longer_requires_fields(self):

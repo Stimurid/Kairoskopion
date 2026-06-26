@@ -87,11 +87,9 @@ contact the editor for explicit expectations."].
   prefers empirical work" — say "unknown".
 - Do NOT recommend a wholesale manuscript rewrite. Each action is \
   surgical: a section, a claim, a citation, a paragraph reframe.
-- Do NOT invent specific citations. Allowed forms vary by field: \
-  "Add references to recent graph neural network benchmarks (2022–2024)" \
-  (CS), "Add foundational theorem references for convex optimization" \
-  (math), "Add references to the postphenomenological tradition" \
-  (philosophy). Name the area/role, NOT a specific paper. \
+- Do NOT invent specific citations. Name the area/role and recency \
+  window — NOT a specific paper. Use the citation role type supported \
+  by article evidence and venue corpus. \
   NOT allowed: "Cite Smith 2024" (fake reference).
 - If a mismatch action would alter the article's protected core \
   (central argument, method, claims), mark it as requiring user \

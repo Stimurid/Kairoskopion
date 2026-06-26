@@ -24,7 +24,7 @@ Your input:
 - depth/cost constraints.
 
 Your job: for each candidate, produce a PRELIMINARY pool-level \
-semantic assessment on 16 axes. This is NOT a final FitAssessment — \
+semantic assessment on 15 axes. This is NOT a final FitAssessment — \
 it is a triage filter to prioritize which candidates deserve deep \
 analysis.
 """ + _DOMAIN_AGNOSTIC_DOCTRINE + """\
@@ -34,7 +34,7 @@ analysis.
 For each candidate:
 1. **venue_candidate_id** — echo the input ID.
 2. **canonical_name** — echo the venue name.
-3. **preliminary_assessment** — object with 16 axes:
+3. **preliminary_assessment** — object with 15 semantic/preliminary axes:
    - **topic_object_fit** — article's research object vs venue scope.
    - **field_subfield_fit** — discipline/subfield alignment.
    - **epistemic_regime_fit** — method/evidence regime compatibility.
@@ -54,15 +54,18 @@ For each candidate:
    - **strategic_value** — strategic value of this venue for the \
      user's goals.
    - **depth_needed** — how much deeper analysis is needed.
-   - **confidence** — confidence in this preliminary assessment.
 
    Each axis value: "strong", "medium", "weak", "poor", "unknown".
    Each axis MUST carry:
    - **evidence_marker**: "source_evidence", "corpus_evidence", \
      "user_input", "llm_inference", "unknown".
 
-4. **overall_impression** — 1-2 sentence summary.
-5. **recommended_depth** — "skip", "quick_scan", "light_profile", \
+4. **confidence** — overall confidence in this candidate's assessment: \
+   "high", "medium", "low", "none".
+5. **confidence_reasoning** — why this confidence level.
+6. **unknowns** — per-candidate list of unknowns affecting assessment.
+7. **overall_impression** — 1-2 sentence summary.
+8. **recommended_depth** — "skip", "quick_scan", "light_profile", \
    "deep_profile".
 
 ## Rules
@@ -112,7 +115,7 @@ _MATRIX_AXES = [
     "citation_ecology_confidence", "evidence_completeness",
     "rewrite_reframe_effort", "protected_core_risk",
     "compliance_uncertainty", "strategic_value",
-    "depth_needed", "confidence",
+    "depth_needed",
 ]
 
 _AXIS_SCHEMA = {
@@ -149,6 +152,15 @@ VENUE_MATRIX_OUTPUT_SCHEMA = {
                         },
                         "additionalProperties": True,
                     },
+                    "confidence": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low", "none"],
+                    },
+                    "confidence_reasoning": {"type": "string"},
+                    "unknowns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
                     "overall_impression": {"type": "string"},
                     "recommended_depth": {
                         "type": "string",
@@ -157,7 +169,7 @@ VENUE_MATRIX_OUTPUT_SCHEMA = {
                     },
                 },
                 "required": ["venue_candidate_id", "canonical_name",
-                             "preliminary_assessment"],
+                             "preliminary_assessment", "confidence"],
                 "additionalProperties": True,
             },
         },

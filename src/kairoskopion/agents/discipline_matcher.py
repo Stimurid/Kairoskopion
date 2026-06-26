@@ -36,6 +36,7 @@ from ..llm.json_repair import (
 from ..llm.provider import LLMProvider
 from ..prompts.discipline_matching import (
     DISCIPLINE_MATCHING_FAMILY,
+    DISCIPLINE_MATCHING_V2_FAMILY,
     validate_discipline_match,
 )
 from ..services.discipline_registry import DisciplineRegistry, load_default_registry
@@ -93,7 +94,7 @@ class DisciplineMatcherAgent(AgentRole):
         candidates = self._gather_candidates(summary, region)
         candidate_block = _build_candidate_block(candidates)
 
-        family = DISCIPLINE_MATCHING_FAMILY
+        family = DISCIPLINE_MATCHING_V2_FAMILY
         user_prompt = family["user_prompt_template"].format(
             article_summary=summary[:_SUMMARY_CHAR_CAP],
             region=region,

@@ -1049,7 +1049,7 @@ class CitationNetworkSignature(_DictMixin):
     typically_cite: list[str] = _list()
     never_cite: list[str] = _list()
     conspicuous_absence: list[str] = _list()
-    bridge_traditions: list[str] = _list()
+    bridge_frameworks: list[str] = _list()
     self_citation_norm: str | None = _field()
 
 @dc.dataclass
@@ -1120,7 +1120,7 @@ class GenrePosition(_DictMixin):
 class GeographicAffinity(_DictMixin):
     """Geographic and regional positioning."""
     author_region: str | None = _field()
-    intellectual_tradition_region: str | None = _field()
+    framework_origin_region: str | None = _field()
     target_audience_region: str | None = _field()
     language_of_publication: str | None = _field()
     editorial_board_regions: dict[str, float] = _dict()

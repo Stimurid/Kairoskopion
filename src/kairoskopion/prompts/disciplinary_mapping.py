@@ -41,10 +41,12 @@ enter. For each pathway, assess fit strength, required adaptations, and risks.
 The relevant disciplinary landscape must come from article evidence, \
 user constraints, and registry records. Do not assume any default fields.
 
-## School/tradition awareness
+## Framework / lineage / regime awareness
 
-Schools and traditions must come from article text and registry records, \
-not from LLM memory.
+Epistemic frameworks, methodological lineages, and evidence regimes \
+must come from article text and registry records, not from LLM memory. \
+If registry evidence is insufficient for a pathway, return \
+source_acquisition_needed rather than producing canonical field facts.
 
 ## Forbidden behavior
 

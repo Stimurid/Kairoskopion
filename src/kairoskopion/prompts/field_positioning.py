@@ -28,12 +28,10 @@ _AXES_REFERENCE = """\
 ### Group 2: Epistemic framework affiliation
 - **framework_affiliation_vector**: dict of framework/lineage names → float
   (0.0–1.0). Epistemic frameworks the article affiliates with, as
-  evidenced in the text. Framework kinds vary by field: philosophical
-  traditions, theorem families, method families, design paradigms,
-  protocol standards, benchmark ecosystems. Derive from evidence, not
-  from a fixed list. May be empty if not applicable.
+  evidenced in the text. Derive from evidence, not from a fixed list.
+  May be empty if not applicable.
 - **citation_network_signature**: {expected_references, typically_cite,
-  never_cite, notable_omissions, bridge_traditions, self_citation_norm}.
+  never_cite, notable_omissions, bridge_frameworks, self_citation_norm}.
   "expected_references" = key works or authors the text's positioning implies
   should appear. "notable_omissions" = references that the stated positioning
   would normally entail but are absent — absence may or may not be
@@ -71,7 +69,7 @@ _AXES_REFERENCE = """\
 - **genre_position**: {genre, genre_formality (0.0–1.0), sections_expected (list)}.
 
 ### Group 6: Geopolitics & Institutional context
-- **geographic_affinity**: {author_region, intellectual_tradition_region,
+- **geographic_affinity**: {author_region, framework_origin_region,
   target_audience_region, language_of_publication}.
   For venues add: editorial_board_regions (dict str→float),
   author_regions_published (dict str→float),
@@ -167,7 +165,7 @@ ARTICLE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
                 "typically_cite": {"type": "array", "items": {"type": "string"}},
                 "never_cite": {"type": "array", "items": {"type": "string"}},
                 "notable_omissions": {"type": "array", "items": {"type": "string"}},
-                "bridge_traditions": {"type": "array", "items": {"type": "string"}},
+                "bridge_frameworks": {"type": "array", "items": {"type": "string"}},
                 "self_citation_norm": {"type": ["string", "null"]},
             },
         },
@@ -234,7 +232,7 @@ ARTICLE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
             "type": "object",
             "properties": {
                 "author_region": {"type": ["string", "null"]},
-                "intellectual_tradition_region": {"type": ["string", "null"]},
+                "framework_origin_region": {"type": ["string", "null"]},
                 "target_audience_region": {"type": ["string", "null"]},
                 "language_of_publication": {"type": ["string", "null"]},
             },
@@ -329,7 +327,7 @@ not a point, but a range of accepted positions.
    has no framework structure.
 2. citation_network_signature for a venue:
    - expected_references → key works or authors the venue community expects
-   - bridge_traditions → cross-tradition citations the venue values
+   - bridge_frameworks → cross-framework citations the venue values
    - notable_omissions → references whose absence in a submission would be
      surprising given the venue's positioning
 3. institutional_signals: Prestige and ranking are per-database, per-year,
@@ -415,7 +413,7 @@ VENUE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
                 "typically_cite": {"type": "array", "items": {"type": "string"}},
                 "never_cite": {"type": "array", "items": {"type": "string"}},
                 "notable_omissions": {"type": "array", "items": {"type": "string"}},
-                "bridge_traditions": {"type": "array", "items": {"type": "string"}},
+                "bridge_frameworks": {"type": "array", "items": {"type": "string"}},
                 "self_citation_norm": {"type": ["string", "null"]},
             },
         },
@@ -494,7 +492,7 @@ VENUE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
             "type": "object",
             "properties": {
                 "author_region": {"type": ["string", "null"]},
-                "intellectual_tradition_region": {"type": ["string", "null"]},
+                "framework_origin_region": {"type": ["string", "null"]},
                 "target_audience_region": {"type": ["string", "null"]},
                 "language_of_publication": {"type": ["string", "null"]},
                 "editorial_board_regions": {

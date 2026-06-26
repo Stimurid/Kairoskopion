@@ -5,7 +5,7 @@ from .citation_ecology_analysis import CITATION_ECOLOGY_FAMILY
 from .compliance_assessment import COMPLIANCE_ASSESSMENT_FAMILY
 from .depth_recommendation import DEPTH_RECOMMENDATION_FAMILY
 from .discipline_intent_parsing import DISCIPLINE_INTENT_FAMILY
-from .discipline_matching import DISCIPLINE_MATCHING_FAMILY
+from .discipline_matching import DISCIPLINE_MATCHING_FAMILY, DISCIPLINE_MATCHING_V2_FAMILY
 from .discipline_seeding import DISCIPLINE_SEEDING_FAMILY
 from .discipline_source_acquisition import DISCIPLINE_SOURCE_ACQUISITION_FAMILY
 from .disciplinary_mapping import DISCIPLINARY_MAPPING_FAMILY
@@ -32,6 +32,7 @@ __all__ = [
     "DISCIPLINARY_MAPPING_FAMILY",
     "DISCIPLINE_INTENT_FAMILY",
     "DISCIPLINE_MATCHING_FAMILY",
+    "DISCIPLINE_MATCHING_V2_FAMILY",
     "DISCIPLINE_SEEDING_FAMILY",
     "DISCIPLINE_SOURCE_ACQUISITION_FAMILY",
     "FIT_ASSESSMENT_FAMILY",

@@ -1,7 +1,7 @@
 """Article Semantic Profiling prompt family (UC-1 step 3).
 
-Builds ArticleSemanticProfile: disciplinary registers, school/tradition
-affiliations, argument move type, theoretical shoulders, protected core.
+Builds ArticleSemanticProfile: disciplinary registers, framework
+affiliations, argument move type, foundational anchors, protected core.
 """
 
 from __future__ import annotations
@@ -24,9 +24,11 @@ Which academic disciplines does this article speak to? Not just one — most \
 research touches several. List them with specificity: use the most precise \
 sub-field label the text supports rather than a broad umbrella term.
 
-## 2. Schools and traditions
-Schools and traditions mentioned in the article text. Do not assume any \
-default school. Report only what the article text explicitly references.
+## 2. Framework affiliations
+Epistemic frameworks the article affiliates with, as evidenced in the \
+text. Framework kinds vary by field and are not limited to any fixed \
+list. Report only what the article text explicitly references or \
+demonstrates. Do not assume a default framework.
 
 ## 3. Argument move type
 Describe the argument move type as observed in the text. Use a short \
@@ -42,9 +44,11 @@ Common patterns include (but are not limited to):
 - unknown
 If none of these labels fit, supply a free-form label that does.
 
-## 4. Theoretical shoulders
-Whose work does this article build on? Not just bibliography — the key \
-intellectual debts that structure the argument.
+## 4. Foundational anchors
+What prior work does this article build on? Not just bibliography — the \
+key intellectual debts that structure the argument. These may be authors, \
+theorems, methods, protocols, datasets, or any foundational contribution \
+the field recognizes.
 
 ## 5. Protected core
 What parts of the article's intellectual contribution must NOT be destroyed \
@@ -52,14 +56,14 @@ during adaptation for different venues? What would make the article lose \
 its point if removed?
 
 ## 6. Citation ecology signals
-What citation traditions need to be present? What bridges are needed for \
+What citation role expectations apply? What bridges are needed for \
 different disciplinary audiences?
 
 ## Forbidden behavior
 
 - Do NOT assign a single discipline when multiple are evident.
-- Do NOT guess schools/traditions — only report what is evident from the text.
-- Do NOT conflate "the article cites X" with "the article belongs to X's tradition".
+- Do NOT guess frameworks — only report what is evident from the text.
+- Do NOT conflate "the article cites X" with "the article affiliates with X's framework".
 - Do NOT ignore the protected core.
 - Mark anything uncertain as unknown.
 
@@ -77,8 +81,8 @@ CORRECT (the ONLY accepted format):
 {
   "disciplinary_registers": ["sub-field A", "sub-field B"],
   "primary_discipline": "sub-field A",
-  "schools_and_traditions": ["tradition referenced in text"],
-  "theoretical_shoulders": ["Author X", "Author Y"],
+  "framework_affiliations": [],
+  "foundational_anchors": ["Author X", "Author Y"],
   "opponents_or_foils": [],
   "argument_move_type": "model_building",
   "argument_move_description": "...",
@@ -132,11 +136,11 @@ SEMANTIC_PROFILING_OUTPUT_SCHEMA: dict = {
             "items": {"type": "string"},
         },
         "primary_discipline": {"type": ["string", "null"]},
-        "schools_and_traditions": {
+        "framework_affiliations": {
             "type": "array",
             "items": {"type": "string"},
         },
-        "theoretical_shoulders": {
+        "foundational_anchors": {
             "type": "array",
             "items": {"type": "string"},
         },
