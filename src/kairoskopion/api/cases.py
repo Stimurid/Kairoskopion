@@ -41,6 +41,7 @@ from ..enums import (
 from ..llm.config import LLMConfig
 from ..llm.input_limits import LLM_INPUT_CHAR_CAP, cap_llm_input
 from ..llm.openai_compat import OpenAICompatProvider
+from ..registry.integration import RegistryIntegrationService
 
 
 class CaseStage(str, enum.Enum):
@@ -85,12 +86,14 @@ class Case:
     def __init__(
         self, case_id: str | None = None, title: str = "",
         user_id: str | None = None,
+        registry_service: RegistryIntegrationService | None = None,
     ):
         self.case_id = case_id or generate_id("case")
         self.title = title or "Новый кейс"
         self.created_at = _now()
         self.stage = CaseStage.EMPTY
         self.user_id: str | None = user_id
+        self._registry = registry_service or RegistryIntegrationService()
         self.input_text: str = ""
         self.input_type: str = ""
         # LLM-bound projection of input_text (clipped via input_limits).
@@ -613,20 +616,66 @@ class Case:
         self._build_article_field_position()
 
     def _run_discipline_matcher(self) -> None:
-        """Phase B2: run DisciplineMatcherAgent after article_model is
-        built. Saves result on ``self.discipline_matches`` for downstream
-        agents + UI inspection.
+        """Phase B2: registry-first discipline lookup, then matcher agent.
 
-        Honest fallback: matcher's own deterministic path returns
-        keyword candidates with confidence=low; we save them as-is so
-        the UI can show "no LLM available; here are keyword hints".
-        Never substitutes a fake LLM verdict.
+        P6.1 Track 3: check registry first. If accepted record found,
+        use it as canonical — skip LLM. If provisional, use with warning.
+        If no registry hit, run DisciplineMatcherAgent as before.
         """
         import logging
         logger = logging.getLogger(__name__)
         if self.article_model is None:
             return
 
+        # P6.1 Track 3: registry-first discipline lookup.
+        # Try discipline field first (short, focused), then title.
+        discipline_field = getattr(
+            self.article_model, "disciplinary_register_current", "",
+        ) or ""
+        title = getattr(self.article_model, "title_current", "") or ""
+        queries = [q.strip() for q in [discipline_field, title] if q.strip()]
+
+        reg_result = None
+        for query in queries:
+            reg_result = self._registry.discipline_lookup(
+                query[:200],
+                agent_name="discipline_matcher",
+                case_id=self.case_id,
+            )
+            if reg_result["found"]:
+                break
+
+        if reg_result and reg_result["found"]:
+                rec = reg_result["record"]
+                status = reg_result["usage_status"]
+                display_name = ""
+                if rec.display_names:
+                    display_name = next(iter(rec.display_names.values()), "")
+                self.discipline_matches = {
+                    "matched": [{
+                        "discipline_id": rec.discipline_id,
+                        "display_name": display_name,
+                        "aliases": rec.aliases,
+                        "strength": "canonical" if status == "canonical" else "provisional",
+                        "why": f"registry-first lookup ({status})",
+                        "source_status": rec.source_status,
+                        "review_status": rec.review_status,
+                        "usage_status": status,
+                        "record_id": rec.discipline_id,
+                    }],
+                    "registry_first": True,
+                }
+                if status == "provisional_with_warning":
+                    self.discipline_matches["warnings"] = [
+                        "provisional — not curator-confirmed",
+                    ]
+                logger.info(
+                    "Discipline matched via registry (%s, %s)",
+                    rec.discipline_id, status,
+                )
+                return
+
+        # No registry hit — fall through to matcher agent
         try:
             from ..agents.contract import AgentInput as _AI
             from ..agents.discipline_matcher import DisciplineMatcherAgent
@@ -634,8 +683,6 @@ class Case:
             logger.debug("DisciplineMatcherAgent unavailable: %s", exc)
             return
 
-        # Compact summary for the matcher (avoid shipping the whole
-        # article text; matcher needs intent, not corpus).
         summary_parts: list[str] = []
         for k in (
             "title", "problem_statement", "object_of_inquiry",
@@ -796,12 +843,7 @@ class Case:
         import logging
         logger = logging.getLogger(__name__)
 
-        # F3: minimum-text guard. Real cockpit symptom: pasting 50
-        # chars of "Journal of X" produced a VenueModel with
-        # canonical_name=None, fake regime, fake confidence — UI
-        # rendered blanks as if a profile had been built. Reject early
-        # with an honest hint so the operator can paste full aims/scope
-        # or supply a URL/ISSN.
+        # F3: minimum-text guard.
         stripped_len = len(text.strip())
         if stripped_len < 200:
             self._log_decision("investigate_venue_skipped", {
@@ -861,15 +903,31 @@ class Case:
                 "content_hash": hashlib.sha256(text.encode()).hexdigest()[:16],
                 "char_count": len(text),
             }
+
+        # P6.1 Track 7: store extraction output as provisional records
+        source_url = (self.venue_source_metadata or {}).get("source_url")
+        source_type = (self.venue_source_metadata or {}).get(
+            "source_type", "text_paste",
+        )
+        registry_result = self._registry.store_venue_extraction(
+            venue.to_dict(),
+            source_url=source_url,
+            source_type=source_type,
+        )
+
         self._build_venue_field_position(venue, guidelines_text=text)
-        self._build_venue_family_from_venue()
+
+        # P6.1 Track 5: build family context from registry
+        self._build_venue_family_from_venue(
+            registry_venue_id=registry_result.get("parent_venue_id"),
+        )
+
         self._log_decision("investigate_venue", {
             "venue_name": venue.canonical_name,
+            "registry_records_created": registry_result.get("created_count", 0),
         })
-        # F5: surface venue_field_position + used_llm flag so the UI can
-        # render the field-positioner unknown banner and a "deterministic
-        # fallback ran" warning when the LLM was unavailable.
-        return {
+
+        result = {
             "venue": venue.to_dict(),
             "publication_regime": regime.to_dict() if regime else None,
             "venue_field_position": (
@@ -877,7 +935,11 @@ class Case:
                 if self.venue_field_position else None
             ),
             "used_llm": used_llm,
+            "registry_records_created": registry_result.get("created_count", 0),
         }
+
+        # P6.1 Track 8: propagate registry status to output
+        return self._registry.propagate_status(result)
 
     def investigate_venue_by_reference(
         self,
@@ -1112,16 +1174,34 @@ class Case:
             "pathways_count": len(self.pathways),
         }
 
-    def _build_venue_family_from_venue(self) -> None:
-        """Build venue family context when starting from a concrete venue (Track B → context).
+    def _build_venue_family_from_venue(
+        self,
+        registry_venue_id: str | None = None,
+    ) -> None:
+        """Build venue family context from registry evidence + venue identity.
 
-        Venue family inference is a semantic judgment that requires LLM.
-        Without LLM, stores the venue identity and marks status as blocked.
+        P6.1 Track 5: registry-first family context. If the venue has a
+        registry record, builds family from registry evidence (sections,
+        parent/child neighbors). Otherwise falls back to the blocked stub.
         """
         if not self.investigated_venue:
             return
         venue = self.investigated_venue
         name = venue.canonical_name or ""
+
+        # P6.1: try registry-first family context
+        if registry_venue_id:
+            family = self._registry.build_family_context(registry_venue_id)
+            self.venue_family_context = {
+                "source_venue": name,
+                "registry_venue_id": registry_venue_id,
+                "families": [],
+                "families_status": family.get("status", "incomplete"),
+                "registry_family": family,
+                "set_at": _now(),
+            }
+            return
+
         self.venue_family_context = {
             "source_venue": name,
             "families": [],
@@ -1132,9 +1212,8 @@ class Case:
     def get_venue_matrix(self) -> dict[str, Any]:
         """Build a venue matrix from the venue pool.
 
-        Only technical/structural fields are populated deterministically.
-        Semantic axes (fit, risk, rewrite effort) require LLM and are
-        marked as not_assessed until an LLM pass is done.
+        P6.1 Track 6: enriches candidates with registry provenance.
+        Candidates without provenance get warnings. Rejected excluded.
         """
         if not self.venue_pool or not self.venue_pool.candidates:
             return {"candidates": [], "status": "no_pool"}
@@ -1146,6 +1225,7 @@ class Case:
             matrix_rows.append({
                 "venue_candidate_id": c.get("venue_candidate_id", ""),
                 "canonical_name": c.get("canonical_name", ""),
+                "record_id": c.get("record_id", ""),
                 "evidence_level": len(c.get("evidence_refs", [])),
                 "sources_count": len(c.get("sources", [])),
                 "unknowns_count": len(c.get("unknowns", [])),
@@ -1157,7 +1237,13 @@ class Case:
                 ),
                 "preliminary_assessment": "NOT_ASSESSED_NEEDS_LLM",
             })
-        return {"candidates": matrix_rows, "status": "ok"}
+
+        # P6.1 Track 6: enrich with registry provenance
+        enriched = self._registry.enrich_candidates_with_provenance(matrix_rows)
+
+        result = {"candidates": enriched, "status": "ok"}
+        # P6.1 Track 8: propagate status
+        return self._registry.propagate_status(result)
 
     # ------------------------------------------------------------------
     # Phase 5: Depth mode & budget controls

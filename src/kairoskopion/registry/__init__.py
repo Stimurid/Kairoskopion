@@ -30,6 +30,7 @@ from .status import record_usage_status
 from .legacy import append, read_all, list_ids, find_by_id, registry_exists
 from .store import SourcePacketStore, AcquisitionTaskStore
 from .services import RegistryHub
+from .integration import RegistryIntegrationService
 
 __all__ = [
     # P6 models
@@ -53,6 +54,7 @@ __all__ = [
     "record_usage_status",
     # P6 services
     "RegistryHub",
+    "RegistryIntegrationService",
     "SourcePacketStore",
     "AcquisitionTaskStore",
     # Legacy JSONL (from old registry.py)
