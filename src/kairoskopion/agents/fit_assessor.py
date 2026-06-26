@@ -26,10 +26,11 @@ from ..llm.attempt_metadata import (
 from ..llm.provider import LLMProvider
 from ..prompts.fit_assessment import (
     FIT_ASSESSMENT_FAMILY,
+    FIT_ASSESSMENT_VPKG_FAMILY,
     validate_fit_assessment,
+    validate_fit_assessment_vpkg,
 )
-from ..schema import ArticleModel, FitAssessment, SubmissionScenario, VenueModel
-from ..services.fit_assessment import assess_fit as _deterministic_fit
+from ..schema import FitAssessment
 from .contract import AgentInput, AgentOutput, AgentRole
 
 logger = logging.getLogger(__name__)
@@ -173,6 +174,97 @@ class FitAssessorAgent(AgentRole):
             out.warnings = list(out.warnings or []) + [meta.warning_for_user]
         return out
 
+    def execute_vpkg(
+        self, inp: AgentInput, provider: LLMProvider,
+    ) -> AgentOutput:
+        """16-axis VPKG assessment for Mavrinsky semantic organ (#10)."""
+        article_dict = inp.entities.get("article", {})
+        vpkg_dict = inp.entities.get("vpkg", {})
+        corpus_titles = inp.entities.get("corpus_titles", [])
+
+        family = FIT_ASSESSMENT_VPKG_FAMILY
+        if isinstance(corpus_titles, list):
+            corpus_text = "\n".join(
+                f"- {t}" for t in corpus_titles[:50]
+            ) or "(no corpus titles available)"
+        else:
+            corpus_text = str(corpus_titles)[:3000]
+
+        user_prompt = family["user_prompt_template"].format(
+            article_json=json.dumps(
+                article_dict, ensure_ascii=False, indent=2,
+            ),
+            vpkg_json=json.dumps(
+                vpkg_dict, ensure_ascii=False, indent=2,
+            )[:6000],
+            corpus_titles=corpus_text,
+        )
+        messages = [
+            {"role": "system", "content": family["system_prompt"]},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        try:
+            response = provider.complete(
+                messages,
+                response_schema=family["output_schema"],
+                temperature=0.2,
+                max_tokens=6144,
+            )
+        except Exception as e:
+            logger.warning("VPKG fit assessment LLM failed: %s", e)
+            meta = LLMAttemptMetadata.fallback(
+                reason=FALLBACK_REASON_PROVIDER_ERROR,
+                provider="openai_compatible",
+                model=None,
+                validation_errors=[str(e)[:240]],
+                parse_status="invalid_json",
+            )
+            return self._deterministic_with_attempt(inp, meta)
+
+        parsed, meta, repair_steps, errors = classify_llm_response(
+            response, family["output_schema"],
+        )
+        if parsed is None:
+            return self._deterministic_with_attempt(inp, meta)
+
+        validation_warnings = validate_fit_assessment_vpkg(parsed)
+
+        fit = _build_from_llm(
+            parsed,
+            article_id=article_dict.get("article_model_id"),
+            venue_id=vpkg_dict.get("venue_model_id"),
+            scenario_id=None,
+        )
+        fit.extraction_attempt = meta.to_dict()
+
+        return AgentOutput(
+            output_entity_type="FitAssessment",
+            output_entity=fit.to_dict(),
+            evidence_refs=[],
+            unknowns=parsed.get("unknowns", []),
+            assumptions=[],
+            confidence=parsed.get("confidence", "medium"),
+            warnings=validation_warnings,
+            questions_for_user=parsed.get("questions_for_user", []),
+            quality_gate_status="preliminary",
+            trace_notes=[
+                f"VPKG 16-axis mode",
+                f"LLM model: {response.model}",
+                f"Tokens: {response.input_tokens}+{response.output_tokens}",
+                f"Latency: {response.latency_ms:.0f}ms",
+                f"parse_status: {meta.parse_status}",
+            ],
+            evidence_status=EvidenceStatus.INFERENCE.value,
+            llm_usage={
+                "model": response.model,
+                "input_tokens": response.input_tokens,
+                "output_tokens": response.output_tokens,
+                "latency_ms": response.latency_ms,
+                "extraction_attempt": meta.to_dict(),
+            },
+        )
+
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
         return self._fallback_deterministic(inp)
 
@@ -181,11 +273,35 @@ class FitAssessorAgent(AgentRole):
         venue_dict = inp.entities.get("venue", {})
         scenario_dict = inp.entities.get("scenario", {})
 
-        article = ArticleModel.from_dict(article_dict)
-        venue = VenueModel.from_dict(venue_dict)
-        scenario = SubmissionScenario.from_dict(scenario_dict)
+        all_unknown_axes = [
+            {
+                "axis": axis_name,
+                "value": FitAxisValue.UNKNOWN.value,
+                "notes": "LLM assessment unavailable — axis not evaluated",
+                "evidence_refs": [],
+                "unknowns": ["requires LLM for semantic assessment"],
+            }
+            for axis_name in (
+                "topic", "discipline", "genre", "argument_structure",
+                "method", "citation_ecology", "novelty_positioning",
+                "language_register", "audience", "formal_compliance",
+                "author_eligibility", "publication_regime",
+            )
+        ]
 
-        fit = _deterministic_fit(article, venue, scenario)
+        fit = FitAssessment(
+            fit_assessment_id=fit_assessment_id(),
+            article_model_id=article_dict.get("article_model_id"),
+            venue_model_id=venue_dict.get("venue_model_id"),
+            submission_scenario_id=scenario_dict.get("submission_scenario_id"),
+            assessment_level=AssessmentLevel.LIGHT_PROFILE.value,
+            overall_label=FitLabel.NOT_ENOUGH_DATA.value,
+            axes=all_unknown_axes,
+            confidence="none",
+            unknowns=["All axes require LLM for semantic assessment"],
+            recommendation=None,
+            lifecycle_status=LifecycleStatus.PRELIMINARY.value,
+        )
 
         return AgentOutput(
             output_entity_type="FitAssessment",
@@ -193,12 +309,18 @@ class FitAssessorAgent(AgentRole):
             evidence_refs=[],
             unknowns=fit.unknowns,
             assumptions=[],
-            confidence=fit.confidence or "low",
-            warnings=["Deterministic assessment: limited depth"],
+            confidence="none",
+            warnings=[
+                "LLM fit assessor unavailable — all axes set to 'unknown', "
+                "overall label 'not_enough_data'. No deterministic semantic "
+                "fallback used."
+            ],
             questions_for_user=[],
-            quality_gate_status="preliminary",
-            trace_notes=["Deterministic rule-based assessment (no LLM)"],
-            evidence_status="heuristic",
+            quality_gate_status="blocked",
+            trace_notes=[
+                "All-unknown assessment (no deterministic semantic fallback)"
+            ],
+            evidence_status="none",
         )
 
 

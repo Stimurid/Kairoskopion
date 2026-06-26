@@ -206,3 +206,83 @@ FIT_ASSESSMENT_FAMILY = {
     "output_schema": FIT_ASSESSMENT_OUTPUT_SCHEMA,
     "validator": validate_fit_assessment,
 }
+
+
+# ---------------------------------------------------------------------------
+# 16-axis VPKG variant for Mavrinsky semantic assessment (Organ #10)
+# ---------------------------------------------------------------------------
+
+FIT_ASSESSMENT_VPKG_SYSTEM = FIT_ASSESSMENT_SYSTEM + """\
+
+## Extended axes (VPKG mode — 16 standard + 4 additional)
+
+In addition to the 16 axes above, assess these 4 axes when a \
+VenueProfilePackage (VPKG) is provided:
+
+17. **argument_form_fit** — does the article's argument form \
+    (thesis-driven, exploratory, problem-solution, narrative) match \
+    what the venue corpus typically publishes?
+18. **rewrite_effort** — how much rewriting would be required to adapt \
+    the article for this venue? Values: none, minor, moderate, major.
+19. **citation_effort** — how much bibliography work is needed? \
+    Values: none, minor, moderate, major.
+20. **evidence_confidence** — how confident are you in the evidence base \
+    for this assessment? Separate from per-axis confidence.
+
+For each axis, also report **evidence_source**: "corpus_observation" \
+(you saw it in corpus titles), "vpkg_evidence" (stated in VPKG policy \
+fields), or "inference" (your reasoning without direct evidence).
+
+Total axes in VPKG mode: 20.
+"""
+
+FIT_ASSESSMENT_VPKG_USER_TEMPLATE = """\
+Assess the fit between the following article and venue using the \
+VenueProfilePackage. This is VPKG mode — assess all 20 axes.
+
+## ArticleModel
+```json
+{article_json}
+```
+
+## VenueProfilePackage
+```json
+{vpkg_json}
+```
+
+## Corpus titles (sample)
+{corpus_titles}
+
+IMPORTANT: respond with ONLY the JSON object. No markdown fences, no XML \
+tags, no prose before or after. Every field from the schema must be present.
+"""
+
+_EXPECTED_VPKG_AXES = _EXPECTED_AXES | {
+    "argument_form_fit", "rewrite_effort",
+    "citation_effort", "evidence_confidence",
+}
+
+
+def validate_fit_assessment_vpkg(data: dict) -> list[str]:
+    warnings: list[str] = []
+    axes_present = {a.get("axis") for a in data.get("axes", [])}
+    missing = _EXPECTED_VPKG_AXES - axes_present
+    if missing:
+        warnings.append(f"Missing VPKG axes: {', '.join(sorted(missing))}")
+    values = [a.get("value") for a in data.get("axes", [])]
+    if all(v == "strong" for v in values if v):
+        warnings.append("All axes strong — suspiciously optimistic")
+    if not data.get("unknowns"):
+        warnings.append("No unknowns — unlikely for real-world assessment")
+    return warnings
+
+
+FIT_ASSESSMENT_VPKG_FAMILY = {
+    "family_id": "fit_assessment_vpkg_v1",
+    "agent_role_id": "fit_assessor",
+    "version": "1.0.0",
+    "system_prompt": FIT_ASSESSMENT_VPKG_SYSTEM,
+    "user_prompt_template": FIT_ASSESSMENT_VPKG_USER_TEMPLATE,
+    "output_schema": FIT_ASSESSMENT_OUTPUT_SCHEMA,
+    "validator": validate_fit_assessment_vpkg,
+}

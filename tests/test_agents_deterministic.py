@@ -140,11 +140,14 @@ class TestFitAssessorDeterministic(unittest.TestCase):
 
         self.assertEqual(fit_out.output_entity_type, "FitAssessment")
         self.assertIn("fit_assessment_id", fit_out.output_entity)
-        self.assertEqual(fit_out.evidence_status, "heuristic")
+        self.assertEqual(fit_out.evidence_status, "none")
 
         fit = FitAssessment.from_dict(fit_out.output_entity)
-        self.assertIsNotNone(fit.overall_label)
+        self.assertEqual(fit.overall_label, "not_enough_data")
         self.assertTrue(len(fit.axes) > 0)
+        for ax in fit.axes:
+            ax_val = ax["value"] if isinstance(ax, dict) else ax.value
+            self.assertEqual(ax_val, "unknown")
 
 
 class TestPipelineDeterministic(unittest.TestCase):

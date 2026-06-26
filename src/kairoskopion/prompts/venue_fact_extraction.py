@@ -34,6 +34,26 @@ about indexing, impact factor, or quality are VENDOR_CLAIM unless independently 
 verified. Author guidelines about formatting, word limits, and submission \
 process are FACT_FROM_SOURCE (they define the rules).
 
+## Regime classification (important)
+
+Classify the venue's **publication regime** — the type of publication \
+container:
+- "classic_journal_article" — standard peer-reviewed journal.
+- "special_issue_article" — a special/themed issue within a journal.
+- "conference_proceedings" — published conference papers.
+- "mega_journal" — large-scale open-access journal (e.g. PLOS ONE type).
+- "edited_volume" — chapter in an edited book.
+- null — cannot determine from text.
+
+Do NOT default to "classic_journal_article" when unsure. Use null.
+
+## Policy extraction (important)
+
+For each policy field below, extract what the venue TEXT actually says. \
+Do NOT infer policies from venue type alone. If the text doesn't mention \
+a policy, use null — not a guess. Negation matters: "no APC" is different \
+from no mention of APC.
+
 ## Extraction targets
 
 1. **canonical_name** — the full official name of the journal/venue.
@@ -105,6 +125,14 @@ VENUE_FACT_EXTRACTION_OUTPUT_SCHEMA: dict = {
             "enum": [
                 "journal", "conference_proceedings", "book_series",
                 "edited_volume", "special_issue", "unknown",
+            ],
+        },
+        "regime_type": {
+            "type": ["string", "null"],
+            "enum": [
+                "classic_journal_article", "special_issue_article",
+                "conference_proceedings", "mega_journal",
+                "edited_volume", None,
             ],
         },
         "publisher_or_owner": {"type": ["string", "null"]},
