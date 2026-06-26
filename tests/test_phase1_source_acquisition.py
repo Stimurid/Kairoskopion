@@ -14,9 +14,9 @@ class TestInvestigateVenueByUrl(unittest.TestCase):
     def _make_case(self):
         return Case(case_id="test_url", user_id="u1")
 
-    def test_non_https_rejected(self):
+    def test_unsafe_scheme_rejected(self):
         case = self._make_case()
-        result = case.investigate_venue_by_url("http://example.com")
+        result = case.investigate_venue_by_url("ftp://example.com")
         self.assertEqual(result["status"], "invalid_url")
 
     def test_fetch_failure_returns_error(self):
@@ -104,18 +104,85 @@ class TestSourceRegistration(unittest.TestCase):
         self.assertIsNotNone(case.venue_source_metadata)
 
 
+class TestURLSecurityGate(unittest.TestCase):
+    """Track 4: SSRF blocking for URL intake."""
+
+    def _make_case(self):
+        return Case(case_id="test_ssrf", user_id="u1")
+
+    def test_file_scheme_blocked(self):
+        case = self._make_case()
+        result = case.investigate_venue_by_url("file:///etc/passwd")
+        self.assertEqual(result["status"], "invalid_url")
+
+    def test_ftp_scheme_blocked(self):
+        case = self._make_case()
+        result = case.investigate_venue_by_url("ftp://example.com/file")
+        self.assertEqual(result["status"], "invalid_url")
+
+    def test_data_scheme_blocked(self):
+        case = self._make_case()
+        result = case.investigate_venue_by_url("data:text/html,hello")
+        self.assertEqual(result["status"], "invalid_url")
+
+    def test_localhost_blocked(self):
+        case = self._make_case()
+        result = case.investigate_venue_by_url("https://localhost/admin")
+        self.assertEqual(result["status"], "invalid_url")
+
+    def test_127_blocked(self):
+        case = self._make_case()
+        result = case.investigate_venue_by_url("https://127.0.0.1/admin")
+        self.assertEqual(result["status"], "invalid_url")
+
+    def test_http_allowed(self):
+        """http:// should pass scheme check (safe_url validates scheme)."""
+        safe, _ = Case._is_safe_url("http://example.com")
+        self.assertTrue(safe)
+
+    def test_https_allowed(self):
+        safe, _ = Case._is_safe_url("https://example.com")
+        self.assertTrue(safe)
+
+    def test_no_hostname_blocked(self):
+        safe, reason = Case._is_safe_url("https://")
+        self.assertFalse(safe)
+
+
 class TestAdapterModeToggle(unittest.TestCase):
-    """1.3: Adapter mode toggle."""
+    """1.3: Adapter mode toggle — env-gated for LIVE_API."""
 
     def test_default_mode_is_offline_stub(self):
         case = Case(case_id="test_mode", user_id="u1")
         self.assertEqual(case.adapter_mode, "offline_stub")
 
-    def test_set_valid_mode(self):
+    def test_set_offline_modes_allowed(self):
         case = Case(case_id="test_mode2", user_id="u1")
-        result = case.set_adapter_mode("live_api")
-        self.assertEqual(result["status"], "ok")
-        self.assertEqual(case.adapter_mode, "live_api")
+        for mode in ("offline_stub", "fixture", "cached"):
+            result = case.set_adapter_mode(mode)
+            self.assertEqual(result["status"], "ok")
+
+    def test_live_api_blocked_without_env(self):
+        """LIVE_API requires KAIROSKOPION_ALLOW_LIVE_API env var."""
+        import os
+        env_backup = os.environ.pop("KAIROSKOPION_ALLOW_LIVE_API", None)
+        try:
+            case = Case(case_id="test_mode_gate", user_id="u1")
+            result = case.set_adapter_mode("live_api")
+            self.assertEqual(result["status"], "forbidden")
+        finally:
+            if env_backup is not None:
+                os.environ["KAIROSKOPION_ALLOW_LIVE_API"] = env_backup
+
+    def test_live_api_allowed_with_env(self):
+        import os
+        os.environ["KAIROSKOPION_ALLOW_LIVE_API"] = "1"
+        try:
+            case = Case(case_id="test_mode_env", user_id="u1")
+            result = case.set_adapter_mode("live_api")
+            self.assertEqual(result["status"], "ok")
+        finally:
+            del os.environ["KAIROSKOPION_ALLOW_LIVE_API"]
 
     def test_set_invalid_mode_rejected(self):
         case = Case(case_id="test_mode3", user_id="u1")

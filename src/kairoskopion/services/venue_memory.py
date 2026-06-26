@@ -22,8 +22,18 @@ def _venue_memory_id() -> str:
     return generate_id("vmem")
 
 
+_VALID_REVIEW_STATUSES = ("provisional", "candidate", "accepted", "rejected", "superseded")
+
+
 class VenueMemoryRecord:
-    """One venue's accumulated knowledge."""
+    """One venue's accumulated knowledge.
+
+    Every record tracks provenance, record_type, and review_status.
+    Records start as 'provisional' and must be explicitly promoted
+    to 'accepted' before being treated as canonical venue knowledge.
+    Tacit notes remain notes; outcomes remain outcomes — neither
+    auto-promotes to facts.
+    """
 
     def __init__(
         self,
@@ -35,6 +45,10 @@ class VenueMemoryRecord:
         tacit_signals: list[dict[str, Any]] | None = None,
         prior_outcomes: list[dict[str, Any]] | None = None,
         staleness_status: str = "fresh",
+        review_status: str = "provisional",
+        record_type: str = "case_investigation",
+        created_from_case_id: str | None = None,
+        source_refs: list[str] | None = None,
         created_at: str | None = None,
         updated_at: str | None = None,
     ):
@@ -46,8 +60,16 @@ class VenueMemoryRecord:
         self.tacit_signals = tacit_signals or []
         self.prior_outcomes = prior_outcomes or []
         self.staleness_status = staleness_status
+        self.review_status = review_status
+        self.record_type = record_type
+        self.created_from_case_id = created_from_case_id
+        self.source_refs = source_refs or []
         self.created_at = created_at or _now()
         self.updated_at = updated_at or _now()
+
+    @property
+    def is_canonical(self) -> bool:
+        return self.review_status == "accepted"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -59,6 +81,10 @@ class VenueMemoryRecord:
             "tacit_signals": self.tacit_signals,
             "prior_outcomes": self.prior_outcomes,
             "staleness_status": self.staleness_status,
+            "review_status": self.review_status,
+            "record_type": self.record_type,
+            "created_from_case_id": self.created_from_case_id,
+            "source_refs": self.source_refs,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -68,7 +94,8 @@ class VenueMemoryRecord:
         return cls(**{k: v for k, v in d.items() if k in {
             "venue_memory_id", "canonical_name", "issn", "venue_model_id",
             "facts", "tacit_signals", "prior_outcomes", "staleness_status",
-            "created_at", "updated_at",
+            "review_status", "record_type", "created_from_case_id",
+            "source_refs", "created_at", "updated_at",
         }})
 
     def add_note(self, text: str) -> None:
@@ -164,5 +191,19 @@ class VenueMemoryRegistry:
         if not rec:
             return None
         rec.add_outcome(outcome)
+        self._append(rec)
+        return rec
+
+    def set_review_status(
+        self, venue_memory_id: str, status: str,
+    ) -> VenueMemoryRecord | None:
+        """Promote or reject a venue memory record."""
+        if status not in _VALID_REVIEW_STATUSES:
+            return None
+        rec = self._records.get(venue_memory_id)
+        if not rec:
+            return None
+        rec.review_status = status
+        rec.updated_at = _now()
         self._append(rec)
         return rec

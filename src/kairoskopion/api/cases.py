@@ -905,15 +905,44 @@ class Case:
         })
         return self.investigate_venue(pack.text)
 
+    @staticmethod
+    def _is_safe_url(url: str) -> tuple[bool, str]:
+        """Validate URL against SSRF: scheme, host, private ranges."""
+        from urllib.parse import urlparse
+        import ipaddress
+        import socket
+
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False, f"Scheme '{parsed.scheme}' not allowed; use http or https."
+        hostname = parsed.hostname
+        if not hostname:
+            return False, "No hostname in URL."
+        blocked_hosts = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
+        if hostname.lower() in blocked_hosts:
+            return False, "Localhost URLs are blocked."
+        try:
+            resolved = socket.getaddrinfo(hostname, None)
+            for _, _, _, _, addr in resolved:
+                ip = ipaddress.ip_address(addr[0])
+                if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                    return False, f"Resolved to private/reserved IP {ip}."
+                if str(ip) == "169.254.169.254":
+                    return False, "Cloud metadata IP blocked."
+        except (socket.gaierror, ValueError):
+            pass
+        return True, ""
+
     def investigate_venue_by_url(self, url: str) -> dict[str, Any]:
         """Fetch venue page by URL and feed text into investigate_venue."""
         import hashlib
         from ..adapters.http_client import fetch_text_safe
 
-        if not url.startswith("https://"):
+        safe, reason = self._is_safe_url(url)
+        if not safe:
             return {
                 "status": "invalid_url",
-                "hint": "Only HTTPS URLs are accepted.",
+                "hint": reason,
             }
 
         result = fetch_text_safe(url, timeout=30)
@@ -944,11 +973,22 @@ class Case:
         return self.investigate_venue(text)
 
     def set_adapter_mode(self, mode: str) -> dict[str, Any]:
-        """Switch venue adapter mode for this case."""
+        """Switch venue adapter mode for this case.
+
+        LIVE_API mode requires KAIROSKOPION_ALLOW_LIVE_API=1 in server env.
+        Without this env var, only offline_stub, fixture, and cached are
+        allowed — this prevents accidental external API calls in production.
+        """
+        import os
         from ..adapters.venue.base import VenueAdapterMode
         valid = {m.value for m in VenueAdapterMode}
         if mode not in valid:
             return {"status": "invalid_mode", "valid": sorted(valid)}
+        if mode == "live_api" and not os.environ.get("KAIROSKOPION_ALLOW_LIVE_API"):
+            return {
+                "status": "forbidden",
+                "hint": "LIVE_API requires KAIROSKOPION_ALLOW_LIVE_API=1 in server env.",
+            }
         self.adapter_mode = mode
         self._log_decision("set_adapter_mode", {"mode": mode})
         return {"status": "ok", "mode": mode}
@@ -1043,12 +1083,17 @@ class Case:
         self, text: str, region: str = "auto",
         constraints: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Set discipline intent for Track A venue discovery."""
+        """Set discipline intent for Track A venue discovery.
+
+        Stores raw text intent. Venue family inference requires LLM —
+        if unavailable, returns FUNNEL_BLOCKED_NEEDS_LLM.
+        """
         self.discipline_intent = {
             "text": text,
             "region": region,
             "constraints": constraints or [],
             "set_at": _now(),
+            "intent_parse_status": "needs_llm",
         }
         self.region_hint = region or "auto"
         self._log_decision("set_discipline_intent", {
@@ -1056,101 +1101,41 @@ class Case:
             "region": region,
         })
 
-        families = self._infer_venue_families(text, region)
-
         if self.semantic_profile:
             self.get_pathways()
 
         return {
             "status": "ok",
             "discipline_intent": self.discipline_intent,
-            "venue_families": families,
+            "venue_families": [],
+            "venue_families_status": "FUNNEL_BLOCKED_NEEDS_LLM",
             "pathways_count": len(self.pathways),
         }
 
-    def _infer_venue_families(
-        self, text: str, region: str = "auto",
-    ) -> list[dict[str, Any]]:
-        """Deterministic venue family inference from discipline text."""
-        text_lower = text.lower()
-        families: list[dict[str, Any]] = []
-
-        family_map = {
-            "philosophy": {
-                "family_name": "Philosophy journals",
-                "discipline_zone": "philosophy",
-                "known_venues_ru": ["Вопросы философии", "Логос", "Философский журнал", "Эпистемология и философия науки"],
-                "known_venues_intl": ["Philosophy & Technology", "Synthese", "European Journal of Philosophy"],
-            },
-            "sts": {
-                "family_name": "Science and Technology Studies",
-                "discipline_zone": "sts",
-                "known_venues_ru": ["Социология науки и технологий"],
-                "known_venues_intl": ["Social Studies of Science", "Science, Technology & Human Values"],
-            },
-            "sociology": {
-                "family_name": "Sociology journals",
-                "discipline_zone": "sociology",
-                "known_venues_ru": ["Социологические исследования"],
-                "known_venues_intl": ["European Sociological Review", "British Journal of Sociology"],
-            },
-            "media": {
-                "family_name": "Media and Communication",
-                "discipline_zone": "media_studies",
-                "known_venues_ru": ["Медиаскоп"],
-                "known_venues_intl": ["New Media & Society", "Media, Culture & Society"],
-            },
-            "technology": {
-                "family_name": "Philosophy of Technology",
-                "discipline_zone": "philosophy_of_technology",
-                "known_venues_ru": ["Логос", "Вопросы философии"],
-                "known_venues_intl": ["Philosophy & Technology", "Techné"],
-            },
-        }
-
-        for keyword, family_data in family_map.items():
-            if keyword in text_lower:
-                venues = []
-                if region in ("ru", "auto"):
-                    venues.extend(family_data["known_venues_ru"])
-                if region in ("international", "intl", "auto"):
-                    venues.extend(family_data["known_venues_intl"])
-                families.append({
-                    "family_name": family_data["family_name"],
-                    "discipline_zone": family_data["discipline_zone"],
-                    "expected_venues": venues,
-                    "region": region,
-                    "confidence": "medium",
-                })
-
-        if not families:
-            families.append({
-                "family_name": "Unknown discipline",
-                "discipline_zone": "unknown",
-                "expected_venues": [],
-                "region": region,
-                "confidence": "low",
-            })
-
-        return families
-
     def _build_venue_family_from_venue(self) -> None:
-        """Build venue family context when starting from a concrete venue (Track B → context)."""
+        """Build venue family context when starting from a concrete venue (Track B → context).
+
+        Venue family inference is a semantic judgment that requires LLM.
+        Without LLM, stores the venue identity and marks status as blocked.
+        """
         if not self.investigated_venue:
             return
         venue = self.investigated_venue
-        scope = getattr(venue, "scope_summary", "") or ""
         name = venue.canonical_name or ""
-        families = self._infer_venue_families(f"{name} {scope}")
-        if families:
-            self.venue_family_context = {
-                "source_venue": name,
-                "families": families,
-                "set_at": _now(),
-            }
+        self.venue_family_context = {
+            "source_venue": name,
+            "families": [],
+            "families_status": "BLOCKED_NEEDS_LLM",
+            "set_at": _now(),
+        }
 
     def get_venue_matrix(self) -> dict[str, Any]:
-        """Build a qualitative venue matrix from the venue pool."""
+        """Build a venue matrix from the venue pool.
+
+        Only technical/structural fields are populated deterministically.
+        Semantic axes (fit, risk, rewrite effort) require LLM and are
+        marked as not_assessed until an LLM pass is done.
+        """
         if not self.venue_pool or not self.venue_pool.candidates:
             return {"candidates": [], "status": "no_pool"}
         matrix_rows = []
@@ -1165,12 +1150,12 @@ class Case:
                 "sources_count": len(c.get("sources", [])),
                 "unknowns_count": len(c.get("unknowns", [])),
                 "status": c.get("status", "discovered"),
-                "confidence": c.get("confidence", "low"),
                 "next_action": (
                     "investigate" if c.get("status") == "discovered"
                     else "deepen" if c.get("status") == "light_profiled"
                     else "ready"
                 ),
+                "semantic_assessment": "NOT_ASSESSED_NEEDS_LLM",
             })
         return {"candidates": matrix_rows, "status": "ok"}
 

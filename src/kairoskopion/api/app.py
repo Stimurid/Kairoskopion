@@ -1014,6 +1014,23 @@ def add_venue_memory_outcome(
     return rec.to_dict()
 
 
+class VenueMemoryReviewRequest(BaseModel):
+    status: str
+
+
+@app.post("/venue-memory/{venue_memory_id}/review")
+def review_venue_memory(
+    venue_memory_id: str, req: VenueMemoryReviewRequest,
+):
+    rec = venue_memory_registry.set_review_status(venue_memory_id, req.status)
+    if not rec:
+        raise HTTPException(
+            400 if venue_memory_id in {r.venue_memory_id for r in venue_memory_registry.list_all()} else 404,
+            "Invalid status or venue memory not found",
+        )
+    return rec.to_dict()
+
+
 # ---------------------------------------------------------------------------
 # Phase 5: Depth / budget controls
 # ---------------------------------------------------------------------------
