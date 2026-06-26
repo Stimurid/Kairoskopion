@@ -31,6 +31,7 @@ from ..schema import (
     SubmissionScenario,
     VenueCandidatePool,
     VenueModel,
+    VenueProfilePackage,
     _now,
 )
 from ..enums import (
@@ -146,6 +147,8 @@ class Case:
         self.venue_source_metadata: dict[str, Any] | None = None
         # Phase 1: adapter mode override (default = offline_stub)
         self.adapter_mode: str = "offline_stub"
+        # Phase 2: aggregated venue profile package
+        self.venue_profile_package: VenueProfilePackage | None = None
 
         # Track A (intake-choice-and-routing-seam): user-choice override
         # state. ``classifier_input_type`` / ``classifier_confidence`` /
@@ -941,6 +944,90 @@ class Case:
         self.adapter_mode = mode
         self._log_decision("set_adapter_mode", {"mode": mode})
         return {"status": "ok", "mode": mode}
+
+    def enrich_venue(self) -> dict[str, Any]:
+        """Build a VenueProfilePackage from the investigated venue."""
+        if not self.investigated_venue:
+            return {"status": "no_venue", "hint": "Investigate a venue first."}
+
+        venue = self.investigated_venue
+        identity: dict[str, Any] = {
+            "canonical_name": venue.canonical_name,
+            "issns": [venue.issn] if getattr(venue, "issn", None) else [],
+            "publisher": getattr(venue, "publisher", None),
+            "homepage_url": getattr(venue, "homepage_url", None),
+            "languages": getattr(venue, "languages", None) or [],
+            "venue_type": getattr(venue, "venue_type", "journal"),
+        }
+        use_live = self.adapter_mode == "live_api"
+        from ..services.venue_profile_package_builder import build_venue_profile_package
+        vpkg = build_venue_profile_package(
+            identity=identity,
+            fetch_corpus=use_live,
+            fetch_editorial_board=False,
+        )
+        if self.venue_field_position:
+            vpkg.venue_field_position_id = self.venue_field_position.field_position_id
+            vpkg.completeness["VenueFieldPosition"] = "present"
+        if self.publication_regime:
+            vpkg.publication_regime_id = self.publication_regime.publication_regime_id
+            vpkg.completeness["FormalSubmissionProfile"] = "present"
+        if self.source_evidence_packet:
+            vpkg.source_evidence_packet_id = self.source_evidence_packet.source_evidence_packet_id
+
+        self.venue_profile_package = vpkg
+        self._log_decision("enrich_venue", {
+            "venue_name": venue.canonical_name,
+            "completeness": vpkg.completeness,
+            "confidence": vpkg.confidence,
+        })
+        return {
+            "status": "ok",
+            "venue_profile_package": vpkg.to_dict(),
+        }
+
+    def get_venue_profile_package(self) -> dict[str, Any]:
+        if not self.venue_profile_package:
+            return {"status": "not_built", "hint": "Call enrich-venue first."}
+        return self.venue_profile_package.to_dict()
+
+    def get_compliance(self) -> dict[str, Any]:
+        """Build or return compliance checklist."""
+        if self.compliance_checklist and self.compliance_checklist.status != "not_built":
+            return self.compliance_checklist.to_dict()
+        if not self.investigated_venue or not self.article_model:
+            return {"status": "not_ready", "hint": "Need both article and venue."}
+        from ..services.compliance_checklist_minimal import build_minimal_compliance_checklist
+        checklist = build_minimal_compliance_checklist(
+            article=self.article_model,
+            venue=self.investigated_venue,
+            scenario=self.scenario,
+            risk_report=self.risk_report,
+            bibliography_profile=self.bibliography_profile,
+        )
+        self.compliance_checklist = checklist
+        return checklist.to_dict()
+
+    def build_submission_pack_api(self) -> dict[str, Any]:
+        """Build submission pack via API."""
+        if not self.article_model or not self.investigated_venue:
+            return {"status": "not_ready", "hint": "Need article and venue."}
+        if not self.scenario:
+            from ..schema import SubmissionScenario as _SS
+            scenario = _SS()
+        else:
+            scenario = self.scenario
+        from ..services.submission_pack import build_submission_pack
+        pack = build_submission_pack(
+            article=self.article_model,
+            venue=self.investigated_venue,
+            scenario=scenario,
+            fit=self.fit_assessment,
+            risk=self.risk_report,
+            compliance=self.compliance_checklist,
+        )
+        self.submission_pack = pack
+        return pack.to_dict()
 
     def _build_venue_field_position(
         self,
@@ -2570,6 +2657,7 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         ("source_evidence_packet", "source_evidence_packet"),
         ("protected_core_policy", "protected_core_policy"),
         ("evidence_policy", "evidence_policy"),
+        ("venue_profile_package", "venue_profile_package"),
     ]:
         obj = getattr(case, attr, None)
         if obj is not None:
@@ -2662,6 +2750,7 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
         "source_evidence_packet": SourceEvidencePacket,
         "protected_core_policy": ProtectedCorePolicy,
         "evidence_policy": EvidencePolicy,
+        "venue_profile_package": VenueProfilePackage,
     }
     for key, cls in model_map.items():
         raw = data.get(key)

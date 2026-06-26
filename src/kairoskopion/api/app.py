@@ -447,6 +447,36 @@ def get_investigated_venue(case: Case = Depends(_user_case)):
 
 
 # ---------------------------------------------------------------------------
+# Phase 2: Venue Enrichment & Profile Package
+# ---------------------------------------------------------------------------
+
+@app.post("/cases/{case_id}/enrich-venue")
+def enrich_venue(case: Case = Depends(_user_case)):
+    result = case.enrich_venue()
+    store.save(case)
+    return result
+
+
+@app.get("/cases/{case_id}/venue-profile-package")
+def get_venue_profile_package(case: Case = Depends(_user_case)):
+    return case.get_venue_profile_package()
+
+
+@app.get("/cases/{case_id}/compliance")
+def get_compliance(case: Case = Depends(_user_case)):
+    result = case.get_compliance()
+    store.save(case)
+    return result
+
+
+@app.post("/cases/{case_id}/build-submission-pack")
+def build_submission_pack_api(case: Case = Depends(_user_case)):
+    result = case.build_submission_pack_api()
+    store.save(case)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Article Model
 # ---------------------------------------------------------------------------
 
