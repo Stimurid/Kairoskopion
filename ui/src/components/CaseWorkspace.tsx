@@ -28,6 +28,8 @@ import { VenuePoolBoard } from './VenuePoolBoard';
 import { AdaptationStudio } from './AdaptationStudio';
 import { DecisionLog } from './DecisionLog';
 import { DossierView } from './DossierView';
+import { DepthModePanel } from './DepthModePanel';
+import { VenueMemoryPanel } from './VenueMemoryPanel';
 
 interface Props {
   caseData: CaseDetail;
@@ -654,13 +656,18 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
         return (
           <div className="placeholder-view">
             <h2>Пакет подачи</h2>
-            <p>Сборка финального пакета подачи — будет в следующей фазе.</p>
+            <DepthModePanel caseId={caseId} />
             <DecisionLog caseId={caseId} />
           </div>
         );
 
       case 'dossier':
-        return <DossierView caseId={caseId} />;
+        return (
+          <div>
+            <DossierView caseId={caseId} />
+            <VenueMemoryPanel />
+          </div>
+        );
 
       default:
         return (

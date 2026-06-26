@@ -254,6 +254,44 @@ export const api = {
 
   // Agent map
   getAgentMap: () => get<AgentMapData>('/agents/map'),
+
+  // Phase 1: venue investigation by URL
+  investigateVenueByUrl: (id: string, url: string) =>
+    post<VenueInvestigationResult>(`/cases/${id}/investigate-venue-by-url`, { url }),
+
+  // Phase 2: enrich venue, profile package, compliance, submission pack
+  enrichVenue: (id: string) =>
+    post<Record<string, unknown>>(`/cases/${id}/enrich-venue`),
+  getVenueProfilePackage: (id: string) =>
+    get<Record<string, unknown>>(`/cases/${id}/venue-profile-package`),
+  getCompliance: (id: string) =>
+    get<Record<string, unknown>>(`/cases/${id}/compliance`),
+  buildSubmissionPack: (id: string) =>
+    post<Record<string, unknown>>(`/cases/${id}/build-submission-pack`),
+
+  // Phase 3: discipline intent, venue family, venue matrix
+  setDisciplineIntent: (id: string, description: string, region?: string, constraints?: string[]) =>
+    post<Record<string, unknown>>(`/cases/${id}/set-discipline-intent`, {
+      description, region, constraints,
+    }),
+  getVenueFamilyContext: (id: string) =>
+    get<Record<string, unknown>>(`/cases/${id}/venue-family-context`),
+  getVenueMatrix: (id: string) =>
+    get<Record<string, unknown>>(`/cases/${id}/venue-matrix`),
+
+  // Phase 4: venue memory
+  listVenueMemory: () => get<Record<string, unknown>[]>('/venue-memory'),
+  getVenueMemory: (vmid: string) => get<Record<string, unknown>>(`/venue-memory/${vmid}`),
+
+  // Phase 5: depth mode & budget
+  setDepthMode: (id: string, mode: string) =>
+    post<Record<string, unknown>>(`/cases/${id}/set-depth-mode`, { mode }),
+  setBudget: (id: string, maxApiCalls?: number, maxTokens?: number) =>
+    post<Record<string, unknown>>(`/cases/${id}/set-budget`, {
+      max_api_calls: maxApiCalls, max_tokens: maxTokens,
+    }),
+  getCostEstimate: (id: string) =>
+    get<Record<string, unknown>>(`/cases/${id}/cost-estimate`),
 };
 
 // --- Agent Map types ---

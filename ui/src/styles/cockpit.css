@@ -5709,3 +5709,124 @@ code.agent-detail-value {
 .correction-signal-text {
   color: var(--text-primary);
 }
+
+/* DepthModePanel */
+.depth-mode-panel {
+  padding: 1rem;
+}
+.depth-mode-panel h3 {
+  margin: 0 0 0.75rem;
+  color: var(--text-primary);
+}
+.depth-mode-options {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.depth-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.6rem 1rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 120px;
+  transition: border-color 0.15s;
+}
+.depth-btn:hover {
+  border-color: var(--color-primary);
+}
+.depth-btn.active {
+  border-color: var(--color-primary);
+  background: rgba(91, 127, 255, 0.1);
+}
+.depth-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.cost-estimate {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* VenueMemoryPanel */
+.venue-memory-panel {
+  padding: 1rem;
+}
+.venue-memory-panel h3 {
+  margin: 0 0 0.75rem;
+  color: var(--text-primary);
+}
+.venue-memory-panel .empty-state {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.venue-memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.venue-memory-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+.vmem-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.vmem-issn {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.vmem-staleness {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(91, 127, 255, 0.15);
+  color: var(--color-primary);
+}
+.vmem-staleness.stale {
+  background: rgba(229, 168, 59, 0.15);
+  color: #e5a83b;
+}
+.vmem-facts, .vmem-signals {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+}
+.vmem-fact, .vmem-signal {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.vmem-outcomes {
+  margin-top: 0.4rem;
+  display: flex;
+  gap: 0.4rem;
+}
+.vmem-outcome {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(87, 171, 90, 0.15);
+  color: #57ab5a;
+}
+.vmem-outcome.rejected {
+  background: rgba(229, 83, 75, 0.15);
+  color: #e5534b;
+}
