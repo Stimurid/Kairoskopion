@@ -25,11 +25,13 @@ _AXES_REFERENCE = """\
 - **subdiscipline_address**: {primary, niche, working_area} — hierarchical
   address within the primary discipline.
 
-### Group 2: Tradition / Framework affiliation
-- **tradition_affiliation_vector**: dict of tradition/framework names → float
-  (0.0–1.0). Traditions or frameworks the article affiliates with, as
-  evidenced in the text. May be empty if not applicable to the article's
-  field.
+### Group 2: Epistemic framework affiliation
+- **framework_affiliation_vector**: dict of framework/lineage names → float
+  (0.0–1.0). Epistemic frameworks the article affiliates with, as
+  evidenced in the text. Framework kinds vary by field: philosophical
+  traditions, theorem families, method families, design paradigms,
+  protocol standards, benchmark ecosystems. Derive from evidence, not
+  from a fixed list. May be empty if not applicable.
 - **citation_network_signature**: {expected_references, typically_cite,
   never_cite, notable_omissions, bridge_traditions, self_citation_norm}.
   "expected_references" = key works or authors the text's positioning implies
@@ -109,15 +111,15 @@ values for every axis of the FieldPositionModel. The article is a POINT \
 
 ## Rules
 
-1. Every vector (discipline, tradition_affiliation, argument_move, evidence_type)
+1. Every vector (discipline, framework_affiliation, argument_move, evidence_type)
    must have at least 2 components where applicable. Float values must be 0.0–1.0.
-   tradition_affiliation_vector may be empty if the field has no tradition
+   framework_affiliation_vector may be empty if the field has no framework
    structure.
 2. citation_network_signature: list expected_references the article's positioning
    implies; note notable_omissions where positioning suggests references that
    are absent.
 3. Do NOT guess. If you cannot determine a value, use null and add to unknowns.
-4. Be specific in naming disciplines and traditions — generic labels are useless.
+4. Be specific in naming disciplines and frameworks — generic labels are useless.
 5. Vectors should sum to roughly 1.0 (soft constraint).
 6. formalization_level, jargon_density, accessibility_index, novelty_claim_strength,
    genre_formality, completeness, formal_compliance_score are all 0.0–1.0.
@@ -153,7 +155,7 @@ ARTICLE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
                 "working_area": {"type": ["string", "null"]},
             },
         },
-        "tradition_affiliation_vector": {
+        "framework_affiliation_vector": {
             "type": "object",
             "additionalProperties": {"type": "number"},
             "description": "Traditions or frameworks the article affiliates with. May be empty.",
@@ -262,7 +264,7 @@ ARTICLE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
         "confidence": {"type": ["string", "null"]},
     },
     "required": [
-        "discipline_vector", "tradition_affiliation_vector",
+        "discipline_vector", "framework_affiliation_vector",
         "argument_move_vector", "evidence_type_profile",
         "unknowns",
     ],
@@ -271,7 +273,7 @@ ARTICLE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
 
 def _validate_article_fpm(parsed: dict) -> list[str]:
     warnings = []
-    for vkey in ("discipline_vector", "tradition_affiliation_vector",
+    for vkey in ("discipline_vector", "framework_affiliation_vector",
                  "argument_move_vector", "evidence_type_profile"):
         v = parsed.get(vkey)
         if not v or not isinstance(v, dict):
@@ -319,12 +321,12 @@ not a point, but a range of accepted positions.
 
 ## Venue-specific rules
 
-1. For vector axes (discipline, tradition_affiliation, argument_move,
+1. For vector axes (discipline, framework_affiliation, argument_move,
    evidence_type): produce BOTH a center vector AND an envelope (min–max
    range per dimension). The center = what the venue typically publishes.
    The envelope = what is within scope but may be less common.
-   tradition_affiliation_vector and its envelope may be empty if the venue
-   has no tradition structure.
+   framework_affiliation_vector and its envelope may be empty if the venue
+   has no framework structure.
 2. citation_network_signature for a venue:
    - expected_references → key works or authors the venue community expects
    - bridge_traditions → cross-tradition citations the venue values
@@ -392,12 +394,12 @@ VENUE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
                 "working_area": {"type": ["string", "null"]},
             },
         },
-        "tradition_affiliation_vector": {
+        "framework_affiliation_vector": {
             "type": "object",
             "additionalProperties": {"type": "number"},
             "description": "Traditions or frameworks the venue publishes within. May be empty.",
         },
-        "tradition_envelope": {
+        "framework_envelope": {
             "type": "object",
             "additionalProperties": {
                 "type": "array",
@@ -532,7 +534,7 @@ VENUE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
     },
     "required": [
         "discipline_vector", "discipline_envelope",
-        "tradition_affiliation_vector", "tradition_envelope",
+        "framework_affiliation_vector", "framework_envelope",
         "argument_move_vector", "argument_move_envelope",
         "unknowns",
     ],
@@ -541,12 +543,12 @@ VENUE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
 
 def _validate_venue_fpm(parsed: dict) -> list[str]:
     warnings = []
-    for vkey in ("discipline_vector", "tradition_affiliation_vector",
+    for vkey in ("discipline_vector", "framework_affiliation_vector",
                  "argument_move_vector"):
         v = parsed.get(vkey)
         if not v or not isinstance(v, dict):
             warnings.append(f"Missing or empty {vkey}")
-    for ekey in ("discipline_envelope", "tradition_envelope",
+    for ekey in ("discipline_envelope", "framework_envelope",
                  "argument_move_envelope"):
         e = parsed.get(ekey)
         if not e or not isinstance(e, dict):

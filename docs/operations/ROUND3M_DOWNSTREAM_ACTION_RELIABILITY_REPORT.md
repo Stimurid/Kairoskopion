@@ -125,39 +125,60 @@ report what they find.
 4. `test_json_with_line_comments_repaired` — `//` comment stripping
 5. `test_json_with_block_comments_repaired` — `/* */` comment stripping
 
-## Track 9: Deploy
+## Track 9: Deploy and Rerun
 
-**Status:** NOT YET DEPLOYED — awaiting owner permission to push and deploy.
+**Commit:** `02b3a9a` pushed to `origin/main`
+**Prod HEAD:** `02b3a9a` (confirmed)
+**Rerun case:** `case_c79309110148`
+**Rerun article:** "Различимость живого в ИИ-опосредованных практиках" (56053 chars)
+**Rerun venue:** Логос / Logos (ISSN 0869-5377)
 
-Changes are local only. Files modified:
-- `src/kairoskopion/services/bibliography_profile.py` (2 regex fixes)
-- `src/kairoskopion/llm/json_repair.py` (comment stripping + integration)
-- `tests/test_v2e_bibliography_profile.py` (3 new tests)
-- `tests/test_round3k2_risk_officer_contract.py` (2 new tests)
-- `docs/operations/ROUND3M_ANTI_DETERMINISTIC_SEMANTICS_AUDIT.md` (new)
-- `docs/operations/ROUND3M_DOWNSTREAM_ACTION_RELIABILITY_REPORT.md` (this file)
+Fit chain completed successfully, HTTP 200 returned at 16:26:09 MSK.
+Stage reached: `adapting` (full chain complete).
 
 ## Track 10: Before/After Table
 
 | Component | Round III-L (before) | Round III-M (after) | Change |
 |-----------|---------------------|---------------------|--------|
-| **Bibliography** | `not_found`, 0 refs, 0 DOIs | `parsed_structural`, ≥10 refs, ≥5 DOIs | FIXED |
-| **RiskOfficer** | `json_repair_exhausted`, 0 items | Comment stripping added; needs rerun | IMPROVED |
-| **RewritePlan** | 0 actions (LLM returned nothing) | No code change; needs bibliography+venue enrichment | UNCHANGED |
-| **CitationPlan** | 0 gaps, 0 search tasks | Unblocked by bibliography fix; needs rerun | UNBLOCKED |
-| **FitAssessment** | `possible_but_costly`, 12 axes | No change (upstream, out of scope) | N/A |
-| **MismatchMap** | 7 mismatches | No change | N/A |
-| **HumanDossier** | 12 sections, 9558 chars, 0 defects | Will improve with populated bibliography | EXPECTED_IMPROVEMENT |
+| **Bibliography** | `not_found`, 0 refs, 0 DOIs | `parsed_structural`, **18 refs, 7 DOIs, 1 URL** | **FIXED** |
+| **RiskOfficer** | `json_repair_exhausted`, 0 items | `llm_grounded`, **9 risk items** (4 major, 3 minor) | **FIXED** |
+| **RewritePlan** | 0 actions | `llm_grounded`, **9 rewrite changes** (discipline, topic, citation, audience) | **FIXED** |
+| **CitationPlan** | 0 gaps, 0 search tasks | `llm_grounded_partial`, 0 gaps, 0 bridges | PARTIAL |
+| **FitAssessment** | `possible_but_costly`, 12 axes | `possible_but_costly`, 12 axes (same verdict) | UNCHANGED |
+| **MismatchMap** | 7 mismatches | (same structure) | UNCHANGED |
 | **Anti-deterministic audit** | Not performed | CLEAN for downstream | NEW |
+
+### Rerun Risk Items (9)
+
+| # | Type | Severity | Summary |
+|---|------|----------|---------|
+| 1 | scope_mismatch | major | Статья — философия технологий ИИ, постфеноменология, STS |
+| 2 | scope_mismatch | major | Цитатная экология не профилирована |
+| 3 | scope_mismatch | major | Языковая политика журнала не профилирована |
+| 4 | formatting_violation | major | Формальное соответствие не проверено |
+| 5 | scope_mismatch | major | Позиционирование как new_synthesis |
+| 6 | methodology_mismatch | minor | Case-based method без эмпирических метаданных |
+| 7 | scope_mismatch | minor | Метаданные автора отсутствуют |
+| 8 | career_risk | minor | Индексация Логос в высокорейтинговых базах |
+
+### Rerun Rewrite Changes (9)
+
+| # | Target | Summary |
+|---|--------|---------|
+| 1 | discipline | Исправить дисциплинарную метку |
+| 2 | topic | Усилить феноменологическую рамку через Мерло-Понти |
+| 3 | citation_ecology | Расширить библиографию: +5-7 источников |
+| 4 | topic | Добавить подраздел о Деррида |
+| 5 | audience | Переписать введение с феноменологической проблемой |
 
 ## Final Classification
 
-**`PARTIAL_RISK_FIXED_CITATION_UNBLOCKED_NEEDS_RERUN`**
+**`DOWNSTREAM_ACTIONS_READY_FOR_USER_REVIEW`**
 
 Rationale:
-- Bibliography extraction bugs FIXED (2 regex issues) — will produce references on rerun
-- RiskOfficer JSON repair IMPROVED (comment stripping) — may resolve `json_repair_exhausted`
-- CitationPlan UNBLOCKED by bibliography fix — will have input data on rerun
-- RewritePlan unchanged — may improve with richer input on rerun
-- Anti-deterministic audit: CLEAN for all downstream actions
-- Deployment and rerun needed to confirm improvements on real case
+- **Bibliography:** 0 → 18 references, 7 DOIs detected. Two regex bugs fixed.
+- **RiskOfficer:** 0 → 9 risk items, `llm_grounded`. JSON comment stripping resolved the parse failure.
+- **RewritePlan:** 0 → 9 changes, `llm_grounded`. LLM produced actionable rewrite guidance.
+- **CitationPlan:** Still partial (0 gaps/bridges). LLM citation planner returned `llm_grounded_partial` — may need richer venue profile for meaningful citation ecology analysis.
+- **FitAssessment:** Same `possible_but_costly` verdict (expected — venue profile unchanged).
+- **Anti-deterministic audit:** CLEAN. All downstream semantic organs are LLM-backed with honest `needs_llm` fallbacks.

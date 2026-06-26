@@ -270,14 +270,14 @@ class TestBug9NumericCoercion(unittest.TestCase):
     def test_nested_value_dicts_in_vector(self):
         article_fpm = {
             "discipline_vector": {"phil_tech": {"value": 0.5}, "STS": 0.2},
-            "tradition_affiliation_vector": {"Deleuze": 0.6, "Lacan": {"value": -0.3}},
+            "framework_affiliation_vector": {"Deleuze": 0.6, "Lacan": {"value": -0.3}},
             "argument_move_vector": {"concept_reconstruction": 0.4},
             "language_register": {"language": "ru"},
         }
         venue_fpm = {
             "discipline_vector": {"phil_tech": 0.4, "STS": 0.3},
             "discipline_envelope": {"phil_tech": [0.2, 0.7], "STS": [{"value": 0.0}, 0.5]},
-            "tradition_affiliation_vector": {"Deleuze": 0.5, "Lacan": -0.2},
+            "framework_affiliation_vector": {"Deleuze": 0.5, "Lacan": -0.2},
             "argument_move_vector": {"concept_reconstruction": 0.3},
             "language_register": {"language": "ru"},
         }

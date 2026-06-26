@@ -58,7 +58,7 @@ class TestArticleFieldPositionerDeterministic(unittest.TestCase):
         self.assertEqual(fpm.entity_type, "article")
         self.assertEqual(fpm.entity_id, "art_test")
         self.assertIn("philosophy_of_technology", fpm.discipline_vector)
-        self.assertIn("Simondon", fpm.tradition_affiliation_vector)
+        self.assertIn("Simondon", fpm.framework_affiliation_vector)
 
     def test_missing_article(self):
         agent = ArticleFieldPositionerAgent()
@@ -158,8 +158,8 @@ class TestFitChainComputesFPMFit(unittest.TestCase):
                 "philosophy_of_technology": [0.0, 1.0],
                 "STS": [0.0, 1.0],
             },
-            tradition_affiliation_vector={"Simondon": 0.5},
-            tradition_envelope={"Simondon": [0.0, 1.0]},
+            framework_affiliation_vector={"Simondon": 0.5},
+            framework_envelope={"Simondon": [0.0, 1.0]},
             argument_move_vector={"concept_reconstruction": 0.5},
             argument_move_envelope={"concept_reconstruction": [0.0, 1.0]},
             language_register={"language": "en"},

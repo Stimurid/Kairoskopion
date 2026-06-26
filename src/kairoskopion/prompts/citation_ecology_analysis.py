@@ -62,8 +62,8 @@ ALL fields:
 ## Gap categories (domain-agnostic)
 
 - **foundation_gap** — missing foundational references the venue \
-  expects (theorems for math, seminal experiments for biology, \
-  canonical cases for law, key thinkers for philosophy).
+  community expects. Derive the expected foundation type from the \
+  article's field and the venue's corpus, not from a fixed list.
 - **recency_gap** — bibliography too dated for the venue.
 - **diversity_gap** — too narrow in source types or perspectives.
 - **bridge_gap** — missing citations connecting the article to \
@@ -92,7 +92,15 @@ For each suggestion:
 - **target_area** — the area/tradition/literature to bridge to.
 - **reference_anchors** — known authors, groups, or landmark works \
   in the area (ONLY if they are widely known facts, NOT fabricated \
-  references). Use sparingly.
+  references). Use sparingly. Each anchor must carry an \
+  **anchor_status**:
+  - "source_grounded" — anchor comes from the article's bibliography \
+    or a registry record.
+  - "corpus_grounded" — anchor comes from the venue corpus data.
+  - "role_level" — anchor names an area/role, not a specific work.
+  - "unverified_llm_hint" — anchor is an LLM inference, not \
+    verified against any source. Must be segregated in output and \
+    never presented as fact.
 - **rationale** — why this bridge matters for the venue.
 - **evidence_marker** — source of this suggestion.
 
@@ -213,8 +221,18 @@ CITATION_ECOLOGY_OUTPUT_SCHEMA = {
                                         "unknown",
                                     ],
                                 },
+                                "anchor_status": {
+                                    "type": "string",
+                                    "enum": [
+                                        "source_grounded",
+                                        "corpus_grounded",
+                                        "role_level",
+                                        "unverified_llm_hint",
+                                    ],
+                                },
                             },
-                            "required": ["name", "evidence_status"],
+                            "required": ["name", "evidence_status",
+                                         "anchor_status"],
                             "additionalProperties": False,
                         },
                     },
@@ -283,3 +301,5 @@ CITATION_ECOLOGY_FAMILY = {
     "output_schema": CITATION_ECOLOGY_OUTPUT_SCHEMA,
     "validator": validate_citation_ecology,
 }
+
+CITATION_ECOLOGY_ANALYSIS_FAMILY = CITATION_ECOLOGY_FAMILY

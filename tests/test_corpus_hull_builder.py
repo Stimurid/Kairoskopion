@@ -110,9 +110,9 @@ class TestCorpusHullAggregation(unittest.TestCase):
         self.assertEqual(fpm.entity_id, "ven_continental")
 
         # School envelope contains the constructive triad
-        self.assertIn("Deleuze_Guattari", fpm.tradition_envelope or {})
-        self.assertIn("Foucault", fpm.tradition_envelope or {})
-        self.assertIn("Agamben", fpm.tradition_envelope or {})
+        self.assertIn("Deleuze_Guattari", fpm.framework_envelope or {})
+        self.assertIn("Foucault", fpm.framework_envelope or {})
+        self.assertIn("Agamben", fpm.framework_envelope or {})
 
         # Latour is below the noise floor → must NOT appear
         # (this is "incomplete graph != absence of tradition" — the
@@ -120,7 +120,7 @@ class TestCorpusHullAggregation(unittest.TestCase):
         # floor exclusion the rubric tolerates)
         # We just check it's filtered, the absence-of-claim is handled
         # by §3.6 caveat, not by this test.
-        self.assertNotIn("Latour_ANT", fpm.tradition_envelope or {})
+        self.assertNotIn("Latour_ANT", fpm.framework_envelope or {})
 
         # Argument move envelope populated from genre_summary
         self.assertIn("theoretical_essay", fpm.argument_move_envelope or {})
@@ -143,7 +143,7 @@ class TestCorpusHullAggregation(unittest.TestCase):
         fpm = build_venue_corpus_hull(analysis)
         # Quick mode uses margin 0.20, so each envelope width should
         # be roughly 0.40 unless clipped to [0,1].
-        dg_range = (fpm.tradition_envelope or {}).get("Deleuze_Guattari")
+        dg_range = (fpm.framework_envelope or {}).get("Deleuze_Guattari")
         self.assertIsNotNone(dg_range)
         width = dg_range[1] - dg_range[0]
         self.assertGreaterEqual(width, 0.30)
@@ -161,7 +161,7 @@ class TestUnknownNotAbsent(unittest.TestCase):
         analysis = _empty_analysis()
         fpm = build_venue_corpus_hull(analysis)
         # No envelopes populated
-        self.assertFalse(fpm.tradition_envelope)
+        self.assertFalse(fpm.framework_envelope)
         self.assertFalse(fpm.argument_move_envelope)
         # But the FPM exists with a clear unknowns marker, not silent absence
         self.assertEqual(fpm.confidence, "none")
@@ -171,9 +171,9 @@ class TestUnknownNotAbsent(unittest.TestCase):
         analysis = _synthetic_continental_analysis(n=30)
         analysis.school_patterns = []
         fpm = build_venue_corpus_hull(analysis)
-        # tradition_envelope must be empty AND there must be an explicit
+        # framework_envelope must be empty AND there must be an explicit
         # unknown explaining why (not just missing the field silently)
-        self.assertFalse(fpm.tradition_envelope)
+        self.assertFalse(fpm.framework_envelope)
         self.assertTrue(any("school" in u.lower() for u in fpm.unknowns))
 
     def test_missing_genre_logs_unknown(self):
@@ -233,8 +233,8 @@ class TestOfficialScopeNotCorpusFact(unittest.TestCase):
         fpm = build_venue_corpus_hull(sts_analysis)
         # Corpus says STS; envelope says STS. No Deleuze/Foucault
         # leakage from any "scope" hint.
-        self.assertIn("Latour_ANT", fpm.tradition_envelope or {})
-        self.assertNotIn("Deleuze_Guattari", fpm.tradition_envelope or {})
+        self.assertIn("Latour_ANT", fpm.framework_envelope or {})
+        self.assertNotIn("Deleuze_Guattari", fpm.framework_envelope or {})
         self.assertIn("case_study",
                       fpm.method_stance.get("accepted_method_families", []))
 
@@ -274,7 +274,7 @@ class TestIndexingNotFit(unittest.TestCase):
     def test_hull_does_not_consume_indexing_signal(self):
         # Even if we craftily inject indexing into citation_stats
         # (the most-likely accidental channel), it must not move
-        # discipline_envelope or tradition_envelope.
+        # discipline_envelope or framework_envelope.
         analysis = _synthetic_continental_analysis(n=30)
         analysis.citation_stats = {
             "avg_references": 42.5,
@@ -286,7 +286,7 @@ class TestIndexingNotFit(unittest.TestCase):
         fpm = build_venue_corpus_hull(analysis)
         # discipline and school envelopes still derive from
         # school_patterns / method_patterns only.
-        self.assertIn("Deleuze_Guattari", fpm.tradition_envelope or {})
+        self.assertIn("Deleuze_Guattari", fpm.framework_envelope or {})
         # The indexing claim survives in citation_network_signature.corpus_citation_stats
         # because the builder is faithful to inputs, BUT it must NOT
         # be promoted into institutional_signals or into the school
@@ -328,7 +328,7 @@ class TestEnvelopeOutputShapeFPMCompatible(unittest.TestCase):
         article_fpm = FieldPositionModel(
             entity_type="article",
             entity_id="art_mavrinsky",
-            tradition_affiliation_vector={
+            framework_affiliation_vector={
                 "Deleuze_Guattari": 0.6,
                 "Foucault": 0.5,
                 "Agamben": 0.4,
@@ -357,7 +357,7 @@ class TestEnvelopeOutputShapeFPMCompatible(unittest.TestCase):
         venue_fpm = build_venue_corpus_hull(
             _synthetic_continental_analysis(n=30)
         )
-        for key, rng in (venue_fpm.tradition_envelope or {}).items():
+        for key, rng in (venue_fpm.framework_envelope or {}).items():
             self.assertIsInstance(rng, list, f"envelope {key} not a list")
             self.assertEqual(len(rng), 2, f"envelope {key} not [lo,hi]")
             self.assertLessEqual(rng[0], rng[1], f"envelope {key} lo > hi")
@@ -409,7 +409,7 @@ class TestEndToEndViaAnalyzer(unittest.TestCase):
         # Quick mode (n=6) → wide envelopes, low confidence
         self.assertEqual(fpm.confidence, "low")
         # And some schools detected from the synthetic texts
-        self.assertTrue(fpm.tradition_envelope or fpm.unknowns,
+        self.assertTrue(fpm.framework_envelope or fpm.unknowns,
                         "either schools detected or explicit unknown logged")
 
 

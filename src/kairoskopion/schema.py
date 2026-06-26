@@ -88,7 +88,7 @@ from .ids import (
     section_model_id,
     special_issue_model_id,
     discipline_record_id,
-    tribe_or_framework_record_id,
+    epistemic_framework_record_id,
     venue_section_record_id,
     classification_system_record_id,
     subject_category_record_id,
@@ -1183,8 +1183,8 @@ class FieldPositionModel(_DictMixin):
     subdiscipline_address: dict[str, str] = _dict()
 
     # Group 2: Camp/Tribe positioning
-    tradition_affiliation_vector: dict[str, float] = _dict()
-    tradition_envelope: dict[str, list[float]] | None = _field()
+    framework_affiliation_vector: dict[str, float] = _dict()
+    framework_envelope: dict[str, list[float]] | None = _field()
     citation_network_signature: dict[str, Any] = _dict()
     opponents_and_foils: dict[str, Any] = _dict()
 
@@ -1825,23 +1825,29 @@ class DisciplineRecord(_DictMixin):
 
 
 @dc.dataclass
-class TribeOrFrameworkRecord(_DictMixin):
-    """Registry record for a school, tradition, framework, or method family.
+class EpistemicFrameworkRecord(_DictMixin):
+    """Registry record for an epistemic framework (tradition, method family,
+    design paradigm, theorem family, protocol, standard, benchmark ecosystem).
 
+    framework_kind is open/source-backed, not a prompt-enumerated list.
     Not LLM memory — source-backed records only.
     """
 
-    tribe_record_id: str = dc.field(default_factory=tribe_or_framework_record_id)
+    framework_record_id: str = dc.field(default_factory=epistemic_framework_record_id)
     display_name: str | None = _field()
     display_names: dict[str, str] = _dict()
     aliases: list[str] = _list()
-    record_type: str = "unknown"  # school / tradition / framework / method_family
+    framework_kind: str = "unknown"  # open label: tradition, method_family, theorem_family, protocol, standard, design_paradigm, benchmark_ecosystem, etc.
     discipline_record_ids: list[str] = _list()
     source_status: str = "provisional"
     evidence_refs: list[str] = _list()
     review_status: str = "pending"
     provenance: str | None = _field()
     created_at: str = dc.field(default_factory=_now)
+
+
+# backward compat alias
+TribeOrFrameworkRecord = EpistemicFrameworkRecord
 
 
 @dc.dataclass

@@ -102,14 +102,18 @@ class TestDisciplineRecord(unittest.TestCase):
         self.assertNotEqual(r.review_status, "curator_confirmed")
 
 
-class TestTribeOrFrameworkRecord(unittest.TestCase):
+class TestEpistemicFrameworkRecord(unittest.TestCase):
     def test_minimal(self):
         r = TribeOrFrameworkRecord(
             display_name="Actor-Network Theory",
-            record_type="framework",
+            framework_kind="framework",
         )
-        self.assertEqual(r.record_type, "framework")
-        self.assertTrue(r.tribe_record_id.startswith("tfrec_"))
+        self.assertEqual(r.framework_kind, "framework")
+        self.assertTrue(r.framework_record_id.startswith("efrec_"))
+
+    def test_backward_compat_alias(self):
+        from kairoskopion.schema import EpistemicFrameworkRecord
+        self.assertIs(TribeOrFrameworkRecord, EpistemicFrameworkRecord)
 
     def test_discipline_link(self):
         r = TribeOrFrameworkRecord(
@@ -392,32 +396,34 @@ class TestCatalogVersionFallback(unittest.TestCase):
 
 # ── 7. Tradition rename (school → tradition) ─────────────────────
 
-class TestTraditionRename(unittest.TestCase):
-    def test_schema_uses_tradition_not_school(self):
+class TestFrameworkRename(unittest.TestCase):
+    def test_schema_uses_framework_not_school_or_tradition(self):
         from kairoskopion.schema import FieldPositionModel
         fpm = FieldPositionModel(
             entity_type="article",
             entity_id="art_test",
-            tradition_affiliation_vector={"ANT": 0.7},
+            framework_affiliation_vector={"ANT": 0.7},
         )
-        self.assertEqual(fpm.tradition_affiliation_vector["ANT"], 0.7)
+        self.assertEqual(fpm.framework_affiliation_vector["ANT"], 0.7)
         self.assertFalse(hasattr(fpm, "school_affiliation_vector"))
+        self.assertFalse(hasattr(fpm, "tradition_affiliation_vector"))
 
-    def test_venue_fpm_tradition_envelope(self):
+    def test_venue_fpm_framework_envelope(self):
         from kairoskopion.schema import FieldPositionModel
         fpm = FieldPositionModel(
             entity_type="venue",
             entity_id="ven_test",
-            tradition_envelope={"ANT": [0.2, 0.9]},
+            framework_envelope={"ANT": [0.2, 0.9]},
         )
-        self.assertIsNotNone(fpm.tradition_envelope)
+        self.assertIsNotNone(fpm.framework_envelope)
         self.assertFalse(hasattr(fpm, "school_envelope"))
+        self.assertFalse(hasattr(fpm, "tradition_envelope"))
 
-    def test_field_position_fit_uses_tradition(self):
+    def test_field_position_fit_uses_framework(self):
         from kairoskopion.logic.field_position_fit import compute_field_position_fit
         article = {
             "discipline_vector": {"test_field": 0.7},
-            "tradition_affiliation_vector": {"tradition_A": 0.8},
+            "framework_affiliation_vector": {"tradition_A": 0.8},
             "argument_move_vector": {"analysis": 0.5},
             "evidence_type_profile": {"theoretical": 0.7},
             "method_stance": {"explicit_method": False},
@@ -429,8 +435,8 @@ class TestTraditionRename(unittest.TestCase):
         }
         venue = {
             "discipline_vector": {"test_field": 0.6},
-            "tradition_affiliation_vector": {"tradition_A": 0.7},
-            "tradition_envelope": {"tradition_A": [0.3, 0.9]},
+            "framework_affiliation_vector": {"tradition_A": 0.7},
+            "framework_envelope": {"tradition_A": [0.3, 0.9]},
             "argument_move_vector": {"analysis": 0.5},
             "evidence_type_profile": {"theoretical": 0.6},
             "method_stance": {"requires_explicit_method": False},
@@ -444,6 +450,278 @@ class TestTraditionRename(unittest.TestCase):
         school_axis = [a for a in result["axes"] if a["axis"] == "school_fit"]
         self.assertEqual(len(school_axis), 1)
         self.assertEqual(school_axis[0]["status"], "contained")
+
+
+# ── 8. Track 1 P5C-fix: no tradition_affiliation_vector in runtime ─
+
+class TestTrack1NoTraditionInRuntime(unittest.TestCase):
+    def test_no_tradition_affiliation_vector_in_schema_fields(self):
+        import dataclasses
+        from kairoskopion.schema import FieldPositionModel
+        field_names = {f.name for f in dataclasses.fields(FieldPositionModel)}
+        self.assertNotIn("tradition_affiliation_vector", field_names)
+        self.assertNotIn("tradition_envelope", field_names)
+        self.assertIn("framework_affiliation_vector", field_names)
+        self.assertIn("framework_envelope", field_names)
+
+    def test_no_tradition_affiliation_vector_in_prompt_text(self):
+        from kairoskopion.prompts.field_positioning import (
+            ARTICLE_FIELD_POSITION_FAMILY,
+            VENUE_FIELD_POSITION_FAMILY,
+        )
+        for family_name, family in [
+            ("article", ARTICLE_FIELD_POSITION_FAMILY),
+            ("venue", VENUE_FIELD_POSITION_FAMILY),
+        ]:
+            system = family["system_prompt"]
+            user_tpl = family["user_prompt_template"]
+            self.assertNotIn("tradition_affiliation_vector", system,
+                             f"{family_name} system prompt still has tradition_affiliation_vector")
+            self.assertNotIn("tradition_affiliation_vector", user_tpl,
+                             f"{family_name} user template still has tradition_affiliation_vector")
+
+    def test_no_tradition_envelope_in_output_schema(self):
+        from kairoskopion.prompts.field_positioning import (
+            ARTICLE_FIELD_POSITION_FAMILY,
+            VENUE_FIELD_POSITION_FAMILY,
+        )
+        for name, family in [
+            ("article", ARTICLE_FIELD_POSITION_FAMILY),
+            ("venue", VENUE_FIELD_POSITION_FAMILY),
+        ]:
+            schema_str = json.dumps(family["output_schema"])
+            self.assertNotIn("tradition_affiliation_vector", schema_str,
+                             f"{name} output schema has tradition_affiliation_vector")
+            self.assertNotIn("tradition_envelope", schema_str,
+                             f"{name} output schema has tradition_envelope")
+
+    def test_framework_affiliation_vector_in_output_schema(self):
+        from kairoskopion.prompts.field_positioning import (
+            ARTICLE_FIELD_POSITION_FAMILY,
+            VENUE_FIELD_POSITION_FAMILY,
+        )
+        for name, family in [
+            ("article", ARTICLE_FIELD_POSITION_FAMILY),
+            ("venue", VENUE_FIELD_POSITION_FAMILY),
+        ]:
+            schema_str = json.dumps(family["output_schema"])
+            self.assertIn("framework_affiliation_vector", schema_str,
+                          f"{name} output schema missing framework_affiliation_vector")
+
+    def test_epistemic_framework_record_has_open_kind(self):
+        from kairoskopion.schema import EpistemicFrameworkRecord
+        r = EpistemicFrameworkRecord(
+            display_name="Actor-Network Theory",
+            framework_kind="method_family",
+        )
+        self.assertEqual(r.framework_kind, "method_family")
+        r2 = EpistemicFrameworkRecord(
+            display_name="Finite Element Method",
+            framework_kind="design_paradigm",
+        )
+        self.assertEqual(r2.framework_kind, "design_paradigm")
+
+    def test_math_article_no_humanities_tradition_by_default(self):
+        from kairoskopion.agents.article_field_positioner import ArticleFieldPositionerAgent
+        from kairoskopion.agents.contract import AgentInput
+        agent = ArticleFieldPositionerAgent()
+        inp = AgentInput(
+            operation_id="t",
+            agent_role_id="article_field_positioner",
+            entities={
+                "article": {
+                    "article_model_id": "art_math",
+                    "disciplinary_register_current": "algebraic_topology",
+                    "language": "en",
+                },
+                "semantic_profile": {
+                    "disciplinary_registers": ["algebraic_topology", "homological_algebra"],
+                    "schools_and_traditions": [],
+                    "argument_move_type": "proof",
+                },
+            },
+        )
+        out = agent.execute_deterministic(inp)
+        fpm_dict = out.output_entity
+        fav = fpm_dict.get("framework_affiliation_vector", {})
+        for humanities_label in [
+            "continental_phenomenology", "Deleuze", "Foucault",
+            "Heidegger", "Frankfurt_School", "poststructuralism",
+        ]:
+            self.assertNotIn(humanities_label, fav,
+                             f"Math article got humanities framework '{humanities_label}' by default")
+
+
+# ── 9. Track 2 P5C-fix: no field-list examples in runtime prompts ─
+
+class TestTrack2NoFieldListAttractors(unittest.TestCase):
+    def test_no_field_list_examples_in_citation_ecology_prompt(self):
+        from kairoskopion.prompts.citation_ecology_analysis import (
+            CITATION_ECOLOGY_ANALYSIS_FAMILY,
+        )
+        system = CITATION_ECOLOGY_ANALYSIS_FAMILY["system_prompt"]
+        for banned in [
+            "theorems for math",
+            "seminal experiments for biology",
+            "canonical cases for law",
+            "key thinkers for philosophy",
+        ]:
+            self.assertNotIn(banned, system,
+                             f"Citation ecology prompt still has attractor '{banned}'")
+
+
+# ── 10. Track 3 P5C-fix: source_id/source_url provenance gates ────
+
+class TestTrack3SourceProvenanceGates(unittest.TestCase):
+    def test_acquisition_schema_forbids_source_id(self):
+        schema = DISCIPLINE_SOURCE_ACQUISITION_OUTPUT_SCHEMA
+        task_props = schema["properties"]["acquisition_tasks"]["items"]["properties"]
+        self.assertNotIn("source_id", task_props)
+        self.assertNotIn("source_url", task_props)
+
+    def test_validator_accepts_null_search_hints(self):
+        data = {
+            "acquisition_tasks": [
+                {
+                    "target_system": "OECD FORD",
+                    "search_query": "algebraic topology",
+                    "search_hints": None,
+                    "expected_result_type": "subject_category",
+                    "confidence": "high",
+                },
+            ],
+            "reasoning": "OECD FORD is the standard classification.",
+        }
+        warnings = validate_source_acquisition(data)
+        self.assertEqual(warnings, [])
+
+    def test_no_source_id_field_in_prompt_instructions(self):
+        family = DISCIPLINE_SOURCE_ACQUISITION_FAMILY
+        system = family["system_prompt"]
+        self.assertIn("Do NOT produce source_id values from LLM memory", system)
+        self.assertIn("Do NOT produce source_url values from LLM memory", system)
+
+
+# ── 11. Track 4 P5C-fix: citation anchor safety ──────────────────
+
+class TestTrack4CitationAnchorSafety(unittest.TestCase):
+    def test_citation_ecology_schema_has_anchor_status(self):
+        from kairoskopion.prompts.citation_ecology_analysis import (
+            CITATION_ECOLOGY_ANALYSIS_FAMILY,
+        )
+        schema = CITATION_ECOLOGY_ANALYSIS_FAMILY["output_schema"]
+        schema_str = json.dumps(schema)
+        self.assertIn("anchor_status", schema_str,
+                      "Citation ecology schema must include anchor_status field")
+
+    def test_anchor_status_values_documented(self):
+        from kairoskopion.prompts.citation_ecology_analysis import (
+            CITATION_ECOLOGY_ANALYSIS_FAMILY,
+        )
+        system = CITATION_ECOLOGY_ANALYSIS_FAMILY["system_prompt"]
+        for level in ["source_grounded", "corpus_grounded", "role_level"]:
+            self.assertIn(level, system,
+                          f"System prompt must document anchor_status level '{level}'")
+
+
+# ── 12. Track 5 P5C-fix: venue metric/quartile invariants ────────
+
+class TestTrack5VenueMetricQuartileInvariants(unittest.TestCase):
+    def test_same_venue_different_databases_distinct_records(self):
+        scopus = VenueMetricRecord(
+            venue_id="ven_1", metric_type="quartile",
+            metric_value="Q1", metric_source="Scopus", year=2024,
+            subject_category_id="subcat_phil",
+        )
+        wos = VenueMetricRecord(
+            venue_id="ven_1", metric_type="quartile",
+            metric_value="Q2", metric_source="WoS", year=2024,
+            subject_category_id="subcat_phil",
+        )
+        self.assertNotEqual(scopus.venue_metric_record_id, wos.venue_metric_record_id)
+        self.assertNotEqual(scopus.metric_value, wos.metric_value)
+
+    def test_same_database_different_years_distinct(self):
+        r2023 = VenueMetricRecord(
+            venue_id="ven_1", metric_type="impact_factor",
+            metric_value="2.5", metric_source="Scopus", year=2023,
+        )
+        r2024 = VenueMetricRecord(
+            venue_id="ven_1", metric_type="impact_factor",
+            metric_value="3.1", metric_source="Scopus", year=2024,
+        )
+        self.assertNotEqual(r2023.venue_metric_record_id, r2024.venue_metric_record_id)
+
+    def test_same_database_different_categories_distinct(self):
+        phil = VenueMetricRecord(
+            venue_id="ven_1", metric_type="quartile",
+            metric_value="Q1", metric_source="Scopus", year=2024,
+            subject_category_id="subcat_philosophy",
+        )
+        sts = VenueMetricRecord(
+            venue_id="ven_1", metric_type="quartile",
+            metric_value="Q3", metric_source="Scopus", year=2024,
+            subject_category_id="subcat_sts",
+        )
+        self.assertNotEqual(phil.venue_metric_record_id, sts.venue_metric_record_id)
+        self.assertNotEqual(phil.metric_value, sts.metric_value)
+
+    def test_section_level_metric_carries_section_id(self):
+        r = VenueMetricRecord(
+            venue_id="ven_1", venue_section_id="vsrec_track_a",
+            metric_type="quartile", metric_value="Q2",
+            metric_source="Scopus", year=2024,
+        )
+        self.assertEqual(r.venue_section_id, "vsrec_track_a")
+
+    def test_never_single_prestige_tier(self):
+        records = [
+            VenueMetricRecord(
+                venue_id="ven_1", metric_type="quartile",
+                metric_value=f"Q{q}", metric_source=src, year=2024,
+                subject_category_id=f"subcat_{cat}",
+            )
+            for q, src, cat in [
+                (1, "Scopus", "phil"), (3, "Scopus", "sts"),
+                (2, "WoS", "phil"), (4, "WoS", "sts"),
+            ]
+        ]
+        ids = {r.venue_metric_record_id for r in records}
+        self.assertEqual(len(ids), 4, "All 4 records must have unique IDs")
+        values = {r.metric_value for r in records}
+        self.assertGreater(len(values), 1, "Must not collapse to single prestige tier")
+
+
+# ── 13. Track 6 P5C-fix: runtime v2 invariant ───────────────────
+
+class TestTrack6RuntimeV2Invariant(unittest.TestCase):
+    def test_agents_import_directly_from_prompt_modules(self):
+        from kairoskopion.agents.article_field_positioner import (
+            ARTICLE_FIELD_POSITION_FAMILY,
+        )
+        from kairoskopion.agents.venue_field_positioner import (
+            VENUE_FIELD_POSITION_FAMILY,
+        )
+        self.assertIn("v2", ARTICLE_FIELD_POSITION_FAMILY.get("family_id", ""))
+        self.assertIn("v2", VENUE_FIELD_POSITION_FAMILY.get("family_id", ""))
+
+    def test_citation_ecology_agent_uses_v2(self):
+        from kairoskopion.prompts.citation_ecology_analysis import (
+            CITATION_ECOLOGY_FAMILY,
+        )
+        self.assertIn("v2", CITATION_ECOLOGY_FAMILY.get("family_id", ""))
+
+    def test_catalog_bare_name_resolves_v2_before_v1(self):
+        for bare_name in [
+            "semantic_profiling", "article_modeling",
+            "venue_fact_extraction",
+        ]:
+            fam = get_prompt_family(bare_name)
+            self.assertIsNotNone(fam, f"bare '{bare_name}' must resolve")
+            fid = fam.get("family_id", "")
+            if get_prompt_family(f"{bare_name}_v2") is not None:
+                self.assertIn("v2", fid,
+                              f"bare '{bare_name}' must resolve to v2 when v2 exists")
 
 
 if __name__ == "__main__":

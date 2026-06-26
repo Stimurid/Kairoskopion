@@ -105,7 +105,7 @@ def build_venue_corpus_hull(
 
     # ---- Discipline / school envelopes ----
     # We deliberately distinguish:
-    #  - school_patterns -> tradition_envelope
+    #  - school_patterns -> framework_envelope
     #  - method_patterns -> evidence_type_envelope + method_envelope hint
     #
     # We do NOT derive discipline_envelope from a single keyword set;
@@ -117,15 +117,15 @@ def build_venue_corpus_hull(
     # at the harness level, not here.
 
     if analysis.school_patterns:
-        fpm.tradition_envelope = _envelope_from_patterns(
+        fpm.framework_envelope = _envelope_from_patterns(
             analysis.school_patterns, n, margin, floor
         )
-        # Also expose a center as the tradition_affiliation_vector (single point
+        # Also expose a center as the framework_affiliation_vector (single point
         # = arithmetic mean of envelope; useful for venue→article distance).
-        fpm.tradition_affiliation_vector = _vector_center(fpm.tradition_envelope)
+        fpm.framework_affiliation_vector = _vector_center(fpm.framework_envelope)
     else:
         unknowns.append(
-            "No school_patterns in corpus analysis — tradition_envelope empty"
+            "No school_patterns in corpus analysis — framework_envelope empty"
         )
 
     if analysis.method_patterns:

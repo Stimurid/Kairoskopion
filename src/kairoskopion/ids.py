@@ -278,8 +278,12 @@ def discipline_record_id() -> str:
     return generate_id("drec")
 
 
-def tribe_or_framework_record_id() -> str:
-    return generate_id("tfrec")
+def epistemic_framework_record_id() -> str:
+    return generate_id("efrec")
+
+
+# backward compat alias
+tribe_or_framework_record_id = epistemic_framework_record_id
 
 
 def venue_section_record_id() -> str:
