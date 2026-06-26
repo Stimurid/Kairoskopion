@@ -122,6 +122,13 @@ app.add_middleware(
 
 store = CaseStore()
 
+from kairoskopion.services.venue_memory import VenueMemoryRegistry
+from pathlib import Path as _Path
+_vm_data_dir = _Path(
+    os.environ.get("KAIROSKOPION_DATA_DIR") or ".kairoskopion"
+)
+venue_memory_registry = VenueMemoryRegistry(_vm_data_dir)
+
 
 # ---------------------------------------------------------------------------
 # Health
@@ -956,6 +963,55 @@ def get_agent_map():
         "prompts": prompts,
         "llm": provider_status(),
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: VenueMemory
+# ---------------------------------------------------------------------------
+
+@app.get("/venue-memory")
+def list_venue_memory():
+    return [r.to_dict() for r in venue_memory_registry.list_all()]
+
+
+@app.get("/venue-memory/{venue_memory_id}")
+def get_venue_memory(venue_memory_id: str):
+    rec = venue_memory_registry.get(venue_memory_id)
+    if not rec:
+        raise HTTPException(404, "Venue memory not found")
+    return rec.to_dict()
+
+
+class VenueMemoryNoteRequest(BaseModel):
+    text: str
+
+
+@app.post("/venue-memory/{venue_memory_id}/note")
+def add_venue_memory_note(
+    venue_memory_id: str, req: VenueMemoryNoteRequest,
+):
+    rec = venue_memory_registry.add_note(venue_memory_id, req.text)
+    if not rec:
+        raise HTTPException(404, "Venue memory not found")
+    return rec.to_dict()
+
+
+class VenueMemoryOutcomeRequest(BaseModel):
+    result: str
+    notes: str = ""
+
+
+@app.post("/venue-memory/{venue_memory_id}/outcome")
+def add_venue_memory_outcome(
+    venue_memory_id: str, req: VenueMemoryOutcomeRequest,
+):
+    rec = venue_memory_registry.add_outcome(
+        venue_memory_id,
+        {"result": req.result, "notes": req.notes},
+    )
+    if not rec:
+        raise HTTPException(404, "Venue memory not found")
+    return rec.to_dict()
 
 
 # ---------------------------------------------------------------------------
