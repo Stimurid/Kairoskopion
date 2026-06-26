@@ -6,6 +6,10 @@ multi-axis FitAssessment. No single score. No acceptance probability.
 
 from __future__ import annotations
 
+from kairoskopion.prompts.discipline_intent_parsing import (
+    _DOMAIN_AGNOSTIC_DOCTRINE,
+)
+
 FIT_ASSESSMENT_SYSTEM = """\
 You are Fit Assessor — a specialized analytical role within Kairoskopion, \
 an evidence-first publication-positioning system.
@@ -13,6 +17,7 @@ an evidence-first publication-positioning system.
 Your task: compare an ArticleModel against a VenueModel in the context of \
 a SubmissionScenario. Produce a multi-axis FitAssessment showing the \
 structure of matches, gaps, effort requirements, and risks.
+""" + _DOMAIN_AGNOSTIC_DOCTRINE + """
 
 ## Core rules
 
@@ -30,7 +35,9 @@ structure of matches, gaps, effort requirements, and risks.
 
 For each axis, provide: value (strong/moderate/weak/poor/unknown), \
 reasoning, evidence_refs (what from ArticleModel/VenueModel supports this), \
-and unknowns.
+unknowns, and evidence_source — one of: "source_fact" (directly from \
+venue/article text), "user_constraint" (from SubmissionScenario), \
+"llm_inference" (your reasoning), "unknown" (insufficient data).
 
 1. **topic_fit** — does the article's subject matter fall within the venue's scope?
 2. **discipline_fit** — does the article's disciplinary register match the venue?

@@ -1,6 +1,6 @@
 """VenueMatrixAssessor agent — Organ #4.
 
-Produces per-candidate semantic assessment on fit axes.
+Universal preliminary pool matrix with 16 axes and evidence markers.
 """
 
 from __future__ import annotations
@@ -25,14 +25,22 @@ from .contract import AgentInput, AgentOutput, AgentRole
 logger = logging.getLogger(__name__)
 
 
+def _safe_json(obj: Any) -> str:
+    if obj is None:
+        return "not available"
+    if isinstance(obj, str):
+        return obj
+    return json.dumps(obj, ensure_ascii=False, default=str)[:4000]
+
+
 class VenueMatrixAssessorAgent(AgentRole):
     role_id = "venue_matrix_assessor"
 
     def execute(
         self, inp: AgentInput, provider: LLMProvider,
     ) -> AgentOutput:
-        candidates = inp.entities.get("candidates", [])
-        article_context = inp.entities.get("article_context", {})
+        entities = inp.entities or {}
+        candidates = entities.get("candidates", [])
 
         if not candidates:
             meta = LLMAttemptMetadata.not_attempted()
@@ -48,11 +56,22 @@ class VenueMatrixAssessorAgent(AgentRole):
 
         family = VENUE_MATRIX_FAMILY
         user_prompt = family["user_prompt_template"].format(
-            article_context=json.dumps(
-                article_context, ensure_ascii=False, indent=2,
+            article_summary=_safe_json(entities.get("article")),
+            semantic_profile=_safe_json(
+                entities.get("semantic_profile"),
             ),
+            discipline_intent=_safe_json(
+                entities.get("discipline_intent"),
+            ),
+            scenario_json=_safe_json(entities.get("scenario")),
             candidates_json=json.dumps(
                 candidates, ensure_ascii=False, indent=2,
+            ),
+            evidence_completeness=_safe_json(
+                entities.get("evidence_completeness"),
+            ),
+            depth_constraints=_safe_json(
+                (inp.user_constraints or {}).get("depth_constraints"),
             ),
         )
         messages = [
@@ -96,13 +115,7 @@ class VenueMatrixAssessorAgent(AgentRole):
                 assessments.append({
                     "venue_candidate_id": cid,
                     "canonical_name": c.get("canonical_name", ""),
-                    "semantic_assessment": {
-                        "topic_fit": "unknown",
-                        "discipline_fit": "unknown",
-                        "core_risk": "unknown",
-                        "overall_impression": "not assessed by LLM",
-                        "confidence": "low",
-                    },
+                    "preliminary_assessment": "NOT_ASSESSED_NEEDS_LLM",
                 })
 
         return AgentOutput(
@@ -139,7 +152,7 @@ class VenueMatrixAssessorAgent(AgentRole):
             {
                 "venue_candidate_id": c.get("venue_candidate_id", ""),
                 "canonical_name": c.get("canonical_name", ""),
-                "semantic_assessment": "NOT_ASSESSED_NEEDS_LLM",
+                "preliminary_assessment": "NOT_ASSESSED_NEEDS_LLM",
             }
             for c in candidates
         ]
@@ -158,7 +171,7 @@ class VenueMatrixAssessorAgent(AgentRole):
         )
 
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
-        candidates = inp.entities.get("candidates", [])
+        candidates = (inp.entities or {}).get("candidates", [])
         return self._honest_fallback(
             candidates=candidates,
             meta=LLMAttemptMetadata.fallback(

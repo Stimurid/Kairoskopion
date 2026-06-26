@@ -1,6 +1,6 @@
 """DisciplineIntentParser agent — Organ #1.
 
-Parses free-text discipline intent into structured discipline model.
+Interprets discipline intent using article evidence and constraints.
 """
 
 from __future__ import annotations
@@ -25,6 +25,14 @@ from .contract import AgentInput, AgentOutput, AgentRole
 logger = logging.getLogger(__name__)
 
 
+def _safe_json(obj: Any) -> str:
+    if obj is None:
+        return "not available"
+    if isinstance(obj, str):
+        return obj
+    return json.dumps(obj, ensure_ascii=False, default=str)[:4000]
+
+
 class DisciplineIntentParserAgent(AgentRole):
     role_id = "discipline_intent_parser"
 
@@ -32,8 +40,10 @@ class DisciplineIntentParserAgent(AgentRole):
         self, inp: AgentInput, provider: LLMProvider,
     ) -> AgentOutput:
         intent_text = inp.raw_text or ""
-        region_hint = inp.user_constraints.get("region_hint", "")
-        constraints = inp.user_constraints.get("constraints", [])
+        uc = inp.user_constraints or {}
+        entities = inp.entities or {}
+        region_hint = uc.get("region_hint", "")
+        constraints = uc.get("constraints", [])
         if isinstance(constraints, list):
             constraints_str = json.dumps(constraints, ensure_ascii=False)
         else:
@@ -42,8 +52,18 @@ class DisciplineIntentParserAgent(AgentRole):
         family = DISCIPLINE_INTENT_FAMILY
         user_prompt = family["user_prompt_template"].format(
             intent_text=intent_text,
+            article_summary=_safe_json(entities.get("article")),
+            semantic_profile=_safe_json(entities.get("semantic_profile")),
+            discipline_matches=_safe_json(
+                entities.get("discipline_matches"),
+            ),
+            protected_core=_safe_json(entities.get("protected_core")),
+            scenario_constraints=_safe_json(entities.get("scenario")),
             region_hint=region_hint or "not specified",
             user_constraints=constraints_str or "none",
+            reframe_tolerance=_safe_json(
+                uc.get("reframe_tolerance", "not specified"),
+            ),
         )
         messages = [
             {"role": "system", "content": family["system_prompt"]},
@@ -116,7 +136,7 @@ class DisciplineIntentParserAgent(AgentRole):
             },
             confidence="none",
             warnings=[
-                "LLM discipline intent parser unavailable — "
+                "LLM discipline intent interpreter unavailable — "
                 "intent_parse_status remains 'needs_llm'"
             ],
             quality_gate_status="blocked",

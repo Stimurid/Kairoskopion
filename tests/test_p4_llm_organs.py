@@ -147,13 +147,14 @@ class TestVenueFunnelPlanner(unittest.TestCase):
     def test_a_valid_llm_response(self):
         agent = self._agent()
         provider = _mock_provider(parsed={
-            "venue_families": [
-                {"family_name": "STS core", "discipline_zone": "STS",
-                 "representative_venues": ["Social Studies of Science"],
-                 "search_strategy": "OpenAlex STS",
-                 "expected_fit": "high", "notes": ""},
+            "known_corpus_candidates": [],
+            "candidate_families": [
+                {"family_descriptor": "STS core",
+                 "discipline_zone": "STS",
+                 "search_strategy": "OpenAlex STS"},
             ],
-            "search_priorities": ["STS journals"],
+            "external_discovery_tasks": [],
+            "corpus_coverage_gaps": [],
             "confidence": "medium",
             "unknowns": [],
             "reasoning": "Standard STS mapping.",
@@ -163,7 +164,9 @@ class TestVenueFunnelPlanner(unittest.TestCase):
         self.assertEqual(
             out.output_entity["venue_families_status"], "planned",
         )
-        self.assertTrue(len(out.output_entity["venue_families"]) > 0)
+        self.assertTrue(
+            len(out.output_entity["candidate_families"]) > 0,
+        )
 
     def test_b_provider_unavailable(self):
         agent = self._agent()
@@ -172,7 +175,11 @@ class TestVenueFunnelPlanner(unittest.TestCase):
             out.output_entity["venue_families_status"],
             "FUNNEL_BLOCKED_NEEDS_LLM",
         )
-        self.assertEqual(out.output_entity["venue_families"], [])
+        self.assertEqual(
+            out.output_entity.get("candidate_families",
+                                  out.output_entity.get("known_corpus_candidates", [])),
+            [],
+        )
 
     def test_c_malformed_response(self):
         agent = self._agent()
@@ -188,7 +195,9 @@ class TestVenueFunnelPlanner(unittest.TestCase):
     def test_e_no_deterministic_families(self):
         agent = self._agent()
         out = agent.execute_deterministic(self._inp())
-        self.assertEqual(out.output_entity["venue_families"], [])
+        self.assertEqual(
+            out.output_entity["candidate_families"], [],
+        )
         self.assertEqual(out.confidence, "none")
 
 
@@ -282,7 +291,7 @@ class TestVenueMatrixAssessor(unittest.TestCase):
             "assessments": [{
                 "venue_candidate_id": "vc1",
                 "canonical_name": "Test Journal",
-                "semantic_assessment": {
+                "preliminary_assessment": {
                     "topic_fit": "strong",
                     "discipline_fit": "medium",
                     "core_risk": "weak",
@@ -295,19 +304,19 @@ class TestVenueMatrixAssessor(unittest.TestCase):
         out = agent.execute(self._inp(), provider)
         self.assertEqual(out.output_entity_type, "VenueMatrixAssessment")
         a = out.output_entity["assessments"][0]
-        self.assertIsInstance(a["semantic_assessment"], dict)
+        self.assertIsInstance(a["preliminary_assessment"], dict)
 
     def test_b_provider_unavailable(self):
         agent = self._agent()
         out = agent.execute_deterministic(self._inp())
         a = out.output_entity["assessments"][0]
-        self.assertEqual(a["semantic_assessment"], "NOT_ASSESSED_NEEDS_LLM")
+        self.assertEqual(a["preliminary_assessment"], "NOT_ASSESSED_NEEDS_LLM")
 
     def test_c_malformed(self):
         agent = self._agent()
         out = agent.execute(self._inp(), _garbage_provider())
         a = out.output_entity["assessments"][0]
-        self.assertEqual(a["semantic_assessment"], "NOT_ASSESSED_NEEDS_LLM")
+        self.assertEqual(a["preliminary_assessment"], "NOT_ASSESSED_NEEDS_LLM")
 
     def test_d_is_agent_role(self):
         self.assertIsInstance(self._agent(), AgentRole)
@@ -590,7 +599,7 @@ class TestCitationEcologyOrgan(unittest.TestCase):
                       "description": "Missing foundational STS refs."}],
             "bridge_references": [],
             "ecology_health": "needs_work",
-            "venue_canon_alignment": "partial",
+            "venue_alignment_assessment": "partial",
             "summary": "Bibliography needs STS canon.",
             "confidence": "medium",
             "unknowns": [],

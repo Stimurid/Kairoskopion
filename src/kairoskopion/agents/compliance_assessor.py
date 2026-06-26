@@ -63,6 +63,14 @@ class ComplianceAssessorAgent(AgentRole):
             "structural_checklist", {},
         )
 
+        def _safe(key: str) -> str:
+            v = inp.entities.get(key)
+            if v is None:
+                return "not available"
+            if isinstance(v, str):
+                return v[:4000]
+            return json.dumps(v, ensure_ascii=False, default=str)[:4000]
+
         family = COMPLIANCE_ASSESSMENT_FAMILY
         user_prompt = family["user_prompt_template"].format(
             structural_checklist_json=json.dumps(
@@ -70,6 +78,13 @@ class ComplianceAssessorAgent(AgentRole):
             )[:4000],
             article_compact=_compact(article, _ARTICLE_COMPACT_FIELDS),
             venue_compact=_compact(venue, _VENUE_COMPACT_FIELDS),
+            guidelines_text=_safe("guidelines_text"),
+            source_freshness=_safe("source_freshness"),
+            scenario_json=_safe("scenario"),
+            risk_report=_safe("risk_report"),
+            citation_plan=_safe("citation_plan"),
+            rewrite_plan=_safe("rewrite_plan"),
+            personal_data_flags=_safe("personal_data_flags"),
         )
         messages = [
             {"role": "system", "content": family["system_prompt"]},
@@ -109,7 +124,25 @@ class ComplianceAssessorAgent(AgentRole):
                     "overall_compliance", "insufficient_data",
                 ),
                 "summary": parsed.get("summary", ""),
-                "semantic_pass": True,
+                "source_freshness_status": parsed.get(
+                    "source_freshness_status", "unknown",
+                ),
+                "missing_policy_areas": parsed.get(
+                    "missing_policy_areas", [],
+                ),
+                "privacy_warnings": parsed.get(
+                    "privacy_warnings", [],
+                ),
+                "export_safety_warnings": parsed.get(
+                    "export_safety_warnings", [],
+                ),
+                "submission_pack_readiness": parsed.get(
+                    "submission_pack_readiness", "insufficient_data",
+                ),
+                "user_decisions_required": parsed.get(
+                    "user_decisions_required", [],
+                ),
+                "semantic_pass": parsed.get("semantic_pass", True),
                 "extraction_attempt": meta.to_dict(),
                 "confidence": parsed.get("confidence", "medium"),
                 "unknowns": parsed.get("unknowns", []),

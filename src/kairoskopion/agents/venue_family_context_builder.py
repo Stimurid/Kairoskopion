@@ -1,6 +1,6 @@
 """VenueFamilyContextBuilder agent — Organ #3.
 
-Given a concrete venue, infers its discipline family context.
+Infers venue discipline family context from corpus evidence only.
 """
 
 from __future__ import annotations
@@ -25,17 +25,34 @@ from .contract import AgentInput, AgentOutput, AgentRole
 logger = logging.getLogger(__name__)
 
 
+def _safe_json(obj: Any) -> str:
+    if obj is None:
+        return "not available"
+    if isinstance(obj, str):
+        return obj
+    return json.dumps(obj, ensure_ascii=False, default=str)[:4000]
+
+
 class VenueFamilyContextBuilderAgent(AgentRole):
     role_id = "venue_family_context_builder"
 
     def execute(
         self, inp: AgentInput, provider: LLMProvider,
     ) -> AgentOutput:
-        venue = inp.entities.get("venue", {})
+        entities = inp.entities or {}
+        venue = entities.get("venue", {})
 
         family = VENUE_FAMILY_CONTEXT_FAMILY
         user_prompt = family["user_prompt_template"].format(
             venue_json=json.dumps(venue, ensure_ascii=False, indent=2),
+            corpus_summaries=_safe_json(
+                entities.get("corpus_summaries"),
+            ),
+            venue_memory=_safe_json(entities.get("venue_memory")),
+            article_summary=_safe_json(entities.get("article")),
+            discipline_intent=_safe_json(
+                entities.get("discipline_intent"),
+            ),
         )
         messages = [
             {"role": "system", "content": family["system_prompt"]},
@@ -67,17 +84,20 @@ class VenueFamilyContextBuilderAgent(AgentRole):
 
         warnings = validate_venue_family_context(parsed)
 
-        families = parsed.get("families", [])
-        for f in families:
-            if isinstance(f, dict):
-                f.setdefault("evidence_status", "llm_inference")
-
         return AgentOutput(
             output_entity_type="VenueFamilyContext",
             output_entity={
                 "source_venue": parsed.get("source_venue", ""),
-                "families": families,
-                "families_status": parsed.get("families_status", "assessed"),
+                "families": parsed.get("families", []),
+                "corpus_coverage_warning": parsed.get(
+                    "corpus_coverage_warning",
+                ),
+                "recommended_next_action": parsed.get(
+                    "recommended_next_action",
+                ),
+                "families_status": parsed.get(
+                    "families_status", "assessed",
+                ),
                 "extraction_attempt": meta.to_dict(),
                 "confidence": parsed.get("confidence", "medium"),
                 "unknowns": parsed.get("unknowns", []),
@@ -114,7 +134,9 @@ class VenueFamilyContextBuilderAgent(AgentRole):
                 "families_status": "BLOCKED_NEEDS_LLM",
                 "extraction_attempt": meta.to_dict(),
                 "confidence": "none",
-                "unknowns": ["LLM venue family context builder unavailable"],
+                "unknowns": [
+                    "LLM venue family context builder unavailable",
+                ],
                 "reasoning": "",
             },
             confidence="none",
@@ -126,7 +148,7 @@ class VenueFamilyContextBuilderAgent(AgentRole):
         )
 
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
-        venue = inp.entities.get("venue", {})
+        venue = (inp.entities or {}).get("venue", {})
         return self._honest_fallback(
             venue=venue,
             meta=LLMAttemptMetadata.fallback(

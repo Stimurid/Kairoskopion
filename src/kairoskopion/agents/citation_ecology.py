@@ -61,15 +61,27 @@ class CitationEcologyAgent(AgentRole):
         bibliography = inp.entities.get("bibliography", {})
         venue_guidelines = inp.entities.get("venue_guidelines", "")
 
+        def _safe(key: str) -> str:
+            v = inp.entities.get(key)
+            if v is None:
+                return "not available"
+            if isinstance(v, str):
+                return v[:4000]
+            return json.dumps(v, ensure_ascii=False, default=str)[:4000]
+
         family = CITATION_ECOLOGY_FAMILY
         user_prompt = family["user_prompt_template"].format(
             article_compact=_compact(article, _ARTICLE_COMPACT_FIELDS),
+            method_regime=_safe("method_regime"),
             bibliography_json=json.dumps(
                 bibliography, ensure_ascii=False, indent=2,
             )[:4000],
             venue_compact=_compact(venue, _VENUE_COMPACT_FIELDS),
             venue_guidelines=str(venue_guidelines)[:2000]
             if venue_guidelines else "(not available)",
+            citation_expectations=_safe("citation_expectations"),
+            venue_corpus=_safe("venue_corpus"),
+            technical_refs=_safe("technical_refs"),
         )
         messages = [
             {"role": "system", "content": family["system_prompt"]},
@@ -107,8 +119,11 @@ class CitationEcologyAgent(AgentRole):
                 "gaps": parsed.get("gaps", []),
                 "bridge_references": parsed.get("bridge_references", []),
                 "ecology_health": parsed.get("ecology_health", "adequate"),
-                "venue_canon_alignment": parsed.get(
-                    "venue_canon_alignment", "",
+                "citation_role_map": parsed.get(
+                    "citation_role_map", [],
+                ),
+                "venue_alignment_assessment": parsed.get(
+                    "venue_alignment_assessment", "",
                 ),
                 "summary": parsed.get("summary", ""),
                 "extraction_attempt": meta.to_dict(),
@@ -143,7 +158,8 @@ class CitationEcologyAgent(AgentRole):
                 "gaps": [],
                 "bridge_references": [],
                 "ecology_health": "unknown",
-                "venue_canon_alignment": "",
+                "citation_role_map": [],
+                "venue_alignment_assessment": "",
                 "summary": "needs_llm",
                 "extraction_attempt": meta.to_dict(),
                 "confidence": "none",

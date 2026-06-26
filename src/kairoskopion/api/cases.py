@@ -1155,7 +1155,7 @@ class Case:
                     else "deepen" if c.get("status") == "light_profiled"
                     else "ready"
                 ),
-                "semantic_assessment": "NOT_ASSESSED_NEEDS_LLM",
+                "preliminary_assessment": "NOT_ASSESSED_NEEDS_LLM",
             })
         return {"candidates": matrix_rows, "status": "ok"}
 

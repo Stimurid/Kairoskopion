@@ -89,7 +89,7 @@ class TestVenueMatrix(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertEqual(len(result["candidates"]), 2)
         for c in result["candidates"]:
-            self.assertEqual(c["semantic_assessment"], "NOT_ASSESSED_NEEDS_LLM")
+            self.assertEqual(c["preliminary_assessment"], "NOT_ASSESSED_NEEDS_LLM")
             self.assertNotIn("confidence", c)
 
     def test_matrix_next_action_is_technical(self):

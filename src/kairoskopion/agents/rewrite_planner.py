@@ -76,13 +76,27 @@ class RewritePlannerAgent(AgentRole):
                 quality_gate_status="preliminary",
             )
 
+        def _safe(key: str) -> str:
+            v = inp.entities.get(key)
+            if v is None:
+                return "not available"
+            if isinstance(v, str):
+                return v[:4000]
+            return json.dumps(v, ensure_ascii=False, default=str)[:4000]
+
         family = REWRITE_PLANNING_FAMILY
         user_prompt = family["user_prompt_template"].format(
             article_compact=_compact(article, _ARTICLE_COMPACT_FIELDS),
+            protected_core=_safe("protected_core"),
             venue_compact=_compact(venue, _VENUE_COMPACT_FIELDS),
+            fit_assessment=_safe("fit_assessment"),
             mismatches_json=json.dumps(
                 mismatches, ensure_ascii=False, indent=2,
             ),
+            risk_report=_safe("risk_report"),
+            citation_plan=_safe("citation_plan"),
+            compliance_checklist=_safe("compliance_checklist"),
+            scenario_json=_safe("scenario"),
         )
         messages = [
             {"role": "system", "content": family["system_prompt"]},
