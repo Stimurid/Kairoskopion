@@ -282,7 +282,7 @@ def _build_pathways(
             required_adaptations=list(adaptations),
             field_core_risk=pw.get("field_core_risk") or pw.get("core_risk"),
             venue_type_hints=pw.get("venue_type_hints", []) or [],
-            example_venue_names=pw.get("example_venue_names", []) or pw.get("example_venues", []) or [],
+            venue_search_queries=pw.get("venue_search_queries", []) or pw.get("example_venue_names", []) or [],
             language_options=pw.get("language_options", []) or [],
             indexing_options=pw.get("indexing_options", []) or [],
             rank=pw.get("rank", i) or i,

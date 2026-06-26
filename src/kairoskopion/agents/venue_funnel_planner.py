@@ -62,6 +62,9 @@ class VenueFunnelPlannerAgent(AgentRole):
                 entities.get("evidence_summaries"),
             ),
             venue_memory=_safe_json(entities.get("venue_memory")),
+            registry_records=_safe_json(
+                entities.get("registry_records"),
+            ),
             user_constraints=json.dumps(constraints, ensure_ascii=False)
             if isinstance(constraints, list) else str(constraints),
             region_hint=region_hint or "not specified",

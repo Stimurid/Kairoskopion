@@ -87,6 +87,13 @@ from .ids import (
     journal_model_id,
     section_model_id,
     special_issue_model_id,
+    discipline_record_id,
+    tribe_or_framework_record_id,
+    venue_section_record_id,
+    classification_system_record_id,
+    subject_category_record_id,
+    venue_classification_record_id,
+    venue_metric_record_id,
 )
 
 
@@ -805,7 +812,7 @@ class DisciplinaryPathway(_DictMixin):
     field_core_risk: str | None = _field()
     # Venue signals: which kinds of venues exist in this space
     venue_type_hints: list[str] = _list()
-    example_venue_names: list[str] = _list()
+    venue_search_queries: list[str] = _list()
     language_options: list[str] = _list()
     indexing_options: list[str] = _list()
     # Ranking
@@ -1176,8 +1183,8 @@ class FieldPositionModel(_DictMixin):
     subdiscipline_address: dict[str, str] = _dict()
 
     # Group 2: Camp/Tribe positioning
-    school_affiliation_vector: dict[str, float] = _dict()
-    school_envelope: dict[str, list[float]] | None = _field()
+    tradition_affiliation_vector: dict[str, float] = _dict()
+    tradition_envelope: dict[str, list[float]] | None = _field()
     citation_network_signature: dict[str, Any] = _dict()
     opponents_and_foils: dict[str, Any] = _dict()
 
@@ -1790,4 +1797,154 @@ class SpecialIssueModel(_DictMixin):
     evidence_status: str = "unknown"
     unknowns: list[str] = _list()
     warnings: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+# ---------------------------------------------------------------------------
+# Open-field registry records (P5C)
+# ---------------------------------------------------------------------------
+
+@dc.dataclass
+class DisciplineRecord(_DictMixin):
+    """Registry record for a discipline/field.
+
+    Disciplines are registry records, not prompt examples.
+    Provisional until reviewed by curator.
+    """
+
+    discipline_record_id: str = dc.field(default_factory=discipline_record_id)
+    display_name: str | None = _field()
+    display_names: dict[str, str] = _dict()  # lang → name
+    aliases: list[str] = _list()
+    parent_discipline_id: str | None = _field()
+    source_status: str = "provisional"  # provisional / accepted / rejected
+    evidence_refs: list[str] = _list()
+    review_status: str = "pending"  # pending / reviewed / curator_confirmed
+    provenance: str | None = _field()  # adapter/search that created it
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class TribeOrFrameworkRecord(_DictMixin):
+    """Registry record for a school, tradition, framework, or method family.
+
+    Not LLM memory — source-backed records only.
+    """
+
+    tribe_record_id: str = dc.field(default_factory=tribe_or_framework_record_id)
+    display_name: str | None = _field()
+    display_names: dict[str, str] = _dict()
+    aliases: list[str] = _list()
+    record_type: str = "unknown"  # school / tradition / framework / method_family
+    discipline_record_ids: list[str] = _list()
+    source_status: str = "provisional"
+    evidence_refs: list[str] = _list()
+    review_status: str = "pending"
+    provenance: str | None = _field()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class VenueSectionRecord(_DictMixin):
+    """First-class record for a journal section, track, special issue, or
+    proceedings track.
+
+    One journal may have sections targeting different fields.
+    """
+
+    venue_section_record_id: str = dc.field(default_factory=venue_section_record_id)
+    parent_venue_id: str | None = _field()  # venue_record_id or venue_model_id
+    section_type: str = "unknown"  # section / track / special_issue / proceedings_track
+    display_name: str | None = _field()
+    display_names: dict[str, str] = _dict()
+    scope_description: str | None = _field()
+    target_disciplines: list[str] = _list()  # discipline_record_ids
+    issn: str | None = _field()  # some sections have own ISSN
+    editor_names: list[str] = _list()
+    status: str = "active"  # active / closed / unknown
+    evidence_refs: list[str] = _list()
+    source_status: str = "provisional"
+    provenance: str | None = _field()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class ClassificationSystemRecord(_DictMixin):
+    """Registry record for a classification system (OECD, ASJC, UDC, ВАК, etc.).
+
+    Classification systems are records, not hardcoded.
+    """
+
+    classification_system_record_id: str = dc.field(
+        default_factory=classification_system_record_id,
+    )
+    system_name: str | None = _field()  # "OECD", "ASJC", "UDC", "ВАК", "ERC"
+    display_names: dict[str, str] = _dict()
+    publisher: str | None = _field()  # "Scopus", "Web of Science", "ВАК"
+    version: str | None = _field()
+    evidence_refs: list[str] = _list()
+    source_status: str = "provisional"
+    provenance: str | None = _field()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class SubjectCategoryRecord(_DictMixin):
+    """A category within a classification system."""
+
+    subject_category_record_id: str = dc.field(
+        default_factory=subject_category_record_id,
+    )
+    classification_system_id: str | None = _field()
+    code: str | None = _field()  # "5.7.7", "3312", etc.
+    display_name: str | None = _field()
+    display_names: dict[str, str] = _dict()
+    parent_category_id: str | None = _field()
+    evidence_refs: list[str] = _list()
+    source_status: str = "provisional"
+    provenance: str | None = _field()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class VenueClassificationRecord(_DictMixin):
+    """Many-to-many: venue/section × classification_system × subject_category × year.
+
+    One journal may have different positions in different systems.
+    One journal may belong to several subject categories with different quartiles.
+    """
+
+    venue_classification_record_id: str = dc.field(
+        default_factory=venue_classification_record_id,
+    )
+    venue_id: str | None = _field()  # venue_record_id / venue_model_id
+    venue_section_id: str | None = _field()  # optional — section-specific
+    classification_system_id: str | None = _field()
+    subject_category_id: str | None = _field()
+    year: int | None = _field()
+    evidence_refs: list[str] = _list()
+    source_status: str = "provisional"
+    provenance: str | None = _field()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class VenueMetricRecord(_DictMixin):
+    """Quartile/rank per database × year × subject_category × section.
+
+    NOT collapsed to ``journal.quartile = Q1``.
+    """
+
+    venue_metric_record_id: str = dc.field(default_factory=venue_metric_record_id)
+    venue_id: str | None = _field()
+    venue_section_id: str | None = _field()
+    classification_system_id: str | None = _field()
+    subject_category_id: str | None = _field()
+    year: int | None = _field()
+    metric_type: str | None = _field()  # quartile / rank / impact_factor / cite_score / h_index
+    metric_value: str | None = _field()  # "Q1", "42", "3.7"
+    metric_source: str | None = _field()  # "Scopus", "Web of Science", "RSCI"
+    evidence_refs: list[str] = _list()
+    source_status: str = "provisional"
+    provenance: str | None = _field()
     created_at: str = dc.field(default_factory=_now)

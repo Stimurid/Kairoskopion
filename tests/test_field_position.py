@@ -28,7 +28,7 @@ class TestFieldPositionModelDataclass(unittest.TestCase):
             entity_type="article",
             entity_id="art_test123",
             discipline_vector={"philosophy_of_technology": 0.7, "STS": 0.3},
-            school_affiliation_vector={"Simondon": 0.9, "Stiegler": 0.3},
+            tradition_affiliation_vector={"Simondon": 0.9, "Stiegler": 0.3},
         )
         self.assertEqual(fpm.entity_type, "article")
         self.assertIn("philosophy_of_technology", fpm.discipline_vector)
@@ -42,8 +42,8 @@ class TestFieldPositionModelDataclass(unittest.TestCase):
             entity_id="ven_test456",
             discipline_vector={"philosophy_of_technology": 0.5},
             discipline_envelope={"philosophy_of_technology": [0.3, 1.0], "STS": [0.0, 0.4]},
-            school_affiliation_vector={"continental_phenomenology": 0.6},
-            school_envelope={"continental_phenomenology": [0.2, 0.9]},
+            tradition_affiliation_vector={"continental_phenomenology": 0.6},
+            tradition_envelope={"continental_phenomenology": [0.2, 0.9]},
         )
         self.assertEqual(fpm.entity_type, "venue")
         self.assertIsNotNone(fpm.discipline_envelope)
@@ -119,7 +119,7 @@ class TestComputeFieldPositionFit(unittest.TestCase):
     def _make_article(self):
         return {
             "discipline_vector": {"philosophy_of_technology": 0.7, "STS": 0.3},
-            "school_affiliation_vector": {"Simondon": 0.8, "Stiegler": 0.2},
+            "tradition_affiliation_vector": {"Simondon": 0.8, "Stiegler": 0.2},
             "argument_move_vector": {"concept_reconstruction": 0.6, "genealogy": 0.4},
             "evidence_type_profile": {"theoretical_argument": 0.8, "textual_analysis": 0.2},
             "method_stance": {"explicit_method": False, "method_family": "philosophical_analysis"},
@@ -137,8 +137,8 @@ class TestComputeFieldPositionFit(unittest.TestCase):
                 "philosophy_of_technology": [0.3, 1.0],
                 "STS": [0.0, 0.6],
             },
-            "school_affiliation_vector": {"Simondon": 0.5, "continental_phenomenology": 0.3},
-            "school_envelope": {
+            "tradition_affiliation_vector": {"Simondon": 0.5, "continental_phenomenology": 0.3},
+            "tradition_envelope": {
                 "Simondon": [0.2, 0.9],
                 "Stiegler": [0.0, 0.5],
                 "continental_phenomenology": [0.1, 0.7],
@@ -172,7 +172,7 @@ class TestComputeFieldPositionFit(unittest.TestCase):
         article = self._make_article()
         venue = self._make_venue_good_fit()
         venue["discipline_envelope"] = {"quantitative_economics": [0.5, 1.0]}
-        venue["school_envelope"] = {"Chicago_school": [0.5, 1.0]}
+        venue["tradition_envelope"] = {"Chicago_school": [0.5, 1.0]}
         venue["argument_move_envelope"] = {"systematic_review": [0.5, 1.0]}
         venue["method_stance"]["requires_explicit_method"] = True
         venue["method_stance"]["accepted_method_families"] = ["econometrics"]
@@ -205,7 +205,7 @@ class TestPromptFamilyValidators(unittest.TestCase):
     def test_valid_article_fpm(self):
         parsed = {
             "discipline_vector": {"a": 0.5, "b": 0.3},
-            "school_affiliation_vector": {"x": 0.6, "y": 0.4},
+            "tradition_affiliation_vector": {"x": 0.6, "y": 0.4},
             "argument_move_vector": {"p": 0.5, "q": 0.5},
             "evidence_type_profile": {"t": 0.7, "u": 0.3},
             "formalization_level": 0.4,
@@ -216,7 +216,7 @@ class TestPromptFamilyValidators(unittest.TestCase):
     def test_missing_vector(self):
         parsed = {
             "discipline_vector": {},
-            "school_affiliation_vector": {"x": 0.5, "y": 0.5},
+            "tradition_affiliation_vector": {"x": 0.5, "y": 0.5},
             "argument_move_vector": {"p": 0.5, "q": 0.5},
             "evidence_type_profile": {"t": 0.5, "u": 0.5},
         }
@@ -226,7 +226,7 @@ class TestPromptFamilyValidators(unittest.TestCase):
     def test_out_of_range(self):
         parsed = {
             "discipline_vector": {"a": 1.5, "b": 0.3},
-            "school_affiliation_vector": {"x": 0.5, "y": 0.5},
+            "tradition_affiliation_vector": {"x": 0.5, "y": 0.5},
             "argument_move_vector": {"p": 0.5, "q": 0.5},
             "evidence_type_profile": {"t": 0.5, "u": 0.5},
         }
@@ -237,8 +237,8 @@ class TestPromptFamilyValidators(unittest.TestCase):
         parsed = {
             "discipline_vector": {"a": 0.5},
             "discipline_envelope": {"a": [0.2, 0.8]},
-            "school_affiliation_vector": {"x": 0.5},
-            "school_envelope": {"x": [0.1, 0.9]},
+            "tradition_affiliation_vector": {"x": 0.5},
+            "tradition_envelope": {"x": [0.1, 0.9]},
             "argument_move_vector": {"p": 0.5},
             "argument_move_envelope": {"p": [0.2, 0.8]},
         }
@@ -249,8 +249,8 @@ class TestPromptFamilyValidators(unittest.TestCase):
         parsed = {
             "discipline_vector": {"a": 0.5},
             "discipline_envelope": {"a": [0.8, 0.2]},
-            "school_affiliation_vector": {"x": 0.5},
-            "school_envelope": {"x": [0.1, 0.9]},
+            "tradition_affiliation_vector": {"x": 0.5},
+            "tradition_envelope": {"x": [0.1, 0.9]},
             "argument_move_vector": {"p": 0.5},
             "argument_move_envelope": {"p": [0.2, 0.8]},
         }

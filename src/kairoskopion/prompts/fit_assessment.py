@@ -155,9 +155,17 @@ FIT_ASSESSMENT_OUTPUT_SCHEMA: dict = {
                     },
                     "reasoning": {"type": "string"},
                     "evidence_refs": {"type": "array", "items": {"type": "string"}},
+                    "evidence_source": {
+                        "type": "string",
+                        "enum": [
+                            "source_fact", "user_constraint",
+                            "llm_inference", "corpus_observation",
+                            "vpkg_evidence", "inference", "unknown",
+                        ],
+                    },
                     "unknowns": {"type": "array", "items": {"type": "string"}},
                 },
-                "required": ["axis", "value", "reasoning"],
+                "required": ["axis", "value", "reasoning", "evidence_source"],
                 "additionalProperties": False,
             },
         },

@@ -1,28 +1,27 @@
-"""Discipline Seeder prompt family (Phase B2).
+"""Discipline Seeder prompt family (Phase B2, P5C rewrite).
 
-Consumes 1-3 ``DisciplineSourcePacket`` objects produced by
-``DisciplineSourceAcquisitionAgent`` and produces a draft
-``DisciplineModel`` card.
+Consumes source packets from adapters/searches and produces a draft
+DisciplineRecord card. The card is a working tool for downstream agents,
+NOT an encyclopedia entry.
 
-The card is a **working tool for downstream agents**, NOT an
-encyclopedia entry. The seeder is told this explicitly:
-fields like ``legitimate_objects`` / ``illegitimate_or_borderline_objects``
-/ ``epistemic_regime`` matter more than a polished description.
-
-Output ships as ``source_status="llm_draft"``. Curator promotes to
-``user_confirmed`` after review (no automatic promotion).
+Key P5C invariants:
+- key_authors ONLY from packet excerpts, never from LLM memory
+- No examples of specific disciplines/thinkers in prompt text
+- source_status ships as "provisional" (was "llm_draft")
+- evidence_refs mirror input packets only — no new sources invented
 """
 
 from __future__ import annotations
+
+from .discipline_intent_parsing import _OPEN_FIELD_DOCTRINE
 
 DISCIPLINE_SEEDING_SYSTEM = """\
 You are Discipline Seeder — Phase B agent for Kairoskopion's \
 disciplinary landscape registry.
 
-Your job: given 1-3 authoritative source packets describing a \
-discipline, produce a DisciplineCard that downstream agents \
-(semantic_profiler, fit_assessor, venue_candidate_screening) can use \
-as a working tool.
+Your job: given source packets describing a discipline, produce a \
+DisciplineCard that downstream agents can use as a working tool.
+""" + _OPEN_FIELD_DOCTRINE + """\
 
 ## Core principle: working tool, not encyclopedia
 
@@ -40,7 +39,7 @@ let an agent decide "this article fits / doesn't fit / borderline".
 
 ## Anti-rules
 
-- Do NOT invent ВАК codes, ERC IDs, or other identifiers. If a packet \
+- Do NOT invent classification codes or identifiers. If a packet \
   doesn't provide them, leave evidence_refs[].source_id null.
 - Do NOT fill every field. Leave fields that the packets don't justify \
   as null (for strings) or empty list (for arrays). Mark missing items \
@@ -49,10 +48,9 @@ let an agent decide "this article fits / doesn't fit / borderline".
   "various methods" or "many objects". If you can't be specific, \
   leave the field empty and put the name in ``unknowns``.
 - Do NOT invent key_authors. Only include authors actually mentioned \
-  in the packet excerpts OR who are uncontroversially identified with \
-  this discipline (Heidegger for philosophy of technology, Vygotsky \
-  for cultural-historical psychology). Mark uncertain authors \
-  ``role`` based on the strongest justification you can give.
+  in the source packet excerpts. Do NOT recall authors from LLM \
+  training memory. If no authors are mentioned in packets, leave \
+  key_authors empty.
 - Do NOT propagate language assumption: a discipline may have \
   English-language theoretical core but Russian-language venue \
   practice — fill ``russian_specificity`` if relevant, otherwise null.
@@ -60,7 +58,7 @@ let an agent decide "this article fits / doesn't fit / borderline".
 ## Output
 
 Return a JSON object matching DisciplineCard schema. ``source_status`` \
-MUST be ``"llm_draft"``. ``evidence_refs`` MUST mirror the input \
+MUST be ``"provisional"``. ``evidence_refs`` MUST mirror the input \
 packets (no new sources invented).
 
 For fields you cannot fill, leave null / empty AND record the field \
@@ -95,7 +93,7 @@ DISCIPLINE_SEEDING_OUTPUT_SCHEMA = {
             "type": "string",
             "enum": ["ru", "international", "eu-fr", "eu-de", "en-us", "en-uk", "other"],
         },
-        "source_status": {"type": "string", "enum": ["llm_draft"]},
+        "source_status": {"type": "string", "enum": ["provisional"]},
         "aliases": {"type": "array", "items": {"type": "string"}},
         "paradigm": {"type": ["string", "null"]},
         "epistemic_regime": {"type": ["string", "null"]},
@@ -155,8 +153,8 @@ DISCIPLINE_SEEDING_OUTPUT_SCHEMA = {
 
 def validate_seeding(data: dict) -> list[str]:
     warnings: list[str] = []
-    if data.get("source_status") != "llm_draft":
-        warnings.append("seeder output must ship as source_status=llm_draft")
+    if data.get("source_status") != "provisional":
+        warnings.append("seeder output must ship as source_status=provisional")
     if not data.get("evidence_refs"):
         warnings.append("seeder output must have at least one evidence_ref (from input packets)")
     # Working-tool fields should not all be empty
@@ -170,9 +168,9 @@ def validate_seeding(data: dict) -> list[str]:
 
 
 DISCIPLINE_SEEDING_FAMILY = {
-    "family_id": "discipline_seeding_v1",
+    "family_id": "discipline_seeding_v2",
     "agent_role_id": "discipline_seeder",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "system_prompt": DISCIPLINE_SEEDING_SYSTEM,
     "user_prompt_template": DISCIPLINE_SEEDING_USER_TEMPLATE,
     "output_schema": DISCIPLINE_SEEDING_OUTPUT_SCHEMA,

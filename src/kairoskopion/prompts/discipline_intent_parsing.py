@@ -6,46 +6,49 @@ protected core, and submission constraints. Domain-agnostic.
 
 from __future__ import annotations
 
-_DOMAIN_AGNOSTIC_DOCTRINE = """\
+_OPEN_FIELD_DOCTRINE = """\
 
-## Domain-agnostic doctrine
+## Open-field doctrine
 
-Kairoskopion is domain-agnostic. The current article may belong to \
-any field: mathematics, biology, medicine, semiconductor physics, \
-engineering, computer science, chemistry, law, sociology, history, \
-philosophy, interdisciplinary zones, or any other.
+Kairoskopion operates over an open publication field.
 
-Do not assume humanities, philosophy, STS, empirical social science, \
-or journal article form unless the input evidence says so.
+Do not assume any default discipline, field family, method regime, \
+evidence regime, genre, citation ecology, venue type, classification \
+system, region, language, or publication container.
 
-Preserve domain-specific epistemic regimes:
-- mathematical proof
-- theoretical derivation
-- experimental measurement
-- simulation/modeling
-- clinical trial
-- observational study
-- engineering design
-- benchmark/evaluation
-- textual interpretation
-- archival research
-- philosophical argument
-- legal analysis
-- policy analysis
-- mixed-methods
-- other or unknown
+Do not use examples as taxonomy. Do not infer field identity from \
+familiar labels. Do not transfer standards from one field to another.
 
-Use field-neutral categories: research object, claim type, evidence \
-type, method regime, validation regime, genre, publication container, \
-audience, venue evidence, protected core, adaptation cost, uncertainty.
+The relevant field structure must come from:
+1. article evidence;
+2. user constraints;
+3. accepted registry records;
+4. source packets;
+5. venue/corpus evidence;
+6. explicit external adapter/search results;
+7. curator/user-confirmed records.
 
-Do not convert one field's standards into another. For example:
-- do not demand empirical data for a mathematical proof;
-- do not demand theorem structure for an ethnographic study;
-- do not demand clinical trial structure for a conceptual article;
-- do not demand humanities canonical thinkers for semiconductor physics;
-- do not reduce interdisciplinary work to the closest familiar field.
+If a field, method regime, venue family, citation expectation, \
+section scope, classification code, indexing category, or quartile \
+cannot be established from those sources, mark it unknown or create \
+a source acquisition task.
+
+Use generic descriptors only when evidence is insufficient:
+- field_unknown;
+- method_regime_unknown;
+- evidence_regime_unknown;
+- venue_family_unknown;
+- classification_unknown;
+- indexing_unknown;
+- section_scope_unknown.
+
+Never convert unknown into absence.
+Never convert model memory into fact.
+Do not convert one field's standards into another.
 """
+
+# Backward compat alias — old name used by P5A imports
+_DOMAIN_AGNOSTIC_DOCTRINE = _OPEN_FIELD_DOCTRINE
 
 DISCIPLINE_INTENT_SYSTEM = """\
 You are Discipline Intent Interpreter — a specialized role in \
@@ -76,11 +79,10 @@ what the article actually supports.
 3. **possible_field_translations** — if the article could be \
    repositioned to a neighboring field, list candidates with cost \
    and protected-core risk.
-4. **epistemic_regime** — the article's epistemic regime: \
-   mathematical proof, experimental, simulation, clinical, \
-   observational, engineering design, benchmark, textual \
-   interpretation, archival, philosophical argument, legal analysis, \
-   policy analysis, mixed-methods, other, unknown.
+4. **epistemic_regime** — the article's epistemic regime as \
+   identified from article evidence. Use the regime the article \
+   actually employs; do not pick from a fixed list. If the regime \
+   cannot be determined, use "method_regime_unknown".
 5. **publication_container_preferences** — implied container types \
    (journal, proceedings, edited volume, special issue, repository).
 6. **protected_core_constraints** — what must NOT be changed \

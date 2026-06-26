@@ -7,6 +7,8 @@ Two prompt families:
 
 from __future__ import annotations
 
+from .discipline_intent_parsing import _OPEN_FIELD_DOCTRINE
+
 
 # ---------------------------------------------------------------------------
 # Shared axis definitions (used in both prompts)
@@ -18,37 +20,37 @@ _AXES_REFERENCE = """\
 ### Group 1: Disciplinary positioning
 - **discipline_vector**: dict of discipline names → float (0.0–1.0).
   Not one discipline — a weighted membership across several.
-  Be specific: "philosophy of technology" not "philosophy",
-  "STS" not "social science", "computational linguistics" not "linguistics".
+  Use the most specific label the text supports. Prefer narrow sub-fields
+  over broad umbrella terms.
 - **subdiscipline_address**: {primary, niche, working_area} — hierarchical
   address within the primary discipline.
 
-### Group 2: Camp/Tribe positioning
-- **school_affiliation_vector**: dict of school/tradition names → float (0.0–1.0).
-  Intellectual camps and traditions, NOT disciplines.
-  Examples: "Simondon", "Actor-Network Theory", "Frankfurt School",
-  "analytic philosophy of mind", "posthumanism", "Russian cosmism".
-- **citation_network_signature**: {must_cite, typically_cite, never_cite,
-  conspicuous_absence, bridge_traditions, self_citation_norm}.
-  "conspicuous_absence" = authors everyone in this camp cites but THIS text
-  does not — absence is signal.
+### Group 2: Tradition / Framework affiliation
+- **tradition_affiliation_vector**: dict of tradition/framework names → float
+  (0.0–1.0). Traditions or frameworks the article affiliates with, as
+  evidenced in the text. May be empty if not applicable to the article's
+  field.
+- **citation_network_signature**: {expected_references, typically_cite,
+  never_cite, notable_omissions, bridge_traditions, self_citation_norm}.
+  "expected_references" = key works or authors the text's positioning implies
+  should appear. "notable_omissions" = references that the stated positioning
+  would normally entail but are absent — absence may or may not be
+  significant depending on field norms.
 - **opponents_and_foils**: {explicit_opponents, implicit_foils,
   published_polemics, avoided_polemics}.
 
 ### Group 3: Argument profile
 - **argument_move_vector**: dict of move types → float (0.0–1.0).
-  Types: problem_statement, genealogy, concept_reconstruction,
-  school_critique, model_building, comparative_analysis,
-  disciplinary_translation, polemical_essay, empirical_conceptual_hybrid,
-  systematic_review, methodology_piece, meta_analysis.
+  Weighted presence of argument moves used in the text: how the article
+  structures its contribution (e.g. problem statement, model building,
+  comparative analysis, critique, synthesis, systematic review).
 - **novelty_mode**: {mode, novelty_claim_strength (0.0–1.0),
   builds_on_or_opposes}.
-  Modes: reconceptualization, original_framework, critique, synthesis,
-  application, meta_analysis.
+  How the article positions its novelty contribution.
 - **evidence_type_profile**: dict of evidence types → float (0.0–1.0).
-  Types: theoretical_argument, textual_analysis, case_study,
-  quantitative_data, experimental, archival, interview_ethnographic,
-  computational, mixed_methods.
+  Weighted distribution of evidence kinds used in the text (e.g.
+  theoretical argument, case study, quantitative data, experimental,
+  archival, computational, mixed methods).
 
 ### Group 4: Methodological register
 - **method_stance**: {explicit_method (bool), method_family (str),
@@ -56,7 +58,7 @@ _AXES_REFERENCE = """\
   For venues add: requires_explicit_method, accepted_method_families,
   rejected_method_families.
 - **formalization_level**: float (0.0–1.0).
-  0.0 = free-form essay, 1.0 = formal axiomatic model.
+  0.0 = free-form prose, 1.0 = fully formal/axiomatic structure.
 
 ### Group 5: Audience & Register
 - **audience_level**: {expertise_required (general/educated/specialist/
@@ -72,8 +74,9 @@ _AXES_REFERENCE = """\
   For venues add: editorial_board_regions (dict str→float),
   author_regions_published (dict str→float),
   anglophone_hegemony_index (0.0–1.0).
-- **institutional_signals**: {prestige_tier (top/mid/emerging/predatory/unknown),
-  indexing (list), open_access (str), apc_range_usd_min, apc_range_usd_max,
+- **institutional_signals**: Prestige and ranking are per-database, per-year,
+  per-category. Do not assign a single prestige tier. Instead populate:
+  {indexing (list), open_access (str), apc_range_usd_min, apc_range_usd_max,
   review_model, typical_decision_weeks}.
 
 ### Group 7: Temporal
@@ -87,29 +90,34 @@ _AXES_REFERENCE = """\
 # Article prompt family
 # ---------------------------------------------------------------------------
 
-ARTICLE_FIELD_POSITION_SYSTEM = f"""\
+ARTICLE_FIELD_POSITION_SYSTEM = """\
 You are Field Position Analyst — a specialized role within Kairoskopion, \
 an evidence-first publication-positioning system.
+
+""" + _OPEN_FIELD_DOCTRINE + """
 
 Your task: given an ArticleModel and manuscript text, produce coordinate \
 values for every axis of the FieldPositionModel. The article is a POINT \
 (or compact region) in academic disciplinary space.
 
-{_AXES_REFERENCE}
+""" + _AXES_REFERENCE + """
 
 ### Article-specific axis
-- **article_readiness**: {{manuscript_stage (idea/draft/presubmission/submitted/
+- **article_readiness**: {manuscript_stage (idea/draft/presubmission/submitted/
   revision/accepted), completeness (0.0–1.0), word_count, has_abstract,
-  has_bibliography, has_methods_section, formal_compliance_score (0.0–1.0)}}.
+  has_bibliography, has_methods_section, formal_compliance_score (0.0–1.0)}.
 
 ## Rules
 
-1. Every vector (discipline, school, argument_move, evidence_type) must have
-   at least 2 components. Float values must be 0.0–1.0.
-2. citation_network_signature: list who the article cites as "theoretical
-   shoulders" under must_cite; note conspicuous absences.
+1. Every vector (discipline, tradition_affiliation, argument_move, evidence_type)
+   must have at least 2 components where applicable. Float values must be 0.0–1.0.
+   tradition_affiliation_vector may be empty if the field has no tradition
+   structure.
+2. citation_network_signature: list expected_references the article's positioning
+   implies; note notable_omissions where positioning suggests references that
+   are absent.
 3. Do NOT guess. If you cannot determine a value, use null and add to unknowns.
-4. Be specific in naming disciplines and schools — generic labels are useless.
+4. Be specific in naming disciplines and traditions — generic labels are useless.
 5. Vectors should sum to roughly 1.0 (soft constraint).
 6. formalization_level, jargon_density, accessibility_index, novelty_claim_strength,
    genre_formality, completeness, formal_compliance_score are all 0.0–1.0.
@@ -145,17 +153,18 @@ ARTICLE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
                 "working_area": {"type": ["string", "null"]},
             },
         },
-        "school_affiliation_vector": {
+        "tradition_affiliation_vector": {
             "type": "object",
             "additionalProperties": {"type": "number"},
+            "description": "Traditions or frameworks the article affiliates with. May be empty.",
         },
         "citation_network_signature": {
             "type": "object",
             "properties": {
-                "must_cite": {"type": "array", "items": {"type": "string"}},
+                "expected_references": {"type": "array", "items": {"type": "string"}},
                 "typically_cite": {"type": "array", "items": {"type": "string"}},
                 "never_cite": {"type": "array", "items": {"type": "string"}},
-                "conspicuous_absence": {"type": "array", "items": {"type": "string"}},
+                "notable_omissions": {"type": "array", "items": {"type": "string"}},
                 "bridge_traditions": {"type": "array", "items": {"type": "string"}},
                 "self_citation_norm": {"type": ["string", "null"]},
             },
@@ -253,7 +262,7 @@ ARTICLE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
         "confidence": {"type": ["string", "null"]},
     },
     "required": [
-        "discipline_vector", "school_affiliation_vector",
+        "discipline_vector", "tradition_affiliation_vector",
         "argument_move_vector", "evidence_type_profile",
         "unknowns",
     ],
@@ -262,7 +271,7 @@ ARTICLE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
 
 def _validate_article_fpm(parsed: dict) -> list[str]:
     warnings = []
-    for vkey in ("discipline_vector", "school_affiliation_vector",
+    for vkey in ("discipline_vector", "tradition_affiliation_vector",
                  "argument_move_vector", "evidence_type_profile"):
         v = parsed.get(vkey)
         if not v or not isinstance(v, dict):
@@ -282,8 +291,8 @@ def _validate_article_fpm(parsed: dict) -> list[str]:
 
 ARTICLE_FIELD_POSITION_FAMILY: dict = {
     "agent_role_id": "article_field_positioner",
-    "family_id": "article_field_position_v1",
-    "version": "1.0",
+    "family_id": "article_field_position_v2",
+    "version": "2.0",
     "system_prompt": ARTICLE_FIELD_POSITION_SYSTEM,
     "user_prompt_template": ARTICLE_FIELD_POSITION_USER_TEMPLATE,
     "output_schema": ARTICLE_FIELD_POSITION_OUTPUT_SCHEMA,
@@ -295,29 +304,35 @@ ARTICLE_FIELD_POSITION_FAMILY: dict = {
 # Venue prompt family
 # ---------------------------------------------------------------------------
 
-VENUE_FIELD_POSITION_SYSTEM = f"""\
+VENUE_FIELD_POSITION_SYSTEM = """\
 You are Venue Field Position Analyst — a specialized role within Kairoskopion, \
 an evidence-first publication-positioning system.
+
+""" + _OPEN_FIELD_DOCTRINE + """
 
 Your task: given a VenueModel, editorial board data, published corpus data, \
 and author guidelines, produce coordinate ENVELOPES for every axis of the \
 FieldPositionModel. A venue is an EXTENDED REGION in academic space — \
 not a point, but a range of accepted positions.
 
-{_AXES_REFERENCE}
+""" + _AXES_REFERENCE + """
 
 ## Venue-specific rules
 
-1. For vector axes (discipline, school, argument_move, evidence_type):
-   produce BOTH a center vector AND an envelope (min–max range per dimension).
-   The center = what the venue typically publishes.
+1. For vector axes (discipline, tradition_affiliation, argument_move,
+   evidence_type): produce BOTH a center vector AND an envelope (min–max
+   range per dimension). The center = what the venue typically publishes.
    The envelope = what is within scope but may be less common.
+   tradition_affiliation_vector and its envelope may be empty if the venue
+   has no tradition structure.
 2. citation_network_signature for a venue:
-   - canonical_must_cite → authors/works the venue community expects
+   - expected_references → key works or authors the venue community expects
    - bridge_traditions → cross-tradition citations the venue values
-   - absent_traditions_risk → citing these signals wrong camp
-3. institutional_signals: fill prestige_tier, indexing, open_access, apc,
-   review_model, typical_decision_weeks from venue data.
+   - notable_omissions → references whose absence in a submission would be
+     surprising given the venue's positioning
+3. institutional_signals: Prestige and ranking are per-database, per-year,
+   per-category. Do not assign a single prestige tier. Fill indexing,
+   open_access, apc, review_model, typical_decision_weeks from venue data.
 4. geographic_affinity: fill editorial_board_regions, author_regions_published,
    anglophone_hegemony_index from editorial board and corpus data.
 5. method_stance for a venue: requires_explicit_method, accepted/rejected families.
@@ -377,11 +392,12 @@ VENUE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
                 "working_area": {"type": ["string", "null"]},
             },
         },
-        "school_affiliation_vector": {
+        "tradition_affiliation_vector": {
             "type": "object",
             "additionalProperties": {"type": "number"},
+            "description": "Traditions or frameworks the venue publishes within. May be empty.",
         },
-        "school_envelope": {
+        "tradition_envelope": {
             "type": "object",
             "additionalProperties": {
                 "type": "array",
@@ -393,14 +409,12 @@ VENUE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
         "citation_network_signature": {
             "type": "object",
             "properties": {
-                "must_cite": {"type": "array", "items": {"type": "string"}},
+                "expected_references": {"type": "array", "items": {"type": "string"}},
                 "typically_cite": {"type": "array", "items": {"type": "string"}},
                 "never_cite": {"type": "array", "items": {"type": "string"}},
-                "conspicuous_absence": {"type": "array", "items": {"type": "string"}},
+                "notable_omissions": {"type": "array", "items": {"type": "string"}},
                 "bridge_traditions": {"type": "array", "items": {"type": "string"}},
                 "self_citation_norm": {"type": ["string", "null"]},
-                "absent_traditions_risk": {"type": "array", "items": {"type": "string"}},
-                "canonical_must_cite": {"type": "array", "items": {"type": "string"}},
             },
         },
         "opponents_and_foils": {
@@ -494,8 +508,8 @@ VENUE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
         },
         "institutional_signals": {
             "type": "object",
+            "description": "Prestige and ranking are per-database, per-year, per-category. Do not assign a single prestige tier.",
             "properties": {
-                "prestige_tier": {"type": ["string", "null"]},
                 "indexing": {"type": "array", "items": {"type": "string"}},
                 "open_access": {"type": ["string", "null"]},
                 "apc_range_usd_min": {"type": ["integer", "null"]},
@@ -518,7 +532,7 @@ VENUE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
     },
     "required": [
         "discipline_vector", "discipline_envelope",
-        "school_affiliation_vector", "school_envelope",
+        "tradition_affiliation_vector", "tradition_envelope",
         "argument_move_vector", "argument_move_envelope",
         "unknowns",
     ],
@@ -527,12 +541,12 @@ VENUE_FIELD_POSITION_OUTPUT_SCHEMA: dict = {
 
 def _validate_venue_fpm(parsed: dict) -> list[str]:
     warnings = []
-    for vkey in ("discipline_vector", "school_affiliation_vector",
+    for vkey in ("discipline_vector", "tradition_affiliation_vector",
                  "argument_move_vector"):
         v = parsed.get(vkey)
         if not v or not isinstance(v, dict):
             warnings.append(f"Missing or empty {vkey}")
-    for ekey in ("discipline_envelope", "school_envelope",
+    for ekey in ("discipline_envelope", "tradition_envelope",
                  "argument_move_envelope"):
         e = parsed.get(ekey)
         if not e or not isinstance(e, dict):
@@ -548,8 +562,8 @@ def _validate_venue_fpm(parsed: dict) -> list[str]:
 
 VENUE_FIELD_POSITION_FAMILY: dict = {
     "agent_role_id": "venue_field_positioner",
-    "family_id": "venue_field_position_v1",
-    "version": "1.0",
+    "family_id": "venue_field_position_v2",
+    "version": "2.0",
     "system_prompt": VENUE_FIELD_POSITION_SYSTEM,
     "user_prompt_template": VENUE_FIELD_POSITION_USER_TEMPLATE,
     "output_schema": VENUE_FIELD_POSITION_OUTPUT_SCHEMA,

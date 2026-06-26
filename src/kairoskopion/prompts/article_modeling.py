@@ -6,6 +6,8 @@ agent: it reconstructs the publication-facing structure of the text.
 
 from __future__ import annotations
 
+from .discipline_intent_parsing import _OPEN_FIELD_DOCTRINE
+
 ARTICLE_MODELING_SYSTEM = """\
 You are Article Modeler — a specialized analytical role within Kairoskopion, \
 an evidence-first publication-positioning system.
@@ -15,7 +17,7 @@ structure as an ArticleModel. You are NOT summarizing the text. You are \
 extracting what this text IS as a potential academic publication: its thesis, \
 method, genre, novelty mode, disciplinary register, argument structure, \
 citation ecology, and protected core.
-
+""" + _OPEN_FIELD_DOCTRINE + """
 ## Output rules
 
 Return a JSON object with the fields listed in the schema. Every field must \
@@ -41,15 +43,11 @@ be present. Use null for fields you cannot determine.
 5. **secondary_claims** — supporting or tangential claims.
 6. **argument_structure** — how the argument is built: deductive, dialectical, \
    genealogical, case-based, comparative, normative, etc.
-7. **method_status** — one of: conceptual_method, empirical_method, \
-   case_based, mixed, review_method, unknown. A theoretical essay arguing from \
-   first principles is conceptual_method. An article analyzing survey data is \
-   empirical_method.
-8. **genre_current** — one of: research_article, theoretical_essay, \
-   systematic_review, commentary, conceptual_article, forum_piece, \
-   book_review, unknown. Detect from structure and voice, not keywords.
-9. **disciplinary_register_current** — the discipline(s) the text operates \
-   in: philosophy, STS, sociology, education, ethics, etc.
+7. **method_status** — Describe the article's method regime as found in the \
+   text. Use method_regime_unknown if not determinable.
+8. **genre_current** — Describe the article's genre/form as found in the text.
+9. **disciplinary_register_current** — The disciplinary register as evidenced \
+   by the article's vocabulary, references, and method.
 10. **novelty_mode** — one of: new_theory, critique, extension, translation_between_fields, \
     application, synthesis, unknown. What kind of intellectual move does the \
     article make?
@@ -60,9 +58,8 @@ be present. Use null for fields you cannot determine.
     or distinguishes itself from.
 13. **key_terms** — discipline-specific terms that define the article's \
     vocabulary. Not generic academic terms.
-14. **citation_ecology_description** — brief characterization of the \
-    bibliography: heavy on philosophy? recent empirical? cross-disciplinary? \
-    thin?
+14. **citation_ecology_description** — Describe the citation ecology as \
+    observed in the text.
 15. **protected_core_candidate** — what parts of the article MUST NOT be \
     changed in adaptation: the central thesis, object of inquiry, key \
     distinctions, methodological stance. This is a candidate — user must confirm.
@@ -114,22 +111,9 @@ ARTICLE_MODELING_OUTPUT_SCHEMA: dict = {
         "core_claims": {"type": "array", "items": {"type": "string"}},
         "secondary_claims": {"type": "array", "items": {"type": "string"}},
         "argument_structure": {"type": ["string", "null"]},
-        "method_status": {
-            "type": "string",
-            "enum": [
-                "conceptual_method", "empirical_method", "case_based",
-                "mixed", "review_method", "unknown",
-            ],
-        },
+        "method_status": {"type": "string"},
         "method_description": {"type": ["string", "null"]},
-        "genre_current": {
-            "type": "string",
-            "enum": [
-                "research_article", "theoretical_essay", "systematic_review",
-                "commentary", "conceptual_article", "forum_piece",
-                "book_review", "unknown",
-            ],
-        },
+        "genre_current": {"type": "string"},
         "disciplinary_register_current": {"type": ["string", "null"]},
         "novelty_mode": {
             "type": "string",
@@ -194,26 +178,23 @@ def validate_article_extraction(data: dict) -> list[str]:
         if not data.get("unknowns"):
             warnings.append("Abstract-only input should have unknowns")
 
-    if data.get("method_status") not in (
-        "conceptual_method", "empirical_method", "case_based",
-        "mixed", "review_method", "unknown", None,
+    if data.get("method_status") is not None and not isinstance(
+        data.get("method_status"), str
     ):
-        warnings.append(f"Invalid method_status: {data.get('method_status')}")
+        warnings.append(f"method_status must be a string: {data.get('method_status')}")
 
-    if data.get("genre_current") not in (
-        "research_article", "theoretical_essay", "systematic_review",
-        "commentary", "conceptual_article", "forum_piece",
-        "book_review", "unknown", None,
+    if data.get("genre_current") is not None and not isinstance(
+        data.get("genre_current"), str
     ):
-        warnings.append(f"Invalid genre: {data.get('genre_current')}")
+        warnings.append(f"genre_current must be a string: {data.get('genre_current')}")
 
     return warnings
 
 
 ARTICLE_MODELING_FAMILY = {
-    "family_id": "article_modeling_v1",
+    "family_id": "article_modeling_v2",
     "agent_role_id": "article_modeler",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "system_prompt": ARTICLE_MODELING_SYSTEM,
     "user_prompt_template": ARTICLE_MODELING_USER_TEMPLATE,
     "output_schema": ARTICLE_MODELING_OUTPUT_SCHEMA,

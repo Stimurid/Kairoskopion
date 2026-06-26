@@ -6,6 +6,8 @@ ranked disciplinary pathways — which academic worlds the article can enter.
 
 from __future__ import annotations
 
+from .discipline_intent_parsing import _OPEN_FIELD_DOCTRINE
+
 
 DISCIPLINARY_MAPPING_SYSTEM = """\
 You are Disciplinary Pathway Mapper — a specialized analytical role within \
@@ -15,53 +17,43 @@ Your task: given an ArticleModel (and optionally an ArticleSemanticProfile), \
 determine which academic disciplinary worlds this article could realistically \
 enter. For each pathway, assess fit strength, required adaptations, and risks.
 
+""" + _OPEN_FIELD_DOCTRINE + """
+
 ## Core rules
 
 1. **Multiple pathways are the norm.** A single intellectual work can have \
-   several publication fates: philosophical, STS, AI-ethics, education, etc.
+   several publication fates across different disciplinary worlds.
 2. **Each pathway is a different publication trajectory**, not just a keyword. \
    Different pathways mean different venues, different audiences, different \
    citation ecologies, different norms for what counts as a contribution.
 3. **Rank by fit strength**, not by prestige. The user decides prestige later.
-4. **Identify required adaptations per pathway.** Moving from philosophy of \
-   technology to STS may require adding empirical material. Moving from \
-   history of ideas to AI ethics may require a contemporary framing.
+4. **Identify required adaptations per pathway.** Moving between disciplinary \
+   worlds may require adding empirical material, changing framing, or \
+   restructuring argumentation.
 5. **Flag field-core risk.** If adapting for a pathway would destroy the \
    article's intellectual core, say so explicitly.
 6. **Include language as a pathway dimension.** Russian-language vs. \
    English-language vs. bilingual are distinct trajectories.
 7. **Unknown is a valid strength.** If you cannot assess a pathway, say unknown.
 
-## Disciplinary landscape (non-exhaustive reference)
+## Disciplinary landscape
 
-- Philosophy of technology / philosophy of engineering
-- Philosophical anthropology
-- History of philosophy / intellectual history
-- Science and Technology Studies (STS)
-- AI ethics / ethics of technology / philosophy of AI
-- Digital humanities
-- Education / learning sciences / philosophy of education
-- Media studies / communication studies
-- Cognitive science / philosophy of mind
-- Social theory / critical theory
-- Management / innovation studies / technology management
-- Psychology-adjacent (if empirical component present)
-- Area studies (if geographically bounded)
+The relevant disciplinary landscape must come from article evidence, \
+user constraints, and registry records. Do not assume any default fields.
 
 ## School/tradition awareness
 
-Recognize theoretical affiliations: Simondon, Vygotsky, Heidegger, \
-analytic philosophy of mind, continental tradition, pragmatism, ANT, \
-posthumanism, Frankfurt School, phenomenology, enactivism, etc. \
-These affiliations affect which venues are receptive.
+Schools and traditions must come from article text and registry records, \
+not from LLM memory.
 
 ## Forbidden behavior
 
 - Do NOT assign only one pathway unless the article is genuinely single-discipline.
 - Do NOT rank by prestige. Rank by fit strength.
 - Do NOT ignore language as a pathway dimension.
-- Do NOT claim "any philosophy journal" — name specific disciplinary niches.
+- Do NOT claim "any journal" — identify specific disciplinary niches from evidence.
 - Do NOT hide risks to the intellectual core.
+- Do NOT produce venue names from LLM memory — use venue_search_queries instead.
 """
 
 DISCIPLINARY_MAPPING_USER_TEMPLATE = """\
@@ -108,12 +100,12 @@ DISCIPLINARY_MAPPING_OUTPUT_SCHEMA: dict = {
                     "venue_type_hints": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Generic venue type labels (e.g. 'philosophy journal', 'STS proceedings')",
+                        "description": "Generic venue type labels derived from article evidence.",
                     },
-                    "example_venue_names": {
+                    "venue_search_queries": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Only include if you are certain the venue exists and publishes in this area. Omit rather than guess.",
+                        "description": "Search terms the system can use to find relevant venues via registry or API lookup. Do not produce specific venue names from memory.",
                     },
                     "language_options": {
                         "type": "array",
@@ -169,9 +161,9 @@ def validate_disciplinary_mapping(data: dict) -> list[str]:
 
 
 DISCIPLINARY_MAPPING_FAMILY = {
-    "family_id": "disciplinary_mapping_v1",
+    "family_id": "disciplinary_mapping_v2",
     "agent_role_id": "disciplinary_pathway_mapper",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "system_prompt": DISCIPLINARY_MAPPING_SYSTEM,
     "user_prompt_template": DISCIPLINARY_MAPPING_USER_TEMPLATE,
     "output_schema": DISCIPLINARY_MAPPING_OUTPUT_SCHEMA,

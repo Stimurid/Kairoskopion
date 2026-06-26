@@ -200,7 +200,23 @@ CITATION_ECOLOGY_OUTPUT_SCHEMA = {
                     "target_area": {"type": "string"},
                     "reference_anchors": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "evidence_status": {
+                                    "type": "string",
+                                    "enum": [
+                                        "from_bibliography",
+                                        "from_venue_corpus",
+                                        "from_registry",
+                                        "unknown",
+                                    ],
+                                },
+                            },
+                            "required": ["name", "evidence_status"],
+                            "additionalProperties": False,
+                        },
                     },
                     "rationale": {"type": "string"},
                     "evidence_marker": {"type": "string"},
@@ -243,10 +259,17 @@ def validate_citation_ecology(data: dict) -> list[str]:
     for i, b in enumerate(data.get("bridge_references", [])):
         if not isinstance(b, dict):
             continue
-        for t in b.get("reference_anchors", []):
-            if "202" in str(t):
+        for j, t in enumerate(b.get("reference_anchors", [])):
+            name = t.get("name", "") if isinstance(t, dict) else str(t)
+            if "202" in name:
                 warnings.append(
-                    f"bridge_reference[{i}] may contain fabricated year"
+                    f"bridge_reference[{i}].reference_anchors[{j}] "
+                    f"may contain fabricated year"
+                )
+            if isinstance(t, dict) and not t.get("evidence_status"):
+                warnings.append(
+                    f"bridge_reference[{i}].reference_anchors[{j}] "
+                    f"missing evidence_status"
                 )
     return warnings
 

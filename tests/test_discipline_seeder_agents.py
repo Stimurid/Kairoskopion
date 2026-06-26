@@ -161,14 +161,14 @@ class TestPromptsExposed(unittest.TestCase):
         from kairoskopion.prompts import DISCIPLINE_SOURCE_ACQUISITION_FAMILY
         self.assertEqual(
             DISCIPLINE_SOURCE_ACQUISITION_FAMILY["family_id"],
-            "discipline_source_acquisition_v1",
+            "discipline_source_acquisition_v2",
         )
 
     def test_seeding_family_exposed(self):
         from kairoskopion.prompts import DISCIPLINE_SEEDING_FAMILY
         self.assertEqual(
             DISCIPLINE_SEEDING_FAMILY["family_id"],
-            "discipline_seeding_v1",
+            "discipline_seeding_v2",
         )
 
 

@@ -270,3 +270,33 @@ def section_model_id() -> str:
 
 def special_issue_model_id() -> str:
     return generate_id("spiss")
+
+
+# --- Open-field registry record IDs (P5C) ---
+
+def discipline_record_id() -> str:
+    return generate_id("drec")
+
+
+def tribe_or_framework_record_id() -> str:
+    return generate_id("tfrec")
+
+
+def venue_section_record_id() -> str:
+    return generate_id("vsrec")
+
+
+def classification_system_record_id() -> str:
+    return generate_id("csrec")
+
+
+def subject_category_record_id() -> str:
+    return generate_id("screc")
+
+
+def venue_classification_record_id() -> str:
+    return generate_id("vcrec")
+
+
+def venue_metric_record_id() -> str:
+    return generate_id("vmrec")

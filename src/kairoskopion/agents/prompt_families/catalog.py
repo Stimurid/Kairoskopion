@@ -25,7 +25,7 @@ from .submission_pack import SUBMISSION_PACK_FAMILY
 # Canonical 14 spec families + 2 UC-1 extensions
 PROMPT_FAMILY_CATALOG: dict[str, dict] = {
     # Spec §69.1 — Article Modeling
-    "article_modeling_v1": ARTICLE_MODELING_FAMILY,
+    "article_modeling_v2": ARTICLE_MODELING_FAMILY,
     # Spec §69.2 — Scenario Interview
     "scenario_interview_v1": SCENARIO_INTERVIEW_FAMILY,
     # Spec §69.3 — Venue Fact Extraction
@@ -53,16 +53,19 @@ PROMPT_FAMILY_CATALOG: dict[str, dict] = {
     # Spec §69.14 — Evidence Audit
     "evidence_audit_v1": EVIDENCE_AUDIT_FAMILY,
     # UC-1 extension — Semantic Profiling
-    "semantic_profiling_v1": SEMANTIC_PROFILING_FAMILY,
+    "semantic_profiling_v2": SEMANTIC_PROFILING_FAMILY,
     # UC-1 extension — Disciplinary Mapping
     "disciplinary_mapping_v1": DISCIPLINARY_MAPPING_FAMILY,
+    "disciplinary_mapping_v2": DISCIPLINARY_MAPPING_FAMILY,
 }
 
 
 def get_prompt_family(family_id: str) -> dict | None:
     fam = PROMPT_FAMILY_CATALOG.get(family_id)
-    if fam is None and not family_id.endswith("_v1"):
-        fam = PROMPT_FAMILY_CATALOG.get(f"{family_id}_v1")
+    if fam is None and not family_id.endswith(("_v1", "_v2")):
+        fam = PROMPT_FAMILY_CATALOG.get(f"{family_id}_v2")
+        if fam is None:
+            fam = PROMPT_FAMILY_CATALOG.get(f"{family_id}_v1")
     return fam
 
 

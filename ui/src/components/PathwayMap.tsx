@@ -90,11 +90,11 @@ export function PathwayMap({ pathways, onSelectPathway, selectedPathwayId }: Pro
                 <p className="pathway-strategic">{p.strategic_value_notes}</p>
               )}
 
-              {p.example_venue_names.length > 0 && (
+              {p.venue_search_queries.length > 0 && (
                 <div className="pathway-venues">
-                  <span className="pathway-section-label">Примеры площадок:</span>
+                  <span className="pathway-section-label">Поисковые запросы:</span>
                   <div className="pathway-venue-chips">
-                    {p.example_venue_names.map((v, i) => (
+                    {p.venue_search_queries.map((v, i) => (
                       <span key={i} className="venue-chip">{v}</span>
                     ))}
                   </div>

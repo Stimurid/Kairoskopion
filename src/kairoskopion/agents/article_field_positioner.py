@@ -79,7 +79,7 @@ def _build_fpm_from_parsed(
         entity_id=article.get("article_model_id"),
         discipline_vector=parsed.get("discipline_vector", {}) or {},
         subdiscipline_address=parsed.get("subdiscipline_address", {}) or {},
-        school_affiliation_vector=parsed.get("school_affiliation_vector", {}) or {},
+        tradition_affiliation_vector=parsed.get("tradition_affiliation_vector", {}) or {},
         citation_network_signature=parsed.get("citation_network_signature", {}) or {},
         opponents_and_foils=parsed.get("opponents_and_foils", {}) or {},
         argument_move_vector=parsed.get("argument_move_vector", {}) or {},
@@ -123,7 +123,7 @@ def _deterministic_fpm(
         entity_id=article.get("article_model_id"),
         discipline_vector=discipline_vector,
         subdiscipline_address={"primary": primary},
-        school_affiliation_vector=school_vector,
+        tradition_affiliation_vector=school_vector,
         citation_network_signature={
             "must_cite": semantic.get("theoretical_shoulders", []) or [],
         },

@@ -6,6 +6,8 @@ affiliations, argument move type, theoretical shoulders, protected core.
 
 from __future__ import annotations
 
+from .discipline_intent_parsing import _OPEN_FIELD_DOCTRINE
+
 
 SEMANTIC_PROFILING_SYSTEM = """\
 You are Article Semantic Profiler — a specialized analytical role within \
@@ -14,36 +16,31 @@ Kairoskopion, an evidence-first publication-positioning system.
 Your task: given an ArticleModel and (optionally) the raw manuscript text, \
 build a rich semantic profile of the article. This profile will be used for \
 disciplinary pathway mapping and venue discovery.
-
+""" + _OPEN_FIELD_DOCTRINE + """
 You must identify:
 
 ## 1. Disciplinary registers (multiple)
 Which academic disciplines does this article speak to? Not just one — most \
-humanities/social science work touches several. List them with specificity:
-- "philosophy of technology" not just "philosophy"
-- "STS" not just "social science"
-- "philosophical anthropology" not just "anthropology"
+research touches several. List them with specificity: use the most precise \
+sub-field label the text supports rather than a broad umbrella term.
 
 ## 2. Schools and traditions
-What intellectual traditions does the article belong to or engage with? \
-Examples: Simondon, Vygotsky, Heidegger, analytic philosophy of mind, \
-continental phenomenology, pragmatism, ANT, posthumanism, Frankfurt School, \
-enactivism, Russian cosmism, Marxist tradition, structuralism, etc.
+Schools and traditions mentioned in the article text. Do not assume any \
+default school. Report only what the article text explicitly references.
 
 ## 3. Argument move type
-What type of intellectual move does the article make?
+Describe the argument move type as observed in the text. Use a short \
+descriptive label that captures the intellectual move the article makes. \
+Common patterns include (but are not limited to):
 - problem_statement — posing a new problem or reframing an existing one
-- genealogy — tracing the historical development of a concept/idea
-- concept_reconstruction — rebuilding/redefining a concept
-- school_critique — critiquing a school of thought or tradition
 - model_building — proposing a new theoretical model or framework
 - comparative_analysis — comparing approaches, theories, traditions
 - disciplinary_translation — bringing ideas from one field to another
-- polemical_essay — arguing a position against established views
 - empirical_conceptual_hybrid — mixing empirical data with conceptual analysis
 - systematic_review — comprehensive review of a field or topic
 - methodology_piece — proposing or discussing research methods
 - unknown
+If none of these labels fit, supply a free-form label that does.
 
 ## 4. Theoretical shoulders
 Whose work does this article build on? Not just bibliography — the key \
@@ -78,10 +75,10 @@ WRONG (will break the system):
 
 CORRECT (the ONLY accepted format):
 {
-  "disciplinary_registers": ["philosophy of technology", "STS"],
-  "primary_discipline": "philosophy of technology",
-  "schools_and_traditions": ["postphenomenology", "enactivism"],
-  "theoretical_shoulders": ["Ihde", "Simondon"],
+  "disciplinary_registers": ["sub-field A", "sub-field B"],
+  "primary_discipline": "sub-field A",
+  "schools_and_traditions": ["tradition referenced in text"],
+  "theoretical_shoulders": ["Author X", "Author Y"],
   "opponents_or_foils": [],
   "argument_move_type": "model_building",
   "argument_move_description": "...",
@@ -90,7 +87,7 @@ CORRECT (the ONLY accepted format):
   "protected_core_candidates": ["central distinction X"],
   "mutable_zones": ["introduction framing"],
   "field_core_nonnegotiables": [],
-  "intended_audience": "philosophers of technology and STS scholars",
+  "intended_audience": "specialists in sub-field A",
   "audience_expertise_level": "specialist",
   "unknowns": ["citation ecology not assessed"],
   "questions_for_user": [],
@@ -149,13 +146,7 @@ SEMANTIC_PROFILING_OUTPUT_SCHEMA: dict = {
         },
         "argument_move_type": {
             "type": "string",
-            "enum": [
-                "problem_statement", "genealogy", "concept_reconstruction",
-                "school_critique", "model_building", "comparative_analysis",
-                "disciplinary_translation", "polemical_essay",
-                "empirical_conceptual_hybrid", "systematic_review",
-                "methodology_piece", "unknown",
-            ],
+            "description": "Free-form label describing the argument move type observed in the text.",
         },
         "argument_move_description": {"type": ["string", "null"]},
         "citation_bridges_needed": {
@@ -205,9 +196,9 @@ def validate_semantic_profile(data: dict) -> list[str]:
 
 
 SEMANTIC_PROFILING_FAMILY = {
-    "family_id": "semantic_profiling_v1",
+    "family_id": "semantic_profiling_v2",
     "agent_role_id": "article_semantic_profiler",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "system_prompt": SEMANTIC_PROFILING_SYSTEM,
     "user_prompt_template": SEMANTIC_PROFILING_USER_TEMPLATE,
     "output_schema": SEMANTIC_PROFILING_OUTPUT_SCHEMA,

@@ -140,9 +140,9 @@ def compute_field_position_fit(
 
     # --- Group 2: School/Tribe ---
     status, dist, edge = _vector_distance_to_envelope(
-        article_fpm.get("school_affiliation_vector", {}),
-        venue_fpm.get("school_affiliation_vector", {}),
-        venue_fpm.get("school_envelope"),
+        article_fpm.get("tradition_affiliation_vector", {}),
+        venue_fpm.get("tradition_affiliation_vector", {}),
+        venue_fpm.get("tradition_envelope"),
     )
     axes.append({
         "axis": "school_fit",

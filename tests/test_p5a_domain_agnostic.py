@@ -15,31 +15,47 @@ import unittest
 # Shared doctrine constant
 # ═══════════════════════════════════════════════════════════════════════
 
-class TestDomainAgnosticDoctrine(unittest.TestCase):
-    def test_doctrine_exists_and_has_regimes(self):
+class TestOpenFieldDoctrine(unittest.TestCase):
+    def test_doctrine_exists_and_has_open_field_markers(self):
         from kairoskopion.prompts.discipline_intent_parsing import (
-            _DOMAIN_AGNOSTIC_DOCTRINE,
+            _OPEN_FIELD_DOCTRINE,
         )
-        self.assertIn("mathematical proof", _DOMAIN_AGNOSTIC_DOCTRINE)
-        self.assertIn("experimental measurement", _DOMAIN_AGNOSTIC_DOCTRINE)
-        self.assertIn("clinical trial", _DOMAIN_AGNOSTIC_DOCTRINE)
-        self.assertIn("simulation", _DOMAIN_AGNOSTIC_DOCTRINE)
-        self.assertIn("legal analysis", _DOMAIN_AGNOSTIC_DOCTRINE)
+        self.assertIn("open publication field", _OPEN_FIELD_DOCTRINE)
+        self.assertIn("Do not use examples as taxonomy", _OPEN_FIELD_DOCTRINE)
+        self.assertIn("Never convert unknown into absence", _OPEN_FIELD_DOCTRINE)
+        self.assertIn("Never convert model memory into fact", _OPEN_FIELD_DOCTRINE)
+        self.assertIn("source acquisition task", _OPEN_FIELD_DOCTRINE)
 
-    def test_doctrine_no_philosophy_bias(self):
+    def test_doctrine_no_field_list_attractor(self):
         from kairoskopion.prompts.discipline_intent_parsing import (
-            _DOMAIN_AGNOSTIC_DOCTRINE,
+            _OPEN_FIELD_DOCTRINE,
         )
-        lower = _DOMAIN_AGNOSTIC_DOCTRINE.lower()
+        lower = _OPEN_FIELD_DOCTRINE.lower()
+        self.assertNotIn("mathematics", lower)
+        self.assertNotIn("biology", lower)
+        self.assertNotIn("semiconductor", lower)
+        self.assertNotIn("philosophy", lower)
         self.assertNotIn("postphenomenolog", lower)
         self.assertNotIn("ihde", lower)
         self.assertNotIn("verbeek", lower)
         self.assertNotIn("continental theory", lower)
 
-    def test_doctrine_imported_by_all_prompt_families(self):
+    def test_doctrine_no_epistemic_regime_list(self):
         from kairoskopion.prompts.discipline_intent_parsing import (
-            _DOMAIN_AGNOSTIC_DOCTRINE,
+            _OPEN_FIELD_DOCTRINE,
         )
+        lower = _OPEN_FIELD_DOCTRINE.lower()
+        self.assertNotIn("mathematical proof", lower)
+        self.assertNotIn("clinical trial", lower)
+        self.assertNotIn("experimental measurement", lower)
+
+    def test_backward_compat_alias(self):
+        from kairoskopion.prompts.discipline_intent_parsing import (
+            _DOMAIN_AGNOSTIC_DOCTRINE, _OPEN_FIELD_DOCTRINE,
+        )
+        self.assertIs(_DOMAIN_AGNOSTIC_DOCTRINE, _OPEN_FIELD_DOCTRINE)
+
+    def test_doctrine_imported_by_all_prompt_families(self):
         from kairoskopion.prompts.venue_funnel_planning import (
             VENUE_FUNNEL_FAMILY,
         )
@@ -68,7 +84,7 @@ class TestDomainAgnosticDoctrine(unittest.TestCase):
             MISMATCH_NARRATIVE_FAMILY,
         )
 
-        snippet = "mathematical proof"
+        snippet = "open publication field"
         for name, fam in [
             ("venue_funnel", VENUE_FUNNEL_FAMILY),
             ("venue_family_context", VENUE_FAMILY_CONTEXT_FAMILY),
@@ -82,7 +98,7 @@ class TestDomainAgnosticDoctrine(unittest.TestCase):
         ]:
             self.assertIn(
                 snippet, fam["system_prompt"],
-                f"{name} system_prompt missing domain-agnostic doctrine",
+                f"{name} system_prompt missing open-field doctrine",
             )
 
 

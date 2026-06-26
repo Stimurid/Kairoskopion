@@ -1,11 +1,19 @@
-"""Venue Fact Extraction prompt family (spec §56, §69.3).
+"""Venue Fact Extraction prompt family (spec §56, §69.3, P5C rewrite).
 
 Extracts VenueModel from venue guidelines, official pages, and other sources.
 The LLM acts as Venue Profiler agent: it builds an evidence-backed model of
 the publication container.
+
+P5C changes:
+- Sections, tracks, special issues are first-class records
+- Indexing claims are per-database with year/category where stated
+- Metrics claims are per-database/year/category, never collapsed
+- Open-field doctrine injected
 """
 
 from __future__ import annotations
+
+from .discipline_intent_parsing import _OPEN_FIELD_DOCTRINE
 
 VENUE_FACT_EXTRACTION_SYSTEM = """\
 You are Venue Profiler — a specialized analytical role within Kairoskopion, \
@@ -14,6 +22,7 @@ an evidence-first publication-positioning system.
 Your task: given venue source text (guidelines, official pages, policy documents), \
 extract a structured VenueModel. You are NOT describing the journal. You are \
 building a factual, evidence-linked model of a publication container.
+""" + _OPEN_FIELD_DOCTRINE + """\
 
 ## Output rules
 
@@ -41,11 +50,37 @@ container:
 - "classic_journal_article" — standard peer-reviewed journal.
 - "special_issue_article" — a special/themed issue within a journal.
 - "conference_proceedings" — published conference papers.
-- "mega_journal" — large-scale open-access journal (e.g. PLOS ONE type).
+- "mega_journal" — large-scale open-access journal.
 - "edited_volume" — chapter in an edited book.
 - null — cannot determine from text.
 
 Do NOT default to "classic_journal_article" when unsure. Use null.
+
+## Sections, tracks, and special issues (P5C — first-class records)
+
+A venue may have **sections**, **tracks**, or **special issues** that \
+target different fields from the parent journal. Extract them as separate \
+records in the ``sections`` array:
+
+- Each section has its own scope, editor(s), and may have its own ISSN.
+- A section may target a different discipline than the parent venue.
+- Special issues are time-bounded sections with specific themes.
+- Conference proceedings tracks are sections within a proceedings venue.
+
+Do NOT treat the venue as monolithic. If the source text mentions sections \
+or tracks, extract each one separately.
+
+## Indexing and metrics (P5C — per-record, not flat)
+
+Indexing and metrics are **per-database, per-year, per-category**:
+
+- ``indexing_claims``: each claim specifies which database, which \
+  subject category (if stated), and year (if stated). A venue may be \
+  indexed in multiple categories with different positions.
+- ``metrics_claims``: each metric specifies database, metric type, \
+  value, year, and subject category. Do NOT collapse "Q1 in Scopus \
+  and Q2 in WoS" into a single quartile. Do NOT omit the year.
+- A section or special issue may have different indexing from parent.
 
 ## Policy extraction (important)
 
@@ -63,41 +98,40 @@ from no mention of APC.
 4. **official_urls** — list of official URLs found in the text.
 5. **scope_summary** — what the venue publishes, its thematic focus. \
    Extract from aims/scope section, not from marketing blurbs.
-6. **subject_areas** — list of disciplines/fields the venue covers.
-7. **article_types** — accepted article types (research article, review, \
-   commentary, etc.) as stated in guidelines.
-8. **language_policy** — what language(s) articles must be in. Distinguish \
-   between article body language and metadata language requirements.
-9. **word_limits** — word count limits per article type if stated.
-10. **abstract_requirements** — abstract word limit, structure requirements.
-11. **review_model** — double_blind, single_blind, open_review, unknown.
-12. **indexing_claims** — list of indexing databases claimed. Each with \
-    evidence_status (usually vendor_claim unless independently confirmed).
-13. **metrics_claims** — impact factor, quartile, h-index claims. Always \
-    vendor_claim unless from independent source.
-14. **open_access_status** — gold, hybrid, subscription, unknown.
-15. **apc_policy** — article processing charge: amount, waivers, or no_apc.
-16. **ai_policy** — what the venue says about AI/LLM use in manuscripts.
-17. **data_policy** — data availability/sharing requirements.
-18. **ethics_policy** — ethics approval, IRB requirements.
-19. **anonymization_policy** — blinding requirements for review.
-20. **submission_portal** — which system is used (OJS, ScholarOne, etc.).
-21. **typical_timeline** — review/publication timeline if mentioned.
-22. **special_requirements** — any unusual requirements not covered above.
+6. **subject_areas** — list of disciplines/fields the venue covers \
+   as stated in the text.
+7. **sections** — list of sections/tracks/special issues found in the text.
+8. **article_types** — accepted article types as stated in guidelines.
+9. **language_policy** — what language(s) articles must be in.
+10. **word_limits** — word count limits per article type if stated.
+11. **abstract_requirements** — abstract word limit, structure requirements.
+12. **review_model** — double_blind, single_blind, open_review, unknown.
+13. **indexing_claims** — list of indexing claims. Each with database, \
+    subject_category (if stated), year (if stated), evidence_status.
+14. **metrics_claims** — list of metric claims. Each with database, \
+    metric_type, value, year, subject_category, evidence_status.
+15. **open_access_status** — gold, hybrid, subscription, unknown.
+16. **apc_policy** — article processing charge: amount, waivers, or no_apc.
+17. **ai_policy** — what the venue says about AI/LLM use in manuscripts.
+18. **data_policy** — data availability/sharing requirements.
+19. **ethics_policy** — ethics approval, IRB requirements.
+20. **anonymization_policy** — blinding requirements for review.
+21. **submission_portal** — which system is used (OJS, ScholarOne, etc.).
+22. **typical_timeline** — review/publication timeline if mentioned.
+23. **special_requirements** — any unusual requirements not covered above.
 
 ## Forbidden behavior
 
 - Do NOT build VenueModel from your training data or memory. Use ONLY the \
   provided source text.
-- Do NOT treat author guidelines as the complete venue model. Guidelines \
-  cover submission rules; scope, editorial focus, and actual publication \
-  patterns require additional sources.
+- Do NOT treat author guidelines as the complete venue model.
 - Do NOT confuse a special issue with the parent journal.
 - Do NOT assert indexing/quartile status without source — mark as vendor_claim \
   if from journal homepage, unknown if not mentioned.
 - Do NOT present publisher marketing as verified fact.
 - Do NOT infer hidden editorial preferences without evidence.
 - Do NOT treat inaccessible information as absent — use "unknown", not "no".
+- Do NOT collapse per-database or per-year metrics into a single value.
 """
 
 VENUE_FACT_EXTRACTION_USER_TEMPLATE = """\
@@ -139,6 +173,36 @@ VENUE_FACT_EXTRACTION_OUTPUT_SCHEMA: dict = {
         "official_urls": {"type": "array", "items": {"type": "string"}},
         "scope_summary": {"type": ["string", "null"]},
         "subject_areas": {"type": "array", "items": {"type": "string"}},
+        "sections": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "section_name": {"type": "string"},
+                    "section_type": {
+                        "type": "string",
+                        "enum": [
+                            "section", "track", "special_issue",
+                            "proceedings_track", "unknown",
+                        ],
+                    },
+                    "scope_description": {"type": ["string", "null"]},
+                    "target_disciplines": {
+                        "type": "array", "items": {"type": "string"},
+                    },
+                    "editors": {
+                        "type": "array", "items": {"type": "string"},
+                    },
+                    "issn": {"type": ["string", "null"]},
+                    "status": {"type": ["string", "null"]},
+                    "evidence_status": {"type": "string"},
+                },
+                "required": [
+                    "section_name", "section_type", "evidence_status",
+                ],
+                "additionalProperties": False,
+            },
+        },
         "article_types": {
             "type": "array",
             "items": {
@@ -191,6 +255,9 @@ VENUE_FACT_EXTRACTION_OUTPUT_SCHEMA: dict = {
                 "type": "object",
                 "properties": {
                     "database": {"type": "string"},
+                    "subject_category": {"type": ["string", "null"]},
+                    "year": {"type": ["integer", "null"]},
+                    "section_name": {"type": ["string", "null"]},
                     "evidence_status": {"type": "string"},
                     "details": {"type": ["string", "null"]},
                 },
@@ -203,11 +270,15 @@ VENUE_FACT_EXTRACTION_OUTPUT_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "metric": {"type": "string"},
+                    "database": {"type": "string"},
+                    "metric_type": {"type": "string"},
                     "value": {"type": ["string", "null"]},
+                    "year": {"type": ["integer", "null"]},
+                    "subject_category": {"type": ["string", "null"]},
+                    "section_name": {"type": ["string", "null"]},
                     "evidence_status": {"type": "string"},
                 },
-                "required": ["metric", "evidence_status"],
+                "required": ["database", "metric_type", "evidence_status"],
                 "additionalProperties": False,
             },
         },
@@ -279,9 +350,9 @@ def validate_venue_extraction(data: dict) -> list[str]:
 
 
 VENUE_FACT_EXTRACTION_FAMILY = {
-    "family_id": "venue_fact_extraction_v1",
+    "family_id": "venue_fact_extraction_v2",
     "agent_role_id": "venue_profiler",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "system_prompt": VENUE_FACT_EXTRACTION_SYSTEM,
     "user_prompt_template": VENUE_FACT_EXTRACTION_USER_TEMPLATE,
     "output_schema": VENUE_FACT_EXTRACTION_OUTPUT_SCHEMA,

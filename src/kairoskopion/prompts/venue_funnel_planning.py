@@ -56,9 +56,8 @@ Period. No exceptions.
 
 2. **candidate_families** — field-neutral venue family descriptors \
    derived from intent and evidence. Each with:
-   - family_descriptor (e.g. "computational biology journals", \
-     "applied mathematics proceedings", "STS interdisciplinary \
-     venues" — descriptive, not named venues);
+   - family_descriptor (a descriptive label derived from the \
+     article's discipline intent — NOT a specific venue name);
    - discipline_zone;
    - search_strategy (how to find venues in this family: which \
      databases, which queries, which adapters);
@@ -117,6 +116,9 @@ Evidence pack summaries:
 
 VenueMemory accepted records:
 {venue_memory}
+
+Registry records (disciplines, classifications, venue sections):
+{registry_records}
 
 User constraints: {user_constraints}
 Region hint: {region_hint}

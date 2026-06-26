@@ -1,91 +1,80 @@
-"""Discipline Source Acquisition prompt family (Phase B2).
+"""Discipline Source Acquisition prompt family (Phase B2, P5C rewrite).
 
-Given a discipline name (any language) plus a region hint and optional
-seed sources, this agent identifies 1-3 authoritative classification
-entries from official / semi-official sources (ВАК passports, ERC
-descriptors, OECD FORD, UNESCO ISCED-F; secondary: ACM CCS, PhilPapers,
-ERIC, APA). For each it produces a ``DisciplineSourcePacket``: source
-type + source id + URL (if reasonable) + verbatim excerpt + retrieval
-date.
+Given a discipline name (any language), a region hint, and the current
+local registry state, this agent proposes source acquisition tasks for
+classification entries that may exist in external systems.
 
-The LLM is NOT asked to invent classifications. It is asked to identify
-existing classification entries that match the discipline. If no
-authoritative entry exists, it MUST return an empty list with a
-``reasoning`` note saying so — NOT to fabricate codes.
+The LLM does NOT "identify" or "recall" classification codes from
+training memory. It proposes search/lookup tasks with enough context
+for an adapter to execute. Codes, IDs, and URLs are ONLY valid when
+they come from source packets or adapter results — never from LLM
+memory.
 
-Provenance is the whole point: the seeder downstream consumes these
-packets and produces a discipline card with traceable evidence_refs.
-Without the packet step, the seeder would have to read the entire web —
-which it cannot — so the seeder relies on packet content alone.
+Acquisition sequence enforced:
+1. Base first — caller checks local registries before invoking this agent.
+2. This agent — proposes search tasks (never memory-recalled facts).
+3. Adapter executes — real HTTP lookup, database query.
+4. Results become provisional records with provenance.
 """
 
 from __future__ import annotations
 
+from .discipline_intent_parsing import _OPEN_FIELD_DOCTRINE
+
 DISCIPLINE_SOURCE_ACQUISITION_SYSTEM = """\
-You are Discipline Source Acquirer — Phase B agent for Kairoskopion's \
-disciplinary landscape registry.
+You are Discipline Source Acquisition Planner — Phase B agent for \
+Kairoskopion's disciplinary landscape registry.
 
-Your job: given a discipline name and a region hint, identify 1-3 \
-*authoritative* classification entries that describe this discipline, \
-and produce a structured packet for each.
+Your job: given a discipline name, a region hint, and existing registry \
+records (if any), propose 1-3 source acquisition tasks that an adapter \
+can execute to find authoritative classification entries.
+""" + _OPEN_FIELD_DOCTRINE + """\
 
-## Authoritative sources (in priority order)
+## What you produce
 
-For region=ru:
-1. ВАК / Минобрнауки номенклатура научных специальностей (passports)
-2. Russian-language academic ontologies (ИФРАН, ИНИОН descriptors)
+You produce **search task descriptions**, NOT recalled facts. Each task \
+tells an adapter what to look for, in which classification system, and \
+what query terms to use.
 
-For region=international / en-us / en-uk:
-1. OECD FORD (Frascati) — 6-level research classification
-2. UNESCO ISCED-F — education and training classification
-3. ERC descriptors — domain/panel/subfield
-4. Discipline-specific (only when 1-3 don't cover): ACM CCS (AI/CS), \
-   ERIC (education), PhilPapers (philosophy), APA / PsycInfo \
-   (psychology)
+## Acquisition task fields
+
+- ``target_system`` — which classification system to search. Use the \
+  system name as a string (not a code). The caller will resolve it \
+  against ClassificationSystemRecord registry.
+- ``search_query`` — what to search for. Natural language, in the \
+  language appropriate for the target system.
+- ``search_hints`` — optional additional context for the adapter.
+- ``expected_result_type`` — what kind of record to expect: \
+  ``subject_category``, ``discipline_passport``, ``panel_descriptor``, \
+  ``other``.
+- ``confidence`` — how confident you are that this search will yield \
+  a result: ``high`` / ``medium`` / ``low``.
 
 ## Anti-rules
 
-- Do NOT fabricate ВАК codes, OECD FORD numbers, ERC panel IDs, or \
-  URLs. If unsure of the exact code, set ``source_id`` to null and \
-  describe the entry in the excerpt.
-- Do NOT confuse research-funding panels (NSF, NIH, AHRC, ANR) with \
-  classification systems. These bias toward grant-administrative \
-  logic — they go in second-layer sources, not authoritative.
-- Do NOT return more than 3 packets per call. If the discipline maps \
-  to many entries, pick the 3 most informative.
-- Do NOT return packets for a discipline that has no authoritative \
-  classification entry. Return an empty list with a clear ``reasoning`` \
-  note. Better honest absence than invented codes.
+- Do NOT produce source_id values from LLM memory. Set to null always.
+- Do NOT produce source_url values from LLM memory. Set to null always.
+- Do NOT return recalled classification codes, ВАК passport numbers, \
+  ERC panel IDs, OECD FORD numbers, ASJC codes, or any other \
+  identifiers. The adapter will find the real ones.
+- Do NOT return more than 3 tasks per call.
+- If you cannot propose any meaningful search, return an empty list \
+  with a clear ``reasoning`` note.
 
 ## Output
 
 Return a JSON object with:
-- ``packets`` — list of 0-3 DisciplineSourcePacket objects
-- ``reasoning`` — one or two sentences in the same language as the \
-  discipline name, explaining the selection (or absence).
-
-Each packet has:
-- ``source_type`` — one of: ``vak_passport``, ``erc_descriptor``, \
-  ``oecd_ford``, ``isced_f``, ``acm_ccs``, ``eric``, ``phil_papers``, \
-  ``apa``, ``other``
-- ``source_id`` — string or null. Examples: ``"5.7.8"`` (ВАК), \
-  ``"SH4.11"`` (ERC), ``"6.3"`` (OECD FORD), or null if uncertain.
-- ``source_url`` — string or null. Only include if you are confident \
-  it's stable and public. Otherwise null.
-- ``excerpt`` — 1-3 sentence description of what THIS entry says about \
-  the discipline. In the source's original language (Russian for ВАК, \
-  English for ERC/OECD, etc.).
-- ``confidence`` — ``high`` / ``medium`` / ``low``. ``low`` means \
-  you're not sure the source code is exactly right and a curator \
-  should verify.
+- ``acquisition_tasks`` — list of 0-3 search task descriptions
+- ``existing_registry_notes`` — what the existing registry already covers
+- ``reasoning`` — one or two sentences explaining the search strategy
 """
 
 DISCIPLINE_SOURCE_ACQUISITION_USER_TEMPLATE = """\
-Identify authoritative classification entries for the following \
-discipline.
+Propose source acquisition tasks for the following discipline.
 
 Discipline name: {discipline_name}
 Region hint: {region}
+Existing registry records (may be empty): {existing_records}
 Existing source hints (may be empty): {hints}
 
 Apply the rules from your system prompt. Return the JSON object.
@@ -94,58 +83,61 @@ Apply the rules from your system prompt. Return the JSON object.
 DISCIPLINE_SOURCE_ACQUISITION_OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
-        "packets": {
+        "acquisition_tasks": {
             "type": "array",
             "maxItems": 3,
             "items": {
                 "type": "object",
                 "properties": {
-                    "source_type": {
+                    "target_system": {"type": "string"},
+                    "search_query": {"type": "string"},
+                    "search_hints": {"type": ["string", "null"]},
+                    "expected_result_type": {
                         "type": "string",
                         "enum": [
-                            "vak_passport", "erc_descriptor", "oecd_ford",
-                            "isced_f", "acm_ccs", "eric", "phil_papers",
-                            "apa", "other",
+                            "subject_category", "discipline_passport",
+                            "panel_descriptor", "other",
                         ],
                     },
-                    "source_id": {"type": ["string", "null"]},
-                    "source_url": {"type": ["string", "null"]},
-                    "excerpt": {"type": "string"},
                     "confidence": {
                         "type": "string",
                         "enum": ["high", "medium", "low"],
                     },
                 },
-                "required": ["source_type", "excerpt", "confidence"],
+                "required": [
+                    "target_system", "search_query",
+                    "expected_result_type", "confidence",
+                ],
                 "additionalProperties": False,
             },
         },
+        "existing_registry_notes": {"type": ["string", "null"]},
         "reasoning": {"type": "string"},
     },
-    "required": ["packets", "reasoning"],
+    "required": ["acquisition_tasks", "reasoning"],
     "additionalProperties": False,
 }
 
 
 def validate_source_acquisition(data: dict) -> list[str]:
     warnings: list[str] = []
-    packets = data.get("packets") or []
-    if not packets and len(data.get("reasoning") or "") < 20:
+    tasks = data.get("acquisition_tasks") or []
+    if not tasks and len(data.get("reasoning") or "") < 20:
         warnings.append(
-            "Empty packets list must come with a substantive reasoning note"
+            "Empty task list must come with a substantive reasoning note"
         )
-    for i, p in enumerate(packets):
-        if not (p.get("excerpt") or "").strip():
-            warnings.append(f"packet[{i}] has empty excerpt")
-        if p.get("source_id") and len(p["source_id"]) > 40:
-            warnings.append(f"packet[{i}] source_id suspiciously long")
+    for i, t in enumerate(tasks):
+        if not (t.get("search_query") or "").strip():
+            warnings.append(f"task[{i}] has empty search_query")
+        if not (t.get("target_system") or "").strip():
+            warnings.append(f"task[{i}] has empty target_system")
     return warnings
 
 
 DISCIPLINE_SOURCE_ACQUISITION_FAMILY = {
-    "family_id": "discipline_source_acquisition_v1",
+    "family_id": "discipline_source_acquisition_v2",
     "agent_role_id": "discipline_source_acquisition",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "system_prompt": DISCIPLINE_SOURCE_ACQUISITION_SYSTEM,
     "user_prompt_template": DISCIPLINE_SOURCE_ACQUISITION_USER_TEMPLATE,
     "output_schema": DISCIPLINE_SOURCE_ACQUISITION_OUTPUT_SCHEMA,

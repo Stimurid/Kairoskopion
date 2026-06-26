@@ -154,7 +154,7 @@ export interface DisciplinaryPathway {
   required_adaptations: string[];
   field_core_risk: FieldCoreImpact;
   venue_type_hints: string[];
-  example_venue_names: string[];
+  venue_search_queries: string[];
   rank: number;
   strategic_value_notes: string;
   reasoning?: string;
