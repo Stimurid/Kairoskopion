@@ -410,6 +410,32 @@ def investigate_venue_by_reference(
     )
 
 
+class InvestigateVenueByUrlRequest(BaseModel):
+    url: str
+
+
+class SetAdapterModeRequest(BaseModel):
+    mode: str
+
+
+@app.post("/cases/{case_id}/investigate-venue-by-url")
+def investigate_venue_by_url(
+    req: InvestigateVenueByUrlRequest, case: Case = Depends(_user_case),
+):
+    result = case.investigate_venue_by_url(req.url)
+    store.save(case)
+    return result
+
+
+@app.post("/cases/{case_id}/set-adapter-mode")
+def set_adapter_mode(
+    req: SetAdapterModeRequest, case: Case = Depends(_user_case),
+):
+    result = case.set_adapter_mode(req.mode)
+    store.save(case)
+    return result
+
+
 @app.get("/cases/{case_id}/investigated-venue")
 def get_investigated_venue(case: Case = Depends(_user_case)):
     if not case.investigated_venue:

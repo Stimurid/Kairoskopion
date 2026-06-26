@@ -142,6 +142,11 @@ class Case:
         # M-8: LLM refinement chat history
         self.refinement_chat: list[dict[str, Any]] = []
 
+        # Phase 1: source acquisition metadata for venue intake
+        self.venue_source_metadata: dict[str, Any] | None = None
+        # Phase 1: adapter mode override (default = offline_stub)
+        self.adapter_mode: str = "offline_stub"
+
         # Track A (intake-choice-and-routing-seam): user-choice override
         # state. ``classifier_input_type`` / ``classifier_confidence`` /
         # ``classifier_needs_user_choice`` preserve the AUTO classifier
@@ -837,6 +842,15 @@ class Case:
 
         self.investigated_venue = venue
         self.publication_regime = regime
+        if self.venue_source_metadata is None:
+            import hashlib
+            self.venue_source_metadata = {
+                "source_url": None,
+                "source_type": "text_paste",
+                "acquisition_timestamp": _now(),
+                "content_hash": hashlib.sha256(text.encode()).hexdigest()[:16],
+                "char_count": len(text),
+            }
         self._build_venue_field_position(venue, guidelines_text=text)
         self._log_decision("investigate_venue", {
             "venue_name": venue.canonical_name,
@@ -879,6 +893,54 @@ class Case:
             "canonical_name": pack.canonical_name,
         })
         return self.investigate_venue(pack.text)
+
+    def investigate_venue_by_url(self, url: str) -> dict[str, Any]:
+        """Fetch venue page by URL and feed text into investigate_venue."""
+        import hashlib
+        from ..adapters.http_client import fetch_text_safe
+
+        if not url.startswith("https://"):
+            return {
+                "status": "invalid_url",
+                "hint": "Only HTTPS URLs are accepted.",
+            }
+
+        result = fetch_text_safe(url, timeout=30)
+        if not result.ok:
+            self._log_decision("investigate_venue_by_url_failed", {
+                "url": url, "error": result.error,
+            })
+            return {
+                "status": "fetch_failed",
+                "url": url,
+                "error": result.error,
+            }
+
+        text = result.text
+        content_hash = hashlib.sha256(text.encode()).hexdigest()[:16]
+        self.venue_source_metadata = {
+            "source_url": url,
+            "source_type": "url_fetch",
+            "acquisition_timestamp": _now(),
+            "content_hash": content_hash,
+            "char_count": len(text),
+        }
+        self._log_decision("investigate_venue_by_url", {
+            "url": url,
+            "content_hash": content_hash,
+            "char_count": len(text),
+        })
+        return self.investigate_venue(text)
+
+    def set_adapter_mode(self, mode: str) -> dict[str, Any]:
+        """Switch venue adapter mode for this case."""
+        from ..adapters.venue.base import VenueAdapterMode
+        valid = {m.value for m in VenueAdapterMode}
+        if mode not in valid:
+            return {"status": "invalid_mode", "valid": sorted(valid)}
+        self.adapter_mode = mode
+        self._log_decision("set_adapter_mode", {"mode": mode})
+        return {"status": "ok", "mode": mode}
 
     def _build_venue_field_position(
         self,
@@ -2549,6 +2611,11 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
     if case.refinement_chat:
         snap["refinement_chat"] = case.refinement_chat
 
+    if case.venue_source_metadata is not None:
+        snap["venue_source_metadata"] = case.venue_source_metadata
+    if case.adapter_mode and case.adapter_mode != "offline_stub":
+        snap["adapter_mode"] = case.adapter_mode
+
     return snap
 
 
@@ -2638,6 +2705,13 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
     rc = data.get("refinement_chat")
     if isinstance(rc, list):
         case.refinement_chat = rc
+
+    vsm = data.get("venue_source_metadata")
+    if isinstance(vsm, dict):
+        case.venue_source_metadata = vsm
+    am = data.get("adapter_mode")
+    if isinstance(am, str) and am:
+        case.adapter_mode = am
 
     raw_pathways = data.get("pathways", [])
     for p in raw_pathways:
