@@ -1068,6 +1068,10 @@ def get_cost_estimate(case_id: str, user=Depends(get_current_user)):
 # Static frontend (SPA) — serves built UI if dist/ exists
 # ---------------------------------------------------------------------------
 
+# -- P6 registry router ------------------------------------------------
+from .registry_router import router as _registry_router
+app.include_router(_registry_router)
+
 _frontend_dir = Path(__file__).resolve().parent.parent.parent.parent / "ui" / "dist"
 
 if _frontend_dir.is_dir():
