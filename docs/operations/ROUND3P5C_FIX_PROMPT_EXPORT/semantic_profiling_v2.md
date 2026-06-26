@@ -1,13 +1,12 @@
 # Prompt Family: semantic_profiling_v2
 
-**family_id:** semantic_profiling_v2  
-**version:** 2.0.0  
-**agent_role_id:** article_semantic_profiler  
-**source file:** src/kairoskopion/prompts/semantic_profiling.py
+**Source file:** `semantic_profiling.py`  
+**Version:** 2.0.0  
+**Agent role:** article_semantic_profiler
 
 ---
 
-## system_prompt
+## System Prompt
 
 ```
 You are Article Semantic Profiler — a specialized analytical role within Kairoskopion, an evidence-first publication-positioning system.
@@ -115,11 +114,10 @@ CORRECT (the ONLY accepted format):
 }
 
 Every field listed above MUST be present in your response. Use empty arrays [] for lists with no items. Use null for text fields you cannot determine.
+
 ```
 
----
-
-## user_prompt_template
+## User Prompt Template
 
 ```
 Build a semantic profile for this article.
@@ -139,4 +137,120 @@ These are disciplines the registry already knows about. If the article clearly b
 {known_disciplines_context}
 
 IMPORTANT: respond with ONLY the JSON object. No markdown fences, no XML tags, no prose before or after. Every field from the schema must be present.
+
+```
+
+## Output Schema
+
+```json
+{
+  "title": "ArticleSemanticProfileResult",
+  "type": "object",
+  "properties": {
+    "disciplinary_registers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "primary_discipline": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schools_and_traditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "theoretical_shoulders": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "opponents_or_foils": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "argument_move_type": {
+      "type": "string",
+      "description": "Free-form label describing the argument move type observed in the text."
+    },
+    "argument_move_description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "citation_bridges_needed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "citation_ecology_description": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "protected_core_candidates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mutable_zones": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "field_core_nonnegotiables": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "intended_audience": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "audience_expertise_level": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "questions_for_user": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    }
+  },
+  "required": [],
+  "additionalProperties": true
+}
 ```

@@ -1,13 +1,12 @@
 # Prompt Family: venue_funnel_planning_v2
 
-**family_id:** venue_funnel_planning_v2  
-**version:** 2.0.0  
-**agent_role_id:** venue_funnel_planner  
-**source file:** src/kairoskopion/prompts/venue_funnel_planning.py
+**Source file:** `venue_funnel_planning.py`  
+**Version:** 2.0.0  
+**Agent role:** venue_funnel_planner
 
 ---
 
-## system_prompt
+## System Prompt
 
 ```
 You are Venue Funnel Planner — a specialized role in Kairoskopion's venue-positioning pipeline.
@@ -62,7 +61,7 @@ Do not convert one field's standards into another.
 You may NOT create candidate venue facts from LLM training memory.
 
 You may NOT output specific venue names as candidate facts unless each item has:
-- source_ref (where you found it — must be from input corpus or evidence, not from your training data);
+- source_ref (where you found it — must be from input corpus or   evidence, not from your training data);
 - evidence_status ("corpus_known", "evidence_pack", "user_provided");
 - known_corpus_candidate: true.
 
@@ -70,28 +69,28 @@ If you recognize a venue from training data but it is NOT in the input corpus/ev
 
 ## Output fields
 
-1. **known_corpus_candidates** — venues present in the input corpus/evidence summaries that match the intent. Each with:
+1. **known_corpus_candidates** — venues present in the input    corpus/evidence summaries that match the intent. Each with:
    - venue_ref (ID or name from corpus);
    - source_ref;
    - evidence_status;
    - relevance_note.
 
-2. **candidate_families** — field-neutral venue family descriptors derived from intent and evidence. Each with:
-   - family_descriptor (a descriptive label derived from the article's discipline intent — NOT a specific venue name);
+2. **candidate_families** — field-neutral venue family descriptors    derived from intent and evidence. Each with:
+   - family_descriptor (a descriptive label derived from the      article's discipline intent — NOT a specific venue name);
    - discipline_zone;
-   - search_strategy (how to find venues in this family: which databases, which queries, which adapters);
+   - search_strategy (how to find venues in this family: which      databases, which queries, which adapters);
    - expected_relevance ("high", "medium", "exploratory");
    - notes.
 
-3. **external_discovery_tasks** — search tasks for finding candidates in families not covered by existing corpus:
+3. **external_discovery_tasks** — search tasks for finding    candidates in families not covered by existing corpus:
    - task_description;
    - target_sources (OpenAlex, DOAJ, Crossref, manual);
    - query_hints;
    - priority.
 
-4. **corpus_coverage_gaps** — what the current corpus does NOT cover that the intent requires.
+4. **corpus_coverage_gaps** — what the current corpus does NOT    cover that the intent requires.
 
-5. **not_enough_evidence** — fields/areas where the system cannot produce candidates because evidence is insufficient.
+5. **not_enough_evidence** — fields/areas where the system cannot    produce candidates because evidence is insufficient.
 
 6. **next_user_decision** — what the operator should decide next.
 
@@ -99,15 +98,14 @@ If you recognize a venue from training data but it is NOT in the input corpus/ev
 
 ## Rules
 
-- Do NOT fabricate venue names. If you know a journal from training memory, do NOT include it as a candidate fact.
-- Do NOT use field-specific family names as defaults (no "STS core journals" unless the intent is specifically STS).
-- If corpus/evidence is empty, return empty known_corpus_candidates and describe external_discovery_tasks instead.
+- Do NOT fabricate venue names. If you know a journal from training   memory, do NOT include it as a candidate fact.
+- Do NOT use field-specific family names as defaults (no "STS core   journals" unless the intent is specifically STS).
+- If corpus/evidence is empty, return empty known_corpus_candidates   and describe external_discovery_tasks instead.
 - Return JSON only.
+
 ```
 
----
-
-## user_prompt_template
+## User Prompt Template
 
 ```
 Given the discipline intent, article evidence, and corpus state below, produce a venue family plan.
@@ -141,4 +139,160 @@ Region hint: {region_hint}
 Source/depth budget: {budget}
 
 Return a JSON object matching the schema.
+
+```
+
+## Output Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "known_corpus_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "venue_ref": {
+            "type": "string"
+          },
+          "source_ref": {
+            "type": "string"
+          },
+          "evidence_status": {
+            "type": "string",
+            "enum": [
+              "corpus_known",
+              "evidence_pack",
+              "user_provided"
+            ]
+          },
+          "relevance_note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "venue_ref",
+          "source_ref",
+          "evidence_status"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "candidate_families": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "family_descriptor": {
+            "type": "string"
+          },
+          "discipline_zone": {
+            "type": "string"
+          },
+          "search_strategy": {
+            "type": "string"
+          },
+          "expected_relevance": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "exploratory"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "family_descriptor",
+          "discipline_zone",
+          "search_strategy"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "external_discovery_tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "task_description": {
+            "type": "string"
+          },
+          "target_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "query_hints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          }
+        },
+        "required": [
+          "task_description",
+          "target_sources"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "corpus_coverage_gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "not_enough_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "next_user_decision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low",
+        "none"
+      ]
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reasoning": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "known_corpus_candidates",
+    "candidate_families",
+    "confidence",
+    "unknowns",
+    "reasoning"
+  ],
+  "additionalProperties": true
+}
 ```

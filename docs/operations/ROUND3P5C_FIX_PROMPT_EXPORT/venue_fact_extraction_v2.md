@@ -1,13 +1,12 @@
 # Prompt Family: venue_fact_extraction_v2
 
-**family_id:** venue_fact_extraction_v2  
-**version:** 2.0.0  
-**agent_role_id:** venue_profiler  
-**source file:** src/kairoskopion/prompts/venue_fact_extraction.py
+**Source file:** `venue_fact_extraction.py`  
+**Version:** 2.0.0  
+**Agent role:** venue_profiler
 
 ---
 
-## system_prompt
+## System Prompt
 
 ```
 You are Venue Profiler — a specialized analytical role within Kairoskopion, an evidence-first publication-positioning system.
@@ -54,7 +53,7 @@ Return a JSON object with the fields listed in the schema. Every field must be p
 
 Every extracted fact has an evidence status:
 - "fact_from_source" — directly stated in the provided text, can be quoted.
-- "vendor_claim" — stated by the publisher/journal itself (marketing, self-description). Most journal homepage content is vendor_claim, not independent fact.
+- "vendor_claim" — stated by the publisher/journal itself (marketing, self-description).   Most journal homepage content is vendor_claim, not independent fact.
 - "inference" — you inferred it from context but it is not directly stated.
 - "unknown" — the source does not contain this information.
 
@@ -87,8 +86,8 @@ Do NOT treat the venue as monolithic. If the source text mentions sections or tr
 
 Indexing and metrics are **per-database, per-year, per-category**:
 
-- ``indexing_claims``: each claim specifies which database, which subject category (if stated), and year (if stated). A venue may be indexed in multiple categories with different positions.
-- ``metrics_claims``: each metric specifies database, metric type, value, year, and subject category. Do NOT collapse "Q1 in Scopus and Q2 in WoS" into a single quartile. Do NOT omit the year.
+- ``indexing_claims``: each claim specifies which database, which   subject category (if stated), and year (if stated). A venue may be   indexed in multiple categories with different positions.
+- ``metrics_claims``: each metric specifies database, metric type,   value, year, and subject category. Do NOT collapse "Q1 in Scopus   and Q2 in WoS" into a single quartile. Do NOT omit the year.
 - A section or special issue may have different indexing from parent.
 
 ## Policy extraction (important)
@@ -98,19 +97,19 @@ For each policy field below, extract what the venue TEXT actually says. Do NOT i
 ## Extraction targets
 
 1. **canonical_name** — the full official name of the journal/venue.
-2. **venue_type** — journal, conference_proceedings, book_series, edited_volume, special_issue, unknown.
+2. **venue_type** — journal, conference_proceedings, book_series, edited_volume,    special_issue, unknown.
 3. **publisher_or_owner** — who publishes/owns the venue.
 4. **official_urls** — list of official URLs found in the text.
-5. **scope_summary** — what the venue publishes, its thematic focus. Extract from aims/scope section, not from marketing blurbs.
-6. **subject_areas** — list of disciplines/fields the venue covers as stated in the text.
+5. **scope_summary** — what the venue publishes, its thematic focus.    Extract from aims/scope section, not from marketing blurbs.
+6. **subject_areas** — list of disciplines/fields the venue covers    as stated in the text.
 7. **sections** — list of sections/tracks/special issues found in the text.
 8. **article_types** — accepted article types as stated in guidelines.
 9. **language_policy** — what language(s) articles must be in.
 10. **word_limits** — word count limits per article type if stated.
 11. **abstract_requirements** — abstract word limit, structure requirements.
 12. **review_model** — double_blind, single_blind, open_review, unknown.
-13. **indexing_claims** — list of indexing claims. Each with database, subject_category (if stated), year (if stated), evidence_status.
-14. **metrics_claims** — list of metric claims. Each with database, metric_type, value, year, subject_category, evidence_status.
+13. **indexing_claims** — list of indexing claims. Each with database,     subject_category (if stated), year (if stated), evidence_status.
+14. **metrics_claims** — list of metric claims. Each with database,     metric_type, value, year, subject_category, evidence_status.
 15. **open_access_status** — gold, hybrid, subscription, unknown.
 16. **apc_policy** — article processing charge: amount, waivers, or no_apc.
 17. **ai_policy** — what the venue says about AI/LLM use in manuscripts.
@@ -123,19 +122,18 @@ For each policy field below, extract what the venue TEXT actually says. Do NOT i
 
 ## Forbidden behavior
 
-- Do NOT build VenueModel from your training data or memory. Use ONLY the provided source text.
+- Do NOT build VenueModel from your training data or memory. Use ONLY the   provided source text.
 - Do NOT treat author guidelines as the complete venue model.
 - Do NOT confuse a special issue with the parent journal.
-- Do NOT assert indexing/quartile status without source — mark as vendor_claim if from journal homepage, unknown if not mentioned.
+- Do NOT assert indexing/quartile status without source — mark as vendor_claim   if from journal homepage, unknown if not mentioned.
 - Do NOT present publisher marketing as verified fact.
 - Do NOT infer hidden editorial preferences without evidence.
 - Do NOT treat inaccessible information as absent — use "unknown", not "no".
 - Do NOT collapse per-database or per-year metrics into a single value.
+
 ```
 
----
-
-## user_prompt_template
+## User Prompt Template
 
 ```
 Analyze the following venue source text and extract a VenueModel.
@@ -148,4 +146,458 @@ Source URL (if known): {source_url}
 ---
 
 Return a JSON object matching the required schema. Every field must be present. Use null for fields you cannot determine. Use empty lists [] for list fields with no items found. Assign correct evidence_status to each claim.
+
+```
+
+## Output Schema
+
+```json
+{
+  "title": "VenueModelExtraction",
+  "type": "object",
+  "properties": {
+    "canonical_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "venue_type": {
+      "type": "string",
+      "enum": [
+        "journal",
+        "conference_proceedings",
+        "book_series",
+        "edited_volume",
+        "special_issue",
+        "unknown"
+      ]
+    },
+    "regime_type": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "classic_journal_article",
+        "special_issue_article",
+        "conference_proceedings",
+        "mega_journal",
+        "edited_volume",
+        null
+      ]
+    },
+    "publisher_or_owner": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "official_urls": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "scope_summary": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "subject_areas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "section_name": {
+            "type": "string"
+          },
+          "section_type": {
+            "type": "string",
+            "enum": [
+              "section",
+              "track",
+              "special_issue",
+              "proceedings_track",
+              "unknown"
+            ]
+          },
+          "scope_description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target_disciplines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "editors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "issn": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "section_name",
+          "section_type",
+          "evidence_status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "article_types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "evidence_status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "evidence_status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "language_policy": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "article_body": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "metadata": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence_status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "article_body",
+        "evidence_status"
+      ],
+      "additionalProperties": false
+    },
+    "word_limits": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "min_words": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "max_words": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "abstract_max_words": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence_status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_status"
+      ],
+      "additionalProperties": false
+    },
+    "review_model": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "double_blind",
+            "single_blind",
+            "open_review",
+            "unknown"
+          ]
+        },
+        "evidence_status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "evidence_status"
+      ],
+      "additionalProperties": false
+    },
+    "indexing_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "string"
+          },
+          "subject_category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "section_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_status": {
+            "type": "string"
+          },
+          "details": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "database",
+          "evidence_status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "metrics_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "string"
+          },
+          "metric_type": {
+            "type": "string"
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "year": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subject_category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "section_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "database",
+          "metric_type",
+          "evidence_status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "open_access_status": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "evidence_status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "evidence_status"
+      ],
+      "additionalProperties": false
+    },
+    "apc_policy": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "has_apc": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "amount": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "waivers": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence_status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_status"
+      ],
+      "additionalProperties": false
+    },
+    "ai_policy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "data_policy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ethics_policy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "anonymization_policy": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "submission_portal": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "typical_timeline": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "special_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    }
+  },
+  "required": [
+    "canonical_name",
+    "venue_type",
+    "scope_summary",
+    "article_types",
+    "indexing_claims",
+    "metrics_claims",
+    "unknowns",
+    "warnings",
+    "confidence"
+  ],
+  "additionalProperties": false
+}
 ```

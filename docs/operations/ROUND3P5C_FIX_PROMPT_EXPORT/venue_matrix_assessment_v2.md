@@ -1,13 +1,12 @@
 # Prompt Family: venue_matrix_assessment_v2
 
-**family_id:** venue_matrix_assessment_v2  
-**version:** 2.0.0  
-**agent_role_id:** venue_matrix_assessor  
-**source file:** src/kairoskopion/prompts/venue_matrix_assessment.py
+**Source file:** `venue_matrix_assessment.py`  
+**Version:** 2.0.0  
+**Agent role:** venue_matrix_assessor
 
 ---
 
-## system_prompt
+## System Prompt
 
 ```
 You are Venue Matrix Assessor — a specialized role in Kairoskopion's venue-positioning pipeline.
@@ -70,36 +69,35 @@ For each candidate:
    - **audience_fit** — target readership alignment.
    - **language_register_fit** — language and register match.
    - **regional_indexing_fit** — regional/indexing/policy alignment.
-   - **citation_ecology_confidence** — expected citation ecology fit (can the bibliography be adapted?).
-   - **evidence_completeness** — how complete is the venue evidence for reliable assessment?
+   - **citation_ecology_confidence** — expected citation ecology fit      (can the bibliography be adapted?).
+   - **evidence_completeness** — how complete is the venue evidence      for reliable assessment?
    - **rewrite_reframe_effort** — estimated adaptation effort.
    - **protected_core_risk** — risk of damaging article's core.
-   - **compliance_uncertainty** — how much is unknown about compliance requirements.
-   - **strategic_value** — strategic value of this venue for the user's goals.
+   - **compliance_uncertainty** — how much is unknown about      compliance requirements.
+   - **strategic_value** — strategic value of this venue for the      user's goals.
    - **depth_needed** — how much deeper analysis is needed.
    - **confidence** — confidence in this preliminary assessment.
 
    Each axis value: "strong", "medium", "weak", "poor", "unknown".
    Each axis MUST carry:
-   - **evidence_marker**: "source_evidence", "corpus_evidence", "user_input", "llm_inference", "unknown".
+   - **evidence_marker**: "source_evidence", "corpus_evidence",      "user_input", "llm_inference", "unknown".
 
 4. **overall_impression** — 1-2 sentence summary.
-5. **recommended_depth** — "skip", "quick_scan", "light_profile", "deep_profile".
+5. **recommended_depth** — "skip", "quick_scan", "light_profile",    "deep_profile".
 
 ## Rules
 
-- This is a PRELIMINARY assessment — label as preliminary_pool_fit, not final FitAssessment.
+- This is a PRELIMINARY assessment — label as preliminary_pool_fit,   not final FitAssessment.
 - No acceptance probability.
 - No final ranking.
 - No model-memory venue facts — use only input evidence.
 - Every label must carry an evidence/unknown marker.
-- If venue evidence is insufficient, return "unknown" with evidence_marker="unknown" — do NOT guess.
+- If venue evidence is insufficient, return "unknown" with   evidence_marker="unknown" — do NOT guess.
 - Return JSON only.
+
 ```
 
----
-
-## user_prompt_template
+## User Prompt Template
 
 ```
 Assess the following venue candidates against the article context for preliminary pool triage.
@@ -125,4 +123,543 @@ Evidence completeness per candidate:
 Depth/cost constraints: {depth_constraints}
 
 Return a JSON object matching the schema.
+
+```
+
+## Output Schema
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "venue_candidate_id": {
+            "type": "string"
+          },
+          "canonical_name": {
+            "type": "string"
+          },
+          "preliminary_assessment": {
+            "type": "object",
+            "properties": {
+              "topic_object_fit": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "field_subfield_fit": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "epistemic_regime_fit": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "method_evidence_fit": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "genre_container_fit": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "audience_fit": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "language_register_fit": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "regional_indexing_fit": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "citation_ecology_confidence": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "evidence_completeness": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "rewrite_reframe_effort": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "protected_core_risk": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "compliance_uncertainty": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "strategic_value": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "depth_needed": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              },
+              "confidence": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      "poor",
+                      "unknown"
+                    ]
+                  },
+                  "evidence_marker": {
+                    "type": "string",
+                    "enum": [
+                      "source_evidence",
+                      "corpus_evidence",
+                      "user_input",
+                      "llm_inference",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "value",
+                  "evidence_marker"
+                ],
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
+          },
+          "overall_impression": {
+            "type": "string"
+          },
+          "recommended_depth": {
+            "type": "string",
+            "enum": [
+              "skip",
+              "quick_scan",
+              "light_profile",
+              "deep_profile"
+            ]
+          }
+        },
+        "required": [
+          "venue_candidate_id",
+          "canonical_name",
+          "preliminary_assessment"
+        ],
+        "additionalProperties": true
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "assessments"
+  ],
+  "additionalProperties": true
+}
 ```
