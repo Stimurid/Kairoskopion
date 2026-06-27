@@ -1684,13 +1684,34 @@ class Case:
             else:
                 self.venue_pool = pool_data
 
+        # P6.2 Track 3: store discovered candidates as provisional records
+        registry_stored = 0
+        if self.venue_pool and self.venue_pool.candidates:
+            for cand in self.venue_pool.candidates:
+                cand_dict = cand if isinstance(cand, dict) else cand.to_dict()
+                cand_name = cand_dict.get("canonical_name")
+                if not cand_name:
+                    continue
+                self._registry.store_venue_extraction(
+                    {
+                        "canonical_name": cand_name,
+                        "issn": cand_dict.get("issn"),
+                        "eissn": cand_dict.get("issn_l"),
+                    },
+                    source_url=None,
+                    source_type="venue_discovery",
+                )
+                registry_stored += 1
+
         self.stage = CaseStage.VENUE_POOL
         self._log_decision("discover_venues", {
             "candidate_count": len(self.venue_pool.candidates) if self.venue_pool else 0,
+            "registry_stored": registry_stored,
         })
         self._update_quality_gates("discover_venues")
 
-        return self.get_venue_pool()
+        result = self.get_venue_pool()
+        return self._registry.propagate_status(result)
 
     def get_venue_pool(self) -> dict[str, Any]:
         if self.venue_pool:

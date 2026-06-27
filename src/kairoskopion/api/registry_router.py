@@ -127,6 +127,31 @@ def reject_record(
 
 
 # ---------------------------------------------------------------------------
+# Review queue — all pending records across all types
+# ---------------------------------------------------------------------------
+
+@router.get("/review-queue")
+def review_queue(
+    limit: int = Query(100, ge=1, le=500),
+) -> list[dict[str, Any]]:
+    pending: list[dict[str, Any]] = []
+    for record_type in _RECORD_TYPES:
+        reg = load_registry(record_type, _data_dir())
+        for rec in reg.list_all():
+            status = record_usage_status(rec)
+            if status in ("provisional_with_warning", "unknown"):
+                entry = rec.to_dict()
+                entry["_record_type"] = record_type
+                entry["_usage_status"] = status
+                pending.append(entry)
+                if len(pending) >= limit:
+                    break
+        if len(pending) >= limit:
+            break
+    return pending
+
+
+# ---------------------------------------------------------------------------
 # Acquisition tasks
 # ---------------------------------------------------------------------------
 
