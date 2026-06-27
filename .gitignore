@@ -33,18 +33,24 @@ htmlcov/
 *.swo
 *~
 
-data/
-# Canonical disciplinary-landscape data (schema + seed JSONL + CHANGELOG)
-# ships with the repo. Only the live (mutable) registry stays untracked.
+# Data: ignore contents by default, then un-ignore curated subtrees.
+# Using data/* (not data/) so negations can re-include subdirectories.
+data/*
+
+# Curated project data — tracked and reviewable.
 !data/disciplinary_landscape/
 !data/disciplinary_landscape/**
 data/disciplinary_landscape/registry/
-# Top 5 venue evidence packs — tracked, deployable
 !data/venue_evidence_packs/
 !data/venue_evidence_packs/**
-# Data registry directories (JSONL stores), NOT the source package
-/registry/
+!data/seed_registry/
+!data/seed_registry/**
+
+# Private/runtime data — always ignored.
+data/input/
+data/private_work/
 data/registry/
+/registry/
 vault/
 
 .kairoskopion/
@@ -58,12 +64,6 @@ kairoskopion_demo_bundle.zip
 *.zip
 
 private_inputs/
-data/input/private/
-data/private_work/
-
-# Seed registry outputs — tracked
-!data/seed_registry/
-!data/seed_registry/**
 
 # Claude Code
 .claude/
@@ -71,3 +71,4 @@ data/private_work/
 # UI
 ui/node_modules/
 ui/dist/
+ui/data/

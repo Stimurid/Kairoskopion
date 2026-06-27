@@ -1,0 +1,113 @@
+[
+  {
+    "task_id": "acqtask_c5f0d0d2bd5d",
+    "task_type": "discipline_lookup",
+    "query": "Higher Education",
+    "reason": "No discipline record found for 'Higher Education'",
+    "target_sources": [
+      "vak",
+      "oecd_ford",
+      "openalex"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T11:20:51.999886+00:00",
+    "updated_at": "2026-06-27T11:20:51.999891+00:00"
+  },
+  {
+    "task_id": "acqtask_a1ec8454107f",
+    "task_type": "discipline_lookup",
+    "query": "AI in Education",
+    "reason": "No discipline record found for 'AI in Education'",
+    "target_sources": [
+      "vak",
+      "oecd_ford",
+      "openalex"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T11:20:52.000616+00:00",
+    "updated_at": "2026-06-27T11:20:52.000621+00:00"
+  },
+  {
+    "task_id": "acqtask_47f141c34666",
+    "task_type": "discipline_lookup",
+    "query": "Educational Technology",
+    "reason": "No discipline record found for 'Educational Technology'",
+    "target_sources": [
+      "vak",
+      "oecd_ford",
+      "openalex"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T11:20:52.001282+00:00",
+    "updated_at": "2026-06-27T11:20:52.001287+00:00"
+  },
+  {
+    "task_id": "acqtask_842a8a39e963",
+    "task_type": "venue_discovery",
+    "query": "Higher Education",
+    "reason": "No venue records for domain 'Higher Education' — registry empty",
+    "target_sources": [
+      "elibrary_ru",
+      "vak_list",
+      "openalex",
+      "crossref",
+      "doaj",
+      "scopus_sjr"
+    ],
+    "priority": "high",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T11:20:52.013828+00:00",
+    "updated_at": "2026-06-27T11:20:52.013831+00:00"
+  },
+  {
+    "task_id": "acqtask_0da78e993d75",
+    "task_type": "venue_discovery",
+    "query": "AI in Education",
+    "reason": "No venue records for domain 'AI in Education' — registry empty",
+    "target_sources": [
+      "elibrary_ru",
+      "vak_list",
+      "openalex",
+      "crossref",
+      "doaj",
+      "scopus_sjr"
+    ],
+    "priority": "high",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T11:20:52.014409+00:00",
+    "updated_at": "2026-06-27T11:20:52.014414+00:00"
+  },
+  {
+    "task_id": "acqtask_558647b476b2",
+    "task_type": "venue_discovery",
+    "query": "Educational Technology",
+    "reason": "No venue records for domain 'Educational Technology' — registry empty",
+    "target_sources": [
+      "elibrary_ru",
+      "vak_list",
+      "openalex",
+      "crossref",
+      "doaj",
+      "scopus_sjr"
+    ],
+    "priority": "high",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T11:20:52.014946+00:00",
+    "updated_at": "2026-06-27T11:20:52.014950+00:00"
+  }
+]

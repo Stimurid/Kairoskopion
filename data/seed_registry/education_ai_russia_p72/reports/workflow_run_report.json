@@ -1,0 +1,479 @@
+{
+  "run_id": "run_20260627_123415177604_4646f8b3",
+  "authority_coverage": {
+    "sufficient": false,
+    "missing_authority_types": [
+      "discipline_classification",
+      "national_journal_registry",
+      "citation_database",
+      "metric_source",
+      "author_guidelines_source",
+      "editorial_board_source",
+      "journal_archive_source"
+    ],
+    "usable_authorities": [],
+    "tasks_to_create": [
+      {
+        "missing_authority_type": "discipline_classification",
+        "target_country": "RU",
+        "target_domain": "education_ai_russia",
+        "target_discipline": null,
+        "reason": "No discipline_classification authority for RU/education_ai_russia",
+        "search_queries": [
+          "VAK nomenclature of scientific specialties",
+          "ГРНТИ (State classification of scientific and technical information)"
+        ],
+        "suggested_connectors": [
+          "local_file",
+          "manual_url",
+          "web_search",
+          "cyberleninka"
+        ]
+      },
+      {
+        "missing_authority_type": "national_journal_registry",
+        "target_country": "RU",
+        "target_domain": "education_ai_russia",
+        "target_discipline": null,
+        "reason": "No national_journal_registry authority for RU/education_ai_russia",
+        "search_queries": [
+          "eLibrary.ru / РИНЦ journal registry",
+          "VAK journal list (Перечень ВАК)"
+        ],
+        "suggested_connectors": [
+          "local_file",
+          "manual_url",
+          "web_search",
+          "cyberleninka"
+        ]
+      },
+      {
+        "missing_authority_type": "citation_database",
+        "target_country": "RU",
+        "target_domain": "education_ai_russia",
+        "target_discipline": null,
+        "reason": "No citation_database authority for RU/education_ai_russia",
+        "search_queries": [
+          "OpenAlex",
+          "Crossref",
+          "OpenCitations"
+        ],
+        "suggested_connectors": [
+          "local_file",
+          "manual_url",
+          "openalex",
+          "crossref",
+          "cyberleninka"
+        ]
+      },
+      {
+        "missing_authority_type": "metric_source",
+        "target_country": "RU",
+        "target_domain": "education_ai_russia",
+        "target_discipline": null,
+        "reason": "No metric_source authority for RU/education_ai_russia",
+        "search_queries": [
+          "РИНЦ / eLibrary indicators",
+          "Scopus / SJR (if used)",
+          "Web of Science / ESCI (if used)"
+        ],
+        "suggested_connectors": [
+          "local_file",
+          "manual_url",
+          "openalex",
+          "manual_url",
+          "cyberleninka"
+        ]
+      },
+      {
+        "missing_authority_type": "author_guidelines_source",
+        "target_country": "RU",
+        "target_domain": "education_ai_russia",
+        "target_discipline": null,
+        "reason": "No author_guidelines_source authority for RU/education_ai_russia",
+        "search_queries": [],
+        "suggested_connectors": [
+          "local_file",
+          "manual_url",
+          "cyberleninka"
+        ]
+      },
+      {
+        "missing_authority_type": "editorial_board_source",
+        "target_country": "RU",
+        "target_domain": "education_ai_russia",
+        "target_discipline": null,
+        "reason": "No editorial_board_source authority for RU/education_ai_russia",
+        "search_queries": [],
+        "suggested_connectors": [
+          "local_file",
+          "manual_url",
+          "cyberleninka"
+        ]
+      },
+      {
+        "missing_authority_type": "journal_archive_source",
+        "target_country": "RU",
+        "target_domain": "education_ai_russia",
+        "target_discipline": null,
+        "reason": "No journal_archive_source authority for RU/education_ai_russia",
+        "search_queries": [
+          "CyberLeninka (cyberleninka.ru)",
+          "eLibrary.ru archive (requires auth)"
+        ],
+        "suggested_connectors": [
+          "local_file",
+          "manual_url",
+          "cyberleninka"
+        ]
+      }
+    ],
+    "confidence": "low",
+    "warnings": [
+      "Insufficient authority coverage — missing 7 types: discipline_classification, national_journal_registry, citation_database, metric_source, author_guidelines_source, editorial_board_source, journal_archive_source"
+    ]
+  },
+  "source_authority_tasks": [
+    {
+      "task_id": "authtask_3ec9e7331605",
+      "target_country": "RU",
+      "target_domain": "education_ai_russia",
+      "missing_authority_type": "discipline_classification",
+      "reason": "No discipline_classification authority for RU/education_ai_russia",
+      "search_queries": [
+        "VAK nomenclature of scientific specialties",
+        "ГРНТИ (State classification of scientific and technical information)"
+      ],
+      "suggested_connectors": [
+        "manual_url",
+        "repo_docs"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "result_authority_ids": [],
+      "created_at": "2026-06-27T12:34:15.177753+00:00",
+      "updated_at": "2026-06-27T12:34:15.177763+00:00"
+    },
+    {
+      "task_id": "authtask_a92330217362",
+      "target_country": "RU",
+      "target_domain": "education_ai_russia",
+      "missing_authority_type": "national_journal_registry",
+      "reason": "No national_journal_registry authority for RU/education_ai_russia",
+      "search_queries": [
+        "eLibrary.ru / РИНЦ journal registry",
+        "VAK journal list (Перечень ВАК)"
+      ],
+      "suggested_connectors": [
+        "openalex",
+        "doaj",
+        "crossref"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "result_authority_ids": [],
+      "created_at": "2026-06-27T12:34:15.177809+00:00",
+      "updated_at": "2026-06-27T12:34:15.177813+00:00"
+    },
+    {
+      "task_id": "authtask_54c20489cb07",
+      "target_country": "RU",
+      "target_domain": "education_ai_russia",
+      "missing_authority_type": "citation_database",
+      "reason": "No citation_database authority for RU/education_ai_russia",
+      "search_queries": [
+        "OpenAlex",
+        "Crossref",
+        "OpenCitations"
+      ],
+      "suggested_connectors": [
+        "openalex",
+        "crossref",
+        "opencitations"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "result_authority_ids": [],
+      "created_at": "2026-06-27T12:34:15.177839+00:00",
+      "updated_at": "2026-06-27T12:34:15.177842+00:00"
+    },
+    {
+      "task_id": "authtask_347a3d22adad",
+      "target_country": "RU",
+      "target_domain": "education_ai_russia",
+      "missing_authority_type": "metric_source",
+      "reason": "No metric_source authority for RU/education_ai_russia",
+      "search_queries": [
+        "РИНЦ / eLibrary indicators",
+        "Scopus / SJR (if used)",
+        "Web of Science / ESCI (if used)"
+      ],
+      "suggested_connectors": [
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "result_authority_ids": [],
+      "created_at": "2026-06-27T12:34:15.177863+00:00",
+      "updated_at": "2026-06-27T12:34:15.177866+00:00"
+    },
+    {
+      "task_id": "authtask_0ad667a9f73e",
+      "target_country": "RU",
+      "target_domain": "education_ai_russia",
+      "missing_authority_type": "author_guidelines_source",
+      "reason": "No author_guidelines_source authority for RU/education_ai_russia",
+      "search_queries": [],
+      "suggested_connectors": [
+        "manual_url"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "result_authority_ids": [],
+      "created_at": "2026-06-27T12:34:15.177885+00:00",
+      "updated_at": "2026-06-27T12:34:15.177888+00:00"
+    },
+    {
+      "task_id": "authtask_ae4baa81268d",
+      "target_country": "RU",
+      "target_domain": "education_ai_russia",
+      "missing_authority_type": "editorial_board_source",
+      "reason": "No editorial_board_source authority for RU/education_ai_russia",
+      "search_queries": [],
+      "suggested_connectors": [
+        "manual_url",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "result_authority_ids": [],
+      "created_at": "2026-06-27T12:34:15.177905+00:00",
+      "updated_at": "2026-06-27T12:34:15.177911+00:00"
+    },
+    {
+      "task_id": "authtask_82807dacb0ec",
+      "target_country": "RU",
+      "target_domain": "education_ai_russia",
+      "missing_authority_type": "journal_archive_source",
+      "reason": "No journal_archive_source authority for RU/education_ai_russia",
+      "search_queries": [
+        "CyberLeninka (cyberleninka.ru)",
+        "eLibrary.ru archive (requires auth)"
+      ],
+      "suggested_connectors": [
+        "cyberleninka",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "result_authority_ids": [],
+      "created_at": "2026-06-27T12:34:15.177929+00:00",
+      "updated_at": "2026-06-27T12:34:15.177932+00:00"
+    }
+  ],
+  "article_archetype": {
+    "archetype_id": "archetype_run_2026",
+    "title_family": "unknown",
+    "article_object": "unknown",
+    "claim_family": [],
+    "genre": "unknown",
+    "method_evidence_regime": [],
+    "citation_ecology": {
+      "references_detected": false
+    },
+    "likely_zones": [],
+    "unlikely_zones": [],
+    "fit_risks": [],
+    "rewrite_requirements": [],
+    "source_article_ref": "luksha_synthetic_for_dogfood",
+    "provenance": "deterministic_article_modeler",
+    "confidence": "low",
+    "status": "draft",
+    "unknowns": [
+      "abstract missing — article model is shallow",
+      "genre not detected",
+      "method not detected",
+      "novelty mode not detected",
+      "protected core not confirmed by user"
+    ],
+    "warnings": [
+      "Deterministic extraction: limited accuracy"
+    ],
+    "needs_llm_for": [
+      "genre_detection",
+      "claim_extraction",
+      "method_detection"
+    ]
+  },
+  "discipline_lookups": [
+    {
+      "query": "education",
+      "hits": 0,
+      "status": "miss",
+      "task_id": "acqtask_d14088fd5e80"
+    },
+    {
+      "query": "pedagogy",
+      "hits": 0,
+      "status": "miss",
+      "task_id": "acqtask_b61b0bf73734"
+    },
+    {
+      "query": "AI",
+      "hits": 0,
+      "status": "miss",
+      "task_id": "acqtask_62507c490349"
+    }
+  ],
+  "acquisition_tasks_created": [
+    {
+      "task_id": "acqtask_d14088fd5e80",
+      "task_type": "discipline_lookup",
+      "query": "education",
+      "reason": "No discipline record found for 'education'",
+      "target_sources": [
+        "vak",
+        "oecd_ford",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T12:34:15.178785+00:00",
+      "updated_at": "2026-06-27T12:34:15.178790+00:00"
+    },
+    {
+      "task_id": "acqtask_b61b0bf73734",
+      "task_type": "discipline_lookup",
+      "query": "pedagogy",
+      "reason": "No discipline record found for 'pedagogy'",
+      "target_sources": [
+        "vak",
+        "oecd_ford",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T12:34:15.180049+00:00",
+      "updated_at": "2026-06-27T12:34:15.180054+00:00"
+    },
+    {
+      "task_id": "acqtask_62507c490349",
+      "task_type": "discipline_lookup",
+      "query": "AI",
+      "reason": "No discipline record found for 'AI'",
+      "target_sources": [
+        "vak",
+        "oecd_ford",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T12:34:15.185628+00:00",
+      "updated_at": "2026-06-27T12:34:15.185640+00:00"
+    },
+    {
+      "task_id": "acqtask_4f78f8d4dcb0",
+      "task_type": "venue_discovery",
+      "query": "education",
+      "reason": "No venue records for domain 'education' — registry empty",
+      "target_sources": [
+        "elibrary_ru",
+        "vak_list",
+        "openalex",
+        "crossref",
+        "doaj",
+        "scopus_sjr"
+      ],
+      "priority": "high",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T12:34:15.186534+00:00",
+      "updated_at": "2026-06-27T12:34:15.186540+00:00"
+    },
+    {
+      "task_id": "acqtask_951d5cc868c1",
+      "task_type": "venue_discovery",
+      "query": "pedagogy",
+      "reason": "No venue records for domain 'pedagogy' — registry empty",
+      "target_sources": [
+        "elibrary_ru",
+        "vak_list",
+        "openalex",
+        "crossref",
+        "doaj",
+        "scopus_sjr"
+      ],
+      "priority": "high",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T12:34:15.187047+00:00",
+      "updated_at": "2026-06-27T12:34:15.187052+00:00"
+    },
+    {
+      "task_id": "acqtask_a1011134ec72",
+      "task_type": "venue_discovery",
+      "query": "AI",
+      "reason": "No venue records for domain 'AI' — registry empty",
+      "target_sources": [
+        "elibrary_ru",
+        "vak_list",
+        "openalex",
+        "crossref",
+        "doaj",
+        "scopus_sjr"
+      ],
+      "priority": "high",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T12:34:15.187531+00:00",
+      "updated_at": "2026-06-27T12:34:15.187536+00:00"
+    }
+  ],
+  "blocked_on_authority": [
+    {
+      "task_type": "venue_metrics",
+      "reason": "No metric source authority — cannot create metric acquisition tasks",
+      "blocked_on": "metric_source"
+    }
+  ],
+  "source_packets_created": [],
+  "provisional_records": {},
+  "venue_universe": [],
+  "shortlist": [],
+  "deep_venue_tasks": [],
+  "available_adapters": [
+    "local_file",
+    "manual_url",
+    "repo_docs",
+    "openalex",
+    "crossref",
+    "doaj",
+    "unpaywall",
+    "opencitations",
+    "cyberleninka"
+  ],
+  "gaps": [
+    "Article archetype incomplete — needs LLM for: genre_detection, claim_extraction, method_detection",
+    "Venue registry empty for domain 'education_ai_russia' — 3 acquisition tasks created",
+    "No VenueMetricRecords in registry — Q1/Q2 ranking not possible without source-backed metrics",
+    "Shortlist has 0 venues — shortage of 5 vs minimum 5. Populate registry with source-backed venue records.",
+    "Article archetype needs LLM for full semantic extraction",
+    "7 source authority discovery tasks — resolve before factual acquisition"
+  ],
+  "warnings": [
+    "Insufficient authority coverage — missing 7 types: discipline_classification, national_journal_registry, citation_database, metric_source, author_guidelines_source, editorial_board_source, journal_archive_source",
+    "Venue universe is empty — only acquisition tasks exist. Populate registry with source-backed records first.",
+    "Running in no-live-LLM mode — semantic analysis deferred",
+    "1 factual tasks blocked on missing source authorities",
+    "6 open acquisition tasks — resolve to populate registry"
+  ]
+}

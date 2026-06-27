@@ -1,0 +1,138 @@
+[
+  {
+    "task_id": "authtask_3ec9e7331605",
+    "target_country": "RU",
+    "target_domain": "education_ai_russia",
+    "missing_authority_type": "discipline_classification",
+    "reason": "No discipline_classification authority for RU/education_ai_russia",
+    "search_queries": [
+      "VAK nomenclature of scientific specialties",
+      "ГРНТИ (State classification of scientific and technical information)"
+    ],
+    "suggested_connectors": [
+      "manual_url",
+      "repo_docs"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "result_authority_ids": [],
+    "created_at": "2026-06-27T12:34:15.177753+00:00",
+    "updated_at": "2026-06-27T12:34:15.177763+00:00"
+  },
+  {
+    "task_id": "authtask_a92330217362",
+    "target_country": "RU",
+    "target_domain": "education_ai_russia",
+    "missing_authority_type": "national_journal_registry",
+    "reason": "No national_journal_registry authority for RU/education_ai_russia",
+    "search_queries": [
+      "eLibrary.ru / РИНЦ journal registry",
+      "VAK journal list (Перечень ВАК)"
+    ],
+    "suggested_connectors": [
+      "openalex",
+      "doaj",
+      "crossref"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "result_authority_ids": [],
+    "created_at": "2026-06-27T12:34:15.177809+00:00",
+    "updated_at": "2026-06-27T12:34:15.177813+00:00"
+  },
+  {
+    "task_id": "authtask_54c20489cb07",
+    "target_country": "RU",
+    "target_domain": "education_ai_russia",
+    "missing_authority_type": "citation_database",
+    "reason": "No citation_database authority for RU/education_ai_russia",
+    "search_queries": [
+      "OpenAlex",
+      "Crossref",
+      "OpenCitations"
+    ],
+    "suggested_connectors": [
+      "openalex",
+      "crossref",
+      "opencitations"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "result_authority_ids": [],
+    "created_at": "2026-06-27T12:34:15.177839+00:00",
+    "updated_at": "2026-06-27T12:34:15.177842+00:00"
+  },
+  {
+    "task_id": "authtask_347a3d22adad",
+    "target_country": "RU",
+    "target_domain": "education_ai_russia",
+    "missing_authority_type": "metric_source",
+    "reason": "No metric_source authority for RU/education_ai_russia",
+    "search_queries": [
+      "РИНЦ / eLibrary indicators",
+      "Scopus / SJR (if used)",
+      "Web of Science / ESCI (if used)"
+    ],
+    "suggested_connectors": [
+      "openalex"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "result_authority_ids": [],
+    "created_at": "2026-06-27T12:34:15.177863+00:00",
+    "updated_at": "2026-06-27T12:34:15.177866+00:00"
+  },
+  {
+    "task_id": "authtask_0ad667a9f73e",
+    "target_country": "RU",
+    "target_domain": "education_ai_russia",
+    "missing_authority_type": "author_guidelines_source",
+    "reason": "No author_guidelines_source authority for RU/education_ai_russia",
+    "search_queries": [],
+    "suggested_connectors": [
+      "manual_url"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "result_authority_ids": [],
+    "created_at": "2026-06-27T12:34:15.177885+00:00",
+    "updated_at": "2026-06-27T12:34:15.177888+00:00"
+  },
+  {
+    "task_id": "authtask_ae4baa81268d",
+    "target_country": "RU",
+    "target_domain": "education_ai_russia",
+    "missing_authority_type": "editorial_board_source",
+    "reason": "No editorial_board_source authority for RU/education_ai_russia",
+    "search_queries": [],
+    "suggested_connectors": [
+      "manual_url",
+      "openalex"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "result_authority_ids": [],
+    "created_at": "2026-06-27T12:34:15.177905+00:00",
+    "updated_at": "2026-06-27T12:34:15.177911+00:00"
+  },
+  {
+    "task_id": "authtask_82807dacb0ec",
+    "target_country": "RU",
+    "target_domain": "education_ai_russia",
+    "missing_authority_type": "journal_archive_source",
+    "reason": "No journal_archive_source authority for RU/education_ai_russia",
+    "search_queries": [
+      "CyberLeninka (cyberleninka.ru)",
+      "eLibrary.ru archive (requires auth)"
+    ],
+    "suggested_connectors": [
+      "cyberleninka",
+      "openalex"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "result_authority_ids": [],
+    "created_at": "2026-06-27T12:34:15.177929+00:00",
+    "updated_at": "2026-06-27T12:34:15.177932+00:00"
+  }
+]

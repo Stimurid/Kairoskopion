@@ -1,0 +1,113 @@
+[
+  {
+    "task_id": "acqtask_d14088fd5e80",
+    "task_type": "discipline_lookup",
+    "query": "education",
+    "reason": "No discipline record found for 'education'",
+    "target_sources": [
+      "vak",
+      "oecd_ford",
+      "openalex"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T12:34:15.178785+00:00",
+    "updated_at": "2026-06-27T12:34:15.178790+00:00"
+  },
+  {
+    "task_id": "acqtask_b61b0bf73734",
+    "task_type": "discipline_lookup",
+    "query": "pedagogy",
+    "reason": "No discipline record found for 'pedagogy'",
+    "target_sources": [
+      "vak",
+      "oecd_ford",
+      "openalex"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T12:34:15.180049+00:00",
+    "updated_at": "2026-06-27T12:34:15.180054+00:00"
+  },
+  {
+    "task_id": "acqtask_62507c490349",
+    "task_type": "discipline_lookup",
+    "query": "AI",
+    "reason": "No discipline record found for 'AI'",
+    "target_sources": [
+      "vak",
+      "oecd_ford",
+      "openalex"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T12:34:15.185628+00:00",
+    "updated_at": "2026-06-27T12:34:15.185640+00:00"
+  },
+  {
+    "task_id": "acqtask_4f78f8d4dcb0",
+    "task_type": "venue_discovery",
+    "query": "education",
+    "reason": "No venue records for domain 'education' — registry empty",
+    "target_sources": [
+      "elibrary_ru",
+      "vak_list",
+      "openalex",
+      "crossref",
+      "doaj",
+      "scopus_sjr"
+    ],
+    "priority": "high",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T12:34:15.186534+00:00",
+    "updated_at": "2026-06-27T12:34:15.186540+00:00"
+  },
+  {
+    "task_id": "acqtask_951d5cc868c1",
+    "task_type": "venue_discovery",
+    "query": "pedagogy",
+    "reason": "No venue records for domain 'pedagogy' — registry empty",
+    "target_sources": [
+      "elibrary_ru",
+      "vak_list",
+      "openalex",
+      "crossref",
+      "doaj",
+      "scopus_sjr"
+    ],
+    "priority": "high",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T12:34:15.187047+00:00",
+    "updated_at": "2026-06-27T12:34:15.187052+00:00"
+  },
+  {
+    "task_id": "acqtask_a1011134ec72",
+    "task_type": "venue_discovery",
+    "query": "AI",
+    "reason": "No venue records for domain 'AI' — registry empty",
+    "target_sources": [
+      "elibrary_ru",
+      "vak_list",
+      "openalex",
+      "crossref",
+      "doaj",
+      "scopus_sjr"
+    ],
+    "priority": "high",
+    "status": "open",
+    "created_by_agent": "seed_workflow",
+    "result_packet_ids": [],
+    "created_at": "2026-06-27T12:34:15.187531+00:00",
+    "updated_at": "2026-06-27T12:34:15.187536+00:00"
+  }
+]

@@ -1,0 +1,160 @@
+{
+  "sufficient": false,
+  "missing_authority_types": [
+    "discipline_classification",
+    "author_guidelines_source",
+    "editorial_board_source",
+    "journal_archive_source"
+  ],
+  "usable_authorities": [
+    {
+      "authority_id": "srcauth_69c9a45e15af",
+      "authority_name": "OpenAlex",
+      "authority_type": "citation_database",
+      "source_status": "accepted",
+      "access_mode": "api",
+      "adapter_hint": "openalex"
+    },
+    {
+      "authority_id": "srcauth_e7fe83ca29f3",
+      "authority_name": "Crossref",
+      "authority_type": "citation_database",
+      "source_status": "accepted",
+      "access_mode": "api",
+      "adapter_hint": "crossref"
+    },
+    {
+      "authority_id": "srcauth_28f6e4072e62",
+      "authority_name": "OpenCitations COCI",
+      "authority_type": "citation_database",
+      "source_status": "accepted",
+      "access_mode": "api",
+      "adapter_hint": "opencitations"
+    },
+    {
+      "authority_id": "srcauth_042f4634c14b",
+      "authority_name": "DOAJ (Directory of Open Access Journals)",
+      "authority_type": "national_journal_registry",
+      "source_status": "accepted",
+      "access_mode": "api",
+      "adapter_hint": "doaj"
+    },
+    {
+      "authority_id": "srcauth_e170e797c15a",
+      "authority_name": "Unpaywall",
+      "authority_type": "metric_source",
+      "source_status": "accepted",
+      "access_mode": "api",
+      "adapter_hint": "unpaywall"
+    },
+    {
+      "authority_id": "srcauth_fcd9fa2afbe1",
+      "authority_name": "Scopus (Elsevier)",
+      "authority_type": "metric_source",
+      "source_status": "provisional",
+      "access_mode": "api",
+      "adapter_hint": "scopus"
+    },
+    {
+      "authority_id": "srcauth_84cc849c9bca",
+      "authority_name": "Web of Science / ESCI / AHCI (Clarivate)",
+      "authority_type": "metric_source",
+      "source_status": "provisional",
+      "access_mode": "api",
+      "adapter_hint": "wos"
+    },
+    {
+      "authority_id": "srcauth_2e10e5734bf0",
+      "authority_name": "ScimagoJR / Scimago Journal Rankings",
+      "authority_type": "metric_source",
+      "source_status": "accepted",
+      "access_mode": "web_search",
+      "adapter_hint": "manual_url"
+    },
+    {
+      "authority_id": "srcauth_070633b7b8eb",
+      "authority_name": "ISSN Portal / ISSN International Centre",
+      "authority_type": "journal_index",
+      "source_status": "accepted",
+      "access_mode": "web_search",
+      "adapter_hint": "manual_url"
+    },
+    {
+      "authority_id": "srcauth_359435f42fce",
+      "authority_name": "Google Scholar",
+      "authority_type": "scholarly_search",
+      "source_status": "provisional",
+      "access_mode": "web_search",
+      "adapter_hint": "manual_url"
+    },
+    {
+      "authority_id": "srcauth_53c2aa3309cb",
+      "authority_name": "Semantic Scholar",
+      "authority_type": "scholarly_search",
+      "source_status": "provisional",
+      "access_mode": "api",
+      "adapter_hint": "semantic_scholar"
+    }
+  ],
+  "tasks_to_create": [
+    {
+      "missing_authority_type": "discipline_classification",
+      "target_country": "INTERNATIONAL",
+      "target_domain": "higher_education_ai_p72c",
+      "target_discipline": null,
+      "reason": "No discipline_classification authority for INTERNATIONAL/higher_education_ai_p72c",
+      "search_queries": [
+        "National research classification",
+        "OECD FORD classification"
+      ],
+      "suggested_connectors": [
+        "local_file",
+        "manual_url",
+        "web_search"
+      ]
+    },
+    {
+      "missing_authority_type": "author_guidelines_source",
+      "target_country": "INTERNATIONAL",
+      "target_domain": "higher_education_ai_p72c",
+      "target_discipline": null,
+      "reason": "No author_guidelines_source authority for INTERNATIONAL/higher_education_ai_p72c",
+      "search_queries": [],
+      "suggested_connectors": [
+        "local_file",
+        "manual_url"
+      ]
+    },
+    {
+      "missing_authority_type": "editorial_board_source",
+      "target_country": "INTERNATIONAL",
+      "target_domain": "higher_education_ai_p72c",
+      "target_discipline": null,
+      "reason": "No editorial_board_source authority for INTERNATIONAL/higher_education_ai_p72c",
+      "search_queries": [],
+      "suggested_connectors": [
+        "local_file",
+        "manual_url"
+      ]
+    },
+    {
+      "missing_authority_type": "journal_archive_source",
+      "target_country": "INTERNATIONAL",
+      "target_domain": "higher_education_ai_p72c",
+      "target_discipline": null,
+      "reason": "No journal_archive_source authority for INTERNATIONAL/higher_education_ai_p72c",
+      "search_queries": [
+        "DOAJ directory",
+        "Journal official archives"
+      ],
+      "suggested_connectors": [
+        "local_file",
+        "manual_url"
+      ]
+    }
+  ],
+  "confidence": "low",
+  "warnings": [
+    "Insufficient authority coverage — missing 4 types: discipline_classification, author_guidelines_source, editorial_board_source, journal_archive_source"
+  ]
+}

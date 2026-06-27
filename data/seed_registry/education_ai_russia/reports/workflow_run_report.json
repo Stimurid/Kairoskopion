@@ -1,0 +1,187 @@
+{
+  "run_id": "run_20260627_112051997082_2dd99314",
+  "article_archetype": {
+    "archetype_id": "archetype_run_2026",
+    "title_family": "unknown",
+    "article_object": "unknown",
+    "claim_family": [],
+    "genre": "unknown",
+    "method_evidence_regime": [],
+    "citation_ecology": {
+      "references_detected": false
+    },
+    "likely_zones": [],
+    "unlikely_zones": [],
+    "fit_risks": [],
+    "rewrite_requirements": [],
+    "source_article_ref": "data\\private_work\\luksha_article_intermediate_versions\\luksha_article_version_package\\versions\\08_cited_clean_current_base.md",
+    "provenance": "deterministic_article_modeler",
+    "confidence": "low",
+    "status": "draft",
+    "unknowns": [
+      "abstract missing — article model is shallow",
+      "genre not detected",
+      "method not detected",
+      "novelty mode not detected",
+      "protected core not confirmed by user"
+    ],
+    "warnings": [
+      "Deterministic extraction: limited accuracy"
+    ],
+    "needs_llm_for": [
+      "genre_detection",
+      "claim_extraction",
+      "method_detection"
+    ]
+  },
+  "discipline_lookups": [
+    {
+      "query": "Higher Education",
+      "hits": 0,
+      "status": "miss",
+      "task_id": "acqtask_c5f0d0d2bd5d"
+    },
+    {
+      "query": "AI in Education",
+      "hits": 0,
+      "status": "miss",
+      "task_id": "acqtask_a1ec8454107f"
+    },
+    {
+      "query": "Educational Technology",
+      "hits": 0,
+      "status": "miss",
+      "task_id": "acqtask_47f141c34666"
+    }
+  ],
+  "acquisition_tasks_created": [
+    {
+      "task_id": "acqtask_c5f0d0d2bd5d",
+      "task_type": "discipline_lookup",
+      "query": "Higher Education",
+      "reason": "No discipline record found for 'Higher Education'",
+      "target_sources": [
+        "vak",
+        "oecd_ford",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T11:20:51.999886+00:00",
+      "updated_at": "2026-06-27T11:20:51.999891+00:00"
+    },
+    {
+      "task_id": "acqtask_a1ec8454107f",
+      "task_type": "discipline_lookup",
+      "query": "AI in Education",
+      "reason": "No discipline record found for 'AI in Education'",
+      "target_sources": [
+        "vak",
+        "oecd_ford",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T11:20:52.000616+00:00",
+      "updated_at": "2026-06-27T11:20:52.000621+00:00"
+    },
+    {
+      "task_id": "acqtask_47f141c34666",
+      "task_type": "discipline_lookup",
+      "query": "Educational Technology",
+      "reason": "No discipline record found for 'Educational Technology'",
+      "target_sources": [
+        "vak",
+        "oecd_ford",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T11:20:52.001282+00:00",
+      "updated_at": "2026-06-27T11:20:52.001287+00:00"
+    },
+    {
+      "task_id": "acqtask_842a8a39e963",
+      "task_type": "venue_discovery",
+      "query": "Higher Education",
+      "reason": "No venue records for domain 'Higher Education' — registry empty",
+      "target_sources": [
+        "elibrary_ru",
+        "vak_list",
+        "openalex",
+        "crossref",
+        "doaj",
+        "scopus_sjr"
+      ],
+      "priority": "high",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T11:20:52.013828+00:00",
+      "updated_at": "2026-06-27T11:20:52.013831+00:00"
+    },
+    {
+      "task_id": "acqtask_0da78e993d75",
+      "task_type": "venue_discovery",
+      "query": "AI in Education",
+      "reason": "No venue records for domain 'AI in Education' — registry empty",
+      "target_sources": [
+        "elibrary_ru",
+        "vak_list",
+        "openalex",
+        "crossref",
+        "doaj",
+        "scopus_sjr"
+      ],
+      "priority": "high",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T11:20:52.014409+00:00",
+      "updated_at": "2026-06-27T11:20:52.014414+00:00"
+    },
+    {
+      "task_id": "acqtask_558647b476b2",
+      "task_type": "venue_discovery",
+      "query": "Educational Technology",
+      "reason": "No venue records for domain 'Educational Technology' — registry empty",
+      "target_sources": [
+        "elibrary_ru",
+        "vak_list",
+        "openalex",
+        "crossref",
+        "doaj",
+        "scopus_sjr"
+      ],
+      "priority": "high",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T11:20:52.014946+00:00",
+      "updated_at": "2026-06-27T11:20:52.014950+00:00"
+    }
+  ],
+  "source_packets_created": [],
+  "provisional_records": {},
+  "venue_universe": [],
+  "shortlist": [],
+  "deep_venue_tasks": [],
+  "gaps": [
+    "Article archetype incomplete — needs LLM for: genre_detection, claim_extraction, method_detection",
+    "Venue registry empty for domain 'education_ai_russia' — 3 acquisition tasks created",
+    "No VenueMetricRecords in registry — Q1/Q2 ranking not possible without source-backed metrics",
+    "Shortlist has 0 venues — shortage of 5 vs minimum 5. Populate registry with source-backed venue records.",
+    "Article archetype needs LLM for full semantic extraction"
+  ],
+  "warnings": [
+    "Venue universe is empty — only acquisition tasks exist. Populate registry with source-backed records first.",
+    "Running in no-live-LLM mode — semantic analysis deferred",
+    "6 open acquisition tasks — resolve to populate registry"
+  ]
+}
