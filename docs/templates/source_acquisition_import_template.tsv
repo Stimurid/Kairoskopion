@@ -1,0 +1,3 @@
+task_id	authority_id	target_kind	target_name	claim_type	required_evidence	supplied_evidence_path_or_url	evidence_kind	access_status	reviewer_note	decision
+htask_example001	auth_vak_journal_list	venue	Вопросы философии	vak_status	VAK inclusion certificate or official list screenshot	data/venue_evidence_packs/voprosy_filosofii_evidence_pack.md	local_evidence_pack	accessible	VAK status confirmed in evidence pack	accept
+htask_example002	auth_scopus	venue_metric	SJR for ВФ	metric_value	Scopus/Scimago official page or database export		insufficient	inaccessible	Requires paid Scopus access	blocked
