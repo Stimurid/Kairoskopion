@@ -153,7 +153,7 @@ class OpenAlexVenueAdapter(VenueAdapter):
         safe_q = quote(query_text, safe="")
         api_url = (
             f"https://api.openalex.org/sources"
-            f"?search={safe_q}&per_page={per_page}&type=journal"
+            f"?search={safe_q}&per_page={per_page}&filter=type:journal"
         )
         cache_path = Path(self._cache_dir) if self._cache_dir else None
 

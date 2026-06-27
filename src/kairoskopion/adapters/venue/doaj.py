@@ -272,9 +272,11 @@ class DOAJVenueAdapter(VenueAdapter):
         if editorial.get("review_process"):
             claims.append(VenueAdapterClaim("review_process", editorial["review_process"], es, "medium"))
 
-        oa_start = bib.get("oa_start", {})
-        if oa_start.get("year"):
+        oa_start = bib.get("oa_start")
+        if isinstance(oa_start, dict) and oa_start.get("year"):
             claims.append(VenueAdapterClaim("oa_start_year", oa_start["year"], es, "medium"))
+        elif isinstance(oa_start, (int, str)) and oa_start:
+            claims.append(VenueAdapterClaim("oa_start_year", oa_start, es, "medium"))
 
         unknowns = []
         if not bib.get("title"):
