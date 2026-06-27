@@ -58,6 +58,12 @@ kairoskopion_demo_bundle.zip
 *.zip
 
 private_inputs/
+data/input/private/
+data/private_work/
+
+# Seed registry outputs — tracked
+!data/seed_registry/
+!data/seed_registry/**
 
 # Claude Code
 .claude/

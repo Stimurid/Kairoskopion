@@ -244,6 +244,6 @@ multiple fields into one query string.
 | `ui/` | React+TypeScript cockpit (17 components) |
 | `ui/src/api/client.ts` | Typed API client |
 | `ui/src/styles/cockpit.css` | Dark theme CSS |
-| `tests/` | 2739+ tests |
+| `tests/` | 2814+ tests |
 | `tests/fixtures/` | Synthetic manuscript, venue, scenario |
 | `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` | Master spec |
