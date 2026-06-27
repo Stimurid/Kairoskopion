@@ -58,6 +58,15 @@ def _resolve_llm_provider(args: argparse.Namespace):
     return None
 
 
+def _resolve_registry_service(root: Path):
+    """Build RegistryIntegrationService for CLI pipeline runs."""
+    from .registry.services import RegistryHub
+    from .registry.integration import RegistryIntegrationService
+    reg_dir = root / "registry"
+    reg_dir.mkdir(parents=True, exist_ok=True)
+    return RegistryIntegrationService(hub=RegistryHub(data_dir=reg_dir))
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     """Show environment status."""
     from .llm.config import is_llm_available, provider_status
@@ -147,7 +156,8 @@ def cmd_run_fixture(args: argparse.Namespace) -> int:
 
     # Run pipeline
     llm = _resolve_llm_provider(args)
-    pipeline = ManuscriptVenueFitPipeline(llm_provider=llm)
+    registry = _resolve_registry_service(root)
+    pipeline = ManuscriptVenueFitPipeline(llm_provider=llm, registry_service=registry)
     if llm:
         print(f"LLM provider: {getattr(llm, '_config', None) and llm._config.model or 'configured'}")
     else:
@@ -260,7 +270,8 @@ def cmd_run_local(args: argparse.Namespace) -> int:
 
     # Run pipeline with real source refs
     llm = _resolve_llm_provider(args)
-    pipeline = ManuscriptVenueFitPipeline(llm_provider=llm)
+    registry = _resolve_registry_service(root)
+    pipeline = ManuscriptVenueFitPipeline(llm_provider=llm, registry_service=registry)
     if llm:
         print(f"LLM provider: {getattr(llm, '_config', None) and llm._config.model or 'configured'}")
     else:

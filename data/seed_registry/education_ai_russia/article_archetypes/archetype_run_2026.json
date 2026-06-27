@@ -1,0 +1,34 @@
+{
+  "archetype_id": "archetype_run_2026",
+  "title_family": "unknown",
+  "article_object": "unknown",
+  "claim_family": [],
+  "genre": "unknown",
+  "method_evidence_regime": [],
+  "citation_ecology": {
+    "references_detected": false
+  },
+  "likely_zones": [],
+  "unlikely_zones": [],
+  "fit_risks": [],
+  "rewrite_requirements": [],
+  "source_article_ref": "data\\private_work\\luksha_article_intermediate_versions\\luksha_article_version_package\\versions\\08_cited_clean_current_base.md",
+  "provenance": "deterministic_article_modeler",
+  "confidence": "low",
+  "status": "draft",
+  "unknowns": [
+    "abstract missing — article model is shallow",
+    "genre not detected",
+    "method not detected",
+    "novelty mode not detected",
+    "protected core not confirmed by user"
+  ],
+  "warnings": [
+    "Deterministic extraction: limited accuracy"
+  ],
+  "needs_llm_for": [
+    "genre_detection",
+    "claim_extraction",
+    "method_detection"
+  ]
+}

@@ -30,6 +30,7 @@ import { DecisionLog } from './DecisionLog';
 import { DossierView } from './DossierView';
 import { DepthModePanel } from './DepthModePanel';
 import { VenueMemoryPanel } from './VenueMemoryPanel';
+import { RegistryReviewPanel } from './RegistryReviewPanel';
 
 interface Props {
   caseData: CaseDetail;
@@ -666,6 +667,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
           <div>
             <DossierView caseId={caseId} />
             <VenueMemoryPanel />
+            <RegistryReviewPanel />
           </div>
         );
 

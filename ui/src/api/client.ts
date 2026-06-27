@@ -97,6 +97,18 @@ export interface AuthResponse {
   session_token: string;
 }
 
+export interface RegistryRecord {
+  [key: string]: unknown;
+  _usage_status?: string;
+  _record_type?: string;
+  source_status?: string;
+  review_status?: string;
+  canonical_name?: string;
+  venue_id?: string;
+  discipline_id?: string;
+  section_id?: string;
+}
+
 export const api = {
   health: () => get<{ status: string; version: string }>('/health'),
 
@@ -292,6 +304,20 @@ export const api = {
     }),
   getCostEstimate: (id: string) =>
     get<Record<string, unknown>>(`/cases/${id}/cost-estimate`),
+
+  // Phase 6: registry
+  listRegistryTypes: () => get<string[]>('/api/registry/types'),
+  listRegistryRecords: (recordType: string, q = '', limit = 50) =>
+    get<RegistryRecord[]>(`/api/registry/${recordType}?q=${encodeURIComponent(q)}&limit=${limit}`),
+  getRegistryRecord: (recordType: string, recordId: string) =>
+    get<RegistryRecord>(`/api/registry/${recordType}/${recordId}`),
+  acceptRegistryRecord: (recordType: string, recordId: string, note?: string) =>
+    post<RegistryRecord>(`/api/registry/${recordType}/${recordId}/accept`, { note: note ?? null }),
+  rejectRegistryRecord: (recordType: string, recordId: string, note?: string) =>
+    post<RegistryRecord>(`/api/registry/${recordType}/${recordId}/reject`, { note: note ?? null }),
+  getReviewQueue: (limit = 100) =>
+    get<RegistryRecord[]>(`/api/registry/review-queue?limit=${limit}`),
+  listOpenTasks: () => get<Record<string, unknown>[]>('/api/registry/tasks/open'),
 };
 
 // --- Agent Map types ---

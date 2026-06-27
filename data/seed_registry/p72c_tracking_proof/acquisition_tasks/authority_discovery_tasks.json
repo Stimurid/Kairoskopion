@@ -1,0 +1,75 @@
+[
+  {
+    "task_id": "authtask_60444bf515be",
+    "target_country": "INTERNATIONAL",
+    "target_domain": "higher_education_ai_p72c",
+    "missing_authority_type": "discipline_classification",
+    "reason": "No discipline_classification authority for INTERNATIONAL/higher_education_ai_p72c",
+    "search_queries": [
+      "National research classification",
+      "OECD FORD classification"
+    ],
+    "suggested_connectors": [
+      "manual_url",
+      "repo_docs"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "result_authority_ids": [],
+    "created_at": "2026-06-27T14:10:09.963912+00:00",
+    "updated_at": "2026-06-27T14:10:09.963923+00:00"
+  },
+  {
+    "task_id": "authtask_2c751b57355d",
+    "target_country": "INTERNATIONAL",
+    "target_domain": "higher_education_ai_p72c",
+    "missing_authority_type": "author_guidelines_source",
+    "reason": "No author_guidelines_source authority for INTERNATIONAL/higher_education_ai_p72c",
+    "search_queries": [],
+    "suggested_connectors": [
+      "manual_url"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "result_authority_ids": [],
+    "created_at": "2026-06-27T14:10:09.963952+00:00",
+    "updated_at": "2026-06-27T14:10:09.963955+00:00"
+  },
+  {
+    "task_id": "authtask_030fa62064c9",
+    "target_country": "INTERNATIONAL",
+    "target_domain": "higher_education_ai_p72c",
+    "missing_authority_type": "editorial_board_source",
+    "reason": "No editorial_board_source authority for INTERNATIONAL/higher_education_ai_p72c",
+    "search_queries": [],
+    "suggested_connectors": [
+      "manual_url",
+      "openalex"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "result_authority_ids": [],
+    "created_at": "2026-06-27T14:10:09.963974+00:00",
+    "updated_at": "2026-06-27T14:10:09.963976+00:00"
+  },
+  {
+    "task_id": "authtask_6375fb1a67d0",
+    "target_country": "INTERNATIONAL",
+    "target_domain": "higher_education_ai_p72c",
+    "missing_authority_type": "journal_archive_source",
+    "reason": "No journal_archive_source authority for INTERNATIONAL/higher_education_ai_p72c",
+    "search_queries": [
+      "DOAJ directory",
+      "Journal official archives"
+    ],
+    "suggested_connectors": [
+      "cyberleninka",
+      "openalex"
+    ],
+    "priority": "normal",
+    "status": "open",
+    "result_authority_ids": [],
+    "created_at": "2026-06-27T14:10:09.963992+00:00",
+    "updated_at": "2026-06-27T14:10:09.963993+00:00"
+  }
+]

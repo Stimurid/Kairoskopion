@@ -1,0 +1,436 @@
+{
+  "run_id": "run_20260627_135151812194_dac211b9",
+  "authority_coverage": {
+    "sufficient": false,
+    "missing_authority_types": [
+      "discipline_classification",
+      "author_guidelines_source",
+      "editorial_board_source",
+      "journal_archive_source"
+    ],
+    "usable_authorities": [
+      {
+        "authority_id": "srcauth_69c9a45e15af",
+        "authority_name": "OpenAlex",
+        "authority_type": "citation_database",
+        "source_status": "accepted",
+        "access_mode": "api",
+        "adapter_hint": "openalex"
+      },
+      {
+        "authority_id": "srcauth_e7fe83ca29f3",
+        "authority_name": "Crossref",
+        "authority_type": "citation_database",
+        "source_status": "accepted",
+        "access_mode": "api",
+        "adapter_hint": "crossref"
+      },
+      {
+        "authority_id": "srcauth_28f6e4072e62",
+        "authority_name": "OpenCitations COCI",
+        "authority_type": "citation_database",
+        "source_status": "accepted",
+        "access_mode": "api",
+        "adapter_hint": "opencitations"
+      },
+      {
+        "authority_id": "srcauth_042f4634c14b",
+        "authority_name": "DOAJ (Directory of Open Access Journals)",
+        "authority_type": "national_journal_registry",
+        "source_status": "accepted",
+        "access_mode": "api",
+        "adapter_hint": "doaj"
+      },
+      {
+        "authority_id": "srcauth_e170e797c15a",
+        "authority_name": "Unpaywall",
+        "authority_type": "metric_source",
+        "source_status": "accepted",
+        "access_mode": "api",
+        "adapter_hint": "unpaywall"
+      },
+      {
+        "authority_id": "srcauth_fcd9fa2afbe1",
+        "authority_name": "Scopus (Elsevier)",
+        "authority_type": "metric_source",
+        "source_status": "provisional",
+        "access_mode": "api",
+        "adapter_hint": "scopus"
+      },
+      {
+        "authority_id": "srcauth_84cc849c9bca",
+        "authority_name": "Web of Science / ESCI / AHCI (Clarivate)",
+        "authority_type": "metric_source",
+        "source_status": "provisional",
+        "access_mode": "api",
+        "adapter_hint": "wos"
+      },
+      {
+        "authority_id": "srcauth_2e10e5734bf0",
+        "authority_name": "ScimagoJR / Scimago Journal Rankings",
+        "authority_type": "metric_source",
+        "source_status": "accepted",
+        "access_mode": "web_search",
+        "adapter_hint": "manual_url"
+      },
+      {
+        "authority_id": "srcauth_070633b7b8eb",
+        "authority_name": "ISSN Portal / ISSN International Centre",
+        "authority_type": "journal_index",
+        "source_status": "accepted",
+        "access_mode": "web_search",
+        "adapter_hint": "manual_url"
+      },
+      {
+        "authority_id": "srcauth_359435f42fce",
+        "authority_name": "Google Scholar",
+        "authority_type": "scholarly_search",
+        "source_status": "provisional",
+        "access_mode": "web_search",
+        "adapter_hint": "manual_url"
+      },
+      {
+        "authority_id": "srcauth_53c2aa3309cb",
+        "authority_name": "Semantic Scholar",
+        "authority_type": "scholarly_search",
+        "source_status": "provisional",
+        "access_mode": "api",
+        "adapter_hint": "semantic_scholar"
+      }
+    ],
+    "tasks_to_create": [
+      {
+        "missing_authority_type": "discipline_classification",
+        "target_country": "INTERNATIONAL",
+        "target_domain": "higher_education_ai",
+        "target_discipline": null,
+        "reason": "No discipline_classification authority for INTERNATIONAL/higher_education_ai",
+        "search_queries": [
+          "National research classification",
+          "OECD FORD classification"
+        ],
+        "suggested_connectors": [
+          "local_file",
+          "manual_url",
+          "web_search"
+        ]
+      },
+      {
+        "missing_authority_type": "author_guidelines_source",
+        "target_country": "INTERNATIONAL",
+        "target_domain": "higher_education_ai",
+        "target_discipline": null,
+        "reason": "No author_guidelines_source authority for INTERNATIONAL/higher_education_ai",
+        "search_queries": [],
+        "suggested_connectors": [
+          "local_file",
+          "manual_url"
+        ]
+      },
+      {
+        "missing_authority_type": "editorial_board_source",
+        "target_country": "INTERNATIONAL",
+        "target_domain": "higher_education_ai",
+        "target_discipline": null,
+        "reason": "No editorial_board_source authority for INTERNATIONAL/higher_education_ai",
+        "search_queries": [],
+        "suggested_connectors": [
+          "local_file",
+          "manual_url"
+        ]
+      },
+      {
+        "missing_authority_type": "journal_archive_source",
+        "target_country": "INTERNATIONAL",
+        "target_domain": "higher_education_ai",
+        "target_discipline": null,
+        "reason": "No journal_archive_source authority for INTERNATIONAL/higher_education_ai",
+        "search_queries": [
+          "DOAJ directory",
+          "Journal official archives"
+        ],
+        "suggested_connectors": [
+          "local_file",
+          "manual_url"
+        ]
+      }
+    ],
+    "confidence": "low",
+    "warnings": [
+      "Insufficient authority coverage — missing 4 types: discipline_classification, author_guidelines_source, editorial_board_source, journal_archive_source"
+    ]
+  },
+  "source_authority_tasks": [
+    {
+      "task_id": "authtask_1be02ebc5f11",
+      "target_country": "INTERNATIONAL",
+      "target_domain": "higher_education_ai",
+      "missing_authority_type": "discipline_classification",
+      "reason": "No discipline_classification authority for INTERNATIONAL/higher_education_ai",
+      "search_queries": [
+        "National research classification",
+        "OECD FORD classification"
+      ],
+      "suggested_connectors": [
+        "manual_url",
+        "repo_docs"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "result_authority_ids": [],
+      "created_at": "2026-06-27T13:51:51.812547+00:00",
+      "updated_at": "2026-06-27T13:51:51.812556+00:00"
+    },
+    {
+      "task_id": "authtask_144d8fddb67d",
+      "target_country": "INTERNATIONAL",
+      "target_domain": "higher_education_ai",
+      "missing_authority_type": "author_guidelines_source",
+      "reason": "No author_guidelines_source authority for INTERNATIONAL/higher_education_ai",
+      "search_queries": [],
+      "suggested_connectors": [
+        "manual_url"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "result_authority_ids": [],
+      "created_at": "2026-06-27T13:51:51.812584+00:00",
+      "updated_at": "2026-06-27T13:51:51.812587+00:00"
+    },
+    {
+      "task_id": "authtask_e597201b7aca",
+      "target_country": "INTERNATIONAL",
+      "target_domain": "higher_education_ai",
+      "missing_authority_type": "editorial_board_source",
+      "reason": "No editorial_board_source authority for INTERNATIONAL/higher_education_ai",
+      "search_queries": [],
+      "suggested_connectors": [
+        "manual_url",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "result_authority_ids": [],
+      "created_at": "2026-06-27T13:51:51.812606+00:00",
+      "updated_at": "2026-06-27T13:51:51.812608+00:00"
+    },
+    {
+      "task_id": "authtask_8a9f17b7672f",
+      "target_country": "INTERNATIONAL",
+      "target_domain": "higher_education_ai",
+      "missing_authority_type": "journal_archive_source",
+      "reason": "No journal_archive_source authority for INTERNATIONAL/higher_education_ai",
+      "search_queries": [
+        "DOAJ directory",
+        "Journal official archives"
+      ],
+      "suggested_connectors": [
+        "cyberleninka",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "result_authority_ids": [],
+      "created_at": "2026-06-27T13:51:51.812623+00:00",
+      "updated_at": "2026-06-27T13:51:51.812625+00:00"
+    }
+  ],
+  "article_archetype": {
+    "archetype_id": "archetype_run_2026",
+    "title_family": "unknown",
+    "article_object": "unknown",
+    "claim_family": [],
+    "genre": "unknown",
+    "method_evidence_regime": [],
+    "citation_ecology": {
+      "references_detected": false
+    },
+    "likely_zones": [],
+    "unlikely_zones": [],
+    "fit_risks": [],
+    "rewrite_requirements": [],
+    "source_article_ref": "data\\private_work\\luksha_article_intermediate_versions\\luksha_article_version_package\\versions\\08_cited_clean_current_base.md",
+    "provenance": "deterministic_article_modeler",
+    "confidence": "low",
+    "status": "draft",
+    "unknowns": [
+      "abstract missing — article model is shallow",
+      "genre not detected",
+      "method not detected",
+      "novelty mode not detected",
+      "protected core not confirmed by user"
+    ],
+    "warnings": [
+      "Deterministic extraction: limited accuracy"
+    ],
+    "needs_llm_for": [
+      "genre_detection",
+      "claim_extraction",
+      "method_detection"
+    ]
+  },
+  "discipline_lookups": [
+    {
+      "query": "higher_education",
+      "hits": 0,
+      "status": "miss",
+      "task_id": "acqtask_c8c1f63a0c51"
+    },
+    {
+      "query": "AI_in_education",
+      "hits": 0,
+      "status": "miss",
+      "task_id": "acqtask_aa95e01ec486"
+    },
+    {
+      "query": "epistemic_legitimation",
+      "hits": 0,
+      "status": "miss",
+      "task_id": "acqtask_205e0ca21876"
+    }
+  ],
+  "acquisition_tasks_created": [
+    {
+      "task_id": "acqtask_c8c1f63a0c51",
+      "task_type": "discipline_lookup",
+      "query": "higher_education",
+      "reason": "No discipline record found for 'higher_education'",
+      "target_sources": [
+        "vak",
+        "oecd_ford",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T13:51:51.817154+00:00",
+      "updated_at": "2026-06-27T13:51:51.817160+00:00"
+    },
+    {
+      "task_id": "acqtask_aa95e01ec486",
+      "task_type": "discipline_lookup",
+      "query": "AI_in_education",
+      "reason": "No discipline record found for 'AI_in_education'",
+      "target_sources": [
+        "vak",
+        "oecd_ford",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T13:51:51.827113+00:00",
+      "updated_at": "2026-06-27T13:51:51.827122+00:00"
+    },
+    {
+      "task_id": "acqtask_205e0ca21876",
+      "task_type": "discipline_lookup",
+      "query": "epistemic_legitimation",
+      "reason": "No discipline record found for 'epistemic_legitimation'",
+      "target_sources": [
+        "vak",
+        "oecd_ford",
+        "openalex"
+      ],
+      "priority": "normal",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T13:51:51.827720+00:00",
+      "updated_at": "2026-06-27T13:51:51.827725+00:00"
+    },
+    {
+      "task_id": "acqtask_63462758e723",
+      "task_type": "venue_discovery",
+      "query": "higher_education",
+      "reason": "No venue records for domain 'higher_education' — registry empty",
+      "target_sources": [
+        "elibrary_ru",
+        "vak_list",
+        "openalex",
+        "crossref",
+        "doaj",
+        "scopus_sjr"
+      ],
+      "priority": "high",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T13:51:51.841503+00:00",
+      "updated_at": "2026-06-27T13:51:51.841506+00:00"
+    },
+    {
+      "task_id": "acqtask_ff3048f6071f",
+      "task_type": "venue_discovery",
+      "query": "AI_in_education",
+      "reason": "No venue records for domain 'AI_in_education' — registry empty",
+      "target_sources": [
+        "elibrary_ru",
+        "vak_list",
+        "openalex",
+        "crossref",
+        "doaj",
+        "scopus_sjr"
+      ],
+      "priority": "high",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T13:51:51.842205+00:00",
+      "updated_at": "2026-06-27T13:51:51.842211+00:00"
+    },
+    {
+      "task_id": "acqtask_496c72196df2",
+      "task_type": "venue_discovery",
+      "query": "epistemic_legitimation",
+      "reason": "No venue records for domain 'epistemic_legitimation' — registry empty",
+      "target_sources": [
+        "elibrary_ru",
+        "vak_list",
+        "openalex",
+        "crossref",
+        "doaj",
+        "scopus_sjr"
+      ],
+      "priority": "high",
+      "status": "open",
+      "created_by_agent": "seed_workflow",
+      "result_packet_ids": [],
+      "created_at": "2026-06-27T13:51:51.842703+00:00",
+      "updated_at": "2026-06-27T13:51:51.842708+00:00"
+    }
+  ],
+  "blocked_on_authority": [],
+  "source_packets_created": [],
+  "provisional_records": {},
+  "venue_universe": [],
+  "shortlist": [],
+  "deep_venue_tasks": [],
+  "available_adapters": [
+    "local_file",
+    "manual_url",
+    "repo_docs",
+    "openalex",
+    "crossref",
+    "doaj",
+    "unpaywall",
+    "opencitations",
+    "cyberleninka"
+  ],
+  "gaps": [
+    "Article archetype incomplete — needs LLM for: genre_detection, claim_extraction, method_detection",
+    "Venue registry empty for domain 'higher_education_ai' — 3 acquisition tasks created",
+    "No VenueMetricRecords in registry — Q1/Q2 ranking not possible without source-backed metrics",
+    "Shortlist has 0 venues — shortage of 5 vs minimum 5. Populate registry with source-backed venue records.",
+    "Article archetype needs LLM for full semantic extraction",
+    "4 source authority discovery tasks — resolve before factual acquisition"
+  ],
+  "warnings": [
+    "Insufficient authority coverage — missing 4 types: discipline_classification, author_guidelines_source, editorial_board_source, journal_archive_source",
+    "Venue universe is empty — only acquisition tasks exist. Populate registry with source-backed records first.",
+    "Running in no-live-LLM mode — semantic analysis deferred",
+    "12 open acquisition tasks — resolve to populate registry"
+  ]
+}

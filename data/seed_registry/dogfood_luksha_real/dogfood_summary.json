@@ -1,0 +1,21 @@
+{
+  "run_id": "run_20260627_135151812194_dac211b9",
+  "article_path": "data\\private_work\\luksha_article_intermediate_versions\\luksha_article_version_package\\versions\\08_cited_clean_current_base.md",
+  "article_size_chars": 75775,
+  "authority_sufficient": false,
+  "authority_confidence": "low",
+  "missing_authority_types": [
+    "discipline_classification",
+    "author_guidelines_source",
+    "editorial_board_source",
+    "journal_archive_source"
+  ],
+  "source_authority_tasks": 4,
+  "blocked_on_authority": 0,
+  "article_archetype": true,
+  "discipline_lookups": 3,
+  "acquisition_tasks": 6,
+  "venue_universe": 0,
+  "shortlist": 0,
+  "available_adapters": 9
+}

@@ -1,0 +1,7 @@
+[
+  {
+    "task_type": "venue_metrics",
+    "reason": "No metric source authority — cannot create metric acquisition tasks",
+    "blocked_on": "metric_source"
+  }
+]
