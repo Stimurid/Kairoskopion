@@ -3,15 +3,21 @@
 Supports rerun_all, rerun_stage, rerun_from_stage, and diff_runs.
 Orchestrates re-execution of the ManuscriptVenueFitPipeline with
 optional prompt overrides, producing new PipelineRun traces.
+
+P11.1: ``execute_replay_run`` calls the real pipeline for supported
+stages; unsupported stages return ``stage_not_yet_replayable``.
 """
 from __future__ import annotations
 
 import dataclasses as dc
+import logging
 from typing import Any
 
 from ..ids import generate_id
 from .pipeline_trace import PipelineNode, PipelineRun, PipelineTraceStore, _hash_text
 from .prompt_override import PromptOverride, PromptOverrideStore
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -214,3 +220,86 @@ def scaffold_replay_run(
         trace_store.save_run(run)
 
     return run
+
+
+# ---------------------------------------------------------------------------
+# Real pipeline execution via replay
+# ---------------------------------------------------------------------------
+
+_REPLAYABLE_FULL = "rerun_all"
+
+_REPLAYABLE_STAGES = frozenset([
+    "mismatch_map", "rewrite_plan", "risk_report",
+    "compliance_check", "evidence_audit",
+])
+
+
+def execute_replay_run(
+    plan: ReplayPlan,
+    *,
+    case_id: str | None = None,
+    trace_store: PipelineTraceStore | None = None,
+    override_store: PromptOverrideStore | None = None,
+    manuscript_text: str | None = None,
+    venue_guidelines_text: str | None = None,
+    scenario_data: dict[str, Any] | None = None,
+    manuscript_source_ref: str = "fixture:manuscript_sample",
+    venue_source_ref: str = "fixture:venue_guidelines_sample",
+    llm_provider: Any | None = None,
+    registry_service: Any | None = None,
+) -> dict[str, Any]:
+    """Execute a replay plan, running real pipeline stages where supported.
+
+    For ``rerun_all`` with manuscript+venue text provided, runs the full
+    instrumented pipeline.  For individual stages, deterministic stages
+    execute if upstream artifacts are available; LLM-agent stages that need
+    the full pipeline context return ``stage_not_yet_replayable``.
+
+    Returns ``{"run": PipelineRun, "result": ..., "status": ...}``.
+    """
+    if plan.mode == _REPLAYABLE_FULL and manuscript_text and venue_guidelines_text:
+        from ..pipelines.manuscript_venue_fit import ManuscriptVenueFitPipeline
+
+        pipeline = ManuscriptVenueFitPipeline(
+            llm_provider=llm_provider,
+            registry_service=registry_service,
+            trace_store=trace_store,
+            override_store=override_store,
+            case_id=case_id,
+        )
+        result = pipeline.execute(
+            manuscript_text=manuscript_text,
+            venue_guidelines_text=venue_guidelines_text,
+            scenario_data=scenario_data or {},
+            manuscript_source_ref=manuscript_source_ref,
+            venue_source_ref=venue_source_ref,
+        )
+        return {
+            "run": result.trace_run,
+            "result": result,
+            "status": "executed",
+        }
+
+    unsupported = [
+        s for s in plan.stages_to_rerun
+        if s not in _REPLAYABLE_STAGES
+    ]
+    if unsupported:
+        run = scaffold_replay_run(plan, case_id=case_id, trace_store=trace_store)
+        for node in (trace_store.list_nodes(run.run_id) if trace_store else []):
+            if node.stage_id in unsupported and node.status == "pending":
+                node.status = "stage_not_yet_replayable"
+                node.diagnostics.append(
+                    f"stage '{node.stage_id}' requires full pipeline context"
+                )
+                if trace_store:
+                    trace_store.save_node(node)
+        return {
+            "run": run,
+            "result": None,
+            "status": "partial_not_replayable",
+            "unsupported_stages": unsupported,
+        }
+
+    run = scaffold_replay_run(plan, case_id=case_id, trace_store=trace_store)
+    return {"run": run, "result": None, "status": "scaffold_only"}

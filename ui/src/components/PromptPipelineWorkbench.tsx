@@ -7,6 +7,7 @@ import type {
   PipelineNodeInfo,
   PromptRunRecordInfo,
   PromptOverrideInfo,
+  RunDiffEntry,
 } from '../api/client';
 
 interface Props {
@@ -14,7 +15,7 @@ interface Props {
   onClose: () => void;
 }
 
-type Tab = 'stages' | 'runs' | 'prompts' | 'overrides';
+type Tab = 'stages' | 'runs' | 'prompts' | 'overrides' | 'compare';
 
 export function PromptPipelineWorkbench({ caseId, onClose }: Props) {
   const [tab, setTab] = useState<Tab>('stages');
@@ -29,6 +30,14 @@ export function PromptPipelineWorkbench({ caseId, onClose }: Props) {
   const [selectedPrompt, setSelectedPrompt] = useState<PromptFamilyInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [compareA, setCompareA] = useState<string | null>(null);
+  const [compareB, setCompareB] = useState<string | null>(null);
+  const [diffEntries, setDiffEntries] = useState<RunDiffEntry[]>([]);
+  const [compareNodesA, setCompareNodesA] = useState<PipelineNodeInfo[]>([]);
+  const [compareNodesB, setCompareNodesB] = useState<PipelineNodeInfo[]>([]);
+  const [comparePromptNode, setComparePromptNode] = useState<string | null>(null);
+  const [comparePromptsA, setComparePromptsA] = useState<PromptRunRecordInfo[]>([]);
+  const [comparePromptsB, setComparePromptsB] = useState<PromptRunRecordInfo[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -116,6 +125,39 @@ export function PromptPipelineWorkbench({ caseId, onClose }: Props) {
     }
   };
 
+  const loadComparison = useCallback(async (runA: string, runB: string) => {
+    setCompareA(runA);
+    setCompareB(runB);
+    setComparePromptNode(null);
+    setComparePromptsA([]);
+    setComparePromptsB([]);
+    try {
+      const [d, nA, nB] = await Promise.all([
+        workbench.diffRuns(caseId, runA, runB),
+        workbench.listNodes(caseId, runA),
+        workbench.listNodes(caseId, runB),
+      ]);
+      setDiffEntries(d);
+      setCompareNodesA(nA);
+      setCompareNodesB(nB);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, [caseId]);
+
+  const loadComparePrompts = useCallback(async (stageId: string) => {
+    setComparePromptNode(stageId);
+    if (!compareA || !compareB) return;
+    const nodeA = compareNodesA.find(n => n.stage_id === stageId);
+    const nodeB = compareNodesB.find(n => n.stage_id === stageId);
+    const [pA, pB] = await Promise.all([
+      nodeA ? workbench.getNodePrompt(caseId, compareA, nodeA.node_id).catch(() => []) : Promise.resolve([]),
+      nodeB ? workbench.getNodePrompt(caseId, compareB, nodeB.node_id).catch(() => []) : Promise.resolve([]),
+    ]);
+    setComparePromptsA(pA);
+    setComparePromptsB(pB);
+  }, [caseId, compareA, compareB, compareNodesA, compareNodesB]);
+
   const statusColor = (s: string) => {
     switch (s) {
       case 'completed': return 'var(--color-success)';
@@ -153,7 +195,7 @@ export function PromptPipelineWorkbench({ caseId, onClose }: Props) {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 12, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
-        {(['stages', 'runs', 'prompts', 'overrides'] as Tab[]).map(t => (
+        {(['stages', 'runs', 'compare', 'prompts', 'overrides'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -166,6 +208,7 @@ export function PromptPipelineWorkbench({ caseId, onClose }: Props) {
           >
             {t === 'stages' ? 'Pipeline Stages' :
              t === 'runs' ? `Runs (${runs.length})` :
+             t === 'compare' ? 'Compare' :
              t === 'prompts' ? `Prompts (${prompts.length})` :
              `Overrides (${overrides.length})`}
           </button>
@@ -453,6 +496,234 @@ export function PromptPipelineWorkbench({ caseId, onClose }: Props) {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Compare tab */}
+      {tab === 'compare' && (
+        <div>
+          {runs.length < 2 ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+              Need at least 2 runs to compare. Use "Rerun All" to create runs.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Run A:
+                  <select
+                    value={compareA ?? ''}
+                    onChange={e => {
+                      const v = e.target.value || null;
+                      setCompareA(v);
+                      if (v && compareB) loadComparison(v, compareB);
+                    }}
+                    style={{
+                      marginLeft: 4, background: 'var(--bg-input)', color: 'var(--text-primary)',
+                      border: '1px solid var(--border)', borderRadius: 4, padding: '3px 6px', fontSize: 12,
+                    }}
+                  >
+                    <option value="">Select...</option>
+                    {runs.map(r => (
+                      <option key={r.run_id} value={r.run_id}>
+                        {r.trigger} — {r.status} ({r.run_id.slice(0, 12)})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  Run B:
+                  <select
+                    value={compareB ?? ''}
+                    onChange={e => {
+                      const v = e.target.value || null;
+                      setCompareB(v);
+                      if (compareA && v) loadComparison(compareA, v);
+                    }}
+                    style={{
+                      marginLeft: 4, background: 'var(--bg-input)', color: 'var(--text-primary)',
+                      border: '1px solid var(--border)', borderRadius: 4, padding: '3px 6px', fontSize: 12,
+                    }}
+                  >
+                    <option value="">Select...</option>
+                    {runs.map(r => (
+                      <option key={r.run_id} value={r.run_id}>
+                        {r.trigger} — {r.status} ({r.run_id.slice(0, 12)})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {compareA && compareB && (
+                <div style={{ maxHeight: 500, overflowY: 'auto' }}>
+                  {diffEntries.length === 0 && compareNodesA.length > 0 && (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 8 }}>
+                      No differences found between these runs.
+                    </div>
+                  )}
+
+                  {/* Node-level side-by-side */}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 12 }}>
+                    <thead>
+                      <tr style={{ color: 'var(--text-muted)', textAlign: 'left' }}>
+                        <th style={{ padding: '3px 6px' }}>Stage</th>
+                        <th style={{ padding: '3px 6px' }}>Status A</th>
+                        <th style={{ padding: '3px 6px' }}>Status B</th>
+                        <th style={{ padding: '3px 6px' }}>Diff</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compareNodesA.map(nA => {
+                        const nB = compareNodesB.find(nb => nb.stage_id === nA.stage_id);
+                        const stageDiffs = diffEntries.filter(d => d.stage_id === nA.stage_id);
+                        const hasDiff = stageDiffs.length > 0;
+                        const hasPrompt = nA.prompt_family_id || nB?.prompt_family_id;
+                        return (
+                          <tr
+                            key={nA.stage_id}
+                            onClick={() => hasPrompt && loadComparePrompts(nA.stage_id)}
+                            style={{
+                              borderTop: '1px solid var(--border)',
+                              cursor: hasPrompt ? 'pointer' : 'default',
+                              background: comparePromptNode === nA.stage_id
+                                ? 'var(--bg-hover)'
+                                : hasDiff
+                                  ? 'rgba(255, 180, 50, 0.05)'
+                                  : 'transparent',
+                            }}
+                          >
+                            <td style={{ padding: '3px 6px', color: 'var(--text-primary)' }}>
+                              {nA.stage_label}
+                            </td>
+                            <td style={{ padding: '3px 6px', color: statusColor(nA.status) }}>
+                              {nA.status}
+                            </td>
+                            <td style={{ padding: '3px 6px', color: statusColor(nB?.status ?? 'absent') }}>
+                              {nB?.status ?? 'absent'}
+                            </td>
+                            <td style={{ padding: '3px 6px' }}>
+                              {hasDiff ? (
+                                <span style={{ fontSize: 11 }}>
+                                  {stageDiffs.map(d => (
+                                    <span key={d.field} style={{
+                                      display: 'inline-block', marginRight: 4,
+                                      padding: '1px 4px', borderRadius: 3,
+                                      background: 'var(--badge-claim-bg, #3a2a1a)',
+                                      color: 'var(--color-warning)',
+                                    }}>
+                                      {d.field}
+                                    </span>
+                                  ))}
+                                </span>
+                              ) : (
+                                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {/* Diff details */}
+                  {diffEntries.length > 0 && (
+                    <details style={{ marginBottom: 12 }}>
+                      <summary style={{ cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 12 }}>
+                        All field diffs ({diffEntries.length})
+                      </summary>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginTop: 4 }}>
+                        <thead>
+                          <tr style={{ color: 'var(--text-muted)' }}>
+                            <th style={{ padding: '2px 6px', textAlign: 'left' }}>Stage</th>
+                            <th style={{ padding: '2px 6px', textAlign: 'left' }}>Field</th>
+                            <th style={{ padding: '2px 6px', textAlign: 'left' }}>Run A</th>
+                            <th style={{ padding: '2px 6px', textAlign: 'left' }}>Run B</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {diffEntries.map((d, i) => (
+                            <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                              <td style={{ padding: '2px 6px', color: 'var(--text-primary)' }}>{d.stage_id}</td>
+                              <td style={{ padding: '2px 6px', color: 'var(--color-warning)' }}>{d.field}</td>
+                              <td style={{ padding: '2px 6px', color: 'var(--text-secondary)' }}>
+                                {String(d.run_a ?? '—')}
+                              </td>
+                              <td style={{ padding: '2px 6px', color: 'var(--text-secondary)' }}>
+                                {String(d.run_b ?? '—')}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </details>
+                  )}
+
+                  {/* Side-by-side prompt comparison */}
+                  {comparePromptNode && (comparePromptsA.length > 0 || comparePromptsB.length > 0) && (
+                    <div style={{
+                      padding: 8, background: 'var(--bg-raised)', borderRadius: 4,
+                      border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                        Prompt comparison: {comparePromptNode}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                            Run A — System Prompt
+                          </div>
+                          <pre style={{
+                            background: 'var(--bg-input)', padding: 6, borderRadius: 4,
+                            fontSize: 10, color: 'var(--text-primary)', whiteSpace: 'pre-wrap',
+                            maxHeight: 180, overflowY: 'auto', margin: 0,
+                          }}>
+                            {comparePromptsA[0]?.rendered_system_prompt || '(none)'}
+                          </pre>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                            Run B — System Prompt
+                          </div>
+                          <pre style={{
+                            background: 'var(--bg-input)', padding: 6, borderRadius: 4,
+                            fontSize: 10, color: 'var(--text-primary)', whiteSpace: 'pre-wrap',
+                            maxHeight: 180, overflowY: 'auto', margin: 0,
+                          }}>
+                            {comparePromptsB[0]?.rendered_system_prompt || '(none)'}
+                          </pre>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                            Run A — User Prompt
+                          </div>
+                          <pre style={{
+                            background: 'var(--bg-input)', padding: 6, borderRadius: 4,
+                            fontSize: 10, color: 'var(--text-primary)', whiteSpace: 'pre-wrap',
+                            maxHeight: 180, overflowY: 'auto', margin: 0,
+                          }}>
+                            {comparePromptsA[0]?.rendered_user_prompt || '(none)'}
+                          </pre>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                            Run B — User Prompt
+                          </div>
+                          <pre style={{
+                            background: 'var(--bg-input)', padding: 6, borderRadius: 4,
+                            fontSize: 10, color: 'var(--text-primary)', whiteSpace: 'pre-wrap',
+                            maxHeight: 180, overflowY: 'auto', margin: 0,
+                          }}>
+                            {comparePromptsB[0]?.rendered_user_prompt || '(none)'}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

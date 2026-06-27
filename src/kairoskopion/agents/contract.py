@@ -60,8 +60,21 @@ class AgentRole(ABC):
         """Execute with deterministic heuristics (fallback)."""
         ...
 
-    def run(self, inp: AgentInput, provider: LLMProvider | None = None) -> AgentOutput:
-        """Run the agent: LLM if provider available, else deterministic."""
+    def run(
+        self,
+        inp: AgentInput,
+        provider: LLMProvider | None = None,
+        *,
+        prompt_family_override: dict[str, str] | None = None,
+    ) -> AgentOutput:
+        """Run the agent: LLM if provider available, else deterministic.
+
+        ``prompt_family_override`` — if provided, a dict with optional keys
+        ``system_prompt`` and/or ``user_prompt_template`` that replace the
+        canonical family values for this single call.  The canonical source
+        is never mutated.
+        """
+        self._prompt_family_override = prompt_family_override
         if provider is not None:
             return self.execute(inp, provider)
         return self.execute_deterministic(inp)

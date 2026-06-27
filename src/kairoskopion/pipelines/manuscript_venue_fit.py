@@ -4,10 +4,15 @@ Supports two execution modes:
 - Deterministic (no LLM): heuristic extraction, same as before.
 - LLM-assisted: agents extract ArticleModel, VenueModel, FitAssessment
   with semantic understanding. Deterministic diagnostics still computed.
+
+P11 instrumentation: every stage creates a PipelineNode with status,
+producer_type, artifacts, prompt metadata, and override tracking.
+LLM-capable stages emit PromptRunRecord with rendered prompts.
 """
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from ..agents.article_modeler import ArticleModelerAgent
@@ -23,6 +28,9 @@ from ..cards import (
 from ..enums import OutputLevel, PipelineRunStatus
 from ..ids import pipeline_run_id as _new_run_id
 from ..llm.provider import LLMProvider
+from ..prompts.article_modeling import ARTICLE_MODELING_FAMILY
+from ..prompts.fit_assessment import FIT_ASSESSMENT_FAMILY
+from ..prompts.venue_fact_extraction import VENUE_FACT_EXTRACTION_FAMILY
 from ..quality import QualityGateResult, evaluate_fit_gate
 from ..registry.integration import RegistryIntegrationService
 from ..schema import (
@@ -46,6 +54,15 @@ from ..services.compliance import build_compliance_checklist
 from ..services.evidence_audit import audit_pipeline_evidence
 from ..services.fit_assessment import assess_fit
 from ..services.mismatch_mapping import build_mismatch_map
+from ..services.pipeline_trace import (
+    PipelineNode,
+    PipelineTraceStore,
+    PromptRunRecord,
+    _hash_text,
+    _now,
+)
+from ..services.pipeline_trace import PipelineRun as TraceRun
+from ..services.prompt_override import PromptOverrideStore
 from ..services.rewrite_planning import build_rewrite_plan
 from ..services.risk_reporting import build_risk_report
 from ..services.scenario import build_scenario_from_dict
@@ -74,6 +91,35 @@ class ManuscriptVenueFitResult:
         self.evidence_gate: QualityGateResult | None = None
         self.artifact_markdown: str | None = None
         self.llm_trace: list[dict[str, Any]] | None = None
+        self.trace_run: Any | None = None
+
+
+_NOT_APPLICABLE_STAGES = frozenset([
+    "input_classification", "semantic_profile",
+    "discipline_mapping", "discipline_matching",
+    "venue_discovery", "venue_family_context", "venue_matrix",
+])
+
+_STAGE_META: dict[str, dict[str, Any]] = {
+    "intake":               {"label": "Source Intake",        "order": 0,  "producer": "deterministic", "service": "build_manuscript_model"},
+    "input_classification": {"label": "Input Classification", "order": 1,  "producer": "llm_agent",     "service": "InputClassifierAgent",          "prompt_family": "input_classification"},
+    "article_model":        {"label": "Article Modeling",     "order": 2,  "producer": "llm_agent",     "service": "ArticleModelerAgent",           "prompt_family": "article_modeling"},
+    "semantic_profile":     {"label": "Semantic Profiling",   "order": 3,  "producer": "llm_agent",     "service": "SemanticProfilerAgent",         "prompt_family": "semantic_profiling"},
+    "bibliography_parse":   {"label": "Bibliography Parsing", "order": 4,  "producer": "deterministic", "service": "build_bibliography_profile"},
+    "discipline_mapping":   {"label": "Disciplinary Mapping", "order": 5,  "producer": "llm_agent",     "service": "DisciplinaryMapperAgent",       "prompt_family": "disciplinary_mapping"},
+    "discipline_matching":  {"label": "Discipline Matching",  "order": 6,  "producer": "llm_agent",     "service": "DisciplineMatcherAgent",        "prompt_family": "discipline_matching"},
+    "venue_investigation":  {"label": "Venue Investigation",  "order": 7,  "producer": "llm_agent",     "service": "VenueProfilerAgent",            "prompt_family": "venue_fact_extraction"},
+    "venue_discovery":      {"label": "Venue Discovery",      "order": 8,  "producer": "llm_agent",     "service": "VenueFunnelPlannerAgent",       "prompt_family": "venue_funnel_planning"},
+    "venue_family_context": {"label": "Venue Family Context", "order": 9,  "producer": "llm_agent",     "service": "VenueFamilyContextBuilderAgent","prompt_family": "venue_family_context"},
+    "venue_matrix":         {"label": "Venue Matrix",         "order": 10, "producer": "llm_agent",     "service": "VenueMatrixAssessorAgent",      "prompt_family": "venue_matrix_assessment"},
+    "fit_gate":             {"label": "Fit Gate",             "order": 11, "producer": "deterministic", "service": "evaluate_fit_gate"},
+    "fit_assessment":       {"label": "Fit Assessment",       "order": 12, "producer": "llm_agent",     "service": "FitAssessorAgent",              "prompt_family": "fit_assessment"},
+    "mismatch_map":         {"label": "Mismatch Mapping",    "order": 13, "producer": "deterministic", "service": "build_mismatch_map"},
+    "rewrite_plan":         {"label": "Rewrite Planning",    "order": 14, "producer": "deterministic", "service": "build_rewrite_plan"},
+    "risk_report":          {"label": "Risk Reporting",      "order": 15, "producer": "deterministic", "service": "build_risk_report"},
+    "compliance_check":     {"label": "Compliance Check",    "order": 16, "producer": "deterministic", "service": "build_compliance_checklist"},
+    "evidence_audit":       {"label": "Evidence Audit",      "order": 17, "producer": "deterministic", "service": "audit_pipeline_evidence"},
+}
 
 
 class ManuscriptVenueFitPipeline(PipelineBase):
@@ -86,13 +132,130 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         *,
         llm_provider: LLMProvider | None = None,
         registry_service: RegistryIntegrationService | None = None,
+        trace_store: PipelineTraceStore | None = None,
+        override_store: PromptOverrideStore | None = None,
+        case_id: str | None = None,
     ) -> None:
         super().__init__()
         self.llm = llm_provider
         self._registry = registry_service
+        self._trace_store = trace_store
+        self._override_store = override_store
+        self._case_id = case_id
         self._article_agent = ArticleModelerAgent()
         self._venue_agent = VenueProfilerAgent()
         self._fit_agent = FitAssessorAgent()
+
+    # -- trace helpers --------------------------------------------------------
+
+    def _make_node(self, trace_run: TraceRun, stage_id: str, **extra: Any) -> PipelineNode:
+        meta = _STAGE_META.get(stage_id, {})
+        node = PipelineNode(
+            run_id=trace_run.run_id,
+            stage_id=stage_id,
+            stage_label=meta.get("label", stage_id),
+            order_index=meta.get("order", 0),
+            producer_type=meta.get("producer", "deterministic"),
+            service_or_agent=meta.get("service", ""),
+            prompt_family_id=meta.get("prompt_family"),
+            status="running",
+            started_at=_now(),
+            **extra,
+        )
+        trace_run.node_ids.append(node.node_id)
+        return node
+
+    def _finish_node(
+        self, node: PipelineNode, *,
+        output_refs: list[str] | None = None,
+        output_hash: str | None = None,
+        diagnostics: list[str] | None = None,
+        status: str = "completed",
+    ) -> None:
+        node.status = status
+        node.completed_at = _now()
+        if output_refs:
+            node.output_artifact_refs = output_refs
+        if output_hash:
+            node.output_hash = output_hash
+        if diagnostics:
+            node.diagnostics = diagnostics
+        if self._trace_store:
+            self._trace_store.save_node(node)
+
+    def _skip_node(self, trace_run: TraceRun, stage_id: str, reason: str) -> None:
+        meta = _STAGE_META.get(stage_id, {})
+        node = PipelineNode(
+            run_id=trace_run.run_id,
+            stage_id=stage_id,
+            stage_label=meta.get("label", stage_id),
+            order_index=meta.get("order", 0),
+            producer_type=meta.get("producer", "deterministic"),
+            service_or_agent=meta.get("service", ""),
+            prompt_family_id=meta.get("prompt_family"),
+            status="not_applicable",
+            diagnostics=[reason],
+        )
+        trace_run.node_ids.append(node.node_id)
+        if self._trace_store:
+            self._trace_store.save_node(node)
+
+    def _get_override_for(self, prompt_family_id: str) -> tuple[dict[str, str] | None, str | None]:
+        if not self._override_store or not self._case_id:
+            return None, None
+        ovr = self._override_store.get_active_override(self._case_id, prompt_family_id)
+        if not ovr:
+            return None, None
+        override_dict: dict[str, str] = {}
+        if ovr.edited_system_prompt:
+            override_dict["system_prompt"] = ovr.edited_system_prompt
+        if ovr.edited_user_template:
+            override_dict["user_prompt_template"] = ovr.edited_user_template
+        return override_dict, ovr.override_id
+
+    def _record_prompt(
+        self,
+        node: PipelineNode,
+        family: dict[str, Any],
+        rendered_user: str,
+        agent_output: Any,
+        override_id: str | None = None,
+    ) -> None:
+        if not self._trace_store:
+            return
+        is_llm = agent_output.llm_usage is not None
+        notes = agent_output.trace_notes or []
+        is_fallback = any(
+            "deterministic" in n.lower() or "fallback" in n.lower()
+            for n in notes
+        )
+
+        provider_status = "success" if is_llm else (
+            "deterministic_fallback" if is_fallback else "not_called"
+        )
+        response_status = "parsed" if is_llm else "deterministic"
+
+        rec = PromptRunRecord(
+            node_id=node.node_id,
+            prompt_family_id=node.prompt_family_id or "",
+            prompt_version_hash=_hash_text(family.get("system_prompt", "")),
+            prompt_override_id=override_id,
+            rendered_system_prompt=family.get("system_prompt", ""),
+            rendered_user_prompt=rendered_user,
+            provider_status=provider_status,
+            response_status=response_status,
+            diagnostics=[n for n in notes if "parse" in n.lower() or "fallback" in n.lower()],
+        )
+        self._trace_store.save_prompt_record(rec)
+
+        node.prompt_version_hash = rec.prompt_version_hash
+        node.prompt_override_id = override_id
+        node.provider_status = provider_status
+        node.parse_status = response_status
+        if is_fallback:
+            node.producer_type = "deterministic_fallback"
+
+    # -- main execution -------------------------------------------------------
 
     def execute(
         self,
@@ -108,8 +271,30 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         result = ManuscriptVenueFitResult()
         llm_trace: list[dict[str, Any]] = []
 
-        # Step 1–3: Build ManuscriptModel and ArticleModel
+        # -- Create trace run --
+        trace_run = TraceRun(case_id=self._case_id, trigger="pipeline_execute")
+        if self._trace_store:
+            self._trace_store.save_run(trace_run)
+
+        # -- Emit not-applicable nodes for stages this pipeline doesn't run --
+        for sid in _NOT_APPLICABLE_STAGES:
+            self._skip_node(trace_run, sid, "not_executed_in_manuscript_venue_fit")
+
+        # ===== Stage: intake (order 0) =====
+        n_intake = self._make_node(trace_run, "intake")
         self.trace.inputs.append(manuscript_source_ref)
+
+        ms = build_manuscript_model(manuscript_text, source_ref=manuscript_source_ref)
+        result.manuscript = ms
+        self.run.created_entity_ids.append(ms.manuscript_id)
+        self.trace.entities_created.append(ms.manuscript_id)
+
+        self._finish_node(n_intake, output_refs=[ms.manuscript_id],
+                          output_hash=_hash_text(str(ms.to_dict())))
+
+        # ===== Stage: article_model (order 2) =====
+        n_art = self._make_node(trace_run, "article_model")
+        override_dict, override_id = self._get_override_for("article_modeling")
 
         article_input = AgentInput(
             operation_id=self.run.pipeline_run_id,
@@ -117,13 +302,10 @@ class ManuscriptVenueFitPipeline(PipelineBase):
             source_refs=[manuscript_source_ref],
             raw_text=manuscript_text,
         )
-        article_output = self._article_agent.run(article_input, self.llm)
-
-        # Reconstruct typed entities from agent output
-        ms = build_manuscript_model(manuscript_text, source_ref=manuscript_source_ref)
-        result.manuscript = ms
-        self.run.created_entity_ids.append(ms.manuscript_id)
-        self.trace.entities_created.append(ms.manuscript_id)
+        article_output = self._article_agent.run(
+            article_input, self.llm,
+            prompt_family_override=override_dict,
+        )
 
         article = ArticleModel.from_dict(article_output.output_entity)
         result.article = article
@@ -135,7 +317,21 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         if article_output.trace_notes:
             _append_notes(self.trace, article_output.trace_notes)
 
-        # Step 3b: Build BibliographyProfile (always deterministic)
+        eff_art_family = dict(ARTICLE_MODELING_FAMILY)
+        if override_dict:
+            eff_art_family.update(override_dict)
+        rendered_art_user = eff_art_family["user_prompt_template"].format(
+            manuscript_text=manuscript_text,
+        )
+        self._record_prompt(n_art, eff_art_family, rendered_art_user,
+                            article_output, override_id)
+        n_art.input_artifact_refs = [manuscript_source_ref]
+        self._finish_node(n_art, output_refs=[article.article_model_id],
+                          output_hash=_hash_text(str(article_output.output_entity)))
+
+        # ===== Stage: bibliography_parse (order 4) =====
+        n_bib = self._make_node(trace_run, "bibliography_parse")
+
         bib_profile = build_bibliography_profile(
             manuscript_text,
             manuscript_id=ms.manuscript_id,
@@ -145,19 +341,26 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         self.run.created_entity_ids.append(bib_profile.bibliography_profile_id)
         self.trace.entities_created.append(bib_profile.bibliography_profile_id)
 
-        # Step 4–6: Build VenueModel and PublicationRegimeModel
+        n_bib.input_artifact_refs = [ms.manuscript_id, article.article_model_id]
+        self._finish_node(n_bib, output_refs=[bib_profile.bibliography_profile_id],
+                          output_hash=_hash_text(str(bib_profile.to_dict())))
+
+        # ===== Stage: venue_investigation (order 7) =====
+        n_venue = self._make_node(trace_run, "venue_investigation")
         self.trace.inputs.append(venue_source_ref)
+        override_dict_v, override_id_v = self._get_override_for("venue_fact_extraction")
 
         venue_input = AgentInput(
             operation_id=self.run.pipeline_run_id,
             agent_role_id="venue_profiler",
             source_refs=[venue_source_ref],
             raw_text=venue_guidelines_text,
-            user_constraints={
-                "source_type": "author_guidelines",
-            },
+            user_constraints={"source_type": "author_guidelines"},
         )
-        venue_output = self._venue_agent.run(venue_input, self.llm)
+        venue_output = self._venue_agent.run(
+            venue_input, self.llm,
+            prompt_family_override=override_dict_v,
+        )
 
         venue_dict = venue_output.output_entity
         regime_dict = venue_dict.pop("_regime", {})
@@ -174,17 +377,31 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         if venue_output.trace_notes:
             _append_notes(self.trace, venue_output.trace_notes)
 
+        eff_venue_family = dict(VENUE_FACT_EXTRACTION_FAMILY)
+        if override_dict_v:
+            eff_venue_family.update(override_dict_v)
+        rendered_venue_user = eff_venue_family["user_prompt_template"].format(
+            venue_text=venue_guidelines_text,
+            source_type="author_guidelines",
+            source_url="unknown",
+        )
+        self._record_prompt(n_venue, eff_venue_family, rendered_venue_user,
+                            venue_output, override_id_v)
+        n_venue.input_artifact_refs = [venue_source_ref]
+        self._finish_node(n_venue, output_refs=[venue.venue_model_id, regime.publication_regime_id],
+                          output_hash=_hash_text(str(venue_output.output_entity)))
+
         if self._registry:
             try:
                 self._registry.store_venue_extraction(
-                    venue_dict,
-                    source_url=None,
-                    source_type="pipeline_venue_profiler",
+                    venue_dict, source_url=None, source_type="pipeline_venue_profiler",
                 )
             except Exception:
                 pass
 
-        # Step 7: Build SubmissionScenario
+        # ===== Stage: fit_gate (order 11) — includes scenario build =====
+        n_gate = self._make_node(trace_run, "fit_gate")
+
         scenario = build_scenario_from_dict(
             scenario_data,
             article_model_id=article.article_model_id,
@@ -194,7 +411,6 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         self.run.created_entity_ids.append(scenario.submission_scenario_id)
         self.trace.entities_created.append(scenario.submission_scenario_id)
 
-        # Quality gate: fit prerequisites
         fit_gate = evaluate_fit_gate(
             has_article_source=bool(article.source_refs),
             has_venue_source=bool(venue.source_refs),
@@ -205,7 +421,17 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         result.fit_gate = fit_gate
         self.record_gate(fit_gate)
 
-        # Step 8: FitAssessment
+        n_gate.input_artifact_refs = [article.article_model_id, venue.venue_model_id]
+        n_gate.gate_results = {"fit_gate": fit_gate.status}
+        self._finish_node(n_gate,
+                          output_refs=[scenario.submission_scenario_id],
+                          output_hash=_hash_text(fit_gate.status),
+                          diagnostics=[f"gate={fit_gate.status}"])
+
+        # ===== Stage: fit_assessment (order 12) =====
+        n_fit = self._make_node(trace_run, "fit_assessment")
+        override_dict_f, override_id_f = self._get_override_for("fit_assessment")
+
         fit_input = AgentInput(
             operation_id=self.run.pipeline_run_id,
             agent_role_id="fit_assessor",
@@ -215,7 +441,10 @@ class ManuscriptVenueFitPipeline(PipelineBase):
                 "scenario": scenario.to_dict(),
             },
         )
-        fit_output = self._fit_agent.run(fit_input, self.llm)
+        fit_output = self._fit_agent.run(
+            fit_input, self.llm,
+            prompt_family_override=override_dict_f,
+        )
         fit = FitAssessment.from_dict(fit_output.output_entity)
         result.fit = fit
         self.run.created_entity_ids.append(fit.fit_assessment_id)
@@ -226,14 +455,37 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         if fit_output.trace_notes:
             _append_notes(self.trace, fit_output.trace_notes)
 
-        # Step 9: MismatchMap (deterministic from fit)
+        eff_fit_family = dict(FIT_ASSESSMENT_FAMILY)
+        if override_dict_f:
+            eff_fit_family.update(override_dict_f)
+        rendered_fit_user = eff_fit_family["user_prompt_template"].format(
+            article_json=json.dumps(article.to_dict(), ensure_ascii=False, indent=2),
+            venue_json=json.dumps(venue.to_dict(), ensure_ascii=False, indent=2),
+            scenario_json=json.dumps(scenario.to_dict(), ensure_ascii=False, indent=2),
+        )
+        self._record_prompt(n_fit, eff_fit_family, rendered_fit_user,
+                            fit_output, override_id_f)
+        n_fit.input_artifact_refs = [article.article_model_id, venue.venue_model_id,
+                                     scenario.submission_scenario_id]
+        self._finish_node(n_fit, output_refs=[fit.fit_assessment_id],
+                          output_hash=_hash_text(str(fit_output.output_entity)))
+
+        # ===== Stage: mismatch_map (order 13) =====
+        n_mm = self._make_node(trace_run, "mismatch_map")
+
         mm = build_mismatch_map(fit)
         result.mismatch_map = mm
         fit.mismatch_map_id = mm.mismatch_map_id
         self.run.created_entity_ids.append(mm.mismatch_map_id)
         self.trace.entities_created.append(mm.mismatch_map_id)
 
-        # Step 10: RewritePlan (deterministic from mismatches)
+        n_mm.input_artifact_refs = [fit.fit_assessment_id]
+        self._finish_node(n_mm, output_refs=[mm.mismatch_map_id],
+                          output_hash=_hash_text(str(mm.to_dict())))
+
+        # ===== Stage: rewrite_plan (order 14) =====
+        n_rw = self._make_node(trace_run, "rewrite_plan")
+
         rw = build_rewrite_plan(
             mm,
             article_model_id=article.article_model_id,
@@ -244,19 +496,39 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         self.run.created_entity_ids.append(rw.rewrite_plan_id)
         self.trace.entities_created.append(rw.rewrite_plan_id)
 
-        # Step 12: RiskReport (deterministic)
+        n_rw.input_artifact_refs = [mm.mismatch_map_id, article.article_model_id]
+        self._finish_node(n_rw, output_refs=[rw.rewrite_plan_id],
+                          output_hash=_hash_text(str(rw.to_dict())))
+
+        # ===== Stage: risk_report (order 15) =====
+        n_risk = self._make_node(trace_run, "risk_report")
+
         risk = build_risk_report(article, venue, scenario, fit, mm)
         result.risk_report = risk
         self.run.created_entity_ids.append(risk.risk_report_id)
         self.trace.entities_created.append(risk.risk_report_id)
 
-        # Step 13: ComplianceChecklist (deterministic)
+        n_risk.input_artifact_refs = [article.article_model_id, venue.venue_model_id,
+                                      fit.fit_assessment_id, mm.mismatch_map_id]
+        self._finish_node(n_risk, output_refs=[risk.risk_report_id],
+                          output_hash=_hash_text(str(risk.to_dict())))
+
+        # ===== Stage: compliance_check (order 16) =====
+        n_cc = self._make_node(trace_run, "compliance_check")
+
         cc = build_compliance_checklist(article, ms, venue, venue_guidelines_text)
         result.compliance = cc
         self.run.created_entity_ids.append(cc.compliance_checklist_id)
         self.trace.entities_created.append(cc.compliance_checklist_id)
 
-        # Step 14: Citation ecology report (deterministic)
+        n_cc.input_artifact_refs = [article.article_model_id, ms.manuscript_id,
+                                    venue.venue_model_id]
+        self._finish_node(n_cc, output_refs=[cc.compliance_checklist_id],
+                          output_hash=_hash_text(str(cc.to_dict())))
+
+        # ===== Stage: evidence_audit (order 17) — includes citation ecology =====
+        n_ev = self._make_node(trace_run, "evidence_audit")
+
         cit_eco = build_citation_ecology_report(
             bib_profile, article, venue, venue_guidelines_text,
         )
@@ -264,16 +536,34 @@ class ManuscriptVenueFitPipeline(PipelineBase):
         self.run.created_entity_ids.append(cit_eco.citation_ecology_report_id)
         self.trace.entities_created.append(cit_eco.citation_ecology_report_id)
 
-        # Step 15: Evidence audit
         ev_gate = audit_pipeline_evidence(article, venue, fit, mm, risk, cc)
         result.evidence_gate = ev_gate
         self.record_gate(ev_gate)
 
-        # Step 16: Generate artifact
+        n_ev.input_artifact_refs = [article.article_model_id, venue.venue_model_id,
+                                    fit.fit_assessment_id, mm.mismatch_map_id,
+                                    risk.risk_report_id, cc.compliance_checklist_id]
+        n_ev.gate_results = {"evidence_audit": ev_gate.status}
+        self._finish_node(n_ev,
+                          output_refs=[cit_eco.citation_ecology_report_id],
+                          output_hash=_hash_text(ev_gate.status),
+                          diagnostics=[f"gate={ev_gate.status}"])
+
+        # -- Finalize --
         result.artifact_markdown = _generate_artifact(result)
         result.llm_trace = llm_trace if llm_trace else None
 
-        # Finish
+        trace_run.status = "completed"
+        trace_run.completed_at = _now()
+        trace_run.gates_summary = {
+            "fit_gate": fit_gate.status,
+            "evidence_audit": ev_gate.status,
+        }
+        if self._trace_store:
+            self._trace_store.save_run(trace_run)
+
+        result.trace_run = trace_run  # expose for API / tests
+
         self.trace.sources_accessed = [manuscript_source_ref, venue_source_ref]
         self.finish(output_level=OutputLevel.PRELIMINARY)
         return result

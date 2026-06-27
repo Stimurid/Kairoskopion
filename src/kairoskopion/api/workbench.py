@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from ..services.pipeline_replay import (
     PIPELINE_STAGES,
     diff_runs,
+    execute_replay_run,
     plan_rerun_all,
     plan_rerun_from_stage,
     plan_rerun_stage,
@@ -230,9 +231,18 @@ class RerunFromStageRequest(BaseModel):
 @router.post("/cases/{case_id}/rerun")
 def rerun_pipeline(case_id: str, req: RerunRequest):
     store = _get_trace_store()
+    override_store = _get_override_store()
     plan = plan_rerun_all(overrides=req.prompt_override_ids)
-    run = scaffold_replay_run(plan, case_id=case_id, trace_store=store)
-    return run.to_dict()
+    outcome = execute_replay_run(
+        plan,
+        case_id=case_id,
+        trace_store=store,
+        override_store=override_store,
+    )
+    run = outcome["run"]
+    resp = run.to_dict()
+    resp["execution_status"] = outcome.get("status", "scaffold_only")
+    return resp
 
 
 @router.post("/cases/{case_id}/rerun-stage")
@@ -241,13 +251,22 @@ def rerun_single_stage(case_id: str, req: RerunStageRequest):
     if get_stage_index(req.stage_id) is None:
         raise HTTPException(400, f"Unknown stage: {req.stage_id}")
     store = _get_trace_store()
+    override_store = _get_override_store()
     plan = plan_rerun_stage(
         req.stage_id,
         overrides=req.prompt_override_ids,
         base_run_id=req.base_run_id,
     )
-    run = scaffold_replay_run(plan, case_id=case_id, trace_store=store)
-    return run.to_dict()
+    outcome = execute_replay_run(
+        plan, case_id=case_id, trace_store=store,
+        override_store=override_store,
+    )
+    run = outcome["run"]
+    resp = run.to_dict()
+    resp["execution_status"] = outcome.get("status", "scaffold_only")
+    if "unsupported_stages" in outcome:
+        resp["unsupported_stages"] = outcome["unsupported_stages"]
+    return resp
 
 
 @router.post("/cases/{case_id}/rerun-from-stage")
@@ -256,13 +275,22 @@ def rerun_from_stage(case_id: str, req: RerunFromStageRequest):
     if get_stage_index(req.stage_id) is None:
         raise HTTPException(400, f"Unknown stage: {req.stage_id}")
     store = _get_trace_store()
+    override_store = _get_override_store()
     plan = plan_rerun_from_stage(
         req.stage_id,
         overrides=req.prompt_override_ids,
         base_run_id=req.base_run_id,
     )
-    run = scaffold_replay_run(plan, case_id=case_id, trace_store=store)
-    return run.to_dict()
+    outcome = execute_replay_run(
+        plan, case_id=case_id, trace_store=store,
+        override_store=override_store,
+    )
+    run = outcome["run"]
+    resp = run.to_dict()
+    resp["execution_status"] = outcome.get("status", "scaffold_only")
+    if "unsupported_stages" in outcome:
+        resp["unsupported_stages"] = outcome["unsupported_stages"]
+    return resp
 
 
 # ---------------------------------------------------------------------------
