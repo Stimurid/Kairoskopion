@@ -180,6 +180,48 @@ For deep spec questions, read:
 - No database — JSONL files + markdown vault (API uses in-memory state)
 - No LLM SDK (yet)
 
+## Critical API contracts (read before writing tests)
+
+### Registry models (`registry/models.py`) — NOT `schema.py`
+
+```
+DisciplineRecord:   display_names: dict[str,str], aliases: list[str]
+                    NO code, NO label fields
+VenueRegistryRecord: canonical_name, issn, eissn, publisher, venue_id
+                     NO issn_l
+VenueSectionRecord:  section_name, section_type, parent_venue_id, scope, section_id
+All records:         source_status (provisional/accepted/rejected/unknown)
+                     review_status (pending/reviewed/curator_confirmed/rejected)
+```
+
+### Schema models (`schema.py`)
+
+```
+VenueModel:          canonical_name, publisher_or_owner — NO issn
+DisciplinaryPathway: discipline_name: str | None — NOT disciplines: list
+VenueCandidatePool:  candidates: list[dict] — dicts, not dataclass instances
+```
+
+### Case method signatures (`api/cases.py`)
+
+```
+investigate_venue(self, text: str)   — text arg required, min 200 chars
+intake_text(self, text: str)         — does NOT create article_model deterministically
+discover_venues(self)                — no args, requires self.pathways set first
+get_venue_matrix(self)               — no args
+__init__(registry_service=None)      — accepts RegistryIntegrationService
+```
+
+### Deterministic venue profiler text format
+
+Only extracts `canonical_name` from: `# Name`, `Journal: Name`, `Name: Name`.
+Russian prose won't parse. Use structured format in tests with 200+ chars.
+
+### BaseRegistry.search() — substring matching
+
+Query must be SHORT enough to be a substring of stored values. Don't concatenate
+multiple fields into one query string.
+
 ## Key file locations
 
 | File | Purpose |
@@ -202,6 +244,6 @@ For deep spec questions, read:
 | `ui/` | React+TypeScript cockpit (17 components) |
 | `ui/src/api/client.ts` | Typed API client |
 | `ui/src/styles/cockpit.css` | Dark theme CSS |
-| `tests/` | 2204+ tests |
+| `tests/` | 2739+ tests |
 | `tests/fixtures/` | Synthetic manuscript, venue, scenario |
 | `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` | Master spec |
