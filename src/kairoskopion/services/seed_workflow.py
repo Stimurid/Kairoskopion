@@ -21,6 +21,10 @@ from ..registry.models import (
 )
 from ..registry.services import RegistryHub
 from .external_source_adapters import ExternalAdapterRegistry
+from .evidence_pack_harvester import (
+    harvest_all_evidence_packs,
+    load_harvest_into_hub,
+)
 from .source_authority_registry import (
     SourceAuthorityDiscoveryTask,
     SourceAuthorityStore,
@@ -45,6 +49,8 @@ class SeedWorkflowConfig:
     no_live_llm: bool = True
     no_paid_api: bool = True
     output_dir: Path | None = None
+    evidence_pack_dir: Path | None = None
+    discipline_seed_path: Path | None = None
 
 
 @dataclass
@@ -119,7 +125,8 @@ class SeedRegistryWorkflow:
         self._search_venues(config, result)
 
         # Stage 5-6: Source packet ingestion + provisional record creation
-        # (Driven by source files if available — no auto-invention)
+        self._ingest_evidence_packs(config, result)
+        self._ingest_discipline_seeds(config, result)
 
         # Stage 7: Venue universe assembly
         self._assemble_venue_universe(result)
@@ -293,6 +300,140 @@ class SeedRegistryWorkflow:
         hits = reg.search(title[:60])
         if not hits:
             result.gaps.append("No epistemic framework records found for article domain")
+
+    # -- Stage 5 --------------------------------------------------------
+
+    def _ingest_evidence_packs(
+        self,
+        config: SeedWorkflowConfig,
+        result: SeedWorkflowResult,
+    ) -> None:
+        ep_dir = config.evidence_pack_dir
+        if not ep_dir or not ep_dir.exists():
+            return
+
+        harvest_results = harvest_all_evidence_packs(ep_dir)
+        if not harvest_results:
+            result.warnings.append(
+                f"Evidence pack dir exists but no packs found: {ep_dir}"
+            )
+            return
+
+        counts = load_harvest_into_hub(harvest_results, self._hub)
+
+        result.provisional_records["venues"] = result.provisional_records.get(
+            "venues", [],
+        )
+        result.provisional_records["sections"] = result.provisional_records.get(
+            "sections", [],
+        )
+        result.provisional_records["metrics"] = result.provisional_records.get(
+            "metrics", [],
+        )
+        result.provisional_records["classifications"] = result.provisional_records.get(
+            "classifications", [],
+        )
+
+        for hr in harvest_results:
+            if hr.venue_record:
+                result.provisional_records["venues"].append({
+                    "venue_id": hr.venue_record.venue_id,
+                    "canonical_name": hr.venue_record.canonical_name,
+                    "issn": hr.venue_record.issn,
+                })
+            for sec in hr.section_records:
+                result.provisional_records["sections"].append({
+                    "section_id": sec.section_id,
+                    "section_name": sec.section_name,
+                    "parent_venue_id": sec.parent_venue_id,
+                })
+            for met in hr.metric_records:
+                result.provisional_records["metrics"].append({
+                    "metric_id": met.metric_id,
+                    "metric_system": met.metric_system,
+                    "metric_value": met.metric_value,
+                })
+            for cls_rec in hr.classification_records:
+                result.provisional_records["classifications"].append({
+                    "record_id": cls_rec.record_id,
+                    "classification_system_id": cls_rec.classification_system_id,
+                })
+            for pkt in hr.source_packets:
+                result.source_packets_created.append({
+                    "packet_id": pkt.packet_id,
+                    "packet_type": pkt.packet_type,
+                    "title": pkt.title,
+                })
+            result.warnings.extend(hr.warnings)
+
+        result.warnings.append(
+            f"Evidence pack harvest: {counts['venues']} venues, "
+            f"{counts['sections']} sections, {counts['metrics']} metrics, "
+            f"{counts['classifications']} classifications, "
+            f"{counts['packets']} packets"
+        )
+
+    # -- Stage 6 --------------------------------------------------------
+
+    def _ingest_discipline_seeds(
+        self,
+        config: SeedWorkflowConfig,
+        result: SeedWorkflowResult,
+    ) -> None:
+        seed_path = config.discipline_seed_path
+        if not seed_path or not seed_path.exists():
+            return
+
+        import json as _json
+        from ..registry.models import DisciplineRecord, EvidenceRef
+
+        count = 0
+        reg = self._hub.disciplines()
+
+        with seed_path.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    raw = _json.loads(line)
+                except _json.JSONDecodeError:
+                    continue
+
+                rec = DisciplineRecord(
+                    discipline_id=raw.get("discipline_id", ""),
+                    display_names=dict(raw.get("display_names", {})),
+                    aliases=list(raw.get("aliases", [])),
+                    legitimate_objects=list(raw.get("legitimate_objects", [])),
+                    boundary_objects=list(raw.get("illegitimate_or_borderline_objects", [])),
+                    method_or_evidence_regimes=list(raw.get("methods", [])),
+                    provenance=f"discipline_seed:{seed_path.name}",
+                )
+
+                evidence_ref = EvidenceRef(
+                    source_type="discipline_seed",
+                    source_id=str(seed_path),
+                    excerpt=raw.get("display_names", {}).get("en", ""),
+                    evidence_status="corpus_grounded",
+                    confidence="medium",
+                )
+
+                existing = reg.find_duplicate(rec)
+                if not existing:
+                    reg.add_provisional(rec, evidence_refs=[evidence_ref])
+                    count += 1
+
+        if count:
+            result.provisional_records["disciplines"] = result.provisional_records.get(
+                "disciplines", [],
+            )
+            result.provisional_records["disciplines"].append({
+                "count": count,
+                "source": str(seed_path),
+            })
+            result.warnings.append(
+                f"Discipline seed ingestion: {count} records from {seed_path.name}"
+            )
 
     # -- Stage 4 --------------------------------------------------------
 
