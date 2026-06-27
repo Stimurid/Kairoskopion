@@ -1,0 +1,61 @@
+# P10 Target Scope — RU Education/AI Venue Harvest
+# Date: 2026-06-27
+# Constraint: no paid LLM, no paid API, no fabricated facts
+
+target_domains:
+  - higher_education_russia
+  - ai_in_education
+  - educational_technology
+  - pedagogy_russia
+  - digital_education
+
+search_queries:
+  openalex:
+    - "education Russia"
+    - "pedagogy"
+    - "higher education"
+    - "educational technology"
+    - "artificial intelligence education"
+    - "digital education"
+    - "педагогика"
+  crossref:
+    - "education Russia"
+    - "pedagogy journal"
+    - "higher education"
+    - "educational technology"
+  doaj:
+    - "education"
+    - "pedagogy"
+    - "educational technology"
+    - "higher education Russia"
+
+discipline_seeds_to_corroborate:
+  - ru-vak-pedagogy
+  - ru-pedagogical-psychology
+  - ru-developing-learning-theory
+
+adapters_to_use:
+  live_search:
+    - openalex
+    - crossref
+    - doaj
+  metadata_enrichment:
+    - unpaywall
+    - opencitations
+  manual_tasks:
+    - cyberleninka
+    - scimago_jr
+    - vak_journal_list
+    - issn_portal
+
+expected_outputs:
+  - provisional venue records (from adapter results)
+  - acquisition tasks (for blocked/manual sources)
+  - verification gate decisions
+  - review packet for owner
+
+constraints:
+  - no auto-promotion to accepted
+  - all records start as provisional
+  - evidence_status must reflect actual source
+  - no fabricated ISSNs, names, metrics, or editors
