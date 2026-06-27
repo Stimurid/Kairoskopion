@@ -129,6 +129,10 @@ _vm_data_dir = _Path(
 )
 venue_memory_registry = VenueMemoryRegistry(_vm_data_dir)
 
+# P11 Prompt Pipeline Workbench routes
+from .workbench import router as _workbench_router
+app.include_router(_workbench_router, prefix="/api")
+
 
 # ---------------------------------------------------------------------------
 # Health
