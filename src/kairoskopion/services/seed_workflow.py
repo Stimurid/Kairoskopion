@@ -20,6 +20,13 @@ from ..registry.models import (
     SourcePacket,
 )
 from ..registry.services import RegistryHub
+from .external_source_adapters import ExternalAdapterRegistry
+from .source_authority_registry import (
+    SourceAuthorityDiscoveryTask,
+    SourceAuthorityStore,
+    SourceAuthoritySufficiencyEvaluator,
+    SufficiencyResult,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -43,14 +50,18 @@ class SeedWorkflowConfig:
 @dataclass
 class SeedWorkflowResult:
     run_id: str = field(default_factory=_new_run_id)
+    authority_coverage: dict[str, Any] | None = None
+    source_authority_tasks: list[dict[str, Any]] = field(default_factory=list)
     article_archetype: dict[str, Any] | None = None
     discipline_lookups: list[dict[str, Any]] = field(default_factory=list)
     acquisition_tasks_created: list[dict[str, Any]] = field(default_factory=list)
+    blocked_on_authority: list[dict[str, Any]] = field(default_factory=list)
     source_packets_created: list[dict[str, Any]] = field(default_factory=list)
     provisional_records: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
     venue_universe: list[dict[str, Any]] = field(default_factory=list)
     shortlist: list[dict[str, Any]] = field(default_factory=list)
     deep_venue_tasks: list[dict[str, Any]] = field(default_factory=list)
+    available_adapters: list[str] = field(default_factory=list)
     gaps: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -70,11 +81,26 @@ class SeedRegistryWorkflow:
     for missing data.
     """
 
-    def __init__(self, hub: RegistryHub) -> None:
+    def __init__(
+        self,
+        hub: RegistryHub,
+        authority_store: SourceAuthorityStore | None = None,
+        adapter_registry: ExternalAdapterRegistry | None = None,
+    ) -> None:
         self._hub = hub
+        self._authority_store = authority_store or SourceAuthorityStore()
+        self._adapter_registry = adapter_registry or ExternalAdapterRegistry()
 
     def run(self, config: SeedWorkflowConfig) -> SeedWorkflowResult:
         result = SeedWorkflowResult()
+
+        # Stage 0: Authority sufficiency evaluation
+        self._evaluate_authority(config, result)
+
+        # Stage 0b: Record available adapters
+        result.available_adapters = [
+            a.adapter_id for a in self._adapter_registry.list_enabled()
+        ]
 
         # Stage 1: Article archetype from deterministic ArticleModeler
         result.article_archetype = self._build_article_archetype(
@@ -89,7 +115,7 @@ class SeedRegistryWorkflow:
         # Stage 3: Framework lookup
         self._lookup_frameworks(config, result)
 
-        # Stage 4: Venue search
+        # Stage 4: Venue search (authority-aware)
         self._search_venues(config, result)
 
         # Stage 5-6: Source packet ingestion + provisional record creation
@@ -115,6 +141,38 @@ class SeedRegistryWorkflow:
             self._write_outputs(config.output_dir, result)
 
         return result
+
+    # -- Stage 0 --------------------------------------------------------
+
+    def _evaluate_authority(
+        self,
+        config: SeedWorkflowConfig,
+        result: SeedWorkflowResult,
+    ) -> None:
+        evaluator = SourceAuthoritySufficiencyEvaluator(self._authority_store)
+        suff = evaluator.evaluate(
+            target_country=config.target_country,
+            target_domain=config.domain_target,
+            publication_task_type="venue_discovery",
+            desired_outputs=["metrics", "deep_model"],
+        )
+        result.authority_coverage = suff.to_dict()
+
+        for task_info in suff.tasks_to_create:
+            available = self._adapter_registry.suggest_for_authority_type(
+                task_info["missing_authority_type"],
+            )
+            task = SourceAuthorityDiscoveryTask(
+                target_country=config.target_country,
+                target_domain=config.domain_target,
+                missing_authority_type=task_info["missing_authority_type"],
+                reason=task_info["reason"],
+                search_queries=task_info.get("search_queries", []),
+                suggested_connectors=available or task_info.get("suggested_connectors", []),
+            )
+            result.source_authority_tasks.append(task.to_dict())
+
+        result.warnings.extend(suff.warnings)
 
     # -- Stage 1 --------------------------------------------------------
 
@@ -294,10 +352,27 @@ class SeedRegistryWorkflow:
 
     # -- Stage 8 --------------------------------------------------------
 
+    def _has_authority(self, authority_type: str) -> bool:
+        cov = getattr(self, "_authority_coverage_types", None)
+        if cov is None:
+            usable = self._authority_store.list_all()
+            self._authority_coverage_types = {
+                a.authority_type for a in usable
+                if a.source_status in ("accepted", "provisional")
+            }
+            cov = self._authority_coverage_types
+        return authority_type in cov
+
     def _check_metrics(self, result: SeedWorkflowResult) -> None:
         metrics_reg = self._hub.venue_metrics()
         all_metrics = metrics_reg.list_all()
         if not all_metrics:
+            if not self._has_authority("metric_source"):
+                result.blocked_on_authority.append({
+                    "task_type": "venue_metrics",
+                    "reason": "No metric source authority — cannot create metric acquisition tasks",
+                    "blocked_on": "metric_source",
+                })
             result.gaps.append(
                 "No VenueMetricRecords in registry — "
                 "Q1/Q2 ranking not possible without source-backed metrics"
@@ -345,6 +420,9 @@ class SeedRegistryWorkflow:
     # -- Stage 10 -------------------------------------------------------
 
     def _create_deep_venue_tasks(self, result: SeedWorkflowResult) -> None:
+        has_editorial = self._has_authority("editorial_board_source")
+        has_archive = self._has_authority("journal_archive_source")
+
         for v in result.shortlist:
             vid = v.get("venue_id", "unknown")
             task = SourceAcquisitionTask(
@@ -360,7 +438,23 @@ class SeedRegistryWorkflow:
                 related_record_id=vid,
             )
             self._hub.tasks.add(task)
-            result.deep_venue_tasks.append(task.to_dict())
+            task_dict = task.to_dict()
+            result.deep_venue_tasks.append(task_dict)
+
+            if not has_editorial:
+                result.blocked_on_authority.append({
+                    "task_type": "editor_background",
+                    "venue_id": vid,
+                    "reason": "No editorial_board_source authority",
+                    "blocked_on": "editorial_board_source",
+                })
+            if not has_archive:
+                result.blocked_on_authority.append({
+                    "task_type": "corpus_analysis",
+                    "venue_id": vid,
+                    "reason": "No journal_archive_source authority",
+                    "blocked_on": "journal_archive_source",
+                })
 
     # -- Stage 11 -------------------------------------------------------
 
@@ -378,6 +472,18 @@ class SeedRegistryWorkflow:
         if archetype.get("needs_llm_for"):
             result.gaps.append(
                 "Article archetype needs LLM for full semantic extraction"
+            )
+
+        if result.source_authority_tasks:
+            result.gaps.append(
+                f"{len(result.source_authority_tasks)} source authority discovery "
+                f"tasks — resolve before factual acquisition"
+            )
+
+        if result.blocked_on_authority:
+            result.warnings.append(
+                f"{len(result.blocked_on_authority)} factual tasks blocked on "
+                f"missing source authorities"
             )
 
         open_tasks = self._hub.tasks.list_open()
@@ -415,6 +521,26 @@ class SeedRegistryWorkflow:
             sl_dir.mkdir(exist_ok=True)
             (sl_dir / "top_q1_q2_by_zone.json").write_text(
                 json.dumps(result.shortlist, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+        if result.authority_coverage:
+            (reports_dir / "authority_coverage.json").write_text(
+                json.dumps(result.authority_coverage, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+        if result.source_authority_tasks:
+            tasks_dir = output_dir / "acquisition_tasks"
+            tasks_dir.mkdir(exist_ok=True)
+            (tasks_dir / "authority_discovery_tasks.json").write_text(
+                json.dumps(result.source_authority_tasks, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+        if result.blocked_on_authority:
+            (reports_dir / "blocked_on_authority.json").write_text(
+                json.dumps(result.blocked_on_authority, indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )
 
