@@ -5830,3 +5830,182 @@ code.agent-detail-value {
   background: rgba(229, 83, 75, 0.15);
   color: #e5534b;
 }
+
+/* Phase P7: Registry review panel */
+.registry-review-panel {
+  margin-top: var(--space-lg);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+.registry-review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+.registry-review-header h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+.registry-tabs {
+  display: flex;
+  gap: var(--space-xs);
+}
+.registry-tab {
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.registry-tab--active {
+  background: var(--color-primary);
+  color: var(--text-inverse);
+  border-color: var(--color-primary);
+}
+.registry-error {
+  padding: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  border-radius: var(--radius);
+  background: rgba(229, 83, 75, 0.12);
+  color: var(--color-danger);
+  font-size: 0.8rem;
+}
+.registry-loading,
+.registry-empty {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: var(--space-md) 0;
+}
+.registry-record-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-xs);
+  background: var(--bg-raised);
+}
+.registry-record-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) var(--space-md);
+  cursor: pointer;
+  gap: var(--space-sm);
+}
+.registry-record-header:hover {
+  background: var(--bg-hover);
+}
+.registry-record-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.registry-record-label strong {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.registry-record-type-tag {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(91, 127, 255, 0.15);
+  color: var(--color-info);
+  flex-shrink: 0;
+}
+.registry-record-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+}
+.registry-status-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.registry-status--canonical {
+  background: rgba(52, 199, 123, 0.15);
+  color: var(--color-success);
+}
+.registry-status--provisional {
+  background: rgba(240, 160, 64, 0.15);
+  color: var(--color-warning);
+}
+.registry-status--rejected {
+  background: rgba(229, 83, 75, 0.15);
+  color: var(--color-danger);
+}
+.registry-status--unknown {
+  background: rgba(93, 99, 117, 0.15);
+  color: var(--text-muted);
+}
+.registry-btn {
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+}
+.registry-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.registry-btn--accept {
+  color: var(--color-success);
+  border-color: rgba(52, 199, 123, 0.4);
+}
+.registry-btn--accept:hover:not(:disabled) {
+  background: rgba(52, 199, 123, 0.15);
+}
+.registry-btn--reject {
+  color: var(--color-danger);
+  border-color: rgba(229, 83, 75, 0.4);
+}
+.registry-btn--reject:hover:not(:disabled) {
+  background: rgba(229, 83, 75, 0.15);
+}
+.registry-btn--search {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.registry-record-detail {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  background: var(--bg-input);
+  border-top: 1px solid var(--border);
+  margin: 0;
+  overflow-x: auto;
+  max-height: 300px;
+}
+.registry-browse-controls {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+.registry-type-select,
+.registry-search-input {
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+.registry-type-select {
+  min-width: 140px;
+}
+.registry-search-input {
+  flex: 1;
+}
