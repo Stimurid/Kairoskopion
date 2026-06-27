@@ -11,7 +11,7 @@
 | 1 | Existing source audit | PASS | `P7_2_EXISTING_SOURCE_AUTHORITY_AUDIT.md` — 9 adapters found |
 | 2 | SourceAuthorityRegistry | PASS | `source_authority_registry.py` — Record, Store, TaskStore, Evaluator |
 | 3 | Sufficiency rules | PASS | `P7_2_SOURCE_AUTHORITY_SUFFICIENCY_RULES.md` — 7 minimum types, country hints |
-| 4 | Populate from project | DEFERRED | No local authority records yet — by design (no Claude-memory facts) |
+| 4 | Populate from project | PASS (P7.2B) | 17 records recovered from corpus — see `P7_2B_ACCEPTANCE_CHECKLIST.md` |
 | 5 | Seed workflow integration | PASS | `seed_workflow.py` — Stage 0 authority evaluation, _has_authority, blocked_on_authority |
 | 6 | External adapter registry | PASS | `external_source_adapters.py` — 14 adapters, suggest_for_authority_type |
 | 7 | Authority-aware task generation | PASS | Acquisition tasks respect authority coverage; blocked tasks reported |

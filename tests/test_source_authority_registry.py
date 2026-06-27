@@ -528,3 +528,95 @@ class TestValidationHardening:
         reg = ExternalAdapterRegistry()
         suggested = reg.suggest_for_authority_type("unknown_type_xyz")
         assert isinstance(suggested, list)
+
+
+# ===================================================================
+# P7.2B Recovery Tests — verify recovered authority records
+# ===================================================================
+
+class TestRecoveredAuthorities:
+    """Tests for P7.2B: recovered source authority records from corpus."""
+
+    @pytest.fixture
+    def recovered_store(self, tmp_path):
+        """Load recovered records into a tmp store to verify structure."""
+        src = Path("data/seed_registry/source_authorities/source_authority_records.jsonl")
+        if not src.exists():
+            pytest.skip("Recovered authority records not yet generated")
+        dst = tmp_path / "recovered.jsonl"
+        dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        return SourceAuthorityStore(dst)
+
+    def test_record_count(self, recovered_store):
+        records = recovered_store.list_all()
+        assert len(records) >= 15, f"Expected >= 15 records, got {len(records)}"
+
+    def test_all_records_have_evidence_refs(self, recovered_store):
+        for rec in recovered_store.list_all():
+            assert rec.evidence_refs, f"{rec.authority_name} has no evidence_refs"
+            for ref in rec.evidence_refs:
+                assert "source_type" in ref, f"Missing source_type in {rec.authority_name}"
+                assert "source_id" in ref, f"Missing source_id in {rec.authority_name}"
+
+    def test_no_model_memory_evidence(self, recovered_store):
+        allowed = {"venue_evidence_pack", "adapter_code", "project_data", "project_doc"}
+        for rec in recovered_store.list_all():
+            for ref in rec.evidence_refs:
+                assert ref["source_type"] in allowed, (
+                    f"{rec.authority_name} has disallowed source_type: {ref['source_type']}"
+                )
+
+    def test_evidence_files_exist(self, recovered_store):
+        for rec in recovered_store.list_all():
+            for ref in rec.evidence_refs:
+                source_id = ref["source_id"]
+                if source_id.startswith("data/") or source_id.startswith("src/"):
+                    assert Path(source_id).exists(), (
+                        f"Evidence file missing: {source_id} "
+                        f"(referenced by {rec.authority_name})"
+                    )
+
+    def test_ru_authorities_have_country(self, recovered_store):
+        ru = recovered_store.by_country("RU")
+        assert len(ru) >= 4, f"Expected >= 4 RU authorities, got {len(ru)}"
+        for rec in ru:
+            assert rec.country == "RU"
+
+    def test_international_authorities(self, recovered_store):
+        intl = recovered_store.by_country("INTERNATIONAL")
+        assert len(intl) >= 8, f"Expected >= 8 INTERNATIONAL authorities, got {len(intl)}"
+
+    def test_accepted_records_have_curator_confirmed(self, recovered_store):
+        for rec in recovered_store.list_all():
+            if rec.source_status == "accepted":
+                assert rec.review_status == "curator_confirmed", (
+                    f"{rec.authority_name} is accepted but review_status={rec.review_status}"
+                )
+
+    def test_sufficiency_ru_with_recovered(self, recovered_store):
+        evaluator = SourceAuthoritySufficiencyEvaluator(recovered_store)
+        result = evaluator.evaluate(target_country="RU", target_domain="education")
+        assert result.sufficient is True, (
+            f"RU/education should be sufficient, missing: {result.missing_authority_types}"
+        )
+
+    def test_sufficiency_ar_no_vak(self, recovered_store):
+        evaluator = SourceAuthoritySufficiencyEvaluator(recovered_store)
+        result = evaluator.evaluate(target_country="AR", target_domain="fishing")
+        for auth in result.usable_authorities:
+            name = auth.get("authority_name", "")
+            assert "ВАК" not in name and "VAK" not in name.upper() or "INTERNATIONAL" in auth.get("country", ""), (
+                f"AR case should not include VAK authority: {name}"
+            )
+
+    def test_authority_types_diverse(self, recovered_store):
+        types = set()
+        for rec in recovered_store.list_all():
+            types.add(rec.authority_type)
+        assert len(types) >= 5, f"Expected >= 5 authority types, got {len(types)}: {types}"
+
+    def test_all_records_have_access_mode(self, recovered_store):
+        for rec in recovered_store.list_all():
+            assert rec.access_mode != "unknown", (
+                f"{rec.authority_name} has unknown access_mode"
+            )
