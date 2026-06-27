@@ -24,6 +24,7 @@ from ..enums import OutputLevel, PipelineRunStatus
 from ..ids import pipeline_run_id as _new_run_id
 from ..llm.provider import LLMProvider
 from ..quality import QualityGateResult, evaluate_fit_gate
+from ..registry.integration import RegistryIntegrationService
 from ..schema import (
     ArticleModel,
     BibliographyProfile,
@@ -80,9 +81,15 @@ class ManuscriptVenueFitPipeline(PipelineBase):
 
     pipeline_type = "manuscript_venue_fit"
 
-    def __init__(self, *, llm_provider: LLMProvider | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        llm_provider: LLMProvider | None = None,
+        registry_service: RegistryIntegrationService | None = None,
+    ) -> None:
         super().__init__()
         self.llm = llm_provider
+        self._registry = registry_service
         self._article_agent = ArticleModelerAgent()
         self._venue_agent = VenueProfilerAgent()
         self._fit_agent = FitAssessorAgent()
@@ -166,6 +173,16 @@ class ManuscriptVenueFitPipeline(PipelineBase):
             llm_trace.append({"agent": "venue_profiler", **venue_output.llm_usage})
         if venue_output.trace_notes:
             _append_notes(self.trace, venue_output.trace_notes)
+
+        if self._registry:
+            try:
+                self._registry.store_venue_extraction(
+                    venue_dict,
+                    source_url=None,
+                    source_type="pipeline_venue_profiler",
+                )
+            except Exception:
+                pass
 
         # Step 7: Build SubmissionScenario
         scenario = build_scenario_from_dict(
