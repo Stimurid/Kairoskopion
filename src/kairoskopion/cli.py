@@ -1636,6 +1636,66 @@ def cmd_review_loop_demo(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_list_acquisition_tasks(args: argparse.Namespace) -> int:
+    from pathlib import Path
+    from .registry.services import RegistryHub
+    reg_dir = Path(args.registry_dir) if args.registry_dir else Path("data/registry")
+    hub = RegistryHub(data_dir=reg_dir)
+    tasks = hub.tasks.list_all()
+    if args.status:
+        tasks = [t for t in tasks if t.status == args.status]
+    print(f"Acquisition tasks: {len(tasks)}")
+    for t in tasks:
+        print(f"  [{t.status}] {t.task_type}: {t.query}")
+    return 0
+
+
+def cmd_run_verification_gate(args: argparse.Namespace) -> int:
+    import json
+    from pathlib import Path
+    from .registry.services import RegistryHub
+    from .services.verification_gate import verify_registry, summarize_verification
+    reg_dir = Path(args.registry_dir) if args.registry_dir else Path("data/registry")
+    hub = RegistryHub(data_dir=reg_dir)
+    decisions = verify_registry(hub)
+    summary = summarize_verification(decisions)
+    print(f"Verification gate: {summary['total']} records")
+    for verdict, count in sorted(summary["verdicts"].items()):
+        if count > 0:
+            print(f"  {verdict}: {count}")
+    if args.output:
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.open("w", encoding="utf-8") as fh:
+            json.dump({
+                "summary": summary,
+                "decisions": [d.to_dict() for d in decisions],
+            }, fh, ensure_ascii=False, indent=2)
+        print(f"Output: {out}")
+    return 0
+
+
+def cmd_export_review_packet(args: argparse.Namespace) -> int:
+    from pathlib import Path
+    from .registry.services import RegistryHub
+    from .services.review_packet_exporter import build_review_packet, write_review_packet
+    reg_dir = Path(args.registry_dir) if args.registry_dir else Path("data/registry")
+    hub = RegistryHub(data_dir=reg_dir)
+    packet = build_review_packet(hub)
+    out_dir = Path(args.output_dir)
+    paths = write_review_packet(packet, out_dir)
+    print(f"Review packet exported:")
+    for fmt, path in paths.items():
+        print(f"  {fmt}: {path}")
+    vs = packet.verification_summary.get("verdicts", {})
+    print(f"Summary: {len(packet.venues)} venues, {len(packet.source_packets)} packets, "
+          f"{len(packet.acquisition_tasks)} tasks")
+    for verdict, count in sorted(vs.items()):
+        if count > 0:
+            print(f"  {verdict}: {count}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="kairoskopion",
@@ -1967,6 +2027,46 @@ def main(argv: list[str] | None = None) -> int:
         help="Write JSON result to file",
     )
 
+    # --- P7.4/P8/P9 Acquisition & Verification CLI commands ---
+    list_acq_parser = sub.add_parser(
+        "list-acquisition-tasks",
+        help="List acquisition tasks from registry",
+    )
+    list_acq_parser.add_argument(
+        "--registry-dir", default=None,
+        help="Registry data directory (default: data/registry)",
+    )
+    list_acq_parser.add_argument(
+        "--status", default=None,
+        help="Filter by status (open, blocked, completed)",
+    )
+
+    verify_gate_parser = sub.add_parser(
+        "run-verification-gate",
+        help="Run verification gate on registry records",
+    )
+    verify_gate_parser.add_argument(
+        "--registry-dir", default=None,
+        help="Registry data directory (default: data/registry)",
+    )
+    verify_gate_parser.add_argument(
+        "--output", default=None,
+        help="Output JSON file for verification decisions",
+    )
+
+    export_review_parser = sub.add_parser(
+        "export-review-packet",
+        help="Export provenance review packet (markdown, JSONL, TSV)",
+    )
+    export_review_parser.add_argument(
+        "--registry-dir", default=None,
+        help="Registry data directory (default: data/registry)",
+    )
+    export_review_parser.add_argument(
+        "--output-dir", required=True,
+        help="Output directory for review packet files",
+    )
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -2006,6 +2106,9 @@ def main(argv: list[str] | None = None) -> int:
         "screen-venue-candidates": cmd_screen_venue_candidates,
         "verify-references": cmd_verify_references,
         "review-loop-demo": cmd_review_loop_demo,
+        "list-acquisition-tasks": cmd_list_acquisition_tasks,
+        "run-verification-gate": cmd_run_verification_gate,
+        "export-review-packet": cmd_export_review_packet,
     }
 
     handler = commands.get(args.command)
