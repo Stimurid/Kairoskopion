@@ -314,23 +314,17 @@ def get_current_user(authorization: str | None = Header(default=None)) -> User:
 def signup(display_name: str, email: str | None = None) -> dict:
     """Create new user + first session token.
 
-    Behaviour for conflicting email per task spec section D:
-      Signup with a known email → 409 conflict (instructs client to
-      use /continue). This avoids ambiguous silent takeover.
+    If the email already belongs to an existing user, return that user
+    with a fresh session token (acts as login). No 409, no separate
+    /continue flow — one form for both signup and return.
     """
     users = _get_user_store()
     ne = normalize_email(email)
-    if ne and users.find_by_email(ne) is not None:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "email_already_registered",
-                "message": (
-                    "An account with this email already exists. "
-                    "Use /continue to get a new session token for it."
-                ),
-            },
-        )
+    if ne:
+        existing = users.find_by_email(ne)
+        if existing is not None:
+            sess = _get_session_store().issue(existing.user_id)
+            return {"user": existing.to_dict(), "session_token": sess.token}
     try:
         user = users.create(display_name=display_name, email=email)
     except ValueError as exc:

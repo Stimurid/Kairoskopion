@@ -67,19 +67,22 @@ class TestSignup(_BaseTestEnv):
         )
         self.assertEqual(r.status_code, 400)
 
-    def test_signup_duplicate_email_returns_409(self):
+    def test_signup_duplicate_email_returns_existing_user(self):
         r1 = self.client.post(
             "/auth/signup",
             json={"display_name": "Cara", "email": "cara@example.org"},
         )
         self.assertEqual(r1.status_code, 200)
+        user1_id = r1.json()["user"]["user_id"]
         r2 = self.client.post(
             "/auth/signup",
             json={"display_name": "Cara2", "email": "cara@example.org"},
         )
-        self.assertEqual(r2.status_code, 409)
-        # The error payload tells the client to route to /continue
-        self.assertIn("continue", r2.text.lower())
+        self.assertEqual(r2.status_code, 200)
+        # Returns the same user, not a new one
+        self.assertEqual(r2.json()["user"]["user_id"], user1_id)
+        # Original display name preserved
+        self.assertEqual(r2.json()["user"]["display_name"], "Cara")
 
     def test_signup_invalid_email_treated_as_none(self):
         r = self.client.post(
