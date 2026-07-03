@@ -58,8 +58,14 @@ class ArticleModelerAgent(AgentRole):
         # Always build deterministic manuscript model (word count, sections, etc.)
         manuscript = _deterministic_manuscript(text, source_ref=source_ref)
 
-        # LLM extraction
-        family = ARTICLE_MODELING_FAMILY
+        # LLM extraction — apply prompt override if set by pipeline
+        family = dict(ARTICLE_MODELING_FAMILY)
+        _ovr = getattr(self, "_prompt_family_override", None)
+        if _ovr:
+            if "system_prompt" in _ovr:
+                family["system_prompt"] = _ovr["system_prompt"]
+            if "user_prompt_template" in _ovr:
+                family["user_prompt_template"] = _ovr["user_prompt_template"]
         user_prompt = family["user_prompt_template"].format(manuscript_text=text)
         messages = [
             {"role": "system", "content": family["system_prompt"]},

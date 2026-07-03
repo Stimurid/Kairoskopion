@@ -39,7 +39,13 @@ class VenueProfilerAgent(AgentRole):
         text = inp.raw_text or ""
         source_ref = inp.source_refs[0] if inp.source_refs else None
 
-        family = VENUE_FACT_EXTRACTION_FAMILY
+        family = dict(VENUE_FACT_EXTRACTION_FAMILY)
+        _ovr = getattr(self, "_prompt_family_override", None)
+        if _ovr:
+            if "system_prompt" in _ovr:
+                family["system_prompt"] = _ovr["system_prompt"]
+            if "user_prompt_template" in _ovr:
+                family["user_prompt_template"] = _ovr["user_prompt_template"]
         user_prompt = family["user_prompt_template"].format(
             venue_text=text,
             source_type=inp.user_constraints.get("source_type", "author_guidelines"),

@@ -67,6 +67,13 @@ function del<T>(path: string) {
   return request<T>(path, { method: 'DELETE' });
 }
 
+function patch<T>(path: string, body?: unknown) {
+  return request<T>(path, {
+    method: 'PATCH',
+    body: body != null ? JSON.stringify(body) : undefined,
+  });
+}
+
 // --- Cases ---
 
 import type {
@@ -375,3 +382,135 @@ export interface AgentMapData {
   prompts: Record<string, AgentMapPrompt>;
   llm: Record<string, unknown>;
 }
+
+// --- P11 Prompt Pipeline Workbench ---
+
+export interface PromptFamilyInfo {
+  prompt_family_id: string;
+  path: string;
+  source_module: string;
+  version_hash: string;
+  has_schema?: boolean;
+  schema_ref?: string;
+  agent_ref?: string;
+  description?: string;
+  system_prompt?: string;
+  user_template?: string;
+}
+
+export interface PipelineStage {
+  stage_id: string;
+  label: string;
+  producer: string;
+  service: string;
+  prompt_family: string | null;
+}
+
+export interface PipelineRunSummary {
+  run_id: string;
+  case_id?: string;
+  trigger: string;
+  status: string;
+  started_at: string;
+  completed_at?: string;
+  node_ids: string[];
+  base_run_id?: string;
+  prompt_override_ids?: string[];
+  gates_summary?: Record<string, unknown>;
+}
+
+export interface PipelineNodeInfo {
+  node_id: string;
+  run_id: string;
+  stage_id: string;
+  stage_label: string;
+  order_index: number;
+  producer_type: string;
+  service_or_agent: string;
+  prompt_family_id?: string;
+  status: string;
+  rerunnable?: boolean;
+  output_hash?: string;
+  prompt_override_id?: string;
+}
+
+export interface PromptRunRecordInfo {
+  prompt_run_id: string;
+  node_id: string;
+  prompt_family_id: string;
+  prompt_version_hash: string;
+  rendered_system_prompt: string;
+  rendered_user_prompt: string;
+  provider_status?: string;
+  response_status?: string;
+}
+
+export interface PromptOverrideInfo {
+  override_id: string;
+  case_id: string;
+  base_prompt_family_id: string;
+  status: string;
+  edited_system_prompt?: string;
+  edited_user_template?: string;
+  notes?: string;
+}
+
+export interface RunDiffEntry {
+  stage_id: string;
+  field: string;
+  run_a: unknown;
+  run_b: unknown;
+  changed: boolean;
+}
+
+export const workbench = {
+  listPrompts: () => get<PromptFamilyInfo[]>('/api/prompts'),
+  getPrompt: (id: string) => get<PromptFamilyInfo>(`/api/prompts/${id}`),
+  listStages: () => get<PipelineStage[]>('/api/pipeline-stages'),
+
+  listRuns: (caseId: string) =>
+    get<PipelineRunSummary[]>(`/api/cases/${caseId}/pipeline-runs`),
+  getRun: (caseId: string, runId: string) =>
+    get<PipelineRunSummary>(`/api/cases/${caseId}/pipeline-runs/${runId}`),
+  listNodes: (caseId: string, runId: string) =>
+    get<PipelineNodeInfo[]>(`/api/cases/${caseId}/pipeline-runs/${runId}/nodes`),
+  getNodePrompt: (caseId: string, runId: string, nodeId: string) =>
+    get<PromptRunRecordInfo[]>(`/api/cases/${caseId}/pipeline-runs/${runId}/nodes/${nodeId}/prompt`),
+
+  listOverrides: (caseId: string) =>
+    get<PromptOverrideInfo[]>(`/api/cases/${caseId}/prompt-overrides`),
+  createOverride: (caseId: string, body: {
+    base_prompt_family_id: string;
+    edited_system_prompt?: string;
+    edited_user_template?: string;
+    notes?: string;
+  }) => post<PromptOverrideInfo>(`/api/cases/${caseId}/prompt-overrides`, body),
+  updateOverride: (caseId: string, overrideId: string, body: {
+    status?: string;
+    edited_system_prompt?: string;
+    edited_user_template?: string;
+    notes?: string;
+  }) => patch<PromptOverrideInfo>(`/api/cases/${caseId}/prompt-overrides/${overrideId}`, body),
+
+  rerunAll: (caseId: string, overrideIds?: string[]) =>
+    post<PipelineRunSummary>(`/api/cases/${caseId}/rerun`, { prompt_override_ids: overrideIds ?? [] }),
+  rerunStage: (caseId: string, stageId: string, baseRunId?: string, overrideIds?: string[]) =>
+    post<PipelineRunSummary>(`/api/cases/${caseId}/rerun-stage`, {
+      stage_id: stageId, base_run_id: baseRunId, prompt_override_ids: overrideIds ?? [],
+    }),
+  rerunFromStage: (caseId: string, stageId: string, baseRunId?: string, overrideIds?: string[]) =>
+    post<PipelineRunSummary>(`/api/cases/${caseId}/rerun-from-stage`, {
+      stage_id: stageId, base_run_id: baseRunId, prompt_override_ids: overrideIds ?? [],
+    }),
+
+  diffRuns: (caseId: string, runA: string, runB: string) =>
+    get<RunDiffEntry[]>(`/api/cases/${caseId}/pipeline-diff?run_a=${runA}&run_b=${runB}`),
+
+  createCorrection: (caseId: string, body: {
+    node_id: string;
+    correction_type: string;
+    user_note: string;
+    affected_prompt_family_id: string;
+    proposed_change?: string;
+  }) => post<unknown>(`/api/cases/${caseId}/corrections`, body),
+};

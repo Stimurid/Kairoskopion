@@ -31,6 +31,7 @@ import { DossierView } from './DossierView';
 import { DepthModePanel } from './DepthModePanel';
 import { VenueMemoryPanel } from './VenueMemoryPanel';
 import { RegistryReviewPanel } from './RegistryReviewPanel';
+import { PromptPipelineWorkbench } from './PromptPipelineWorkbench';
 
 interface Props {
   caseData: CaseDetail;
@@ -58,6 +59,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
   // the Mavrinsky reviewer feedback that triggered this was that the raw
   // structured view was unreadable.
   const [articleViewMode, setArticleViewMode] = useState<'human' | 'technical'>('human');
+  const [showWorkbench, setShowWorkbench] = useState(false);
   const [venueViewMode, setVenueViewMode] = useState<'human' | 'technical'>('human');
   const [pathways, setPathways] = useState<DisciplinaryPathway[]>([]);
   const [venueModel, setVenueModel] = useState<VenueModel | null>(null);
@@ -704,6 +706,32 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
 
       {Object.keys(qualityGates).length > 0 && (
         <QualityGateBar gates={qualityGates} />
+      )}
+
+      <div style={{ padding: '0 16px', marginBottom: 4 }}>
+        <button
+          onClick={() => setShowWorkbench(!showWorkbench)}
+          style={{
+            background: showWorkbench ? 'var(--bg-hover)' : 'transparent',
+            border: '1px solid var(--border)',
+            color: 'var(--text-secondary)',
+            borderRadius: 4,
+            padding: '4px 10px',
+            cursor: 'pointer',
+            fontSize: 12,
+          }}
+        >
+          {showWorkbench ? 'Hide Workbench' : 'Pipeline Workbench'}
+        </button>
+      </div>
+
+      {showWorkbench && (
+        <div style={{ padding: '0 16px' }}>
+          <PromptPipelineWorkbench
+            caseId={caseData.case_id}
+            onClose={() => setShowWorkbench(false)}
+          />
+        </div>
       )}
 
       <div className="workspace-body">

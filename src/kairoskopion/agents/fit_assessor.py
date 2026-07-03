@@ -82,7 +82,13 @@ class FitAssessorAgent(AgentRole):
         venue_dict = inp.entities.get("venue", {})
         scenario_dict = inp.entities.get("scenario", {})
 
-        family = FIT_ASSESSMENT_FAMILY
+        family = dict(FIT_ASSESSMENT_FAMILY)
+        _ovr = getattr(self, "_prompt_family_override", None)
+        if _ovr:
+            if "system_prompt" in _ovr:
+                family["system_prompt"] = _ovr["system_prompt"]
+            if "user_prompt_template" in _ovr:
+                family["user_prompt_template"] = _ovr["user_prompt_template"]
         user_prompt = family["user_prompt_template"].format(
             article_json=json.dumps(article_dict, ensure_ascii=False, indent=2),
             venue_json=json.dumps(venue_dict, ensure_ascii=False, indent=2),
