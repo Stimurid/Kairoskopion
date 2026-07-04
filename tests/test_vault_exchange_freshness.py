@@ -254,6 +254,21 @@ class TestImportBundle:
         result = import_storage_bundle(tmp_path / "nope.zip", tmp_path / "t")
         assert not result["success"]
 
+    def test_import_rejects_zip_slip_vault_path(self, tmp_path):
+        import zipfile
+        bundle = tmp_path / "evil.zip"
+        with zipfile.ZipFile(bundle, "w") as zf:
+            zf.writestr("metadata.json", json.dumps({"kairoskopion_version": "0"}))
+            zf.writestr("registries/dummy.jsonl", '{"id": "x"}\n')
+            zf.writestr("vault/../../escaped.txt", "evil")
+
+        target = tmp_path / "target"
+        result = import_storage_bundle(bundle, target)
+        assert not result["success"]
+        assert any("Unsafe path" in e for e in result["errors"])
+        assert not (tmp_path / "escaped.txt").exists()
+        assert not (target / "escaped.txt").exists()
+
 
 class TestValidateBundle:
     def test_valid_bundle(self, tmp_path):

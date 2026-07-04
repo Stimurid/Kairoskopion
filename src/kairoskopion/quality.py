@@ -105,6 +105,8 @@ def evaluate_evidence_completeness_gate(
             from datetime import datetime, timezone, timedelta
             try:
                 fetched_dt = datetime.fromisoformat(fetched)
+                if fetched_dt.tzinfo is None:
+                    fetched_dt = fetched_dt.replace(tzinfo=timezone.utc)
                 age = datetime.now(timezone.utc) - fetched_dt
                 if age > timedelta(days=stale_threshold_days):
                     gate.stale_sources.append(adapter_id)

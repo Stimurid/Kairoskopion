@@ -66,6 +66,21 @@ class TestEvidenceCompletenessGate(unittest.TestCase):
         self.assertEqual(gate.status, QualityGateStatus.PASSED_WITH_WARNINGS.value)
         self.assertIn("test", gate.stale_sources)
 
+    def test_stale_source_naive_timestamp_still_detected(self):
+        # Naive ISO timestamps (no tz) must not silently skip staleness check
+        results = [
+            {
+                "adapter_id": "test",
+                "status": "success",
+                "evidence_status": "OK",
+                "fetched_at": "2020-01-01T00:00:00",
+            },
+        ]
+        gate = evaluate_evidence_completeness_gate(
+            adapter_results=results, stale_threshold_days=90,
+        )
+        self.assertIn("test", gate.stale_sources)
+
 
 class TestReferenceIntegrityGate(unittest.TestCase):
     def test_no_verification_not_applicable(self):

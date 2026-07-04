@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -22,13 +23,17 @@ import pytest
 # Guard: skip unless live provider is configured
 # ---------------------------------------------------------------------------
 
-def _load_dotenv_for_test() -> bool:
-    """Load .env from repo root (mirrors app.py _load_dotenv_if_present).
-    Returns True if LLM config becomes available after loading.
+def _read_dotenv() -> dict[str, str]:
+    """Parse .env from repo root WITHOUT mutating os.environ.
+
+    Mutating os.environ at import time poisons every other test collected
+    in the same pytest run (they start hitting the live provider), so the
+    parsed vars are applied per-test via the ``dotenv_env`` fixture instead.
     """
     env_path = Path(__file__).resolve().parent.parent / ".env"
     if not env_path.exists():
-        return False
+        return {}
+    parsed: dict[str, str] = {}
     for line in env_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -39,18 +44,37 @@ def _load_dotenv_for_test() -> bool:
         key = key.strip()
         val = val.strip().strip("'\"")
         if key and key not in os.environ:
-            os.environ[key] = val
-    from kairoskopion.llm.config import LLMConfig
-    cfg = LLMConfig.from_env()
-    return cfg is not None and bool(cfg.api_key)
+            parsed[key] = val
+    return parsed
 
 
-_PROVIDER_AVAILABLE = _load_dotenv_for_test()
+_DOTENV_VARS = _read_dotenv()
 
-pytestmark = pytest.mark.skipif(
-    not _PROVIDER_AVAILABLE,
-    reason="Live LLM provider not configured (no .env or missing keys)",
-)
+
+def _provider_available() -> bool:
+    """Check availability under the parsed vars, restoring env afterwards."""
+    with patch.dict(os.environ, _DOTENV_VARS):
+        from kairoskopion.llm.config import LLMConfig
+        cfg = LLMConfig.from_env()
+        return cfg is not None and bool(cfg.api_key)
+
+
+_PROVIDER_AVAILABLE = _provider_available()
+
+pytestmark = [
+    pytest.mark.network,
+    pytest.mark.skipif(
+        not _PROVIDER_AVAILABLE,
+        reason="Live LLM provider not configured (no .env or missing keys)",
+    ),
+]
+
+
+@pytest.fixture(autouse=True)
+def dotenv_env():
+    """Apply .env vars for the duration of each test only."""
+    with patch.dict(os.environ, _DOTENV_VARS):
+        yield
 
 
 # ---------------------------------------------------------------------------
