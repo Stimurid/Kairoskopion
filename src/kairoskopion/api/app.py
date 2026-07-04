@@ -116,7 +116,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    # Must cover every method the UI client uses: GET/POST/DELETE plus
+    # PATCH (workbench prompt-override update, ui/src/api/client.ts).
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 

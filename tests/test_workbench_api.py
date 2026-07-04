@@ -20,6 +20,47 @@ def client(tmp_path, monkeypatch):
     return TestClient(app, raise_server_exceptions=False)
 
 
+class TestCORSPreflight:
+    """CORS must allow every method the UI client actually uses.
+
+    Regression guard for the audit-branch CORS narrowing: the workbench
+    prompt-override update uses PATCH (ui/src/api/client.ts) and broke
+    when allow_methods omitted it.
+    """
+
+    UI_METHODS = ("GET", "POST", "PATCH", "DELETE")
+
+    @pytest.mark.parametrize("method", UI_METHODS)
+    def test_preflight_allows_ui_method(self, client, method):
+        r = client.options(
+            "/api/cases/case_x/prompt-overrides/ovr_x",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": method,
+                "Access-Control-Request-Headers": "content-type,authorization",
+            },
+        )
+        assert r.status_code == 200, f"preflight for {method} rejected"
+        allowed = r.headers.get("access-control-allow-methods", "")
+        assert method in allowed, (
+            f"{method} missing from allow-methods: {allowed}"
+        )
+
+    def test_preflight_allows_ui_headers(self, client):
+        r = client.options(
+            "/cases",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type,authorization",
+            },
+        )
+        assert r.status_code == 200
+        allowed = r.headers.get("access-control-allow-headers", "").lower()
+        assert "content-type" in allowed
+        assert "authorization" in allowed
+
+
 class TestPromptEndpoints:
     def test_list_prompts(self, client):
         r = client.get("/api/prompts")
