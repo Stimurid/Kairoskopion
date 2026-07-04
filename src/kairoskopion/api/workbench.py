@@ -41,6 +41,19 @@ from ..services.prompt_registry import PromptRegistry
 
 router = APIRouter(tags=["workbench"])
 
+
+def _get_llm_provider():
+    """Construct LLM provider from env config (mirrors cases.py pattern)."""
+    try:
+        from ..llm.config import LLMConfig
+        from ..llm.openai_compat import OpenAICompatProvider
+        cfg = LLMConfig.from_env()
+        if cfg is None or not cfg.api_key:
+            return None
+        return OpenAICompatProvider(cfg)
+    except Exception:
+        return None
+
 # --- Singletons (initialized on first import) ---
 
 _data_dir = Path(os.environ.get("KAIROSKOPION_DATA_DIR") or ".kairoskopion")
@@ -220,12 +233,14 @@ class RerunStageRequest(BaseModel):
     stage_id: str
     prompt_override_ids: list[str] = Field(default_factory=list)
     base_run_id: str | None = None
+    manuscript_text: str | None = None
 
 
 class RerunFromStageRequest(BaseModel):
     stage_id: str
     prompt_override_ids: list[str] = Field(default_factory=list)
     base_run_id: str | None = None
+    manuscript_text: str | None = None
 
 
 @router.post("/cases/{case_id}/rerun")
@@ -255,6 +270,7 @@ def rerun_single_stage(case_id: str, req: RerunStageRequest):
     store = _get_trace_store()
     override_store = _get_override_store()
     prompt_reg = _get_prompt_registry()
+    provider = _get_llm_provider()
     plan = plan_rerun_stage(
         req.stage_id,
         overrides=req.prompt_override_ids,
@@ -264,6 +280,8 @@ def rerun_single_stage(case_id: str, req: RerunStageRequest):
         plan, case_id=case_id, trace_store=store,
         override_store=override_store,
         prompt_registry=prompt_reg,
+        llm_provider=provider,
+        manuscript_text=req.manuscript_text,
     )
     run = outcome["run"]
     resp = run.to_dict()
@@ -281,6 +299,7 @@ def rerun_from_stage(case_id: str, req: RerunFromStageRequest):
     store = _get_trace_store()
     override_store = _get_override_store()
     prompt_reg = _get_prompt_registry()
+    provider = _get_llm_provider()
     plan = plan_rerun_from_stage(
         req.stage_id,
         overrides=req.prompt_override_ids,
@@ -290,6 +309,8 @@ def rerun_from_stage(case_id: str, req: RerunFromStageRequest):
         plan, case_id=case_id, trace_store=store,
         override_store=override_store,
         prompt_registry=prompt_reg,
+        llm_provider=provider,
+        manuscript_text=req.manuscript_text,
     )
     run = outcome["run"]
     resp = run.to_dict()
