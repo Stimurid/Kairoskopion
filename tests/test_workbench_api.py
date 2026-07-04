@@ -73,14 +73,14 @@ class TestPipelineRunEndpoints:
         assert r.status_code == 200
         data = r.json()
         run_id = data["run_id"]
-        assert data.get("execution_status") in ("partial_not_replayable", "scaffold_only")
+        assert data.get("execution_status") in ("partial_not_replayable", "scaffold_only", "prompt_rendered")
 
         r2 = client.get(f"/api/cases/c1/pipeline-runs/{run_id}/nodes")
         assert r2.status_code == 200
         nodes = r2.json()
         art_nodes = [n for n in nodes if n["stage_id"] == "article_model"]
         assert len(art_nodes) == 1
-        assert art_nodes[0]["status"] in ("pending", "stage_not_yet_replayable")
+        assert art_nodes[0]["status"] in ("pending", "stage_not_yet_replayable", "prompt_rendered_needs_llm")
 
     def test_rerun_stage_invalid(self, client):
         r = client.post("/api/cases/c1/rerun-stage", json={"stage_id": "bogus"})

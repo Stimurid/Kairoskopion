@@ -14,8 +14,9 @@ import logging
 from typing import Any
 
 from ..ids import generate_id
-from .pipeline_trace import PipelineNode, PipelineRun, PipelineTraceStore, _hash_text
+from .pipeline_trace import PipelineNode, PipelineRun, PipelineTraceStore, PromptRunRecord, _hash_text
 from .prompt_override import PromptOverride, PromptOverrideStore
+from .prompt_registry import PromptRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -234,12 +235,81 @@ _REPLAYABLE_STAGES = frozenset([
 ])
 
 
+def _get_stage_prompt_family(stage_id: str) -> str | None:
+    """Return the prompt_family for a given stage_id, or None."""
+    for s in PIPELINE_STAGES:
+        if s["stage_id"] == stage_id:
+            return s.get("prompt_family")
+    return None
+
+
+def _render_prompt_for_stage(
+    node: PipelineNode,
+    *,
+    prompt_registry: PromptRegistry,
+    override_store: PromptOverrideStore | None,
+    case_id: str | None,
+    trace_store: PipelineTraceStore | None,
+) -> None:
+    """Look up prompt family, apply override, create PromptRunRecord, update node."""
+    family_id = node.prompt_family_id
+    if not family_id or not prompt_registry:
+        return
+
+    info = prompt_registry.get(family_id)
+    if not info:
+        node.status = "stage_not_yet_replayable"
+        node.diagnostics.append(f"prompt family '{family_id}' not found in registry")
+        if trace_store:
+            trace_store.save_node(node)
+        return
+
+    system_prompt = info.system_prompt
+    user_template = info.user_template
+    override_id: str | None = None
+
+    if override_store and case_id:
+        ovr = override_store.get_active_override(case_id, family_id)
+        if ovr:
+            override_id = ovr.override_id
+            if ovr.edited_system_prompt:
+                system_prompt = ovr.edited_system_prompt
+            if ovr.edited_user_template:
+                user_template = ovr.edited_user_template
+
+    version_hash = _hash_text(system_prompt + user_template)
+
+    node.prompt_version_hash = version_hash
+    node.prompt_override_id = override_id
+    node.provider_status = "not_called"
+    node.parse_status = "not_called"
+    node.status = "prompt_rendered_needs_llm"
+
+    if trace_store:
+        trace_store.save_node(node)
+
+    rec = PromptRunRecord(
+        node_id=node.node_id,
+        prompt_family_id=family_id,
+        prompt_version_hash=version_hash,
+        prompt_override_id=override_id,
+        rendered_system_prompt=system_prompt,
+        rendered_user_prompt=user_template,
+        provider_status="not_called",
+        response_status="not_called",
+        diagnostics=["replay: prompt rendered, LLM not called"],
+    )
+    if trace_store:
+        trace_store.save_prompt_record(rec)
+
+
 def execute_replay_run(
     plan: ReplayPlan,
     *,
     case_id: str | None = None,
     trace_store: PipelineTraceStore | None = None,
     override_store: PromptOverrideStore | None = None,
+    prompt_registry: PromptRegistry | None = None,
     manuscript_text: str | None = None,
     venue_guidelines_text: str | None = None,
     scenario_data: dict[str, Any] | None = None,
@@ -251,9 +321,10 @@ def execute_replay_run(
     """Execute a replay plan, running real pipeline stages where supported.
 
     For ``rerun_all`` with manuscript+venue text provided, runs the full
-    instrumented pipeline.  For individual stages, deterministic stages
-    execute if upstream artifacts are available; LLM-agent stages that need
-    the full pipeline context return ``stage_not_yet_replayable``.
+    instrumented pipeline.  For individual stages with a prompt_family and
+    a prompt_registry, renders the prompt (applying overrides) and creates
+    a PromptRunRecord even without an LLM provider.  Deterministic stages
+    execute if upstream artifacts are available.
 
     Returns ``{"run": PipelineRun, "result": ..., "status": ...}``.
     """
@@ -284,21 +355,49 @@ def execute_replay_run(
         s for s in plan.stages_to_rerun
         if s not in _REPLAYABLE_STAGES
     ]
+
+    # Stages that have a prompt family can be prompt-rendered even without
+    # full pipeline execution — they get a PromptRunRecord with status
+    # "prompt_rendered_needs_llm" instead of "stage_not_yet_replayable".
+    prompt_renderable = []
+    truly_unsupported = []
+    for sid in unsupported:
+        pf = _get_stage_prompt_family(sid)
+        if pf and prompt_registry and prompt_registry.get(pf):
+            prompt_renderable.append(sid)
+        else:
+            truly_unsupported.append(sid)
+
     if unsupported:
         run = scaffold_replay_run(plan, case_id=case_id, trace_store=trace_store)
         for node in (trace_store.list_nodes(run.run_id) if trace_store else []):
-            if node.stage_id in unsupported and node.status == "pending":
+            if node.stage_id in prompt_renderable and node.status == "pending":
+                _render_prompt_for_stage(
+                    node,
+                    prompt_registry=prompt_registry,
+                    override_store=override_store,
+                    case_id=case_id,
+                    trace_store=trace_store,
+                )
+            elif node.stage_id in truly_unsupported and node.status == "pending":
                 node.status = "stage_not_yet_replayable"
                 node.diagnostics.append(
                     f"stage '{node.stage_id}' requires full pipeline context"
                 )
                 if trace_store:
                     trace_store.save_node(node)
+
+        if truly_unsupported:
+            return {
+                "run": run,
+                "result": None,
+                "status": "partial_not_replayable",
+                "unsupported_stages": truly_unsupported,
+            }
         return {
             "run": run,
             "result": None,
-            "status": "partial_not_replayable",
-            "unsupported_stages": unsupported,
+            "status": "prompt_rendered",
         }
 
     run = scaffold_replay_run(plan, case_id=case_id, trace_store=trace_store)

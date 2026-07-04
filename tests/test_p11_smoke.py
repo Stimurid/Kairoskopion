@@ -508,7 +508,7 @@ class TestE2EWorkbenchAPI:
         run2_data = r.json()
         run2_id = run2_data["run_id"]
         assert run2_data.get("execution_status") in (
-            "partial_not_replayable", "scaffold_only"
+            "partial_not_replayable", "scaffold_only", "prompt_rendered"
         )
 
         # Diff

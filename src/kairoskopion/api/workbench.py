@@ -232,12 +232,14 @@ class RerunFromStageRequest(BaseModel):
 def rerun_pipeline(case_id: str, req: RerunRequest):
     store = _get_trace_store()
     override_store = _get_override_store()
+    prompt_reg = _get_prompt_registry()
     plan = plan_rerun_all(overrides=req.prompt_override_ids)
     outcome = execute_replay_run(
         plan,
         case_id=case_id,
         trace_store=store,
         override_store=override_store,
+        prompt_registry=prompt_reg,
     )
     run = outcome["run"]
     resp = run.to_dict()
@@ -252,6 +254,7 @@ def rerun_single_stage(case_id: str, req: RerunStageRequest):
         raise HTTPException(400, f"Unknown stage: {req.stage_id}")
     store = _get_trace_store()
     override_store = _get_override_store()
+    prompt_reg = _get_prompt_registry()
     plan = plan_rerun_stage(
         req.stage_id,
         overrides=req.prompt_override_ids,
@@ -260,6 +263,7 @@ def rerun_single_stage(case_id: str, req: RerunStageRequest):
     outcome = execute_replay_run(
         plan, case_id=case_id, trace_store=store,
         override_store=override_store,
+        prompt_registry=prompt_reg,
     )
     run = outcome["run"]
     resp = run.to_dict()
@@ -276,6 +280,7 @@ def rerun_from_stage(case_id: str, req: RerunFromStageRequest):
         raise HTTPException(400, f"Unknown stage: {req.stage_id}")
     store = _get_trace_store()
     override_store = _get_override_store()
+    prompt_reg = _get_prompt_registry()
     plan = plan_rerun_from_stage(
         req.stage_id,
         overrides=req.prompt_override_ids,
@@ -284,6 +289,7 @@ def rerun_from_stage(case_id: str, req: RerunFromStageRequest):
     outcome = execute_replay_run(
         plan, case_id=case_id, trace_store=store,
         override_store=override_store,
+        prompt_registry=prompt_reg,
     )
     run = outcome["run"]
     resp = run.to_dict()
