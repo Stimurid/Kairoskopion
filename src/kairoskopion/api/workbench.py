@@ -38,8 +38,20 @@ from ..services.prompt_override import (
     PromptPatchCandidate,
 )
 from ..services.prompt_registry import PromptRegistry
+from ..llm.config import LLMConfig
+from ..llm.openai_compat import OpenAICompatProvider
 
 router = APIRouter(tags=["workbench"])
+
+
+def _get_llm_provider() -> OpenAICompatProvider | None:
+    """Construct LLM provider from env config, if available."""
+    cfg = LLMConfig.from_env()
+    if cfg is None:
+        return None
+    if not cfg.api_key:
+        return None
+    return OpenAICompatProvider(cfg)
 
 # --- Singletons (initialized on first import) ---
 
@@ -220,12 +232,14 @@ class RerunStageRequest(BaseModel):
     stage_id: str
     prompt_override_ids: list[str] = Field(default_factory=list)
     base_run_id: str | None = None
+    manuscript_text: str | None = None
 
 
 class RerunFromStageRequest(BaseModel):
     stage_id: str
     prompt_override_ids: list[str] = Field(default_factory=list)
     base_run_id: str | None = None
+    manuscript_text: str | None = None
 
 
 @router.post("/cases/{case_id}/rerun")
@@ -260,10 +274,13 @@ def rerun_single_stage(case_id: str, req: RerunStageRequest):
         overrides=req.prompt_override_ids,
         base_run_id=req.base_run_id,
     )
+    provider = _get_llm_provider() if req.manuscript_text else None
     outcome = execute_replay_run(
         plan, case_id=case_id, trace_store=store,
         override_store=override_store,
         prompt_registry=prompt_reg,
+        llm_provider=provider,
+        manuscript_text=req.manuscript_text,
     )
     run = outcome["run"]
     resp = run.to_dict()
@@ -286,10 +303,13 @@ def rerun_from_stage(case_id: str, req: RerunFromStageRequest):
         overrides=req.prompt_override_ids,
         base_run_id=req.base_run_id,
     )
+    provider = _get_llm_provider() if req.manuscript_text else None
     outcome = execute_replay_run(
         plan, case_id=case_id, trace_store=store,
         override_store=override_store,
         prompt_registry=prompt_reg,
+        llm_provider=provider,
+        manuscript_text=req.manuscript_text,
     )
     run = outcome["run"]
     resp = run.to_dict()

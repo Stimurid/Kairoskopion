@@ -250,8 +250,14 @@ def _render_prompt_for_stage(
     override_store: PromptOverrideStore | None,
     case_id: str | None,
     trace_store: PipelineTraceStore | None,
+    llm_provider: Any | None = None,
+    manuscript_text: str | None = None,
 ) -> None:
-    """Look up prompt family, apply override, create PromptRunRecord, update node."""
+    """Look up prompt family, apply override, create PromptRunRecord, update node.
+
+    When *llm_provider* is set and the stage is ``article_model``, calls the
+    real ArticleModelerAgent and records a live PromptRunRecord.
+    """
     family_id = node.prompt_family_id
     if not family_id or not prompt_registry:
         return
@@ -279,6 +285,21 @@ def _render_prompt_for_stage(
 
     version_hash = _hash_text(system_prompt + user_template)
 
+    # Live LLM call path — article_model only for now
+    if llm_provider and node.stage_id == "article_model" and manuscript_text:
+        _execute_article_model_live(
+            node,
+            llm_provider=llm_provider,
+            manuscript_text=manuscript_text,
+            system_prompt=system_prompt,
+            user_template=user_template,
+            override_id=override_id,
+            version_hash=version_hash,
+            family_id=family_id,
+            trace_store=trace_store,
+        )
+        return
+
     node.prompt_version_hash = version_hash
     node.prompt_override_id = override_id
     node.provider_status = "not_called"
@@ -298,6 +319,78 @@ def _render_prompt_for_stage(
         provider_status="not_called",
         response_status="not_called",
         diagnostics=["replay: prompt rendered, LLM not called"],
+    )
+    if trace_store:
+        trace_store.save_prompt_record(rec)
+
+
+def _execute_article_model_live(
+    node: PipelineNode,
+    *,
+    llm_provider: Any,
+    manuscript_text: str,
+    system_prompt: str,
+    user_template: str,
+    override_id: str | None,
+    version_hash: str,
+    family_id: str,
+    trace_store: PipelineTraceStore | None,
+) -> None:
+    """Call ArticleModelerAgent with a live LLM provider and record the result."""
+    from ..agents.article_modeler import ArticleModelerAgent
+    from ..agents.contract import AgentInput
+
+    agent = ArticleModelerAgent()
+    if override_id:
+        agent._prompt_family_override = {
+            "system_prompt": system_prompt,
+            "user_prompt_template": user_template,
+        }
+
+    inp = AgentInput(
+        operation_id=node.run_id,
+        agent_role_id="article_modeler",
+        source_refs=["replay:workbench"],
+        raw_text=manuscript_text,
+    )
+
+    try:
+        output = agent.execute(inp, llm_provider)
+        provider_status = "success"
+        parse_status = "success"
+        response_content = str(output.output_entity)[:2000]
+        diagnostics = output.trace_notes or []
+        node.status = "completed"
+        node.output_hash = _hash_text(str(output.output_entity))
+        node.output_artifact_refs = output.evidence_refs
+    except Exception as exc:
+        logger.warning("Live article_model replay failed: %s", exc)
+        provider_status = "error"
+        parse_status = "not_attempted"
+        response_content = str(exc)[:500]
+        diagnostics = [f"live replay error: {exc}"]
+        node.status = "error"
+
+    node.prompt_version_hash = version_hash
+    node.prompt_override_id = override_id
+    node.provider_status = provider_status
+    node.parse_status = parse_status
+    node.producer_type = "llm_agent"
+
+    if trace_store:
+        trace_store.save_node(node)
+
+    rec = PromptRunRecord(
+        node_id=node.node_id,
+        prompt_family_id=family_id,
+        prompt_version_hash=version_hash,
+        prompt_override_id=override_id,
+        rendered_system_prompt=system_prompt,
+        rendered_user_prompt=user_template,
+        provider_status=provider_status,
+        response_status=parse_status,
+        response_excerpt_or_ref=response_content,
+        diagnostics=diagnostics,
     )
     if trace_store:
         trace_store.save_prompt_record(rec)
@@ -378,6 +471,8 @@ def execute_replay_run(
                     override_store=override_store,
                     case_id=case_id,
                     trace_store=trace_store,
+                    llm_provider=llm_provider,
+                    manuscript_text=manuscript_text,
                 )
             elif node.stage_id in truly_unsupported and node.status == "pending":
                 node.status = "stage_not_yet_replayable"
@@ -394,10 +489,16 @@ def execute_replay_run(
                 "status": "partial_not_replayable",
                 "unsupported_stages": truly_unsupported,
             }
+        # Check if any node was executed live (status="completed" via LLM)
+        all_nodes = trace_store.list_nodes(run.run_id) if trace_store else []
+        any_live = any(
+            n.stage_id in prompt_renderable and n.status == "completed"
+            for n in all_nodes
+        )
         return {
             "run": run,
             "result": None,
-            "status": "prompt_rendered",
+            "status": "live_executed" if any_live else "prompt_rendered",
         }
 
     run = scaffold_replay_run(plan, case_id=case_id, trace_store=trace_store)
