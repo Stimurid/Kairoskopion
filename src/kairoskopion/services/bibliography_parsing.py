@@ -25,6 +25,12 @@ _NEXT_SECTION = re.compile(r"^#+\s+", re.MULTILINE)
 _YEAR_PATTERN = re.compile(r"\b(1[89]\d{2}|20[0-2]\d)\b")
 _DOI_PATTERN = re.compile(r"10\.\d{4,}/[^\s,;)]+")
 
+_NUMBERED_LINE = re.compile(r"^(\[?\d+\]?\.?\s|\(\d+\)\s)")
+_FOUR_DIGITS = re.compile(r"\d{4}")
+_APA_LINE = re.compile(r"^[A-Z][a-z]+,?\s.*\(\d{4}")
+_CHICAGO_LINE = re.compile(r"^[A-Z][a-z]+.*\d{4}\.")
+_BULLET_LINE = re.compile(r"^[-•*–—]")
+
 _BOOK_MARKERS = [
     "press", "publisher", "publications", "verlag",
     "university press", "mit press", "oxford", "cambridge",
@@ -69,25 +75,25 @@ def detect_reference_style(section_text: str) -> str:
         return "unknown"
 
     # Check for numbered style (1. ..., [1] ..., (1) ...)
-    numbered_count = sum(1 for l in lines if re.match(r"^(\[?\d+\]?\.?\s|\(\d+\)\s)", l))
+    numbered_count = sum(1 for l in lines if _NUMBERED_LINE.match(l))
     if numbered_count > len(lines) * 0.6:
         # Distinguish Vancouver from generic numbered
-        if any(";" in l and re.search(r"\d{4}", l) for l in lines[:5]):
+        if any(";" in l and _FOUR_DIGITS.search(l) for l in lines[:5]):
             return "vancouver"
         return "numbered"
 
     # Check for APA style: Author, A. A. (Year).
-    apa_count = sum(1 for l in lines if re.match(r"^[A-Z][a-z]+,?\s.*\(\d{4}", l))
+    apa_count = sum(1 for l in lines if _APA_LINE.match(l))
     if apa_count > len(lines) * 0.5:
         return "apa"
 
     # Check for Chicago author-date: Author Year.
-    chicago_count = sum(1 for l in lines if re.match(r"^[A-Z][a-z]+.*\d{4}\.", l))
+    chicago_count = sum(1 for l in lines if _CHICAGO_LINE.match(l))
     if chicago_count > len(lines) * 0.5:
         return "author_date"
 
     # Check for bullet/dash style
-    bullet_count = sum(1 for l in lines if re.match(r"^[-•*–—]", l))
+    bullet_count = sum(1 for l in lines if _BULLET_LINE.match(l))
     if bullet_count > len(lines) * 0.5:
         return "author_date"
 

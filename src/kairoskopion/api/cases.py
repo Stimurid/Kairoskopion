@@ -43,6 +43,10 @@ from ..llm.input_limits import LLM_INPUT_CHAR_CAP, cap_llm_input
 from ..llm.openai_compat import OpenAICompatProvider
 from ..registry.integration import RegistryIntegrationService
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class CaseStage(str, enum.Enum):
     EMPTY = "empty"
@@ -304,8 +308,8 @@ class Case:
         elif self.effective_input_type in VENUE_PIPELINE_TYPES:
             try:
                 venue_result = self.investigate_venue(text)
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Venue investigation during intake failed: %s", exc)
         elif self.effective_input_type in NEEDS_USER_CHOICE_TYPES:
             # bibliography / field_notes / review_letter / mixed / unknown
             # — no automated pipeline. Save the text on the case so the
@@ -404,8 +408,8 @@ class Case:
         elif chosen_type in VENUE_PIPELINE_TYPES:
             try:
                 self.investigate_venue(text)
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Venue investigation after user choice failed: %s", exc)
         # NEEDS_USER_CHOICE_TYPES selected by user means the user
         # explicitly chose to NOT run a pipeline (e.g. "treat as
         # field notes, no analysis yet"). Don't run anything.
@@ -453,8 +457,7 @@ class Case:
             else:
                 output = agent.execute_deterministic(ag_input)
         except Exception as exc:  # noqa: BLE001
-            import logging
-            logging.getLogger(__name__).warning(
+            logger.warning(
                 "Input classifier crashed: %s", exc,
             )
             return {
@@ -473,8 +476,6 @@ class Case:
         }
 
     def _build_article_model(self):
-        import logging
-        logger = logging.getLogger(__name__)
 
         # Track LLM attempt explicitly so case-level fallbacks (not just
         # agent-level) carry the visible warning that the human view
@@ -528,8 +529,8 @@ class Case:
             if case_level_attempt is not None and self.article_model is not None:
                 try:
                     self.article_model.extraction_attempt = case_level_attempt.to_dict()
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Failed to attach extraction_attempt metadata: %s", exc)
 
         # Round-II: structural title fallback. Title is direct
         # source fact; deterministic extraction is allowed
@@ -565,8 +566,8 @@ class Case:
                         "length": len(self.article_model.title_current),
                         "origin": "source_fact_direct",
                     })
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Title fact tracing failed: %s", exc)
 
         # Auto-name the case from the article title when it's still default.
         if self.article_model and self.article_model.title_current:
@@ -622,8 +623,6 @@ class Case:
         use it as canonical — skip LLM. If provisional, use with warning.
         If no registry hit, run DisciplineMatcherAgent as before.
         """
-        import logging
-        logger = logging.getLogger(__name__)
         if self.article_model is None:
             return
 
@@ -736,7 +735,8 @@ class Case:
         try:
             from ..services.discipline_registry import load_default_registry
             registry = load_default_registry()
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Default discipline registry unavailable: %s", exc)
             registry = None
         lines: list[str] = []
         for m in matched[:6]:
@@ -756,8 +756,6 @@ class Case:
 
     def _build_article_field_position(self):
         """Run article_field_positioner. LLM if available, deterministic otherwise."""
-        import logging
-        logger = logging.getLogger(__name__)
         if self.article_model is None:
             return
 
@@ -792,8 +790,6 @@ class Case:
 
     def _enrich_article(self, search_depth: str) -> dict[str, Any]:
         """Run web enrichment on article_model. Returns enrichment metadata."""
-        import logging
-        logger = logging.getLogger(__name__)
 
         from ..search.provider import SearchDepth
         try:
@@ -840,8 +836,6 @@ class Case:
     # -- Venue investigation --
 
     def investigate_venue(self, text: str) -> dict[str, Any]:
-        import logging
-        logger = logging.getLogger(__name__)
 
         # F3: minimum-text guard.
         stripped_len = len(text.strip())
@@ -1321,8 +1315,6 @@ class Case:
         guidelines_text: str = "",
     ):
         """Run venue_field_positioner. LLM if available, deterministic otherwise."""
-        import logging
-        logger = logging.getLogger(__name__)
         from ..agents.venue_field_positioner import VenueFieldPositionerAgent
         from ..agents.contract import AgentInput as _AI
 
@@ -1424,7 +1416,6 @@ class Case:
     def refine_article_model(self, message: str) -> dict[str, Any]:
         """Send a refinement message to the LLM and return suggestions."""
         import json, logging
-        logger = logging.getLogger(__name__)
 
         if not self.article_model:
             return {"error": "No article model to refine"}
@@ -1522,8 +1513,8 @@ class Case:
                                     "value": str(s["value"]),
                                     "reason": str(s.get("reason", "")),
                                 })
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("LLM suggestion parsing failed: %s", exc)
 
         self.refinement_chat.append({
             "role": "assistant",
@@ -1582,8 +1573,6 @@ class Case:
 
     def get_pathways(self) -> list[dict[str, Any]]:
         if not self.pathways and self.semantic_profile:
-            import logging
-            logger = logging.getLogger(__name__)
             from ..agents.disciplinary_mapper import DisciplinaryPathwayMapperAgent
             from ..agents.contract import AgentInput
             from ..llm.attempt_metadata import (
@@ -1664,8 +1653,6 @@ class Case:
         )
         provider = _get_llm_provider("venue_discovery")
         if provider is not None:
-            import logging
-            logger = logging.getLogger(__name__)
             try:
                 output = agent.execute(inp, provider)
                 logger.info("Venues discovered via LLM")
@@ -1800,8 +1787,6 @@ class Case:
         )
 
     def _run_fit_chain(self):
-        import logging
-        logger = logging.getLogger(__name__)
         from ..services.fit_assessment import assess_fit
         from ..services.mismatch_mapping import build_mismatch_map
         from ..services.rewrite_planning import build_rewrite_plan
@@ -1854,7 +1839,8 @@ class Case:
                 self.fit_assessment = assess_fit(
                     self.article_model, self.selected_venue, scenario,
                 )
-            except Exception:
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Deterministic fit assessment failed: %s", exc)
                 return
 
         self.stage = CaseStage.FIT_ASSESSED
@@ -1891,7 +1877,8 @@ class Case:
                 "mismatch_count": len(self.mismatch_map.mismatches),
                 "summary": self.mismatch_map.summary,
             })
-        except Exception:
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Mismatch map build failed: %s", exc)
             return
 
         # MismatchNarratorAgent: enrich each mismatch with LLM-authored
@@ -2024,7 +2011,10 @@ class Case:
                             single_out = narr_agent.execute(
                                 single_inp, narr_provider,
                             )
-                        except Exception:  # noqa: BLE001
+                        except Exception as exc:  # noqa: BLE001
+                            logger.warning(
+                                "Single-mismatch narrator rescue failed: %s", exc,
+                            )
                             single_out = None
                         if (single_out is None
                                 or not single_out.output_entity):
@@ -2130,8 +2120,8 @@ class Case:
                     "repair_failure_stage": None,
                     "repair_steps_attempted": [],
                 }
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Rewrite plan build failed: %s", exc)
 
         # Build the risk report alongside the rewrite plan so the
         # dossier has it on the same chain run. (Citation ecology
@@ -2205,8 +2195,8 @@ class Case:
                             })
                 except Exception as exc:
                     logger.warning("Policy gate failed (non-fatal): %s", exc)
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Policy gate wrapper failed: %s", exc)
 
         # V2-E: BibliographyProfile from preserved raw article text.
         # Pure structural extraction; no external lookups; no invented
@@ -2714,7 +2704,7 @@ class CorrectionRegistry:
             with open(cls._registry_path(), "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
         except Exception as exc:
-            logging.getLogger(__name__).warning(
+            logger.warning(
                 "CorrectionRegistry.append failed: %s", exc,
             )
 
@@ -2827,9 +2817,17 @@ class CaseStore:
         self._cases: dict[str, Case] = {}
         self._load_all()
 
+    @staticmethod
+    def _validate_path_component(value: str, label: str) -> None:
+        # Defense-in-depth: ids come from generate_id(), but the storage
+        # layer must not trust callers — reject separators/traversal
+        if not value or "/" in value or "\\" in value or ".." in value:
+            raise ValueError(f"Unsafe {label} for storage path: {value!r}")
+
     def _case_path(self, case_id: str, user_id: str | None = None):
-        from pathlib import Path
+        self._validate_path_component(case_id, "case_id")
         if user_id:
+            self._validate_path_component(user_id, "user_id")
             d = self._users_dir / user_id / "cases"
             d.mkdir(parents=True, exist_ok=True)
             return d / f"{case_id}.json"
@@ -2837,7 +2835,6 @@ class CaseStore:
 
     def _load_all(self):
         import json, logging
-        logger = logging.getLogger(__name__)
         # Legacy/system cases (no user_id)
         for p in sorted(self._dir.glob("*.json")):
             try:
@@ -2909,7 +2906,6 @@ class CaseStore:
 
     def _persist(self, case: Case):
         import json, logging
-        logger = logging.getLogger(__name__)
         path = self._case_path(case.case_id, case.user_id)
         snapshot = _case_to_snapshot(case)
         try:
@@ -3071,8 +3067,11 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
         if raw is not None and isinstance(raw, dict):
             try:
                 setattr(case, key, cls.from_dict(raw))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(
+                    "Snapshot field %s failed to deserialize (dropped): %s",
+                    key, exc,
+                )
 
     fpm_fit = data.get("field_position_fit")
     if isinstance(fpm_fit, dict):

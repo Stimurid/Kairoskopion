@@ -270,5 +270,29 @@ class TestArticleModelerExceptionLabel(unittest.TestCase):
         self.assertIn(ea.get("raw_output_ref"), (None, ""))
 
 
+class TestUnhashableEnumValues(unittest.TestCase):
+    """LLM occasionally returns a dict/list for enum-mapped fields;
+    _build_from_llm must degrade to UNKNOWN, not crash on dict lookup
+    (observed live: genre_current returned as dict → TypeError)."""
+
+    def test_dict_valued_enum_fields_do_not_crash(self):
+        from kairoskopion.agents.article_modeler import _build_from_llm
+        from kairoskopion.services.article_modeling import build_manuscript_model
+
+        text = "# Title\n\nSome manuscript body long enough to parse."
+        manuscript = build_manuscript_model(text)
+        parsed = _valid_output()
+        parsed["genre_current"] = {"value": "research_article"}
+        parsed["article_stage"] = ["draft"]
+        parsed["method_status"] = {"status": "empirical_method"}
+        parsed["novelty_mode"] = 42
+
+        article = _build_from_llm(parsed, manuscript, text, None)
+        self.assertEqual(article.genre_current, "unknown")
+        self.assertEqual(article.article_stage, "unknown")
+        self.assertEqual(article.method_status, "unknown")
+        self.assertEqual(article.novelty_mode, "unknown")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -178,7 +178,14 @@ def import_storage_bundle(
 
             elif name.startswith("vault/") and not name.endswith("/"):
                 rel = name[len("vault/"):]
-                target_file = vault_root / rel
+                target_file = (vault_root / rel).resolve()
+                if not target_file.is_relative_to(vault_root.resolve()):
+                    return {
+                        "success": False,
+                        "errors": [
+                            f"Unsafe path in bundle (escapes vault root): {name}"
+                        ],
+                    }
                 target_file.parent.mkdir(parents=True, exist_ok=True)
                 target_file.write_bytes(zf.read(name))
                 imported_vault_files += 1

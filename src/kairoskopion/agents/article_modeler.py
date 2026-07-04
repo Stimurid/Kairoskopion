@@ -265,6 +265,12 @@ def _build_from_llm(
     has_ai_disc = any(p in lower_text for p in ai_patterns)
     abstract_text = manuscript.abstract or ""
 
+    def _enum_key(field: str) -> str:
+        # LLMs occasionally return a dict/list here; unhashable values
+        # must degrade to "unknown", not crash dict lookup
+        v = parsed.get(field, "unknown")
+        return v if isinstance(v, str) else "unknown"
+
     # Map LLM article_stage to our enum
     stage_map = {
         "abstract": ArticleStage.ABSTRACT.value,
@@ -273,8 +279,7 @@ def _build_from_llm(
         "revision": ArticleStage.FULL_MANUSCRIPT.value,
         "unknown": ArticleStage.UNKNOWN.value,
     }
-    llm_stage = parsed.get("article_stage", "unknown")
-    stage = stage_map.get(llm_stage, ArticleStage.UNKNOWN.value)
+    stage = stage_map.get(_enum_key("article_stage"), ArticleStage.UNKNOWN.value)
 
     # Map genre
     genre_map = {
@@ -287,7 +292,7 @@ def _build_from_llm(
         "book_review": Genre.REVIEW.value,
         "unknown": Genre.UNKNOWN.value,
     }
-    genre = genre_map.get(parsed.get("genre_current", "unknown"), Genre.UNKNOWN.value)
+    genre = genre_map.get(_enum_key("genre_current"), Genre.UNKNOWN.value)
 
     # Map method
     method_map = {
@@ -298,7 +303,7 @@ def _build_from_llm(
         "review_method": MethodStatus.REVIEW_METHOD.value,
         "unknown": MethodStatus.UNKNOWN.value,
     }
-    method = method_map.get(parsed.get("method_status", "unknown"), MethodStatus.UNKNOWN.value)
+    method = method_map.get(_enum_key("method_status"), MethodStatus.UNKNOWN.value)
 
     # Map novelty
     novelty_map = {
@@ -310,7 +315,7 @@ def _build_from_llm(
         "synthesis": NoveltyMode.NEW_SYNTHESIS.value,
         "unknown": NoveltyMode.UNKNOWN.value,
     }
-    novelty = novelty_map.get(parsed.get("novelty_mode", "unknown"), NoveltyMode.UNKNOWN.value)
+    novelty = novelty_map.get(_enum_key("novelty_mode"), NoveltyMode.UNKNOWN.value)
 
     # Input mode
     has_sections = len(sections) >= 3
