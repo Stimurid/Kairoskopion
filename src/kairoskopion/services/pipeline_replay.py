@@ -243,6 +243,75 @@ def _get_stage_prompt_family(stage_id: str) -> str | None:
     return None
 
 
+def _execute_article_model_live(
+    node: PipelineNode,
+    *,
+    llm_provider: Any,
+    manuscript_text: str,
+    system_prompt: str,
+    user_template: str,
+    override_id: str | None,
+    version_hash: str,
+    family_id: str,
+    trace_store: PipelineTraceStore | None,
+) -> None:
+    """Call ArticleModelerAgent with a real provider during replay."""
+    from ..agents.article_modeler import ArticleModelerAgent
+    from ..agents.contract import AgentInput
+
+    agent = ArticleModelerAgent()
+    if override_id:
+        agent._prompt_family_override = {
+            "system_prompt": system_prompt,
+            "user_prompt_template": user_template,
+        }
+
+    inp = AgentInput(
+        operation_id=node.run_id,
+        agent_role_id="article_modeler",
+        source_refs=["replay:workbench"],
+        raw_text=manuscript_text,
+    )
+
+    response_content = ""
+    try:
+        output = agent.execute(inp, llm_provider)
+        provider_status = "success"
+        parse_status = "success"
+        response_content = str(output.output_entity)[:2000]
+        node.status = "completed"
+        node.output_hash = _hash_text(str(output.output_entity))
+        node.diagnostics.append("replay: live provider call succeeded")
+    except Exception as exc:
+        provider_status = "error"
+        parse_status = "not_attempted"
+        response_content = str(exc)[:500]
+        node.status = "provider_failed"
+        node.diagnostics.append(f"replay: provider error — {exc!s:.200}")
+        logger.warning("Live replay article_model failed: %s", exc)
+
+    node.provider_status = provider_status
+    node.parse_status = parse_status
+
+    if trace_store:
+        trace_store.save_node(node)
+
+    rec = PromptRunRecord(
+        node_id=node.node_id,
+        prompt_family_id=family_id,
+        prompt_version_hash=version_hash,
+        prompt_override_id=override_id,
+        rendered_system_prompt=system_prompt,
+        rendered_user_prompt=user_template,
+        provider_status=provider_status,
+        response_status=provider_status,
+        response_excerpt_or_ref=response_content,
+        diagnostics=[f"replay: live call, provider_status={provider_status}"],
+    )
+    if trace_store:
+        trace_store.save_prompt_record(rec)
+
+
 def _render_prompt_for_stage(
     node: PipelineNode,
     *,
@@ -250,6 +319,8 @@ def _render_prompt_for_stage(
     override_store: PromptOverrideStore | None,
     case_id: str | None,
     trace_store: PipelineTraceStore | None,
+    llm_provider: Any | None = None,
+    manuscript_text: str | None = None,
 ) -> None:
     """Look up prompt family, apply override, create PromptRunRecord, update node."""
     family_id = node.prompt_family_id
@@ -281,6 +352,22 @@ def _render_prompt_for_stage(
 
     node.prompt_version_hash = version_hash
     node.prompt_override_id = override_id
+
+    # Live LLM path: if provider and manuscript are available for article_model
+    if llm_provider and manuscript_text and node.stage_id == "article_model":
+        _execute_article_model_live(
+            node,
+            llm_provider=llm_provider,
+            manuscript_text=manuscript_text,
+            system_prompt=system_prompt,
+            user_template=user_template,
+            override_id=override_id,
+            version_hash=version_hash,
+            family_id=family_id,
+            trace_store=trace_store,
+        )
+        return
+
     node.provider_status = "not_called"
     node.parse_status = "not_called"
     node.status = "prompt_rendered_needs_llm"
@@ -370,6 +457,7 @@ def execute_replay_run(
 
     if unsupported:
         run = scaffold_replay_run(plan, case_id=case_id, trace_store=trace_store)
+        any_live_executed = False
         for node in (trace_store.list_nodes(run.run_id) if trace_store else []):
             if node.stage_id in prompt_renderable and node.status == "pending":
                 _render_prompt_for_stage(
@@ -378,7 +466,11 @@ def execute_replay_run(
                     override_store=override_store,
                     case_id=case_id,
                     trace_store=trace_store,
+                    llm_provider=llm_provider,
+                    manuscript_text=manuscript_text,
                 )
+                if node.status in ("completed", "provider_failed", "parse_failed"):
+                    any_live_executed = True
             elif node.stage_id in truly_unsupported and node.status == "pending":
                 node.status = "stage_not_yet_replayable"
                 node.diagnostics.append(
@@ -393,6 +485,12 @@ def execute_replay_run(
                 "result": None,
                 "status": "partial_not_replayable",
                 "unsupported_stages": truly_unsupported,
+            }
+        if any_live_executed:
+            return {
+                "run": run,
+                "result": None,
+                "status": "live_executed",
             }
         return {
             "run": run,
