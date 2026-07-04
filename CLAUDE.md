@@ -89,7 +89,7 @@ For deep spec questions, read:
 - Litops compatibility bridge (export-litops-pack)
 - WhiteCrow patch queue bridge (export-whitecrow-patches)
 - Venue evidence registry: VenueRecord/VenueSource/VenueClaim/VenueEvidencePack, seed corpus import, evidence pack build with conflict resolution
-- CLI: 16 commands (`status`, `run-fixture`, `run-local`, `adapters-smoke`, `vault-index`, `export-bundle`, `import-bundle`, `validate-bundle`, `inspect-storage`, `intake-file`, `build-venue-profile`, `build-submission-pack`, `export-litops-pack`, `export-whitecrow-patches`, `import-venue-seed`, `build-venue-evidence-pack`)
+- CLI: 39 commands (core: `status`, `run-fixture`, `run-local`, `adapters-smoke`, `vault-index`, `export-bundle`, `import-bundle`, `validate-bundle`, `inspect-storage`, `intake-file`, `build-venue-profile`, `build-submission-pack`, `export-litops-pack`, `export-whitecrow-patches`, `import-venue-seed`, `build-venue-evidence-pack`; plus inspection/discovery/workflow commands — see `kairoskopion --help`)
 - Integration: Litops bridge (JSONL export), WhiteCrow bridge (patch queue export)
 
 ## Non-negotiable rules
@@ -165,7 +165,7 @@ For deep spec questions, read:
 > No public prod claim.
 
 - **Backend:** FastAPI (`src/kairoskopion/api/`), Bearer auth on all `/cases/*`, disk-backed Case orchestrator
-- **Frontend:** React + TypeScript (`ui/`), Vite build, 17 components, dark theme, responsive
+- **Frontend:** React + TypeScript (`ui/`), Vite build, 29 components, dark theme, responsive
 - **Run:** `uvicorn kairoskopion.api.app:app --reload` (port 8000) + `cd ui && npm run dev` (port 5173)
 - **Build:** `cd ui && npx tsc --noEmit && npx vite build`
 - **Env:** `VITE_API_URL` for frontend API base (defaults to `http://localhost:8000`)
@@ -239,11 +239,11 @@ multiple fields into one query string.
 | `src/kairoskopion/exchange.py` | Export/import storage bundles (zip) |
 | `src/kairoskopion/freshness.py` | Freshness/staleness tracking |
 | `src/kairoskopion/api/app.py` | FastAPI app (staging preview) |
-| `src/kairoskopion/api/cases.py` | Case orchestrator (19 routes + investigate-venue-by-reference) |
+| `src/kairoskopion/api/cases.py` | Case orchestrator (routes live in `api/app.py`, 58 endpoints) |
 | `data/venue_evidence_packs/` | Top 5 venue evidence packs (ВФ, ЭФН, ФЖ, ЦУ) |
-| `ui/` | React+TypeScript cockpit (17 components) |
+| `ui/` | React+TypeScript cockpit (29 components) |
 | `ui/src/api/client.ts` | Typed API client |
 | `ui/src/styles/cockpit.css` | Dark theme CSS |
-| `tests/` | 2814+ tests |
+| `tests/` | 3110+ tests |
 | `tests/fixtures/` | Synthetic manuscript, venue, scenario |
 | `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` | Master spec |

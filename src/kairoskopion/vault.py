@@ -7,11 +7,14 @@ markdown cards. Registries remain the source of structured truth.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from .persistence import ensure_storage_root, read_registry, list_registries
+
+_MD_LINK_RE = re.compile(r'\[([^\]]+)\]\(([^)]+\.md)\)')
 
 _VAULT_DIR = "vault"
 _VAULT_SUBDIRS = (
@@ -57,66 +60,66 @@ def _index_header(title: str, count: int) -> str:
 
 
 def generate_articles_index(records: list[dict]) -> str:
-    md = _index_header("Articles", len(records))
+    parts = [_index_header("Articles", len(records))]
     if records:
-        md += "| ID | Title | Stage | Lifecycle | Unknowns |\n"
-        md += "|-----|-------|-------|-----------|----------|\n"
+        parts.append("| ID | Title | Stage | Lifecycle | Unknowns |\n")
+        parts.append("|-----|-------|-------|-----------|----------|\n")
         for r in records:
             aid = r.get("article_model_id", "?")
-            md += (
+            parts.append(
                 f"| {_link('articles', aid)} "
                 f"| {_safe_get(r, 'title_current')} "
                 f"| {_safe_get(r, 'article_stage')} "
                 f"| {_safe_get(r, 'lifecycle_status')} "
                 f"| {len(r.get('unknowns', []))} |\n"
             )
-    return md
+    return "".join(parts)
 
 
 def generate_venues_index(records: list[dict]) -> str:
-    md = _index_header("Venues", len(records))
+    parts = [_index_header("Venues", len(records))]
     if records:
-        md += "| ID | Name | Type | Lifecycle | Unknowns |\n"
-        md += "|-----|------|------|-----------|----------|\n"
+        parts.append("| ID | Name | Type | Lifecycle | Unknowns |\n")
+        parts.append("|-----|------|------|-----------|----------|\n")
         for r in records:
             vid = r.get("venue_model_id", "?")
-            md += (
+            parts.append(
                 f"| {_link('venues', vid)} "
                 f"| {_safe_get(r, 'canonical_name')} "
                 f"| {_safe_get(r, 'venue_type')} "
                 f"| {_safe_get(r, 'lifecycle_status')} "
                 f"| {len(r.get('unknowns', []))} |\n"
             )
-    return md
+    return "".join(parts)
 
 
 def generate_fits_index(records: list[dict]) -> str:
-    md = _index_header("Fit Assessments", len(records))
+    parts = [_index_header("Fit Assessments", len(records))]
     if records:
-        md += "| ID | Label | Level | Article | Venue |\n"
-        md += "|-----|-------|-------|---------|-------|\n"
+        parts.append("| ID | Label | Level | Article | Venue |\n")
+        parts.append("|-----|-------|-------|---------|-------|\n")
         for r in records:
             fid = r.get("fit_assessment_id", "?")
             art_id = r.get("article_model_id", "?")
             ven_id = r.get("venue_model_id", "?")
-            md += (
+            parts.append(
                 f"| {_link('fits', fid)} "
                 f"| {_safe_get(r, 'overall_label')} "
                 f"| {_safe_get(r, 'assessment_level')} "
                 f"| {_link('articles', art_id)} "
                 f"| {_link('venues', ven_id)} |\n"
             )
-    return md
+    return "".join(parts)
 
 
 def generate_citations_index(records: list[dict]) -> str:
-    md = _index_header("Citation Ecology Reports", len(records))
+    parts = [_index_header("Citation Ecology Reports", len(records))]
     if records:
-        md += "| ID | Article | Venue | Gaps | Tasks | Lifecycle |\n"
-        md += "|-----|---------|-------|------|-------|-----------|\n"
+        parts.append("| ID | Article | Venue | Gaps | Tasks | Lifecycle |\n")
+        parts.append("|-----|---------|-------|------|-------|-----------|\n")
         for r in records:
             cid = r.get("citation_ecology_report_id", "?")
-            md += (
+            parts.append(
                 f"| {_link('citations', cid)} "
                 f"| {_safe_get(r, 'article_model_id')} "
                 f"| {_safe_get(r, 'venue_model_id')} "
@@ -124,33 +127,33 @@ def generate_citations_index(records: list[dict]) -> str:
                 f"| {len(r.get('tasks', []))} "
                 f"| {_safe_get(r, 'lifecycle_status')} |\n"
             )
-    return md
+    return "".join(parts)
 
 
 def generate_traces_index(records: list[dict]) -> str:
-    md = _index_header("Pipeline Runs", len(records))
+    parts = [_index_header("Pipeline Runs", len(records))]
     if records:
-        md += "| ID | Status | Started | Entities created |\n"
-        md += "|-----|--------|---------|------------------|\n"
+        parts.append("| ID | Status | Started | Entities created |\n")
+        parts.append("|-----|--------|---------|------------------|\n")
         for r in records:
             pid = r.get("pipeline_run_id", "?")
-            md += (
+            parts.append(
                 f"| {_link('traces', pid)} "
                 f"| {_safe_get(r, 'status')} "
                 f"| {_safe_get(r, 'started_at')} "
                 f"| {len(r.get('created_entity_ids', []))} |\n"
             )
-    return md
+    return "".join(parts)
 
 
 def generate_adapters_index(records: list[dict]) -> str:
-    md = _index_header("Adapter Results", len(records))
+    parts = [_index_header("Adapter Results", len(records))]
     if records:
-        md += "| ID | Adapter | Query | Status | Records | Mock |\n"
-        md += "|-----|---------|-------|--------|---------|------|\n"
+        parts.append("| ID | Adapter | Query | Status | Records | Mock |\n")
+        parts.append("|-----|---------|-------|--------|---------|------|\n")
         for r in records:
             aid = r.get("adapter_result_id", "?")
-            md += (
+            parts.append(
                 f"| `{aid}` "
                 f"| {_safe_get(r, 'adapter_name')} "
                 f"| {_safe_get(r, 'query')} "
@@ -158,7 +161,7 @@ def generate_adapters_index(records: list[dict]) -> str:
                 f"| {len(r.get('records', []))} "
                 f"| {r.get('is_mock', True)} |\n"
             )
-    return md
+    return "".join(parts)
 
 
 _INDEX_GENERATORS = {
@@ -172,16 +175,18 @@ _INDEX_GENERATORS = {
 
 
 def generate_root_index(counts: dict[str, int]) -> str:
-    md = f"---\ntype: vault_root_index\ngenerated_at: {_now_iso()}\n---\n\n"
-    md += "# Kairoskopion Vault\n\n"
-    md += "Local projection of Kairoskopion state. Registries are the source of truth.\n\n"
-    md += "## Sections\n\n"
+    parts = [
+        f"---\ntype: vault_root_index\ngenerated_at: {_now_iso()}\n---\n\n",
+        "# Kairoskopion Vault\n\n",
+        "Local projection of Kairoskopion state. Registries are the source of truth.\n\n",
+        "## Sections\n\n",
+    ]
     for subdir, count in sorted(counts.items()):
         if count > 0:
-            md += f"- [{subdir}]({subdir}/INDEX.md) — {count} record(s)\n"
+            parts.append(f"- [{subdir}]({subdir}/INDEX.md) — {count} record(s)\n")
         else:
-            md += f"- {subdir} — empty\n"
-    return md
+            parts.append(f"- {subdir} — empty\n")
+    return "".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -301,8 +306,7 @@ def validate_vault_links(vault_root: Path) -> list[dict[str, Any]]:
 
     for md_file in md_files:
         content = md_file.read_text(encoding="utf-8")
-        import re
-        for match in re.finditer(r'\[([^\]]+)\]\(([^)]+\.md)\)', content):
+        for match in _MD_LINK_RE.finditer(content):
             link_text, link_target = match.group(1), match.group(2)
             if link_target.startswith("http"):
                 continue

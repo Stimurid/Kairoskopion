@@ -396,6 +396,21 @@ class TestOpenAICompatProvider:
                 provider.complete([{"role": "user", "content": "test"}])
             assert exc_info.value.error_code == "EMPTY_RESPONSE_TEXT"
 
+    def test_complete_missing_choices_raises_llm_error(self):
+        # Some proxies return HTTP 200 with an error body and no choices;
+        # must surface as LLMError, not raw KeyError/IndexError
+        provider = self._make_provider()
+        for body in (
+            {"id": "chatcmpl-test", "object": "chat.completion", "choices": []},
+            {"error": {"message": "quota exceeded"}},
+        ):
+            resp_bytes = json.dumps(body).encode()
+            mock_resp = _mock_urlopen(resp_bytes)
+            with patch("urllib.request.urlopen", return_value=mock_resp):
+                with pytest.raises(LLMError) as exc_info:
+                    provider.complete([{"role": "user", "content": "test"}])
+                assert exc_info.value.error_code == "MALFORMED_RESPONSE"
+
 
 # ===================================================================
 # Track 4: JSON repair smoke

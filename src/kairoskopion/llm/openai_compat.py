@@ -101,9 +101,16 @@ class OpenAICompatProvider:
                         error_code="INVALID_JSON",
                     ) from je
 
-                choice = raw["choices"][0]
-                content = choice["message"].get("content") or ""
-                reasoning = choice["message"].get("reasoning_content") or ""
+                choices = raw.get("choices") or []
+                if not choices:
+                    raise LLMError(
+                        f"LLM response has no choices: {raw_bytes[:200]}",
+                        error_code="MALFORMED_RESPONSE",
+                    )
+                choice = choices[0]
+                message = choice.get("message") or {}
+                content = message.get("content") or ""
+                reasoning = message.get("reasoning_content") or ""
                 usage = raw.get("usage", {})
 
                 if not content and not reasoning:
