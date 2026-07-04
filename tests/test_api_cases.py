@@ -95,6 +95,19 @@ class TestCaseStore(unittest.TestCase):
     def test_delete_nonexistent(self):
         self.assertFalse(self.store.delete("nonexistent"))
 
+    def test_case_path_rejects_traversal_components(self):
+        # Storage layer must not trust caller-supplied ids: separators
+        # and ".." must be rejected before any filesystem path is built
+        for bad in ("../escape", "..\\escape", "a/b", "a\\b", "..", ""):
+            with self.assertRaises(ValueError, msg=f"case_id={bad!r}"):
+                self.store._case_path(bad)
+        with self.assertRaises(ValueError):
+            self.store._case_path("case_ok", user_id="../other_user")
+
+    def test_case_path_accepts_normal_ids(self):
+        p = self.store._case_path("case_abc123", user_id="user_xyz")
+        self.assertTrue(str(p).endswith("case_abc123.json"))
+
 
 class TestCaseIntake(unittest.TestCase):
     def test_intake_abstract(self):
