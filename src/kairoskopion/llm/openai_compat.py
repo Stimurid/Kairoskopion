@@ -10,6 +10,7 @@ Error taxonomy aligned with litops:
 - INVALID_JSON — response body not valid JSON
 - EMPTY_RESPONSE_TEXT — empty content from API
 - RETRIES_EXHAUSTED — all retry attempts failed
+- AUTH_FAILED — 401/403, API key invalid or expired
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from typing import Any
 
 from .config import LLMConfig
 from .response import LLMResponse
+from .session_log import get_session_log
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,10 @@ class OpenAICompatProvider:
     def __init__(self, config: LLMConfig) -> None:
         self._config = config
 
+    @property
+    def model(self) -> str:
+        return self._config.model
+
     def complete(
         self,
         messages: list[dict[str, str]],
@@ -48,12 +54,65 @@ class OpenAICompatProvider:
         response_schema: dict[str, Any] | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
+        agent_role: str = "",
+    ) -> LLMResponse:
+        models_to_try = [self._config.model] + list(self._config.fallback_models)
+        last_error: LLMError | None = None
+
+        for model_idx, model_name in enumerate(models_to_try):
+            is_fallback = model_idx > 0
+            if is_fallback:
+                logger.info(
+                    "Falling back to model %s (attempt %d/%d)",
+                    model_name, model_idx + 1, len(models_to_try),
+                )
+            try:
+                return self._complete_single(
+                    messages,
+                    model=model_name,
+                    response_schema=response_schema,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    agent_role=agent_role,
+                    is_fallback=is_fallback,
+                )
+            except LLMError as e:
+                last_error = e
+                slog = get_session_log()
+                slog.log_error(
+                    agent_role=agent_role,
+                    model=model_name,
+                    error_code=e.error_code,
+                    error_message=str(e),
+                )
+                if e.error_code == "AUTH_FAILED":
+                    raise
+                if model_idx < len(models_to_try) - 1:
+                    logger.warning(
+                        "Model %s failed (%s), trying next fallback",
+                        model_name, e.error_code,
+                    )
+                    continue
+                raise
+
+        raise last_error or LLMError("No models available", error_code="NO_MODELS")
+
+    def _complete_single(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        model: str,
+        response_schema: dict[str, Any] | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        agent_role: str = "",
+        is_fallback: bool = False,
     ) -> LLMResponse:
         temp = temperature if temperature is not None else self._config.temperature
         tokens = max_tokens if max_tokens is not None else self._config.max_tokens
 
         body: dict[str, Any] = {
-            "model": self._config.model,
+            "model": model,
             "messages": messages,
             "temperature": temp,
             "max_tokens": tokens,
@@ -76,14 +135,21 @@ class OpenAICompatProvider:
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
 
-        payload = json.dumps(body).encode("utf-8")
+        payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
         last_error: Exception | None = None
         last_code: str = "UNKNOWN"
+
+        msg_preview = ""
+        if messages:
+            last_msg = messages[-1].get("content", "")
+            msg_preview = last_msg[:200]
+
+        slog = get_session_log()
 
         for attempt in range(self._config.max_retries):
             if attempt > 0:
                 backoff = min(2 ** attempt, 30)
-                logger.info("LLM retry %d after %ds", attempt + 1, backoff)
+                logger.info("LLM retry %d after %ds (model=%s)", attempt + 1, backoff, model)
                 time.sleep(backoff)
 
             t0 = time.monotonic()
@@ -96,6 +162,12 @@ class OpenAICompatProvider:
                 try:
                     raw = json.loads(raw_bytes)
                 except json.JSONDecodeError as je:
+                    slog.log_error(
+                        agent_role=agent_role, model=model,
+                        error_code="INVALID_JSON",
+                        error_message=f"Response not JSON: {raw_bytes[:200]}",
+                        attempt=attempt + 1, latency_ms=latency,
+                    )
                     raise LLMError(
                         f"LLM returned invalid JSON: {raw_bytes[:200]}",
                         error_code="INVALID_JSON",
@@ -103,6 +175,12 @@ class OpenAICompatProvider:
 
                 choices = raw.get("choices") or []
                 if not choices:
+                    slog.log_error(
+                        agent_role=agent_role, model=model,
+                        error_code="MALFORMED_RESPONSE",
+                        error_message=f"No choices in response: {raw_bytes[:200]}",
+                        attempt=attempt + 1, latency_ms=latency,
+                    )
                     raise LLMError(
                         f"LLM response has no choices: {raw_bytes[:200]}",
                         error_code="MALFORMED_RESPONSE",
@@ -114,6 +192,12 @@ class OpenAICompatProvider:
                 usage = raw.get("usage", {})
 
                 if not content and not reasoning:
+                    slog.log_error(
+                        agent_role=agent_role, model=model,
+                        error_code="EMPTY_RESPONSE_TEXT",
+                        error_message="LLM returned empty content",
+                        attempt=attempt + 1, latency_ms=latency,
+                    )
                     raise LLMError(
                         "LLM returned empty response",
                         error_code="EMPTY_RESPONSE_TEXT",
@@ -128,7 +212,7 @@ class OpenAICompatProvider:
                             "(preview=%r)", content[:120]
                         )
 
-                return LLMResponse(
+                llm_response = LLMResponse(
                     content=content,
                     parsed=parsed,
                     model=raw.get("model"),
@@ -138,27 +222,83 @@ class OpenAICompatProvider:
                     finish_reason=choice.get("finish_reason"),
                 )
 
+                slog.log_call(
+                    agent_role=agent_role,
+                    model=raw.get("model") or model,
+                    messages_preview=msg_preview,
+                    response_preview=content[:500],
+                    latency_ms=latency,
+                    input_tokens=usage.get("prompt_tokens", 0),
+                    output_tokens=usage.get("completion_tokens", 0),
+                    parse_status="parsed" if parsed else "text_only",
+                    fallback_model=model if is_fallback else "",
+                    attempt=attempt + 1,
+                )
+
+                return llm_response
+
             except LLMError:
                 raise
             except urllib.error.HTTPError as e:
+                latency = (time.monotonic() - t0) * 1000
                 last_error = e
-                if e.code in (429, 500, 502, 503, 529):
+
+                if e.code in (401, 403):
+                    error_msg = f"API key invalid or expired (HTTP {e.code})"
+                    slog.log_error(
+                        agent_role=agent_role, model=model,
+                        error_code="AUTH_FAILED",
+                        error_message=error_msg,
+                        attempt=attempt + 1, latency_ms=latency,
+                    )
+                    raise LLMError(error_msg, error_code="AUTH_FAILED") from e
+
+                if e.code in (408, 429, 500, 502, 503, 504, 529):
                     last_code = "PROVIDER_HTTP_ERROR"
-                    logger.warning("LLM HTTP %d on attempt %d", e.code, attempt + 1)
+                    logger.warning("LLM HTTP %d on attempt %d (model=%s)", e.code, attempt + 1, model)
+                    slog.log_error(
+                        agent_role=agent_role, model=model,
+                        error_code=f"HTTP_{e.code}",
+                        error_message=f"HTTP {e.code}: {e.reason}",
+                        attempt=attempt + 1, latency_ms=latency,
+                    )
                     continue
+
+                slog.log_error(
+                    agent_role=agent_role, model=model,
+                    error_code=f"HTTP_{e.code}",
+                    error_message=f"HTTP {e.code}: {e.reason}",
+                    attempt=attempt + 1, latency_ms=latency,
+                )
                 raise LLMError(
                     f"LLM HTTP {e.code}: {e.reason}",
                     error_code="PROVIDER_HTTP_ERROR",
                 ) from e
+
             except urllib.error.URLError as e:
+                latency = (time.monotonic() - t0) * 1000
                 last_error = e
                 last_code = "NETWORK_ERROR"
-                logger.warning("LLM network error on attempt %d: %s", attempt + 1, e)
+                logger.warning("LLM network error on attempt %d (model=%s): %s", attempt + 1, model, e)
+                slog.log_error(
+                    agent_role=agent_role, model=model,
+                    error_code="NETWORK_ERROR",
+                    error_message=str(e)[:200],
+                    attempt=attempt + 1, latency_ms=latency,
+                )
                 continue
+
             except (TimeoutError, OSError) as e:
+                latency = (time.monotonic() - t0) * 1000
                 last_error = e
                 last_code = "PROVIDER_TIMEOUT"
-                logger.warning("LLM timeout on attempt %d", attempt + 1)
+                logger.warning("LLM timeout on attempt %d (model=%s, timeout=%.0fs)", attempt + 1, model, self._config.timeout_seconds)
+                slog.log_error(
+                    agent_role=agent_role, model=model,
+                    error_code="PROVIDER_TIMEOUT",
+                    error_message=f"Timeout after {self._config.timeout_seconds:.0f}s",
+                    attempt=attempt + 1, latency_ms=latency,
+                )
                 continue
 
         raise LLMError(

@@ -362,6 +362,45 @@ def _type_allows_null(spec: Any) -> bool:
     return True
 
 
+def _coerce_required_nulls(data: dict, schema: dict) -> list[str]:
+    """Coerce null values in required non-nullable fields to safe defaults.
+
+    The prompt tells the LLM "use null for fields you cannot determine",
+    but some required fields (arrays, non-nullable strings/enums) reject
+    null in schema validation. Rather than discarding the entire extraction,
+    coerce these to type-appropriate zero values:
+      - array → []
+      - string with "unknown" enum → "unknown"
+      - string without enum → ""
+    Returns list of coerced field names for audit trail.
+    """
+    if not isinstance(data, dict) or not isinstance(schema, dict):
+        return []
+    required = set(schema.get("required") or [])
+    props = schema.get("properties") or {}
+    coerced: list[str] = []
+    for k in required:
+        if k not in data or data[k] is not None:
+            continue
+        spec = props.get(k)
+        if _type_allows_null(spec):
+            continue
+        if not isinstance(spec, dict):
+            continue
+        t = spec.get("type")
+        if t == "array":
+            data[k] = []
+            coerced.append(k)
+        elif t == "string":
+            enum = spec.get("enum")
+            if isinstance(enum, list) and "unknown" in enum:
+                data[k] = "unknown"
+            else:
+                data[k] = ""
+            coerced.append(k)
+    return coerced
+
+
 def _schema_required_present(data: Any, schema: dict | None) -> list[str]:
     """Return missing-required-field errors. Empty list means OK.
 
@@ -594,6 +633,13 @@ def _validate_and_return(
         parsed, filled = _fill_optional_defaults(parsed, schema)
         if filled:
             steps.append(f"optional_defaults_filled:{','.join(filled[:6])}")
+    # Coerce null values in required non-nullable fields to safe defaults
+    # BEFORE validation — prevents discarding an otherwise-valid extraction
+    # just because one array field is null.
+    if isinstance(parsed, dict) and isinstance(schema, dict):
+        coerced = _coerce_required_nulls(parsed, schema)
+        if coerced:
+            steps.append(f"required_nulls_coerced:{','.join(coerced[:6])}")
     errors = _schema_required_present(parsed, schema)
     if errors:
         return RepairOutcome(
