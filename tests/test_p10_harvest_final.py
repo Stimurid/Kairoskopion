@@ -2,7 +2,7 @@
 
 Verifies: domain classification, acquisition task generation,
 verification gate on existing records, review packet export,
-registry-ready output validation.
+provisional candidate export validation.
 """
 from __future__ import annotations
 
@@ -155,18 +155,18 @@ class TestVerificationGateFinal:
         assert summary["total"] >= 1
 
 
-# ── registry-ready output ─────────────────────────────────────────
+# ── provisional candidate export ─────────────────────────────────
 
-class TestRegistryReadyOutput:
+class TestProvisionalCandidateExport:
     def test_output_files_exist(self):
         harvest_dir = Path("data/seed_registry/education_ai_russia/p10_harvest")
-        assert (harvest_dir / "registry_ready_output.jsonl").exists()
+        assert (harvest_dir / "provisional_candidate_export.jsonl").exists()
         assert (harvest_dir / "harvest_summary_final.json").exists()
         assert (harvest_dir / "acquisition_tasks_final.json").exists()
         assert (harvest_dir / "verification_decisions_final.jsonl").exists()
 
     def test_registry_output_all_provisional(self):
-        path = Path("data/seed_registry/education_ai_russia/p10_harvest/registry_ready_output.jsonl")
+        path = Path("data/seed_registry/education_ai_russia/p10_harvest/provisional_candidate_export.jsonl")
         if not path.exists():
             pytest.skip("Output not yet generated")
         with open(path, encoding="utf-8") as f:
@@ -176,7 +176,7 @@ class TestRegistryReadyOutput:
                 assert rec["review_status"] == "pending"
 
     def test_registry_output_has_provenance(self):
-        path = Path("data/seed_registry/education_ai_russia/p10_harvest/registry_ready_output.jsonl")
+        path = Path("data/seed_registry/education_ai_russia/p10_harvest/provisional_candidate_export.jsonl")
         if not path.exists():
             pytest.skip("Output not yet generated")
         with open(path, encoding="utf-8") as f:
@@ -185,7 +185,7 @@ class TestRegistryReadyOutput:
                 assert rec.get("provenance"), f"Missing provenance: {rec.get('venue_id')}"
 
     def test_registry_output_has_domain_tier(self):
-        path = Path("data/seed_registry/education_ai_russia/p10_harvest/registry_ready_output.jsonl")
+        path = Path("data/seed_registry/education_ai_russia/p10_harvest/provisional_candidate_export.jsonl")
         if not path.exists():
             pytest.skip("Output not yet generated")
         valid_tiers = {"tier1_ru_education", "tier2_ai_education", "tier3_edtech",
@@ -196,7 +196,7 @@ class TestRegistryReadyOutput:
                 assert rec.get("domain_tier") in valid_tiers
 
     def test_no_accepted_without_verification(self):
-        path = Path("data/seed_registry/education_ai_russia/p10_harvest/registry_ready_output.jsonl")
+        path = Path("data/seed_registry/education_ai_russia/p10_harvest/provisional_candidate_export.jsonl")
         if not path.exists():
             pytest.skip("Output not yet generated")
         with open(path, encoding="utf-8") as f:
@@ -239,3 +239,58 @@ class TestReviewPacketFinal:
             pytest.skip("Output not yet generated")
         content = path.read_text(encoding="utf-8")
         assert "record_type" in content.split("\n")[0]
+
+
+# ── provisional semantics invariants ─────────────────────────────
+
+class TestProvisionalSemanticsInvariants:
+    EXPORT_PATH = Path("data/seed_registry/education_ai_russia/p10_harvest/provisional_candidate_export.jsonl")
+
+    def _load_records(self):
+        if not self.EXPORT_PATH.exists():
+            pytest.skip("Export not yet generated")
+        with open(self.EXPORT_PATH, encoding="utf-8") as f:
+            return [json.loads(line.strip()) for line in f if line.strip()]
+
+    def test_all_87_retain_provisional_status(self):
+        records = self._load_records()
+        assert len(records) == 87
+        for r in records:
+            assert r["source_status"] == "provisional", (
+                f"{r['venue_id']} has status {r['source_status']}, expected provisional"
+            )
+
+    def test_accepted_count_is_zero(self):
+        records = self._load_records()
+        accepted = [r for r in records if r["source_status"] == "accepted"]
+        assert len(accepted) == 0
+
+    def test_provisional_records_not_in_accepted_registry(self):
+        from kairoskopion.registry.services import RegistryHub
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            hub = RegistryHub(data_dir=Path(tmp))
+            venue_reg = hub._get_registry("venue")
+            assert len(venue_reg.list_all()) == 0
+
+    def test_export_preserves_provenance_and_evidence(self):
+        records = self._load_records()
+        for r in records:
+            assert r.get("provenance"), f"Missing provenance: {r['venue_id']}"
+            assert r.get("evidence_refs"), f"Missing evidence_refs: {r['venue_id']}"
+
+    def test_noise_records_not_promoted(self):
+        records = self._load_records()
+        noise = [r for r in records if r.get("domain_tier") == "noise"]
+        assert len(noise) > 0
+        for r in noise:
+            assert r["source_status"] == "provisional"
+            assert r["review_status"] == "pending"
+
+    def test_unclassified_records_not_promoted(self):
+        records = self._load_records()
+        unclassified = [r for r in records if r.get("domain_tier") == "unclassified"]
+        assert len(unclassified) > 0
+        for r in unclassified:
+            assert r["source_status"] == "provisional"
+            assert r["review_status"] == "pending"

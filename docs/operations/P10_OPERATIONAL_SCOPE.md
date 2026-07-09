@@ -89,5 +89,5 @@ Russian higher education, AI in education, educational technology, university di
 3. Classify records by domain relevance (Tier 1-4 + Noise)
 4. Generate acquisition tasks for unresolved source needs
 5. Export review packets for NEEDS_REVIEW records
-6. Produce registry-ready outputs for provisional records
+6. Produce provisional candidate export for operator review
 7. Prove operator path end-to-end

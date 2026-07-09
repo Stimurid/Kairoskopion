@@ -7,7 +7,7 @@ Produces:
   - acquisition tasks for unresolved source needs
   - verification decisions with explicit verdicts
   - review packets for owner inspection
-  - registry-ready outputs (provisional, schema-valid)
+  - provisional candidate export (schema-valid, not accepted truth)
   - operator smoke report data
 
 Does NOT re-query live adapters (uses existing results).
@@ -319,8 +319,8 @@ def main():
     tsv_path.write_text(export_tsv(packet), encoding="utf-8")
     print(f"  Review packet exported: MD + JSONL + TSV")
 
-    # 6. Produce registry-ready output
-    print("\n[6] Producing registry-ready outputs...")
+    # 6. Produce provisional candidate export
+    print("\n[6] Producing provisional candidate export...")
     registry_output = []
     for rec in records:
         tier = classifications.get(rec.get("venue_id"), {}).get("tier", "unclassified")
@@ -338,14 +338,14 @@ def main():
         }
         registry_output.append(entry)
 
-    registry_path = OUTPUT_DIR / "registry_ready_output.jsonl"
+    registry_path = OUTPUT_DIR / "provisional_candidate_export.jsonl"
     with open(registry_path, "w", encoding="utf-8") as f:
         for entry in registry_output:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     accepted = sum(1 for r in registry_output if r["source_status"] == "accepted")
     provisional = sum(1 for r in registry_output if r["source_status"] == "provisional")
-    print(f"  Registry-ready: {len(registry_output)} records")
+    print(f"  Provisional candidates: {len(registry_output)} records")
     print(f"    Accepted: {accepted}")
     print(f"    Provisional: {provisional}")
 
@@ -369,7 +369,7 @@ def main():
         "domain_classification": tier_counts,
         "acquisition_tasks": task_counts,
         "verification_summary": summary,
-        "registry_ready": {
+        "provisional_candidate_export": {
             "total": len(registry_output),
             "accepted": accepted,
             "provisional": provisional,

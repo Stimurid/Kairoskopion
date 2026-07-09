@@ -109,7 +109,7 @@
 
 ---
 
-## Registry-ready outputs
+## Provisional candidate export
 
 | Metric | Value |
 |---|---|

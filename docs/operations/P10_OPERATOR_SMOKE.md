@@ -15,7 +15,7 @@
 | 4 | Run verification on record | verdict=keep_provisional, reason=Insufficient evidence for promotion |
 | 5 | Inspect verification decision from file | record_id, record_type, verdict, reason all present |
 | 6 | Inspect review packet | MD 9163 chars, JSONL 175 lines, header=review_packet_header |
-| 7 | Inspect registry-ready output | 87 records, 0 accepted, 87 provisional, domain tiers assigned |
+| 7 | Inspect provisional candidate export | 87 records, 0 accepted, 87 provisional, domain tiers assigned |
 | 8 | Provenance audit | 0 missing provenance, 0 missing evidence, 0 fabricated |
 | 9 | Confirm no fabrication | PASS — no fabricated evidence, no auto-promotion |
 
