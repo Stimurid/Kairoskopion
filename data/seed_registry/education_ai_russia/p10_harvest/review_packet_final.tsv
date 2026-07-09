@@ -1,0 +1,88 @@
+record_type	record_id	name_or_label	status	verification_verdict	evidence_count	evidence_kinds	needs_action
+venue	vrec_0e3fbc1df29a	Vysshee Obrazovanie v Rossii = Higher Education in Russia	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_acc91aa8c82e	Pedagogical Education in Russia	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_70fb22abf41a	Professional Education in Russia and Abroad	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_15dcf89a2fc4	Higher Education in Russia and Beyond	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_d0d88b95355b	Высшее образование в России  (Vysshee obrazovanie v Rossii = Higher Education in Russia)	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_75b7c3cdbec1	RUDN Journal of Informatization in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_4a1d18d27ebc	Social and cultural space of Russia and abroad society education language	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_dee7306fe58d	RUDN Journal of Language Education and Translingual Practices	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_0cb9eaf316d4	Physical Education and Sport Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_6ff73549ba95	Pedagogy Culture and Society	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_feb855760b1b	Technology Pedagogy and Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_0c287d99151e	Journal of Education for Teaching International Research and Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_3d4dd1a5358d	International Journal of Engineering Pedagogy (iJEP)	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_6e2c959129c5	The Review of Education Pedagogy & Cultural Studies	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_e4d7453781e2	Phenomenology + Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_2b8691204af8	Entrepreneurship Education and Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_28edafad909a	Journal of Curriculum and Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_3edc536a7139	Writing & Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_36c79c048b90	Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_c90fa0570a9d	The Journal of Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_e76482906efd	Studies in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_46c983cc1f30	Assessment & Evaluation in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_bba157454dc6	Higher Education Research & Development	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_b40717365f80	Research in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_95df75067514	The Internet and Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_38fe3a16c313	Teaching in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_12a1baf0787b	Review of higher education/The review of higher education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_d207e55a1ee5	International Journal of Sustainability in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_f1d95ad04a02	British Journal of Educational Technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_775b2d799a4d	Educational Technology Research and Development	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_c40aa3b8fe84	Educational Technology & Society	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ac1d78f809c0	Australasian Journal of Educational Technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_a1eb9441b001	Educational Technology archive	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_265fbfd6a74d	International Journal of Educational Technology in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_1cb27e9cd298	Journal of Educational Technology Systems	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_24dc5f57e9cc	Contemporary Educational Technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_447b11fdce0d	The turkish online journal of educational technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_cc2115091fbb	Journal of Educational Technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_4c473a016146	Computers and Education Artificial Intelligence	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ab509c925f5f	International Journal of Artificial Intelligence in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_d2a037841e39	Review of Artificial Intelligence in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ad335ee646f7	Journal of The Korean Association of Artificial Intelligence Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_71c33e581d7a	Artificial Intelligence Education Studies	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_7796ba20f324	International Journal of Learning Analytics and Artificial Intelligence for Education (iJAI)	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_47119e56cde7	Artificial Intelligence in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_a68e4916f51a	Artificial Intelligence in Lifelong and Life-Course Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_faa5469fc11c	Journal of Applied Artificial Intelligence in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_4b40d73b571b	International Journal of Artificial Intelligence and Education Technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_f592b49ab73b	Digital Education Review	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_914349cb6523	Digital education outlook	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_f4946b6f361b	Journal of Digital Learning in Teacher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_72eb8ec06351	Frontiers of digital education.	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_4fa24d3b1065	Digital Experiences in Mathematics Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_bb24b15a51eb	JOURNAL OF DIGITAL EDUCATION COMMUNICATION AND ARTS (DECA)	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_9c0462901e3c	Journal of Digital Learning and Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_732c3f7a5387	JOURNAL OF DIGITAL LEARNING AND DISTANCE EDUCATION	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_0f9385e80a14	Digital culture & education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_f493a128d8e4	Idealmathedu Indonesian Digital Journal of Mathematics and Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_0fa7f35fbc85	Społeczeństwo, Edukacja, Język	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_2866e8d8ab41	Jurnal Pendidikan: Teori, Penelitian, dan Pengembangan	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ebc923014b8c	Ankara Üniversitesi Eğitim Bilimleri Fakültesi Özel Eğitim Dergisi	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_7e77afcdefe7	Clinical and Research Journal in Internal Medicine	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_72ac8857b792	Graduate Medical Education Research Journal	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_e94412fa6223	El Cálculo y su Enseñanza	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_64994b461c07	Revista de Educação Matemática	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_c562242317f1	Jurnal Smart	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_b3cd7f33f170	Perspectives in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_7818f59c85c4	Journal of English Language Pedagogy and Practice	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_f44e18eb71bd	Multidisciplinary Journal of School Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_2a42933b56fa	Український педагогічний журнал	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_5d9064fa9899	Temps d'Educació	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_d612cb765157	Studies in Applied Linguistics & TESOL	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_3367e1d6fa74	Вестник Кемеровского государственного университета. Серия: гуманитарные и общественные науки	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_6bf1b635b945	Educar	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_eedbba97a866	Diá-logos	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ed373068a3f6	Journal of Literacy Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ae0badb73663	Educational Innovations and Emerging Technologies	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_d5e01082d6da	Desafíos	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_140a88ca6d00	Mağallaẗ Kulliyyaẗ Al-Tarbiyyaẗ, Ǧāmiʿaẗ Al-Iskandariyyaẗ	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_5600743bafeb	ETD: Educação Temática Digital	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_1bdfb7b516e0	Knowledge Management & E-Learning: An International Journal	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_e4d1c57d4ee0	Омский научный вестник	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_91f5b36c2a92	Journal of Educational Research in Mathematics	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_9f4a9f8c0389	EDUCATIO: Journal of Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_364e16458685	Jurnal Pedagogi dan Pembelajaran	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_8727ebbde221	Кавказология	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_6fa266a5b548	Медицина и организация здравоохранения	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes

@@ -1,0 +1,65 @@
+{
+  "harvest_id": "p10_education_ai_final_2026-07-09",
+  "date": "2026-07-09T14:55:08.984228+00:00",
+  "base_commit": "5ebbe1a",
+  "original_harvest": "p10_education_ai_2026-06-27",
+  "provisional_records": 87,
+  "domain_classification": {
+    "tier1_ru_education": 8,
+    "unclassified": 37,
+    "noise": 6,
+    "tier3_edtech": 17,
+    "tier4_higher_ed": 9,
+    "tier2_ai_education": 10
+  },
+  "acquisition_tasks": {
+    "total": 6,
+    "open": 4,
+    "blocked": 2
+  },
+  "verification_summary": {
+    "total": 87,
+    "verdicts": {
+      "promote_verified": 0,
+      "promote_local_evidence_supported": 0,
+      "keep_provisional": 87,
+      "needs_manual_review": 0,
+      "reject": 0,
+      "blocked": 0
+    },
+    "by_type": {
+      "venue": {
+        "promote_verified": 0,
+        "promote_local_evidence_supported": 0,
+        "keep_provisional": 87,
+        "needs_manual_review": 0,
+        "reject": 0,
+        "blocked": 0
+      }
+    }
+  },
+  "registry_ready": {
+    "total": 87,
+    "accepted": 0,
+    "provisional": 87
+  },
+  "review_packets_exported": [
+    "MD",
+    "JSONL",
+    "TSV"
+  ],
+  "gaps": [
+    "Education/AI venue universe bootstrapped from free adapter queries only — no eLibrary.ru, no RSCI, no Scopus/WoS",
+    "ISSN cross-verification via Crossref not yet executed (SN-02)",
+    "Discipline seeds remain llm_draft — VAK corroboration pending (SN-03)",
+    "Venue metrics entirely absent — requires Scopus/ScimagoJR/WoS (SN-04, blocked)",
+    "Russian-language venue gap — CyberLeninka search not yet executed (SN-05)",
+    "Venue sections not analyzed — requires per-venue evidence packs (SN-06, deferred)"
+  ],
+  "constraints": {
+    "no_paid_api": true,
+    "no_llm_promotion": true,
+    "no_auto_promote": true,
+    "no_fabricated_sources": true
+  }
+}

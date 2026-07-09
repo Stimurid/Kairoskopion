@@ -1,0 +1,442 @@
+record_type	record_id	name_or_label	status	verification_verdict	evidence_count	evidence_kinds	needs_action
+venue	vrec_631e9af0ade2	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_ba5731b814fb	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_71c10a556ac6	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_f6fe9c3b0823	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_e11fc6d8d131	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_825c9ac9ce3b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_d89b2e15bf6b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_1df8be3c4a71	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b7f381adb1e1	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_182fd30ce25f	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_22e0a58ee143	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_062ea0cb51c4	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9d28c769487c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_91228059ead3	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_2127cab62563	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_826c1e4f1bf2	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c3582dbfafdc	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_6246cac9c715	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_ffe333d9aa77	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_84b592ec00d8	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_513c542af184	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_f4fcb7d3b13c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_43b0b4476829	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bfe9a62ebf4c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a90d731e5f78	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_343fc2b1fc36	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_ba5424473b82	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7dff95adf4c8	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_2ffab471d2d2	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4d286e4f74ed	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b5b1a5f24313	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a057a62b591a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3063003d8743	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b53f19bd51c1	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3efc6ec6938a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0d82b483db3f	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0b924335a094	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_23e6fb139a34	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_264aca8e9871	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_72d0ad864084	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_ae24cfd970a3	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_516171351bd3	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_fb62588840ea	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c64046acff11	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b0233bf4e1a4	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_1190a48ac21e	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_be7dd753a80b	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_08928c61f8d0	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_2f7b4ea8d4a4	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7e84581a63a4	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0d227d01a41c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_452397dfc25e	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_27f38e8e5527	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_cadfcd9394a5	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7496f80bd6cd	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4fb6902a2210	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_8e092658e269	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_82d4108e4b1c	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0adbd640123b	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_df5670ec2ed6	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_db0dac61f21a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_ad50c93aadb5	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_12cc2b4ea43f	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_608673f49187	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9ee542805783	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_672b494f6425	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_707e6c58dbec	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_010aaa5bd885	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_59cb7cbcb8a3	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_f9637708acad	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_659d8ddf4fb8	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_199bda5793ea	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_63672a09a3e3	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_6d0c0e6ab208	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_f02eddc6fb32	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bb6a39d60678	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_6cc2c73f98da	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c02149f82327	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c7092694b4e2	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_622694ef0f3f	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_ba49fa978602	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_183c4bb2bd1b	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_95f3faebe397	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4e0e4d616b1c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a8ce0526e07e	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3a5b48800a63	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7531dade449e	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0bc7ab1873cd	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_94531ea3090a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4b037d876eab	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bd13c6d8ee86	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7448592a2a32	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3f7aeff7133d	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_76ef0d85f44e	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_d715c1f6c8a1	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_d6c7dcf616c0	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_2d85800f36dc	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_15abaddd1bf0	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_510a6bff35e4	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0fb6509b4629	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_2ae24af265a6	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c7165c4347cb	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_d5ff7e0686cb	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9d56c3938e9a	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c19def82b5bf	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7aefb62eff55	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9c46757aa007	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7b8e09ecf0cb	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_1d4f4dc6663a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b132923806ac	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7446d3532d9e	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_8d4ebf7e3ff8	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_eafc161fc727	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_30e3caeeda12	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c72f857d0e08	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_fb46b6e6b996	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3ace3520ba74	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_50c8e4320d42	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a4ff9e62cb04	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3323b2982877	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_13668844d95a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_99be81a8e68c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bcae83f4eea4	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3f284d08dc1e	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_482aef25df24	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_38f1a2405a85	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bcd03fdad415	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_8ff160d1037d	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_034da3071fdc	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_eb88a9716593	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c1a4d910d687	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3afe6c93999a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a0d222245ff2	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c0fef2d5f8d8	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bf24f3df2a62	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_810ac0e1d88d	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_da0a8d47a47e	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_e01c3243b44b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_be4064e12df2	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0cd5edf8dc2b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_704f988d044c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_94f4c0736592	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_37ee3b7dd87d	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bd0ca350e972	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_74558c17c669	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_f5af317e896f	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c50075cbb2f3	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_8477348905ec	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_aad809ceef73	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_282ac7c0582a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_e10d6394efc9	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_1a0fd9955c10	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_85bb4fa73029	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0576daf72e5e	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_22a7b798b1ed	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b1200aa7c5c9	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c43d3ad3fe4b	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0e32de11af02	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_6dcd68474b1f	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_17df0c5bbb63	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_94fab5524b62	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c033470479ef	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_f10481786f6f	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_e5f6e7930f92	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a1c145e54e8f	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_322135166e01	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_5871c9a66c6e	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_e982fdfb543b	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_6026671cfd3c	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_fb5a675d41c7	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_ff3a75cdf2df	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_743471f35827	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_be18f11223d9	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_e1a916b32f42	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_559e183431dd	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b8a382c814fb	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_460ce04c0129	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_38ed47d97e77	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_565ad006c461	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a08663abb3d0	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c346f5ff0ac2	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_40a0aaf3cd0b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0e038abc8b56	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b9d4def004b2	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_f8eb933c54ce	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_d1813571cf6b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c6ff96cb3abc	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_44eb13844a4f	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_75b43d08d7ac	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c2cd13c8e5a4	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_02754e30571a	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b54562dd398b	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_56502f5a9131	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_ec1473ef9535	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_1668287f9d33	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_85d34696f139	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_89ed08b81ff5	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_06d29c52e476	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_653397d4f9d0	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b64f7a999ed9	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_037b34df0081	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_994c9c2c3ddc	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a1f45a6e57a1	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_1c86291d5088	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7dbc97a8e0d2	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3fb1618473d0	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_81bb3f159257	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c826ac823934	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4e40963e875e	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_f531fee66a4a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_06589273758e	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_d2e625f2e396	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_d0dc175044f1	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9f0e091bc4df	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b079d158b84b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9ce8763fc85b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_8d33148ecbb9	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bd7324e4eb8a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9c0de03d9e1f	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0c0a90ec3279	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_97196f3a17e9	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4096071dfa56	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_86692cc2e31f	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_1a9b929856cb	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_8a941f024710	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_2e97b8f99b33	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_1a2819d2113c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_6accc4c434f2	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_5be02063b03c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c47d2e7be3ba	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b1058da60d1b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_baaee60f0e0c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b518928c24f4	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3a5e5c890fd0	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c4db94ecf3b5	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4d3699ef3bfe	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_40094207ea13	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4cfac70ffd47	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_f1e7a9260448	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_5d3c0d1c32cf	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4eb52e66c4af	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_74df721b2606	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_33a50d527b56	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_eb4d181dcdaa	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_aa460c3d5247	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0f03553a13a3	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7efcaa04ccc5	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c555579cf805	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4071eb0dbf79	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_d1af7ea91594	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_aa5ba83391a2	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b9b22a258477	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_48ef8c306b57	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_d90c8879c549	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a370e61e2be1	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7664ae524cc2	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_763a8cb97e0c	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a2660005452b	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c00e03429778	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3b56fb30de9c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_6e102e9199d9	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_932e6db34f71	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_5fcfd1ab15e6	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_422f5dd997f2	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c6f6e805d840	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_1fd2dca2367d	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a8a811662a67	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_99692669625e	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_19e48b1cbc7f	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_92da6cdede3a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9e31881afed3	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_ea5ee80c5055	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9dbd3918c8b8	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_04422fc4d34d	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_578a09ed9781	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_52cda9398b4f	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_61d1ef41e088	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_812dc02082b5	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b368ce183a44	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_277dad1ec7a6	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bbd6c886ba2d	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0b669e67fd24	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b47ad578d7d7	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_34713a06e8fb	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3aec90ba8893	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_93bc5435cb9c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_d1cdbe5f8e73	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_ec9ba9eb1b6b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_67eca932c0d3	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_18ccd014f01a	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c83ffe5863d4	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_661fa4ab56df	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7c2e55084c13	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9be6f10e68eb	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_6117c28259b9	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b5768a2736dc	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4f12887d051a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_78da24873d42	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_543b87c52a29	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_81dd9a72fb0f	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4b1ff3ae3ce4	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3f35843e5bf9	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4a5085f5561f	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_535fa53e48bd	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bdc8539c0339	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_eae567c84d8f	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_cccea033a0a5	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_af766e4b7024	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_83570bfa7846	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_008d30d7bc69	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7903d9201887	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0ef7157936f9	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_03c64ebfb7d4	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a82c7667b189	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_3f061beab883	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_af7322d2cd4b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0d80cc919c72	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_62c023b2914f	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9f57e9ff8cfd	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7f7081eeda01	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bc4c1b1a67b4	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_ee2aaf2f7e6d	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_441b0d5a37aa	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_e451cfede5fb	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0587e424ce8d	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_b394479c5f98	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_861a07ce5215	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_632b89d33b90	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_4299ff718c1f	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_dd6bcccdf3d8	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_bfa33d01c8cc	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_94ee7424aa37	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7738a84439ed	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_0f61f9bbdd7f	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c46791d687b0	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_2669d44a7d03	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c489e40cf878	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a9708ae27f8a	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_94a46b089f8c	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_f272963092a7	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_f056f11e30df	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_a60bb3ec758b	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_8bbb8e2f6c4d	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_e02251745284	Philosophy & Technology	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_e557fbb10f5d	Test Venue	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_da40aaa2612e	Логос / Logos	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_d2a5bff03d50	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_93932e8392ae	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_83597c6c1402	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_60b97ec1e9cd	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_9990e2e9ed1e	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_c817956aa8c3	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_7ab6dac6df8d	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_eecf0a9a37fa	Journal of X	provisional	keep_provisional	1	llm_inference	yes
+venue	vrec_5a5854d5a323	Vysshee Obrazovanie v Rossii = Higher Education in Russia	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_bfde972c3025	Pedagogical Education in Russia	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_0bd68933bfa0	Professional Education in Russia and Abroad	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ead3979fc43c	Higher Education in Russia and Beyond	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_a0e3763c42c1	Высшее образование в России  (Vysshee obrazovanie v Rossii = Higher Education in Russia)	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_8335bbbb2991	RUDN Journal of Informatization in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_f299300459e5	Social and cultural space of Russia and abroad society education language	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_6aeae0f47dbe	RUDN Journal of Language Education and Translingual Practices	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_128e1810f8f7	Physical Education and Sport Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_630a59c8bd2a	Pedagogy Culture and Society	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_8eb8f0853287	Technology Pedagogy and Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_034bd9221e35	Journal of Education for Teaching International Research and Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_1683b353bde8	International Journal of Engineering Pedagogy (iJEP)	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_0e321346f696	The Review of Education Pedagogy & Cultural Studies	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_0f2fb385f626	Phenomenology + Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_b62f6a5371cb	Entrepreneurship Education and Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_662ca0912e82	Journal of Curriculum and Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_fb8621b1282d	Writing & Pedagogy	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_c74898bf62a4	Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_86cb2deeb708	The Journal of Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_587409e42faf	Studies in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ac54ebd7f3af	Assessment & Evaluation in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_e86a4e23036e	Higher Education Research & Development	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_5ed9c880f29f	Research in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_74c10e4d4ad3	The Internet and Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_4b2a35baf35c	Teaching in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_8941f69f400d	Review of higher education/The review of higher education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_d207e55a1ee5	International Journal of Sustainability in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_f1d95ad04a02	British Journal of Educational Technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_775b2d799a4d	Educational Technology Research and Development	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_c40aa3b8fe84	Educational Technology & Society	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ac1d78f809c0	Australasian Journal of Educational Technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_a1eb9441b001	Educational Technology archive	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_265fbfd6a74d	International Journal of Educational Technology in Higher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_1cb27e9cd298	Journal of Educational Technology Systems	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_24dc5f57e9cc	Contemporary Educational Technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_447b11fdce0d	The turkish online journal of educational technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_cc2115091fbb	Journal of Educational Technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_4c473a016146	Computers and Education Artificial Intelligence	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ab509c925f5f	International Journal of Artificial Intelligence in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_d2a037841e39	Review of Artificial Intelligence in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ad335ee646f7	Journal of The Korean Association of Artificial Intelligence Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_71c33e581d7a	Artificial Intelligence Education Studies	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_7796ba20f324	International Journal of Learning Analytics and Artificial Intelligence for Education (iJAI)	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_47119e56cde7	Artificial Intelligence in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_a68e4916f51a	Artificial Intelligence in Lifelong and Life-Course Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_faa5469fc11c	Journal of Applied Artificial Intelligence in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_4b40d73b571b	International Journal of Artificial Intelligence and Education Technology	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_f592b49ab73b	Digital Education Review	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_914349cb6523	Digital education outlook	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_f4946b6f361b	Journal of Digital Learning in Teacher Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_72eb8ec06351	Frontiers of digital education.	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_4fa24d3b1065	Digital Experiences in Mathematics Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_bb24b15a51eb	JOURNAL OF DIGITAL EDUCATION COMMUNICATION AND ARTS (DECA)	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_9c0462901e3c	Journal of Digital Learning and Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_732c3f7a5387	JOURNAL OF DIGITAL LEARNING AND DISTANCE EDUCATION	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_0f9385e80a14	Digital culture & education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_f493a128d8e4	Idealmathedu Indonesian Digital Journal of Mathematics and Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_0fa7f35fbc85	Społeczeństwo, Edukacja, Język	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_2866e8d8ab41	Jurnal Pendidikan: Teori, Penelitian, dan Pengembangan	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ebc923014b8c	Ankara Üniversitesi Eğitim Bilimleri Fakültesi Özel Eğitim Dergisi	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_7e77afcdefe7	Clinical and Research Journal in Internal Medicine	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_72ac8857b792	Graduate Medical Education Research Journal	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_e94412fa6223	El Cálculo y su Enseñanza	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_64994b461c07	Revista de Educação Matemática	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_c562242317f1	Jurnal Smart	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_b3cd7f33f170	Perspectives in Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_7818f59c85c4	Journal of English Language Pedagogy and Practice	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_f44e18eb71bd	Multidisciplinary Journal of School Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_2a42933b56fa	Український педагогічний журнал	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_5d9064fa9899	Temps d'Educació	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_d612cb765157	Studies in Applied Linguistics & TESOL	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_3367e1d6fa74	Вестник Кемеровского государственного университета. Серия: гуманитарные и общественные науки	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_6bf1b635b945	Educar	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_eedbba97a866	Diá-logos	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ed373068a3f6	Journal of Literacy Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_ae0badb73663	Educational Innovations and Emerging Technologies	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_d5e01082d6da	Desafíos	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_140a88ca6d00	Mağallaẗ Kulliyyaẗ Al-Tarbiyyaẗ, Ǧāmiʿaẗ Al-Iskandariyyaẗ	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_5600743bafeb	ETD: Educação Temática Digital	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_1bdfb7b516e0	Knowledge Management & E-Learning: An International Journal	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_e4d1c57d4ee0	Омский научный вестник	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_91f5b36c2a92	Journal of Educational Research in Mathematics	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_9f4a9f8c0389	EDUCATIO: Journal of Education	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_364e16458685	Jurnal Pedagogi dan Pembelajaran	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_8727ebbde221	Кавказология	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
+venue	vrec_6fa266a5b548	Медицина и организация здравоохранения	provisional	keep_provisional	2	FACT_FROM_API_METADATA,FACT_FROM_API_METADATA	yes
