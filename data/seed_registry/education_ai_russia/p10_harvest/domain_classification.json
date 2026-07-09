@@ -1,0 +1,448 @@
+{
+  "date": "2026-07-09T14:55:08.981197+00:00",
+  "tier_counts": {
+    "tier1_ru_education": 8,
+    "unclassified": 37,
+    "noise": 6,
+    "tier3_edtech": 17,
+    "tier4_higher_ed": 9,
+    "tier2_ai_education": 10
+  },
+  "classifications": {
+    "vrec_0e3fbc1df29a": {
+      "canonical_name": "Vysshee Obrazovanie v Rossii = Higher Education in Russia",
+      "issn": "0869-3617",
+      "tier": "tier1_ru_education"
+    },
+    "vrec_acc91aa8c82e": {
+      "canonical_name": "Pedagogical Education in Russia",
+      "issn": "2079-8717",
+      "tier": "tier1_ru_education"
+    },
+    "vrec_70fb22abf41a": {
+      "canonical_name": "Professional Education in Russia and Abroad",
+      "issn": "2220-3036",
+      "tier": "tier1_ru_education"
+    },
+    "vrec_15dcf89a2fc4": {
+      "canonical_name": "Higher Education in Russia and Beyond",
+      "issn": null,
+      "tier": "tier1_ru_education"
+    },
+    "vrec_d0d88b95355b": {
+      "canonical_name": "Высшее образование в России  (Vysshee obrazovanie v Rossii = Higher Education in Russia)",
+      "issn": null,
+      "tier": "tier1_ru_education"
+    },
+    "vrec_75b7c3cdbec1": {
+      "canonical_name": "RUDN Journal of Informatization in Education",
+      "issn": "2312-8631",
+      "tier": "tier1_ru_education"
+    },
+    "vrec_4a1d18d27ebc": {
+      "canonical_name": "Social and cultural space of Russia and abroad society education language",
+      "issn": "2312-3281",
+      "tier": "unclassified"
+    },
+    "vrec_dee7306fe58d": {
+      "canonical_name": "RUDN Journal of Language Education and Translingual Practices",
+      "issn": "2312-8011",
+      "tier": "tier1_ru_education"
+    },
+    "vrec_0cb9eaf316d4": {
+      "canonical_name": "Physical Education and Sport Pedagogy",
+      "issn": "1740-8989",
+      "tier": "noise"
+    },
+    "vrec_6ff73549ba95": {
+      "canonical_name": "Pedagogy Culture and Society",
+      "issn": "1468-1366",
+      "tier": "unclassified"
+    },
+    "vrec_feb855760b1b": {
+      "canonical_name": "Technology Pedagogy and Education",
+      "issn": "1475-939X",
+      "tier": "tier3_edtech"
+    },
+    "vrec_0c287d99151e": {
+      "canonical_name": "Journal of Education for Teaching International Research and Pedagogy",
+      "issn": "0260-7476",
+      "tier": "unclassified"
+    },
+    "vrec_3d4dd1a5358d": {
+      "canonical_name": "International Journal of Engineering Pedagogy (iJEP)",
+      "issn": "2192-4880",
+      "tier": "unclassified"
+    },
+    "vrec_6e2c959129c5": {
+      "canonical_name": "The Review of Education Pedagogy & Cultural Studies",
+      "issn": "1071-4413",
+      "tier": "unclassified"
+    },
+    "vrec_e4d7453781e2": {
+      "canonical_name": "Phenomenology + Pedagogy",
+      "issn": "0820-9189",
+      "tier": "noise"
+    },
+    "vrec_2b8691204af8": {
+      "canonical_name": "Entrepreneurship Education and Pedagogy",
+      "issn": "2515-1274",
+      "tier": "unclassified"
+    },
+    "vrec_28edafad909a": {
+      "canonical_name": "Journal of Curriculum and Pedagogy",
+      "issn": "1550-5170",
+      "tier": "unclassified"
+    },
+    "vrec_3edc536a7139": {
+      "canonical_name": "Writing & Pedagogy",
+      "issn": "1756-5839",
+      "tier": "unclassified"
+    },
+    "vrec_36c79c048b90": {
+      "canonical_name": "Higher Education",
+      "issn": "0018-1560",
+      "tier": "tier4_higher_ed"
+    },
+    "vrec_c90fa0570a9d": {
+      "canonical_name": "The Journal of Higher Education",
+      "issn": "0022-1546",
+      "tier": "tier4_higher_ed"
+    },
+    "vrec_e76482906efd": {
+      "canonical_name": "Studies in Higher Education",
+      "issn": "0307-5079",
+      "tier": "tier4_higher_ed"
+    },
+    "vrec_46c983cc1f30": {
+      "canonical_name": "Assessment & Evaluation in Higher Education",
+      "issn": "0260-2938",
+      "tier": "tier4_higher_ed"
+    },
+    "vrec_bba157454dc6": {
+      "canonical_name": "Higher Education Research & Development",
+      "issn": "0729-4360",
+      "tier": "tier4_higher_ed"
+    },
+    "vrec_b40717365f80": {
+      "canonical_name": "Research in Higher Education",
+      "issn": "0361-0365",
+      "tier": "tier4_higher_ed"
+    },
+    "vrec_95df75067514": {
+      "canonical_name": "The Internet and Higher Education",
+      "issn": "1096-7516",
+      "tier": "tier3_edtech"
+    },
+    "vrec_38fe3a16c313": {
+      "canonical_name": "Teaching in Higher Education",
+      "issn": "1356-2517",
+      "tier": "tier4_higher_ed"
+    },
+    "vrec_12a1baf0787b": {
+      "canonical_name": "Review of higher education/The review of higher education",
+      "issn": "0162-5748",
+      "tier": "tier4_higher_ed"
+    },
+    "vrec_d207e55a1ee5": {
+      "canonical_name": "International Journal of Sustainability in Higher Education",
+      "issn": "1467-6370",
+      "tier": "tier4_higher_ed"
+    },
+    "vrec_f1d95ad04a02": {
+      "canonical_name": "British Journal of Educational Technology",
+      "issn": "0007-1013",
+      "tier": "tier3_edtech"
+    },
+    "vrec_775b2d799a4d": {
+      "canonical_name": "Educational Technology Research and Development",
+      "issn": "1042-1629",
+      "tier": "tier3_edtech"
+    },
+    "vrec_c40aa3b8fe84": {
+      "canonical_name": "Educational Technology & Society",
+      "issn": "1176-3647",
+      "tier": "tier3_edtech"
+    },
+    "vrec_ac1d78f809c0": {
+      "canonical_name": "Australasian Journal of Educational Technology",
+      "issn": "1449-3098",
+      "tier": "tier3_edtech"
+    },
+    "vrec_a1eb9441b001": {
+      "canonical_name": "Educational Technology archive",
+      "issn": null,
+      "tier": "tier3_edtech"
+    },
+    "vrec_265fbfd6a74d": {
+      "canonical_name": "International Journal of Educational Technology in Higher Education",
+      "issn": "2365-9440",
+      "tier": "tier3_edtech"
+    },
+    "vrec_1cb27e9cd298": {
+      "canonical_name": "Journal of Educational Technology Systems",
+      "issn": "0047-2395",
+      "tier": "tier3_edtech"
+    },
+    "vrec_24dc5f57e9cc": {
+      "canonical_name": "Contemporary Educational Technology",
+      "issn": "1309-517X",
+      "tier": "tier3_edtech"
+    },
+    "vrec_447b11fdce0d": {
+      "canonical_name": "The turkish online journal of educational technology",
+      "issn": "2146-7242",
+      "tier": "tier3_edtech"
+    },
+    "vrec_cc2115091fbb": {
+      "canonical_name": "Journal of Educational Technology",
+      "issn": "1225-424X",
+      "tier": "tier3_edtech"
+    },
+    "vrec_4c473a016146": {
+      "canonical_name": "Computers and Education Artificial Intelligence",
+      "issn": "2666-920X",
+      "tier": "tier2_ai_education"
+    },
+    "vrec_ab509c925f5f": {
+      "canonical_name": "International Journal of Artificial Intelligence in Education",
+      "issn": "1560-4292",
+      "tier": "tier2_ai_education"
+    },
+    "vrec_d2a037841e39": {
+      "canonical_name": "Review of Artificial Intelligence in Education",
+      "issn": "2965-4688",
+      "tier": "tier2_ai_education"
+    },
+    "vrec_ad335ee646f7": {
+      "canonical_name": "Journal of The Korean Association of Artificial Intelligence Education",
+      "issn": "2733-404X",
+      "tier": "tier2_ai_education"
+    },
+    "vrec_71c33e581d7a": {
+      "canonical_name": "Artificial Intelligence Education Studies",
+      "issn": "3079-8086",
+      "tier": "tier2_ai_education"
+    },
+    "vrec_7796ba20f324": {
+      "canonical_name": "International Journal of Learning Analytics and Artificial Intelligence for Education (iJAI)",
+      "issn": "2706-7564",
+      "tier": "tier2_ai_education"
+    },
+    "vrec_47119e56cde7": {
+      "canonical_name": "Artificial Intelligence in Education",
+      "issn": "3049-5474",
+      "tier": "tier2_ai_education"
+    },
+    "vrec_a68e4916f51a": {
+      "canonical_name": "Artificial Intelligence in Lifelong and Life-Course Education",
+      "issn": "3123-8815",
+      "tier": "tier2_ai_education"
+    },
+    "vrec_faa5469fc11c": {
+      "canonical_name": "Journal of Applied Artificial Intelligence in Education",
+      "issn": "3109-7081",
+      "tier": "tier2_ai_education"
+    },
+    "vrec_4b40d73b571b": {
+      "canonical_name": "International Journal of Artificial Intelligence and Education Technology",
+      "issn": "2835-2432",
+      "tier": "tier2_ai_education"
+    },
+    "vrec_f592b49ab73b": {
+      "canonical_name": "Digital Education Review",
+      "issn": "2013-9144",
+      "tier": "tier3_edtech"
+    },
+    "vrec_914349cb6523": {
+      "canonical_name": "Digital education outlook",
+      "issn": "2788-8568",
+      "tier": "tier3_edtech"
+    },
+    "vrec_f4946b6f361b": {
+      "canonical_name": "Journal of Digital Learning in Teacher Education",
+      "issn": "2153-2974",
+      "tier": "unclassified"
+    },
+    "vrec_72eb8ec06351": {
+      "canonical_name": "Frontiers of digital education.",
+      "issn": "2097-3918",
+      "tier": "tier3_edtech"
+    },
+    "vrec_4fa24d3b1065": {
+      "canonical_name": "Digital Experiences in Mathematics Education",
+      "issn": "2199-3246",
+      "tier": "unclassified"
+    },
+    "vrec_bb24b15a51eb": {
+      "canonical_name": "JOURNAL OF DIGITAL EDUCATION COMMUNICATION AND ARTS (DECA)",
+      "issn": "2614-6916",
+      "tier": "tier3_edtech"
+    },
+    "vrec_9c0462901e3c": {
+      "canonical_name": "Journal of Digital Learning and Education",
+      "issn": "2776-4060",
+      "tier": "unclassified"
+    },
+    "vrec_732c3f7a5387": {
+      "canonical_name": "JOURNAL OF DIGITAL LEARNING AND DISTANCE EDUCATION",
+      "issn": "2964-6685",
+      "tier": "unclassified"
+    },
+    "vrec_0f9385e80a14": {
+      "canonical_name": "Digital culture & education",
+      "issn": "1836-8301",
+      "tier": "unclassified"
+    },
+    "vrec_f493a128d8e4": {
+      "canonical_name": "Idealmathedu Indonesian Digital Journal of Mathematics and Education",
+      "issn": "2407-8530",
+      "tier": "unclassified"
+    },
+    "vrec_0fa7f35fbc85": {
+      "canonical_name": "Społeczeństwo, Edukacja, Język",
+      "issn": "2353-1266",
+      "tier": "unclassified"
+    },
+    "vrec_2866e8d8ab41": {
+      "canonical_name": "Jurnal Pendidikan: Teori, Penelitian, dan Pengembangan",
+      "issn": null,
+      "tier": "unclassified"
+    },
+    "vrec_ebc923014b8c": {
+      "canonical_name": "Ankara Üniversitesi Eğitim Bilimleri Fakültesi Özel Eğitim Dergisi",
+      "issn": "1304-7639",
+      "tier": "unclassified"
+    },
+    "vrec_7e77afcdefe7": {
+      "canonical_name": "Clinical and Research Journal in Internal Medicine",
+      "issn": "2723-5130",
+      "tier": "noise"
+    },
+    "vrec_72ac8857b792": {
+      "canonical_name": "Graduate Medical Education Research Journal",
+      "issn": "2578-6091",
+      "tier": "noise"
+    },
+    "vrec_e94412fa6223": {
+      "canonical_name": "El Cálculo y su Enseñanza",
+      "issn": null,
+      "tier": "unclassified"
+    },
+    "vrec_64994b461c07": {
+      "canonical_name": "Revista de Educação Matemática",
+      "issn": null,
+      "tier": "unclassified"
+    },
+    "vrec_c562242317f1": {
+      "canonical_name": "Jurnal Smart",
+      "issn": "2356-2048",
+      "tier": "unclassified"
+    },
+    "vrec_b3cd7f33f170": {
+      "canonical_name": "Perspectives in Education",
+      "issn": "0258-2236",
+      "tier": "unclassified"
+    },
+    "vrec_7818f59c85c4": {
+      "canonical_name": "Journal of English Language Pedagogy and Practice",
+      "issn": "2645-3576",
+      "tier": "unclassified"
+    },
+    "vrec_f44e18eb71bd": {
+      "canonical_name": "Multidisciplinary Journal of School Education",
+      "issn": "2543-7585",
+      "tier": "unclassified"
+    },
+    "vrec_2a42933b56fa": {
+      "canonical_name": "Український педагогічний журнал",
+      "issn": "2411-1317",
+      "tier": "tier1_ru_education"
+    },
+    "vrec_5d9064fa9899": {
+      "canonical_name": "Temps d'Educació",
+      "issn": "0214-7351",
+      "tier": "unclassified"
+    },
+    "vrec_d612cb765157": {
+      "canonical_name": "Studies in Applied Linguistics & TESOL",
+      "issn": null,
+      "tier": "unclassified"
+    },
+    "vrec_3367e1d6fa74": {
+      "canonical_name": "Вестник Кемеровского государственного университета. Серия: гуманитарные и общественные науки",
+      "issn": "2542-1840",
+      "tier": "unclassified"
+    },
+    "vrec_6bf1b635b945": {
+      "canonical_name": "Educar",
+      "issn": "0211-819X",
+      "tier": "unclassified"
+    },
+    "vrec_eedbba97a866": {
+      "canonical_name": "Diá-logos",
+      "issn": "1996-1642",
+      "tier": "unclassified"
+    },
+    "vrec_ed373068a3f6": {
+      "canonical_name": "Journal of Literacy Education",
+      "issn": null,
+      "tier": "unclassified"
+    },
+    "vrec_ae0badb73663": {
+      "canonical_name": "Educational Innovations and Emerging Technologies",
+      "issn": null,
+      "tier": "unclassified"
+    },
+    "vrec_d5e01082d6da": {
+      "canonical_name": "Desafíos",
+      "issn": "2307-6100",
+      "tier": "unclassified"
+    },
+    "vrec_140a88ca6d00": {
+      "canonical_name": "Mağallaẗ Kulliyyaẗ Al-Tarbiyyaẗ, Ǧāmiʿaẗ Al-Iskandariyyaẗ",
+      "issn": "1110-3922",
+      "tier": "unclassified"
+    },
+    "vrec_5600743bafeb": {
+      "canonical_name": "ETD: Educação Temática Digital",
+      "issn": null,
+      "tier": "unclassified"
+    },
+    "vrec_1bdfb7b516e0": {
+      "canonical_name": "Knowledge Management & E-Learning: An International Journal",
+      "issn": "2073-7904",
+      "tier": "tier3_edtech"
+    },
+    "vrec_e4d1c57d4ee0": {
+      "canonical_name": "Омский научный вестник",
+      "issn": "1813-8225",
+      "tier": "unclassified"
+    },
+    "vrec_91f5b36c2a92": {
+      "canonical_name": "Journal of Educational Research in Mathematics",
+      "issn": "2288-7733",
+      "tier": "unclassified"
+    },
+    "vrec_9f4a9f8c0389": {
+      "canonical_name": "EDUCATIO: Journal of Education",
+      "issn": "2579-8383",
+      "tier": "unclassified"
+    },
+    "vrec_364e16458685": {
+      "canonical_name": "Jurnal Pedagogi dan Pembelajaran",
+      "issn": "2614-3909",
+      "tier": "unclassified"
+    },
+    "vrec_8727ebbde221": {
+      "canonical_name": "Кавказология",
+      "issn": null,
+      "tier": "noise"
+    },
+    "vrec_6fa266a5b548": {
+      "canonical_name": "Медицина и организация здравоохранения",
+      "issn": "2658-4212",
+      "tier": "noise"
+    }
+  }
+}

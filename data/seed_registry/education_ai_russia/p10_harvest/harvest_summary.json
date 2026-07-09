@@ -1,0 +1,51 @@
+{
+  "harvest_id": "p10_education_ai_2026-06-27",
+  "date": "2026-06-27T17:50:07.337353+00:00",
+  "raw_results": 90,
+  "deduped_results": 87,
+  "provisional_records": 87,
+  "loaded_to_registry": 60,
+  "verification_decisions": 601,
+  "verification_summary": {
+    "total": 601,
+    "verdicts": {
+      "promote_verified": 0,
+      "promote_local_evidence_supported": 0,
+      "keep_provisional": 601,
+      "needs_manual_review": 0,
+      "reject": 0,
+      "blocked": 0
+    },
+    "by_type": {
+      "venue": {
+        "promote_verified": 0,
+        "promote_local_evidence_supported": 0,
+        "keep_provisional": 441,
+        "needs_manual_review": 0,
+        "reject": 0,
+        "blocked": 0
+      },
+      "venue_classification": {
+        "promote_verified": 0,
+        "promote_local_evidence_supported": 0,
+        "keep_provisional": 160,
+        "needs_manual_review": 0,
+        "reject": 0,
+        "blocked": 0
+      }
+    }
+  },
+  "gaps": [
+    "Education/AI venue universe is bootstrapped from free adapter queries only",
+    "eLibrary.ru data not available (needs API key)",
+    "RSCI data not available (needs API key)",
+    "Scopus/WoS data not available (paid)",
+    "VAK list corroboration done by adapter cross-reference only",
+    "Discipline seeds remain llm_draft — no authoritative corroboration yet"
+  ],
+  "constraints": {
+    "no_paid_api": true,
+    "no_llm": true,
+    "no_auto_promote": true
+  }
+}
