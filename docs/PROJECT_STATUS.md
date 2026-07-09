@@ -1,6 +1,6 @@
 # Project Status — Kairoskopion
 
-**Last updated:** 2026-06-14 (RC17 — Mavrinsky benchmark-backed baseline + Venue Funnel v1 doctrine)
+**Last updated:** 2026-07-09 (post-P10 operational harvest merge + LLM hardening + intake metadata)
 
 ## Latest release pass — RC17 (2026-06-14)
 
@@ -89,8 +89,8 @@ Deferred (documented as next backlog items):
 
 | Parameter | Value |
 |-----------|-------|
-| Branch | `main` (merge target: `feature/ui-cockpit-v0`) |
-| Tag | `v0.2.0-alpha-rc15` (pending) |
+| Branch | `main` |
+| Tag | `v0.2.0-alpha-rc17` (pending) |
 | Remote | `origin` → `https://github.com/Stimurid/Kairoskopion.git` |
 | Working tree | clean |
 | Python | >=3.11 |
@@ -99,20 +99,21 @@ Deferred (documented as next backlog items):
 ## UI Cockpit v0 (Operator/Staging Preview)
 
 > **This is an internal operator/staging preview, NOT a public product release.**
-> Deterministic backend fallbacks are still in use. Persistence is in-memory only.
-> Auth, job queue, and production hardening are NOT implemented.
-> Staging deployment must be protected (IP-restricted or auth-gated).
+> Deterministic backend fallbacks are still in use.
+> **Staging soft-auth is wired** (display name + optional email; no password).
+> **Persistence is disk-backed** via `CaseStore` JSON files.
+> Job queue and production hardening are NOT implemented.
 > No public prod claim.
 
-- FastAPI backend: 19 REST endpoints covering full Case pipeline
-- React + TypeScript frontend: 17 components, dark theme, responsive layout
+- FastAPI backend: 58 REST endpoints covering full Case pipeline
+- React + TypeScript frontend: 29 components, dark theme, responsive layout
 - Pipeline continuity: select_venue triggers fit → mismatch → rewrite chain
 - Quality gates populated after stage transitions
 - Evidence badge system (FACT, CLAIM, CORPUS, INFERRED, USER, UNKNOWN, STALE, CONFLICT)
 - API smoke test: 18/18 PASS, 1 SKIP (expected)
 - Browser smoke: all views render, zero console errors, mobile responsive at 375px
 - Frontend build: `tsc --noEmit` clean, `vite build` clean
-- Backend on `fix/llm-agent-tolerance-mavrinsky` (after this pass): **1355 pytest tests passing**, 4 deselected = network. Main is still at 1307.
+- **3254 pytest tests passing** (post-P10 merge), 8 deselected = network.
 
 ## Recent commit history (main)
 
