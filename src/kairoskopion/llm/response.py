@@ -15,3 +15,9 @@ class LLMResponse:
     output_tokens: int = 0
     latency_ms: float = 0.0
     finish_reason: str | None = None
+    requested_model: str | None = None
+    effective_model: str | None = None
+    fallback_used: bool = False
+    attempt_count: int = 1
+    attempts: list[Any] = dc.field(default_factory=list)
+    agent_role: str = ""

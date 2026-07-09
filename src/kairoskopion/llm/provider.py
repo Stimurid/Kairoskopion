@@ -21,6 +21,7 @@ class LLMProvider(Protocol):
         response_schema: dict[str, Any] | None = None,
         temperature: float = 0.2,
         max_tokens: int = 4096,
+        agent_role: str = "",
     ) -> LLMResponse:
         """Send a chat completion request and return structured response."""
         ...

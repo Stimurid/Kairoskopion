@@ -78,6 +78,7 @@ class ArticleModelerAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.2,
                 max_tokens=4096,
+                agent_role="article_modeler",
             )
         except Exception as e:
             # Provider call itself failed (network, timeout, API error,
@@ -266,10 +267,14 @@ def _build_from_llm(
     abstract_text = manuscript.abstract or ""
 
     def _enum_key(field: str) -> str:
-        # LLMs occasionally return a dict/list here; unhashable values
-        # must degrade to "unknown", not crash dict lookup
         v = parsed.get(field, "unknown")
-        return v if isinstance(v, str) else "unknown"
+        if isinstance(v, str):
+            return v
+        if isinstance(v, dict):
+            for k in ("value", "name", "type", "status", "mode"):
+                if isinstance(v.get(k), str):
+                    return v[k]
+        return "unknown"
 
     # Map LLM article_stage to our enum
     stage_map = {
@@ -334,10 +339,26 @@ def _build_from_llm(
         if v is None or v == "":
             return []
         if isinstance(v, list):
-            return [str(x) if not isinstance(x, str) else x for x in v]
+            items = []
+            for x in v:
+                if isinstance(x, str):
+                    items.append(x)
+                elif isinstance(x, dict):
+                    for k in ("value", "claim", "name", "text", "term"):
+                        if isinstance(x.get(k), str):
+                            items.append(x[k])
+                            break
+                    else:
+                        items.append(str(x))
+                else:
+                    items.append(str(x))
+            return items
         if isinstance(v, str):
             return [v]
         if isinstance(v, dict):
+            for k in ("value", "name", "text"):
+                if isinstance(v.get(k), str):
+                    return [v[k]]
             return [str(x) for x in v.values()]
         return [str(v)]
 
@@ -347,7 +368,10 @@ def _build_from_llm(
         if isinstance(v, list):
             return ", ".join(str(x) for x in v) if v else None
         if isinstance(v, dict):
-            return ", ".join(f"{k}={v}" for k, v in v.items()) if v else None
+            for k in ("value", "name", "text", "description"):
+                if isinstance(v.get(k), str):
+                    return v[k]
+            return ", ".join(f"{dk}={dv}" for dk, dv in v.items()) if v else None
         return str(v) if v else None
 
     title_llm = _pick("title", "title_current", "title_ru", "title_en", "title_extracted")

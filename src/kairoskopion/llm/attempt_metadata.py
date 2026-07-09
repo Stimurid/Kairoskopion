@@ -77,6 +77,57 @@ def user_warning_for(reason: str) -> str | None:
 
 
 @dataclass
+class LLMModelAttempt:
+    """One provider-level attempt against a single model.
+
+    Collected by the provider during the retry/fallback loop and
+    attached to LLMAttemptMetadata for full observability.
+    """
+
+    attempt_index: int = 0
+    model: str = ""
+    agent_role: str = ""
+    started_at: str = ""
+    latency_ms: float = 0.0
+    provider_status: str = ""
+    response_status: str = ""
+    parse_status: str = ""
+    error_code: str = ""
+    retryable: bool = False
+    transition: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "attempt_index": self.attempt_index,
+            "model": self.model,
+            "agent_role": self.agent_role,
+            "latency_ms": round(self.latency_ms, 1),
+            "provider_status": self.provider_status,
+            "response_status": self.response_status,
+            "parse_status": self.parse_status,
+            "error_code": self.error_code,
+            "retryable": self.retryable,
+            "transition": self.transition,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "LLMModelAttempt":
+        return cls(
+            attempt_index=d.get("attempt_index", 0),
+            model=d.get("model", ""),
+            agent_role=d.get("agent_role", ""),
+            started_at=d.get("started_at", ""),
+            latency_ms=d.get("latency_ms", 0.0),
+            provider_status=d.get("provider_status", ""),
+            response_status=d.get("response_status", ""),
+            parse_status=d.get("parse_status", ""),
+            error_code=d.get("error_code", ""),
+            retryable=d.get("retryable", False),
+            transition=d.get("transition", ""),
+        )
+
+
+@dataclass
 class LLMAttemptMetadata:
     """Per-agent-call audit record.
 
@@ -113,8 +164,16 @@ class LLMAttemptMetadata:
     # Reserved hook for sanitized debug output. None by default.
     raw_output_ref: str | None = None
 
+    # --- Attempt history (added for LLM hardening repair) ---
+    requested_model: str | None = None
+    effective_model: str | None = None
+    attempt_count: int = 0
+    attempts: list[LLMModelAttempt] = field(default_factory=list)
+    final_error_code: str | None = None
+    agent_role: str = ""
+
     def to_dict(self) -> dict[str, Any]:
-        return {
+        d: dict[str, Any] = {
             "llm_attempted": self.llm_attempted,
             "llm_provider": self.llm_provider,
             "llm_model": self.llm_model,
@@ -131,10 +190,22 @@ class LLMAttemptMetadata:
             ],
             "warning_for_user": self.warning_for_user,
             "raw_output_ref": self.raw_output_ref,
+            "requested_model": self.requested_model,
+            "effective_model": self.effective_model,
+            "attempt_count": self.attempt_count,
+            "attempts": [a.to_dict() for a in self.attempts],
+            "final_error_code": self.final_error_code,
+            "agent_role": self.agent_role,
         }
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "LLMAttemptMetadata":
+        attempts_raw = d.get("attempts") or []
+        attempts = [
+            LLMModelAttempt.from_dict(a) if isinstance(a, dict) else a
+            for a in attempts_raw
+        ]
         return cls(
             llm_attempted=bool(d.get("llm_attempted", False)),
             llm_provider=d.get("llm_provider"),
@@ -154,10 +225,30 @@ class LLMAttemptMetadata:
             ),
             warning_for_user=d.get("warning_for_user"),
             raw_output_ref=d.get("raw_output_ref"),
+            requested_model=d.get("requested_model"),
+            effective_model=d.get("effective_model"),
+            attempt_count=d.get("attempt_count", 0),
+            attempts=attempts,
+            final_error_code=d.get("final_error_code"),
+            agent_role=d.get("agent_role", ""),
         )
 
     @classmethod
-    def parse_ok(cls, *, provider, model, latency_ms, content_present, repaired=False, repair_steps=None) -> "LLMAttemptMetadata":
+    def parse_ok(
+        cls,
+        *,
+        provider,
+        model,
+        latency_ms,
+        content_present,
+        repaired=False,
+        repair_steps=None,
+        requested_model: str | None = None,
+        effective_model: str | None = None,
+        attempt_count: int = 1,
+        attempts: list["LLMModelAttempt"] | None = None,
+        agent_role: str = "",
+    ) -> "LLMAttemptMetadata":
         m = cls(
             llm_attempted=True,
             llm_provider=provider,
@@ -171,6 +262,11 @@ class LLMAttemptMetadata:
             fallback_used=False,
             fallback_reason=FALLBACK_REASON_NOT_APPLICABLE,
             warning_for_user=None,
+            requested_model=requested_model or model,
+            effective_model=effective_model or model,
+            attempt_count=attempt_count,
+            attempts=list(attempts or []),
+            agent_role=agent_role,
         )
         return m
 
@@ -187,6 +283,12 @@ class LLMAttemptMetadata:
         repair_steps: list[str] | None = None,
         validation_errors: list[str] | None = None,
         parse_status: str = "fallback_used",
+        requested_model: str | None = None,
+        effective_model: str | None = None,
+        attempt_count: int = 0,
+        attempts: list["LLMModelAttempt"] | None = None,
+        final_error_code: str | None = None,
+        agent_role: str = "",
     ) -> "LLMAttemptMetadata":
         return cls(
             llm_attempted=True,
@@ -202,10 +304,16 @@ class LLMAttemptMetadata:
             fallback_reason=reason,
             validation_errors_summary=list(validation_errors or []),
             warning_for_user=user_warning_for(reason),
+            requested_model=requested_model,
+            effective_model=effective_model,
+            attempt_count=attempt_count,
+            attempts=list(attempts or []),
+            final_error_code=final_error_code,
+            agent_role=agent_role,
         )
 
     @classmethod
-    def not_attempted(cls) -> "LLMAttemptMetadata":
+    def not_attempted(cls, *, agent_role: str = "") -> "LLMAttemptMetadata":
         """When no LLM provider was configured for this call."""
         return cls(
             llm_attempted=False,
@@ -213,6 +321,7 @@ class LLMAttemptMetadata:
             fallback_used=True,
             fallback_reason=FALLBACK_REASON_LLM_UNAVAILABLE,
             warning_for_user=user_warning_for(FALLBACK_REASON_LLM_UNAVAILABLE),
+            agent_role=agent_role,
         )
 
 
@@ -250,6 +359,12 @@ def classify_llm_response(
     latency_ms = getattr(response, "latency_ms", None)
     content_present = bool(getattr(response, "content", ""))
     parsed = getattr(response, "parsed", None)
+    requested_model = getattr(response, "requested_model", None)
+    effective_model = getattr(response, "effective_model", None)
+    attempt_count = getattr(response, "attempt_count", 1)
+    attempts = getattr(response, "attempts", [])
+    resp_agent_role = getattr(response, "agent_role", "")
+    fallback_used = getattr(response, "fallback_used", False)
 
     # Fast path: provider already parsed a dict
     if isinstance(parsed, dict):
@@ -258,7 +373,15 @@ def classify_llm_response(
             model=provider_model,
             latency_ms=latency_ms,
             content_present=content_present,
+            requested_model=requested_model,
+            effective_model=effective_model,
+            attempt_count=attempt_count,
+            attempts=attempts,
+            agent_role=resp_agent_role,
         )
+        if fallback_used:
+            meta.fallback_used = True
+            meta.fallback_reason = "primary_model_failed"
         return parsed, meta, [], []
 
     # Repair path
@@ -275,7 +398,15 @@ def classify_llm_response(
             content_present=content_present,
             repaired=(outcome.status == PARSE_STATUS_REPAIRED_OK),
             repair_steps=outcome.repair_steps,
+            requested_model=requested_model,
+            effective_model=effective_model,
+            attempt_count=attempt_count,
+            attempts=attempts,
+            agent_role=resp_agent_role,
         )
+        if fallback_used:
+            meta.fallback_used = True
+            meta.fallback_reason = "primary_model_failed"
         return outcome.parsed, meta, outcome.repair_steps, []
 
     # Fallback path — pick the right reason
@@ -295,5 +426,10 @@ def classify_llm_response(
         repair_steps=outcome.repair_steps,
         validation_errors=outcome.validation_errors,
         parse_status=outcome.status,
+        requested_model=requested_model,
+        effective_model=effective_model,
+        attempt_count=attempt_count,
+        attempts=attempts,
+        agent_role=resp_agent_role,
     )
     return None, meta, outcome.repair_steps, outcome.validation_errors

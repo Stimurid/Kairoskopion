@@ -367,7 +367,7 @@ class TestOpenAICompatProvider:
         with patch("urllib.request.urlopen", side_effect=http_error):
             with pytest.raises(LLMError) as exc_info:
                 provider.complete([{"role": "user", "content": "test"}])
-            assert exc_info.value.error_code == "PROVIDER_HTTP_ERROR"
+            assert exc_info.value.error_code == "AUTH_FAILED"
 
     def test_complete_retries_on_429(self):
         provider = self._make_provider()

@@ -65,6 +65,7 @@ class VenueFamilyContextBuilderAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.2,
                 max_tokens=2048,
+                agent_role="venue_family_context_builder",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("VenueFamilyContextBuilder LLM failed: %s", exc)

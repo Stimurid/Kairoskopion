@@ -133,6 +133,19 @@ export interface SubmissionScenario {
 
 // --- Pathway ---
 
+export interface LLMModelAttemptRecord {
+  attempt_index: number;
+  model: string;
+  agent_role: string;
+  latency_ms: number;
+  provider_status: string;
+  response_status: string;
+  parse_status: string;
+  error_code: string;
+  retryable: boolean;
+  transition: string;
+}
+
 export interface ExtractionAttempt {
   llm_attempted?: boolean;
   llm_provider?: string | null;
@@ -145,6 +158,12 @@ export interface ExtractionAttempt {
   repair_attempted?: boolean;
   repair_status?: string;
   raw_output_ref?: string | null;
+  requested_model?: string | null;
+  effective_model?: string | null;
+  attempt_count?: number;
+  attempts?: LLMModelAttemptRecord[];
+  final_error_code?: string | null;
+  agent_role?: string;
 }
 
 export interface DisciplinaryPathway {

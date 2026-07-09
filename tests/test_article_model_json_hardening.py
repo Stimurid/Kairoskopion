@@ -116,13 +116,15 @@ class TestNullsForNullAllowedRequiredFields(unittest.TestCase):
         self.assertIn("confidence", out.parsed)
         self.assertIn("questions_for_user", out.parsed)
 
-    def test_non_null_required_field_with_null_still_flags(self):
+    def test_non_null_required_array_with_null_is_coerced(self):
         # core_claims has type "array" (not nullable) but is required.
+        # Null arrays are coerced to [] so the extraction isn't discarded.
         d = _valid_output()
         d["core_claims"] = None
         out = repair_and_parse(json.dumps(d), schema=SCHEMA)
-        self.assertEqual(out.status, PARSE_STATUS_SCHEMA_VALIDATION_FAILED)
-        self.assertTrue(any("core_claims" in e for e in out.validation_errors))
+        self.assertEqual(out.status, PARSE_STATUS_PARSED_OK)
+        self.assertEqual(out.parsed["core_claims"], [])
+        self.assertTrue(any("required_nulls_coerced" in s for s in out.repair_steps))
 
 
 class TestFencesAndProse(unittest.TestCase):
@@ -275,7 +277,7 @@ class TestUnhashableEnumValues(unittest.TestCase):
     _build_from_llm must degrade to UNKNOWN, not crash on dict lookup
     (observed live: genre_current returned as dict → TypeError)."""
 
-    def test_dict_valued_enum_fields_do_not_crash(self):
+    def test_dict_valued_enum_fields_extract_value(self):
         from kairoskopion.agents.article_modeler import _build_from_llm
         from kairoskopion.services.article_modeling import build_manuscript_model
 
@@ -288,9 +290,12 @@ class TestUnhashableEnumValues(unittest.TestCase):
         parsed["novelty_mode"] = 42
 
         article = _build_from_llm(parsed, manuscript, text, None)
-        self.assertEqual(article.genre_current, "unknown")
+        # Dict with recognized key → extracted value
+        self.assertEqual(article.genre_current, "research_article")
+        self.assertEqual(article.method_status, "empirical_method")
+        # List → no extraction possible → unknown
         self.assertEqual(article.article_stage, "unknown")
-        self.assertEqual(article.method_status, "unknown")
+        # Non-string/dict/list → unknown
         self.assertEqual(article.novelty_mode, "unknown")
 
 

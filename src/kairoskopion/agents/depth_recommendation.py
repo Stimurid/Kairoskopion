@@ -87,6 +87,7 @@ class DepthRecommendationAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.2,
                 max_tokens=1024,
+                agent_role="depth_recommendation",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("DepthRecommendation LLM call failed: %s", exc)

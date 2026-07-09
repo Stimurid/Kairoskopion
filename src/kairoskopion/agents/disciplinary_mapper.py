@@ -79,6 +79,7 @@ class DisciplinaryPathwayMapperAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.3,
                 max_tokens=4096,
+                agent_role="disciplinary_pathway_mapper",
             )
         except Exception as e:
             logger.warning("LLM call failed for disciplinary_mapper, falling back: %s", e)

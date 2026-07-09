@@ -109,6 +109,7 @@ class RewritePlannerAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.2,
                 max_tokens=4096,
+                agent_role="rewrite_planner",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("RewritePlanner LLM call failed: %s", exc)

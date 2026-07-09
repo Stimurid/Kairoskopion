@@ -92,6 +92,7 @@ class ArticleSemanticProfilerAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.3,
                 max_tokens=4096,
+                agent_role="semantic_profiler",
             )
         except Exception as e:
             logger.warning("LLM call failed for semantic_profiler, falling back: %s", e)

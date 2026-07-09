@@ -171,6 +171,7 @@ def try_llm_call(
             response_schema=family.get("output_schema"),
             temperature=temperature,
             max_tokens=max_tokens,
+            agent_role=family.get("agent_role_id", ""),
         )
     except Exception as exc:
         logger.warning("LLM call failed for %s: %s", family.get("agent_role_id", "?"), exc)
@@ -247,6 +248,7 @@ def try_llm_call_with_outcome(
             response_schema=(family.get("output_schema") if strict_schema else None),
             temperature=temperature,
             max_tokens=max_tokens,
+            agent_role=agent_role or family.get("agent_role_id", ""),
         )
     except Exception as exc:  # noqa: BLE001
         outcome.provider_status = "exception"

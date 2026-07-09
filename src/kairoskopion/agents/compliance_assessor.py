@@ -97,6 +97,7 @@ class ComplianceAssessorAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.1,
                 max_tokens=4096,
+                agent_role="compliance_assessor",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("ComplianceAssessor LLM call failed: %s", exc)

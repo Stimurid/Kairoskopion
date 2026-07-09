@@ -19,7 +19,7 @@ def _env(primary: str, fallback: str, default: str = "") -> str:
 
 DEFAULT_BASE_URL = "https://api.302.ai/v1"
 DEFAULT_MODEL = "gpt-4.1-mini"
-DEFAULT_TIMEOUT_MS = 30_000
+DEFAULT_TIMEOUT_MS = 90_000
 DEFAULT_MAX_TOKENS = 4096
 DEFAULT_TEMPERATURE = 0.2
 DEFAULT_MAX_RETRIES = 3
@@ -60,6 +60,10 @@ class LLMConfig:
 
     Reads from env vars with two-level fallback:
       KAIROSKOPION_LLM_MODEL → LLM_MODEL → default
+
+    Fallback model queue (KAIROSKOPION_LLM_FALLBACK_MODELS):
+      Comma-separated list of models to try if primary fails.
+      Same base_url and api_key are used for all fallback models.
     """
 
     provider: str = "openai_compatible"
@@ -70,6 +74,7 @@ class LLMConfig:
     max_tokens: int = DEFAULT_MAX_TOKENS
     timeout_seconds: float = DEFAULT_TIMEOUT_MS / 1000
     max_retries: int = DEFAULT_MAX_RETRIES
+    fallback_models: list[str] = dc.field(default_factory=list)
 
     @classmethod
     def from_env(cls) -> LLMConfig | None:
@@ -93,12 +98,20 @@ class LLMConfig:
             else DEFAULT_TIMEOUT_MS / 1000
         )
 
+        fallback_raw = _env(
+            "KAIROSKOPION_LLM_FALLBACK_MODELS", "LLM_FALLBACK_MODELS", "",
+        )
+        fallback_models = [
+            m.strip() for m in fallback_raw.split(",") if m.strip()
+        ]
+
         return cls(
             provider=provider,
             model=model,
             base_url=base_url,
             api_key_env=api_key_env,
             timeout_seconds=timeout_s,
+            fallback_models=fallback_models,
         )
 
     @classmethod

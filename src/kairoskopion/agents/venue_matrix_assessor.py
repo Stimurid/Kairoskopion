@@ -85,6 +85,7 @@ class VenueMatrixAssessorAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.2,
                 max_tokens=4096,
+                agent_role="venue_matrix_assessor",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("VenueMatrixAssessor LLM call failed: %s", exc)

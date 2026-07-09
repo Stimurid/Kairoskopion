@@ -105,6 +105,7 @@ class FitAssessorAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.2,
                 max_tokens=4096,
+                agent_role="fit_assessor",
             )
         except Exception as e:
             logger.warning("LLM call failed for fit_assessor, falling back: %s", e)
@@ -216,6 +217,7 @@ class FitAssessorAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.2,
                 max_tokens=6144,
+                agent_role="fit_assessor",
             )
         except Exception as e:
             logger.warning("VPKG fit assessment LLM failed: %s", e)
