@@ -506,10 +506,15 @@ class Case:
                     logger.info("Article model built via LLM (%s)", output.confidence)
             except Exception as exc:
                 logger.warning("LLM article modeling failed, falling back: %s", exc)
+                exc_attempts = getattr(exc, "attempts", [])
+                exc_error_code = getattr(exc, "error_code", None)
                 case_level_attempt = LLMAttemptMetadata.fallback(
                     reason=FALLBACK_REASON_PROVIDER_ERROR,
                     provider="openai_compatible",
                     validation_errors=[str(exc)[:240]],
+                    attempts=exc_attempts,
+                    final_error_code=exc_error_code,
+                    agent_role="article_modeler",
                 )
                 provider = None
         else:
@@ -1481,18 +1486,53 @@ class Case:
             "timestamp": _now(),
         })
 
+        attempt_meta: dict[str, Any] = {}
         try:
-            response = provider.complete(chat_messages)
+            response = provider.complete(chat_messages, agent_role="article_model_replay")
             raw_text = response.content or ""
+            attempt_meta = {
+                "requested_model": getattr(response, "requested_model", None),
+                "effective_model": getattr(response, "effective_model", None) or getattr(response, "model", None),
+                "fallback_used": getattr(response, "fallback_used", False),
+                "attempt_count": getattr(response, "attempt_count", 1),
+                "attempts": [
+                    a.to_dict() if hasattr(a, "to_dict") else a
+                    for a in getattr(response, "attempts", [])
+                ],
+                "agent_role": "article_model_replay",
+                "provider_status": "ok",
+                "parse_status": "pending",
+                "final_error_code": None,
+            }
         except Exception as exc:
             logger.warning("LLM refinement call failed: %s", exc)
+            exc_attempts = getattr(exc, "attempts", [])
+            attempt_meta = {
+                "requested_model": None,
+                "effective_model": None,
+                "fallback_used": False,
+                "attempt_count": len(exc_attempts),
+                "attempts": [
+                    a.to_dict() if hasattr(a, "to_dict") else a
+                    for a in exc_attempts
+                ],
+                "agent_role": "article_model_replay",
+                "provider_status": "error",
+                "parse_status": "not_attempted",
+                "final_error_code": getattr(exc, "error_code", "UNKNOWN"),
+            }
             reply_text = f"Ошибка при обращении к LLM: {type(exc).__name__}"
             self.refinement_chat.append({
                 "role": "assistant",
                 "content": reply_text,
                 "timestamp": _now(),
             })
-            return {"reply": reply_text, "suggestions": [], "llm_available": True}
+            return {
+                "reply": reply_text,
+                "suggestions": [],
+                "llm_available": True,
+                "attempt_metadata": attempt_meta,
+            }
 
         suggestions: list[dict[str, str]] = []
         reply_text = raw_text
@@ -1513,8 +1553,12 @@ class Case:
                                     "value": str(s["value"]),
                                     "reason": str(s.get("reason", "")),
                                 })
+                attempt_meta["parse_status"] = "parsed_ok"
+            else:
+                attempt_meta["parse_status"] = "parse_failed"
         except Exception as exc:  # noqa: BLE001
             logger.warning("LLM suggestion parsing failed: %s", exc)
+            attempt_meta["parse_status"] = "parse_error"
 
         self.refinement_chat.append({
             "role": "assistant",
@@ -1532,6 +1576,7 @@ class Case:
             "reply": reply_text,
             "suggestions": suggestions,
             "llm_available": True,
+            "attempt_metadata": attempt_meta,
         }
 
     def get_refinement_chat(self) -> list[dict[str, Any]]:
@@ -1597,10 +1642,15 @@ class Case:
                     logger.info("Pathways mapped via LLM")
                 except Exception as exc:
                     logger.warning("LLM pathway mapping failed, falling back: %s", exc)
+                    exc_attempts = getattr(exc, "attempts", [])
+                    exc_error_code = getattr(exc, "error_code", None)
                     case_level_attempt = LLMAttemptMetadata.fallback(
                         reason=FALLBACK_REASON_PROVIDER_ERROR,
                         provider="openai_compatible",
                         validation_errors=[str(exc)[:240]],
+                        attempts=exc_attempts,
+                        final_error_code=exc_error_code,
+                        agent_role="disciplinary_pathway_mapper",
                     )
                     output = agent.execute_deterministic(inp)
             else:

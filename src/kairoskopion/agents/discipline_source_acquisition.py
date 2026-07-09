@@ -102,6 +102,7 @@ class DisciplineSourceAcquisitionAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.2,
                 max_tokens=1500,
+                agent_role="discipline_source_acquisition",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("source acquisition LLM failed: %s", exc)

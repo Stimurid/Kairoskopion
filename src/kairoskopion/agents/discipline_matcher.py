@@ -111,6 +111,7 @@ class DisciplineMatcherAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.0,
                 max_tokens=1024,
+                agent_role="discipline_matcher",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(

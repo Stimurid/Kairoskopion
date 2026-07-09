@@ -81,6 +81,7 @@ class VenueFunnelPlannerAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.3,
                 max_tokens=3072,
+                agent_role="venue_funnel_planner",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("VenueFunnelPlanner LLM call failed: %s", exc)

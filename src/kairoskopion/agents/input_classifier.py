@@ -89,6 +89,7 @@ class InputClassifierAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.0,
                 max_tokens=512,
+                agent_role="input_classifier",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("LLM call failed for input_classifier: %s", exc)

@@ -105,6 +105,7 @@ class DisciplineSeederAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.3,
                 max_tokens=4000,
+                agent_role="discipline_seeder",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("seeder LLM call failed: %s", exc)

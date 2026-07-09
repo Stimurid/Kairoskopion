@@ -78,6 +78,7 @@ class ArticleModelerAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.2,
                 max_tokens=4096,
+                agent_role="article_modeler",
             )
         except Exception as e:
             # Provider call itself failed (network, timeout, API error,

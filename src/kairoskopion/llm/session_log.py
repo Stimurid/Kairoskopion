@@ -1,8 +1,12 @@
-"""Per-session LLM call logging with FIFO rotation.
+"""Provider diagnostic log — per-process JSONL for operator debugging.
 
-Each API session (login→logout or server restart) gets its own log file.
-Logs are JSONL: one JSON object per LLM call with request/response/timing.
-FIFO rotation keeps the last N session files (default 50).
+Each backend process (API server lifecycle, CLI invocation, test run)
+gets its own log file. Logs are JSONL: one JSON object per provider
+attempt with request/response/timing. This is NOT the authoritative
+PipelineRun trace — it supplements the agent-layer LLMAttemptMetadata.
+
+FIFO rotation keeps the last N process files (default 50).
+Size rotation caps individual files (default 10 MB).
 
 Log directory: {data_dir}/logs/llm_sessions/
 File naming: {timestamp}_{session_id}.jsonl
@@ -18,9 +22,12 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-MAX_SESSION_FILES = 50
+MAX_PROCESS_FILES = 50
+DEFAULT_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 _LOG_DIR_ENV = "KAIROSKOPION_LOG_DIR"
 _DATA_DIR_ENV = "KAIROSKOPION_DATA_DIR"
+_MAX_FILES_ENV = "KAIROSKOPION_LLM_LOG_MAX_FILES"
+_MAX_BYTES_ENV = "KAIROSKOPION_LLM_LOG_MAX_BYTES"
 
 
 def _default_log_dir() -> Path:
@@ -31,8 +38,8 @@ def _default_log_dir() -> Path:
     return Path(data_dir) / "logs" / "llm_sessions"
 
 
-def _rotate_fifo(log_dir: Path, max_files: int = MAX_SESSION_FILES) -> int:
-    """Delete oldest session log files to keep at most max_files. Returns count deleted."""
+def _rotate_fifo(log_dir: Path, max_files: int = MAX_PROCESS_FILES) -> int:
+    """Delete oldest process log files to keep at most max_files. Returns count deleted."""
     if not log_dir.is_dir():
         return 0
     files = sorted(log_dir.glob("*.jsonl"), key=lambda f: f.stat().st_mtime)
@@ -48,25 +55,60 @@ def _rotate_fifo(log_dir: Path, max_files: int = MAX_SESSION_FILES) -> int:
 
 
 class LLMSessionLog:
-    """Append-only JSONL log for one session's LLM calls."""
+    """Append-only JSONL provider diagnostic log for one process.
+
+    Terminology: "session" here means one backend process lifecycle,
+    NOT a user session, login session, or PipelineRun.
+    """
 
     def __init__(
         self,
         session_id: str = "default",
         log_dir: Path | None = None,
-        max_files: int = MAX_SESSION_FILES,
+        max_files: int | None = None,
+        max_bytes: int | None = None,
     ) -> None:
         self._session_id = session_id
         self._log_dir = log_dir or _default_log_dir()
-        self._max_files = max_files
+
+        if max_files is None:
+            env_mf = os.environ.get(_MAX_FILES_ENV, "")
+            self._max_files = int(env_mf) if env_mf.isdigit() else MAX_PROCESS_FILES
+        else:
+            self._max_files = max_files
+
+        if max_bytes is None:
+            env_mb = os.environ.get(_MAX_BYTES_ENV, "")
+            self._max_bytes = int(env_mb) if env_mb.isdigit() else DEFAULT_MAX_BYTES
+        else:
+            self._max_bytes = max_bytes
+
         self._log_dir.mkdir(parents=True, exist_ok=True)
         ts = time.strftime("%Y%m%d_%H%M%S")
         self._path = self._log_dir / f"{ts}_{session_id}.jsonl"
+        self._file_index = 0
         _rotate_fifo(self._log_dir, self._max_files)
 
     @property
     def path(self) -> Path:
         return self._path
+
+    @property
+    def max_bytes(self) -> int:
+        return self._max_bytes
+
+    def _rotate_if_needed(self) -> None:
+        """Rotate to a new file if current file exceeds max_bytes."""
+        if self._max_bytes <= 0:
+            return
+        try:
+            if self._path.exists() and self._path.stat().st_size >= self._max_bytes:
+                self._file_index += 1
+                ts = time.strftime("%Y%m%d_%H%M%S")
+                self._path = self._log_dir / f"{ts}_{self._session_id}_{self._file_index}.jsonl"
+                _rotate_fifo(self._log_dir, self._max_files)
+        except OSError:
+            pass
 
     def log_call(
         self,
@@ -85,9 +127,10 @@ class LLMSessionLog:
         attempt: int = 1,
         extra: dict[str, Any] | None = None,
     ) -> None:
+        self._rotate_if_needed()
         record = {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "session": self._session_id,
+            "process_file": self._session_id,
             "agent_role": agent_role,
             "model": model,
             "latency_ms": round(latency_ms, 1),
@@ -112,7 +155,7 @@ class LLMSessionLog:
             with open(self._path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
         except OSError as e:
-            logger.warning("Failed to write LLM session log: %s", e)
+            logger.warning("Failed to write provider diagnostic log: %s", e)
 
     def log_error(
         self,
@@ -135,7 +178,7 @@ class LLMSessionLog:
         )
 
 
-# Global session log — initialized on first access.
+# Global process log — initialized on first access.
 _global_log: LLMSessionLog | None = None
 
 
@@ -147,7 +190,7 @@ def get_session_log(session_id: str = "api") -> LLMSessionLog:
 
 
 def reset_session_log(session_id: str = "api") -> LLMSessionLog:
-    """Start a new session log (e.g. on server restart)."""
+    """Start a new process log (e.g. on server restart)."""
     global _global_log
     _global_log = LLMSessionLog(session_id=session_id)
     return _global_log

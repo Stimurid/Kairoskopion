@@ -21,7 +21,7 @@ from kairoskopion.llm.config import LLMConfig
 from kairoskopion.llm.openai_compat import LLMError, OpenAICompatProvider
 from kairoskopion.llm.session_log import (
     LLMSessionLog,
-    MAX_SESSION_FILES,
+    MAX_PROCESS_FILES,
     _rotate_fifo,
     get_session_log,
     reset_session_log,

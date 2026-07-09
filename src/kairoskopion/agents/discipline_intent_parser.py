@@ -76,6 +76,7 @@ class DisciplineIntentParserAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.2,
                 max_tokens=2048,
+                agent_role="discipline_intent_parser",
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("DisciplineIntentParser LLM call failed: %s", exc)

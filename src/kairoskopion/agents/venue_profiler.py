@@ -62,6 +62,7 @@ class VenueProfilerAgent(AgentRole):
                 response_schema=family["output_schema"],
                 temperature=0.1,
                 max_tokens=4096,
+                agent_role="venue_profiler",
             )
         except Exception as e:
             logger.warning("LLM call failed for venue_profiler, falling back: %s", e)
