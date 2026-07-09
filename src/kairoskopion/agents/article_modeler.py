@@ -88,12 +88,16 @@ class ArticleModelerAgent(AgentRole):
             # "provider unavailable" vs "model returned bad JSON".
             logger.warning("LLM call failed for article_modeler, falling back: %s", e)
             err_code = getattr(e, "error_code", None) or e.__class__.__name__
+            exc_attempts = getattr(e, "attempts", [])
             meta = LLMAttemptMetadata.fallback(
                 reason=FALLBACK_REASON_PROVIDER_ERROR,
                 provider="openai_compatible",
                 model=None,
                 validation_errors=[f"{err_code}: {str(e)[:200]}"],
                 parse_status="not_attempted",
+                attempts=exc_attempts,
+                final_error_code=getattr(e, "error_code", None),
+                agent_role="article_modeler",
             )
             return self._deterministic_with_attempt(inp, meta)
 
@@ -145,6 +149,11 @@ class ArticleModelerAgent(AgentRole):
                     repair_steps=outcome_steps,
                     validation_errors=outcome_errors,
                     parse_status=outcome_status,
+                    requested_model=getattr(response, "requested_model", None),
+                    effective_model=getattr(response, "effective_model", None),
+                    attempt_count=getattr(response, "attempt_count", 1),
+                    attempts=getattr(response, "attempts", []),
+                    agent_role="article_modeler",
                 )
                 return self._deterministic_with_attempt(inp, meta)
 
@@ -163,7 +172,15 @@ class ArticleModelerAgent(AgentRole):
             content_present=content_present,
             repaired=repaired,
             repair_steps=outcome_steps,
+            requested_model=getattr(response, "requested_model", None),
+            effective_model=getattr(response, "effective_model", None),
+            attempt_count=getattr(response, "attempt_count", 1),
+            attempts=getattr(response, "attempts", []),
+            agent_role="article_modeler",
         )
+        if getattr(response, "fallback_used", False):
+            meta.fallback_used = True
+            meta.fallback_reason = "primary_model_failed"
         article.extraction_attempt = meta.to_dict()
 
         return AgentOutput(
