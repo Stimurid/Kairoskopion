@@ -51,10 +51,17 @@ For deep spec questions, read:
 - `docs/DECISIONS.md` — architectural decisions and rationale
 
 **Before deploying to production**, read:
-- **`docs/operations/KAIROSKOPION_PRODUCTION_DEPLOY_RUNBOOK.md`** — host, SSH
-  user, app path, service name, deploy/rollback commands, env notes.
-  Do not rely on chat memory. If SSH config is missing, use the runbook
-  recovery checklist.
+- **`docs/operations/ENVIRONMENT_INVARIANTS.md`** — SSH is **disabled**,
+  retry limit is **zero**. No SSH/SCP/SFTP/port-22 probes. Use non-SSH
+  deployment contour only. If none available, push main and return
+  `DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR`.
+- **`docs/operations/KAIROSKOPION_PRODUCTION_DEPLOY_RUNBOOK.md`** — host,
+  app path, service name, deploy/rollback commands, env notes.
+  Do not rely on chat memory.
+- **`docs/operations/CURRENT_WORKING_STATE.md`** — active blockers, next
+  steps, gate results. Read at session start.
+- **`docs/operations/SESSION_HANDOFF.md`** — durable session state for
+  continuation across context boundaries.
 
 **Before starting any venue-discovery session**, read:
 - `docs/VENUE_FUNNEL_AND_PROFILE_PACKAGE_V1.md` — canonical funnel
