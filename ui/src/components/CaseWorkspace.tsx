@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type {
   CaseDetail,
   ArticleModel,
@@ -72,6 +72,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
   const [protectedCore, setProtectedCore] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [humanViewKey, setHumanViewKey] = useState(0);
   // Track A: last intake result drives the override panel state.
   const [lastIntakeResult, setLastIntakeResult] = useState<{
     needs_user_choice?: boolean;
@@ -86,6 +87,15 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
   } | null>(null);
 
   const caseId = caseData.case_id;
+
+  // Auto-hydrate article model on mount when the case already has one
+  useEffect(() => {
+    if (caseData.article_model_id && !articleModel) {
+      api.getArticleModel(caseId)
+        .then(am => setArticleModel(am))
+        .catch(() => { /* not available yet — user will see loader */ });
+    }
+  }, [caseId, caseData.article_model_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStageClick = (stage: string) => {
     setActiveView(stage);
@@ -233,6 +243,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
       await api.confirmArticleModel(caseId, protectedCore, corrections);
       const am = await api.getArticleModel(caseId);
       setArticleModel(am);
+      setHumanViewKey(k => k + 1);
       onCaseUpdate();
     } catch (e) {
       handleError(e);
@@ -472,6 +483,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
             </div>
             {articleViewMode === 'human' ? (
               <HumanModelView
+                key={`human-${humanViewKey}`}
                 caseId={caseId}
                 kind="article"
                 onBack={() => setActiveView('intake')}

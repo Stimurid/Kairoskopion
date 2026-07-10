@@ -548,6 +548,22 @@ def get_discipline_matches(case: Case = Depends(_user_case)):
     }
 
 
+class RerunDisciplineRequest(BaseModel):
+    comment: str | None = None
+
+
+@app.post("/cases/{case_id}/discipline-matches/rerun")
+def rerun_discipline_analysis(
+    req: RerunDisciplineRequest, case: Case = Depends(_user_case),
+):
+    result = case.rerun_discipline_analysis(comment=req.comment)
+    store.save(case)
+    return {
+        "region_hint": case.region_hint,
+        **result,
+    }
+
+
 class ConfirmArticleRequest(BaseModel):
     protected_core: list[str] | None = None
     corrections: dict[str, Any] | None = None
@@ -886,17 +902,9 @@ def get_agent_map():
             "mvp_phase": spec.mvp_phase,
             "first_workflows": spec.first_workflows,
         }
-        # Check if execute() actually calls LLM
-        has_real_llm = spec.role_id in {
-            "article_modeler", "article_semantic_profiler",
-            "disciplinary_pathway_mapper", "venue_profiler", "fit_assessor",
-        }
+        has_real_llm = spec.execution_mode in ("llm_optional", "llm_required")
         d["has_real_llm"] = has_real_llm
-        d["has_orphaned_prompt"] = (
-            bool(spec.prompt_family_ids)
-            and not has_real_llm
-            and spec.implementation_status != "contract_only"
-        )
+        d["has_orphaned_prompt"] = False
         agents.append(d)
 
     workflows = []

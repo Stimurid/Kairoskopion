@@ -207,8 +207,10 @@ def provider_status() -> dict:
         per_role_models[role] = rcfg.model
         if rcfg.model != cfg.model:
             overridden_roles.append(role)
+    is_available = bool(cfg.model and cfg.base_url and has_key)
     return {
-        "available": bool(cfg.model and cfg.base_url),
+        "available": is_available,
+        "status": "configured" if is_available else "not_configured",
         "provider": cfg.provider,
         "model": cfg.model,
         "base_url": cfg.base_url,

@@ -4713,6 +4713,117 @@ code.agent-detail-value {
   color: var(--text-secondary, #b8bccc);
 }
 
+.discipline-rank {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 1.6em;
+  text-align: center;
+}
+
+.discipline-match-names {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.discipline-display-name {
+  font-size: 0.85rem;
+  color: var(--text-primary, #e8eaf2);
+  font-weight: 500;
+}
+
+.discipline-expand-icon {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.discipline-source-badge {
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.discipline-source-badge--keyword {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.35);
+}
+
+.discipline-match-detail {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius);
+  font-size: 0.78rem;
+}
+
+.discipline-evidence {
+  margin-bottom: var(--space-xs, 4px);
+}
+
+.discipline-evidence strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.discipline-evidence--supporting strong {
+  color: rgb(120, 220, 140);
+}
+
+.discipline-evidence--contradicting strong {
+  color: #e74c3c;
+}
+
+.discipline-evidence ul {
+  list-style: disc;
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--text-secondary, #b8bccc);
+}
+
+.discipline-relation-type {
+  margin: var(--space-xs, 4px) 0 0;
+  color: var(--text-secondary, #b8bccc);
+}
+
+.discipline-rerun-section {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-subtle, #2a2f3a);
+}
+
+.discipline-rerun-section h4 {
+  font-size: 0.85rem;
+  margin: 0 0 var(--space-sm);
+  color: var(--text-primary, #e8eaf2);
+}
+
+.discipline-rerun-comment {
+  width: 100%;
+  min-height: 60px;
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-input, #0d1017);
+  border: 1px solid var(--border-subtle, #2a2f3a);
+  border-radius: var(--radius);
+  color: var(--text-primary, #e8eaf2);
+  font-size: 0.8rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.discipline-rerun-comment:focus {
+  outline: none;
+  border-color: var(--accent, #4a8cff);
+}
+
 .discipline-new-candidate {
   margin-top: var(--space-md);
   padding: var(--space-sm);
