@@ -21,9 +21,11 @@ export function clearToken(): void {
 }
 
 export class UnauthorizedError extends Error {
-  constructor(public body: string) {
+  body: string;
+  constructor(body: string) {
     super(`API 401: ${body}`);
     this.name = 'UnauthorizedError';
+    this.body = body;
   }
 }
 

@@ -233,12 +233,6 @@ function renderMarkdown(md: string): string {
     .join('\n');
 }
 
-// Blocks that are structural (intro summary, questions, corrections
-// guide) — not individual model fields the user needs to judge.
-const NON_FIELD_BLOCK_PREFIXES = [
-  'block_0', // Usually the top-level summary before any H2
-];
-
 function isReviewableBlock(block: ParsedBlock): boolean {
   // Must have a field path to be reviewable
   if (!block.fieldPath) return false;
