@@ -123,7 +123,7 @@ class DisciplineMatcherAgent(AgentRole):
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.0,
-                max_tokens=4096,
+                max_tokens=8192,
                 agent_role="discipline_matcher",
             )
         except Exception as exc:  # noqa: BLE001
