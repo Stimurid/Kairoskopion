@@ -4824,6 +4824,72 @@ code.agent-detail-value {
   border-color: var(--accent, #4a8cff);
 }
 
+/* Genre/method LLM rerun section */
+.genre-method-rerun-section {
+  margin: var(--space-lg) 0;
+  padding: var(--space-md);
+  border: 1px solid rgba(240, 180, 41, 0.35);
+  border-left: 3px solid rgb(240, 180, 41);
+  background: rgba(240, 180, 41, 0.04);
+  border-radius: var(--radius);
+}
+
+.genre-method-rerun-section h4 {
+  font-size: 0.85rem;
+  margin: 0 0 var(--space-xs);
+  color: rgb(240, 180, 41);
+}
+
+.genre-method-rerun-hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary, #8b8fa3);
+  margin: 0 0 var(--space-sm);
+}
+
+.genre-method-rerun-comment {
+  width: 100%;
+  min-height: 48px;
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--bg-input, #0d1017);
+  border: 1px solid var(--border-subtle, #2a2f3a);
+  border-radius: var(--radius);
+  color: var(--text-primary, #e8eaf2);
+  font-size: 0.8rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.genre-method-rerun-comment:focus {
+  outline: none;
+  border-color: var(--accent, #4a8cff);
+}
+
+.genre-method-rerun-result {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: rgba(52, 199, 123, 0.08);
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+}
+
+.genre-method-rerun-result p { margin: 2px 0; }
+
+.genre-method-rerun-source {
+  font-size: 0.72rem;
+  color: var(--text-muted, #666);
+  margin-top: var(--space-xs);
+}
+
+.genre-method-rerun-error {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: rgba(229, 83, 75, 0.1);
+  border-radius: var(--radius);
+  color: #e5534b;
+  font-size: 0.8rem;
+}
+
 .discipline-new-candidate {
   margin-top: var(--space-md);
   padding: var(--space-sm);

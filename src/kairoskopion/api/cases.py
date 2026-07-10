@@ -622,64 +622,16 @@ class Case:
         self._build_article_field_position()
 
     def _run_discipline_matcher(self) -> None:
-        """Phase B2: registry-first discipline lookup, then matcher agent.
+        """Phase B2: discipline analysis via LLM when available.
 
-        P6.1 Track 3: check registry first. If accepted record found,
-        use it as canonical — skip LLM. If provisional, use with warning.
-        If no registry hit, run DisciplineMatcherAgent as before.
+        Registry substring lookup provides seed candidates only.
+        When LLM provider is configured, the LLM matcher ALWAYS runs
+        to produce the full ranked analysis. Registry-only results are
+        used only when no LLM provider is available.
         """
         if self.article_model is None:
             return
 
-        # P6.1 Track 3: registry-first discipline lookup.
-        # Try discipline field first (short, focused), then title.
-        discipline_field = getattr(
-            self.article_model, "disciplinary_register_current", "",
-        ) or ""
-        title = getattr(self.article_model, "title_current", "") or ""
-        queries = [q.strip() for q in [discipline_field, title] if q.strip()]
-
-        reg_result = None
-        for query in queries:
-            reg_result = self._registry.discipline_lookup(
-                query[:200],
-                agent_name="discipline_matcher",
-                case_id=self.case_id,
-            )
-            if reg_result["found"]:
-                break
-
-        if reg_result and reg_result["found"]:
-                rec = reg_result["record"]
-                status = reg_result["usage_status"]
-                display_name = ""
-                if rec.display_names:
-                    display_name = next(iter(rec.display_names.values()), "")
-                self.discipline_matches = {
-                    "matched": [{
-                        "discipline_id": rec.discipline_id,
-                        "display_name": display_name,
-                        "aliases": rec.aliases,
-                        "strength": "canonical" if status == "canonical" else "provisional",
-                        "why": f"registry-first lookup ({status})",
-                        "source_status": rec.source_status,
-                        "review_status": rec.review_status,
-                        "usage_status": status,
-                        "record_id": rec.discipline_id,
-                    }],
-                    "registry_first": True,
-                }
-                if status == "provisional_with_warning":
-                    self.discipline_matches["warnings"] = [
-                        "provisional — not curator-confirmed",
-                    ]
-                logger.info(
-                    "Discipline matched via registry (%s, %s)",
-                    rec.discipline_id, status,
-                )
-                return
-
-        # No registry hit — fall through to matcher agent
         try:
             from ..agents.contract import AgentInput as _AI
             from ..agents.discipline_matcher import DisciplineMatcherAgent
@@ -720,6 +672,8 @@ class Case:
             out = agent.execute_deterministic(inp)
         if out and out.output_entity:
             self.discipline_matches = out.output_entity
+            if provider is not None:
+                self.discipline_matches["source"] = "llm"
             logger.info(
                 "Discipline matcher emitted %d matches (%s)",
                 len(out.output_entity.get("matched", [])),
@@ -786,6 +740,52 @@ class Case:
         if previous:
             result["previous_run"] = previous
         return result
+
+    def rerun_article_model(self, comment: str | None = None) -> dict[str, Any]:
+        """Re-run article modeler via LLM to resolve UNKNOWN genre/method."""
+        if self.article_model is None:
+            return {"error": "No article model — run intake first"}
+        text = self.article_input_text or self.input_text or ""
+        if len(text) < 100:
+            return {"error": "Insufficient text for re-analysis"}
+        provider = _get_llm_provider("article_modeler")
+        if provider is None:
+            return {"error": "LLM provider not configured"}
+        try:
+            from ..agents.article_modeler import ArticleModelerAgent
+            from ..agents.contract import AgentInput as _AI
+        except Exception as exc:  # noqa: BLE001
+            return {"error": f"Agent unavailable: {exc}"}
+        if comment:
+            text = f"[Комментарий оператора: {comment}]\n\n{text}"
+        agent = ArticleModelerAgent()
+        inp = _AI(
+            operation_id="article_model_rerun",
+            agent_role_id="article_modeler",
+            raw_text=text,
+        )
+        try:
+            out = agent.execute(inp, provider)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Article model rerun LLM failed: %s", exc)
+            return {"error": f"LLM call failed: {exc}"}
+        if out and out.output_entity:
+            from ..schema import ArticleModel
+            new_model = ArticleModel.from_dict(out.output_entity)
+            old_genre = getattr(self.article_model, "genre_current", None)
+            old_method = getattr(self.article_model, "method_status", None)
+            self.article_model.genre_current = new_model.genre_current
+            self.article_model.method_status = new_model.method_status
+            self.article_model.novelty_mode = new_model.novelty_mode
+            if new_model.argument_structure:
+                self.article_model.argument_structure = new_model.argument_structure
+            return {
+                "genre": {"old": old_genre, "new": self.article_model.genre_current},
+                "method": {"old": old_method, "new": self.article_model.method_status},
+                "novelty_mode": self.article_model.novelty_mode,
+                "source": "llm",
+            }
+        return {"error": "LLM returned no output entity"}
 
     def _build_matched_disciplines_context(self) -> str | None:
         """Build a compact block summarizing the matcher's verdict for

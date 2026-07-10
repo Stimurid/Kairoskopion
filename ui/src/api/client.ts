@@ -210,6 +210,15 @@ export const api = {
       reasoning: string;
     }>(`/cases/${id}/discipline-matches/rerun`, { comment }),
 
+  rerunArticleModel: (id: string, comment?: string) =>
+    post<{
+      genre?: { old: string | null; new: string };
+      method?: { old: string | null; new: string };
+      novelty_mode?: string;
+      source?: string;
+      error?: string;
+    }>(`/cases/${id}/article-model/rerun`, { comment }),
+
   // Article
   getArticleModel: (id: string) => get<ArticleModel>(`/cases/${id}/article-model`),
   confirmArticleModel: (

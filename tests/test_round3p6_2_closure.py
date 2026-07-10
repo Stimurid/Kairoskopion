@@ -427,7 +427,6 @@ class TestBypassAuditStructural:
     def test_registry_relevant_agents_wired(self):
         from kairoskopion.api import cases as mod
         src = Path(mod.__file__).read_text(encoding="utf-8")
-        assert "_registry.discipline_lookup" in src
         assert "_registry.store_venue_extraction" in src
         assert "_registry.propagate_status" in src
         assert "_registry.enrich_candidates_with_provenance" in src

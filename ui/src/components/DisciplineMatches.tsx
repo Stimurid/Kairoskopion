@@ -5,19 +5,23 @@ interface DisciplineMatch {
   discipline_id: string;
   display_name?: string;
   strength: string;
+  confidence?: string;
+  relation_type_ru?: string;
   why: string;
   supporting_evidence?: string[];
   contradicting_evidence?: string[];
   relation_type?: string;
+  position_rationale?: string;
 }
 
 interface DisciplineMatchesData {
   region_hint: string;
   matched: DisciplineMatch[];
-  new_candidate: { display_name: string; reason: string } | null;
+  new_candidate: { display_name: string; reason: string; proposed_name_ru?: string; why_existing_insufficient?: string } | null;
   confidence: 'high' | 'medium' | 'low';
   reasoning: string;
   source?: string;
+  extraction_attempt?: Record<string, unknown>;
 }
 
 interface Props {
@@ -27,8 +31,11 @@ interface Props {
 const STRENGTH_LABELS: Record<string, { label: string; className: string }> = {
   primary: { label: 'Основное поле', className: 'discipline-strength--primary' },
   strong: { label: 'Сильное соответствие', className: 'discipline-strength--primary' },
+  strong_adjacent: { label: 'Сильное смежное', className: 'discipline-strength--primary' },
+  canonical: { label: 'Каноническое', className: 'discipline-strength--primary' },
   secondary: { label: 'Смежная область', className: 'discipline-strength--secondary' },
   partial: { label: 'Частичное соответствие', className: 'discipline-strength--secondary' },
+  provisional: { label: 'Предварительное', className: 'discipline-strength--secondary' },
   tangential: { label: 'Слабое боковое соответствие', className: 'discipline-strength--tangential' },
   weak: { label: 'Слабое соответствие', className: 'discipline-strength--tangential' },
   unknown: { label: 'Не определено', className: 'discipline-strength--unknown' },
@@ -157,6 +164,11 @@ export function DisciplineMatches({ caseId }: Props) {
                 {m.why && <p className="discipline-match-why">{m.why}</p>}
                 {isOpen && (
                   <div className="discipline-match-detail">
+                    {m.relation_type_ru && (
+                      <p className="discipline-relation-type">
+                        <strong>Тип связи:</strong> {m.relation_type_ru}
+                      </p>
+                    )}
                     {m.supporting_evidence && m.supporting_evidence.length > 0 && (
                       <div className="discipline-evidence discipline-evidence--supporting">
                         <strong>Признаки, поддерживающие выбор:</strong>
@@ -169,9 +181,14 @@ export function DisciplineMatches({ caseId }: Props) {
                         <ul>{m.contradicting_evidence.map((e, i) => <li key={i}>{e}</li>)}</ul>
                       </div>
                     )}
-                    {m.relation_type && (
+                    {m.position_rationale && (
                       <p className="discipline-relation-type">
-                        <strong>Тип связи:</strong> {m.relation_type}
+                        <strong>Позиция в ранжировании:</strong> {m.position_rationale}
+                      </p>
+                    )}
+                    {m.confidence && (
+                      <p className="discipline-relation-type">
+                        <strong>Уверенность:</strong> {CONFIDENCE_LABELS[m.confidence] || m.confidence}
                       </p>
                     )}
                   </div>
@@ -183,9 +200,14 @@ export function DisciplineMatches({ caseId }: Props) {
       )}
       {data.new_candidate && (
         <div className="discipline-new-candidate">
-          <strong>LLM предложил нового кандидата:</strong> {data.new_candidate.display_name}
-          <p className="discipline-match-why">{data.new_candidate.reason}</p>
+          <strong>LLM предложил нового кандидата:</strong> {data.new_candidate.proposed_name_ru || data.new_candidate.display_name}
+          <p className="discipline-match-why">{data.new_candidate.why_existing_insufficient || data.new_candidate.reason}</p>
         </div>
+      )}
+      {data.source === 'llm' && (
+        <p className="discipline-source-info" style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 'var(--space-sm)' }}>
+          Источник: LLM-анализ
+        </p>
       )}
 
       <div className="discipline-rerun-section">

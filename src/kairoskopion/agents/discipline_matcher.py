@@ -39,6 +39,15 @@ from ..prompts.discipline_matching import (
     DISCIPLINE_MATCHING_V2_FAMILY,
     validate_discipline_match,
 )
+
+try:
+    from ..prompts.discipline_matching import (
+        DISCIPLINE_MATCHING_V3_FAMILY,
+        validate_discipline_match_v3,
+    )
+except ImportError:
+    DISCIPLINE_MATCHING_V3_FAMILY = None
+    validate_discipline_match_v3 = None
 from ..services.discipline_registry import DisciplineRegistry, load_default_registry
 from .contract import AgentInput, AgentOutput, AgentRole
 
@@ -94,7 +103,11 @@ class DisciplineMatcherAgent(AgentRole):
         candidates = self._gather_candidates(summary, region)
         candidate_block = _build_candidate_block(candidates)
 
-        family = DISCIPLINE_MATCHING_V2_FAMILY
+        family = (
+            DISCIPLINE_MATCHING_V3_FAMILY
+            if DISCIPLINE_MATCHING_V3_FAMILY is not None
+            else DISCIPLINE_MATCHING_V2_FAMILY
+        )
         user_prompt = family["user_prompt_template"].format(
             article_summary=summary[:_SUMMARY_CHAR_CAP],
             region=region,
@@ -110,7 +123,7 @@ class DisciplineMatcherAgent(AgentRole):
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.0,
-                max_tokens=1024,
+                max_tokens=4096,
                 agent_role="discipline_matcher",
             )
         except Exception as exc:  # noqa: BLE001
@@ -146,7 +159,13 @@ class DisciplineMatcherAgent(AgentRole):
                     ),
                 )
 
-        warnings = validate_discipline_match(parsed)
+        validator = (
+            validate_discipline_match_v3
+            if validate_discipline_match_v3 is not None
+            and DISCIPLINE_MATCHING_V3_FAMILY is not None
+            else validate_discipline_match
+        )
+        warnings = validator(parsed)
 
         # Filter matched ids that are not in the candidate set — the
         # model occasionally hallucinates ids. Drop silently rather

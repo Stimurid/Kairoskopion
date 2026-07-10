@@ -268,6 +268,11 @@ export function HumanModelView({ caseId, kind, venueKey, onConfirm, onBack }: Pr
   const [signals, setSignals] = useState<{ type: string; field?: string; severity: string; message: string }[]>([]);
   const [signalsOpen, setSignalsOpen] = useState(false);
 
+  // Genre/method LLM rerun
+  const [rerunGenreComment, setRerunGenreComment] = useState('');
+  const [rerunGenreRunning, setRerunGenreRunning] = useState(false);
+  const [rerunGenreResult, setRerunGenreResult] = useState<{ genre?: { old: string; new: string }; method?: { old: string; new: string }; error?: string } | null>(null);
+
   useEffect(() => {
     if (kind !== 'article') return;
     api.getCorrectionSignals().then(r => {
@@ -434,6 +439,21 @@ export function HumanModelView({ caseId, kind, venueKey, onConfirm, onBack }: Pr
   const isConfirmed = lifecycle === 'confirmed' || lifecycle === 'confirmed_by_user';
   const showPerBlock = kind === 'article' && !isConfirmed && reviewableBlocks.length > 0;
 
+  const hasUnknownGenreOrMethod = useMemo(() => {
+    if (kind !== 'article' || !markdown) return false;
+    for (const block of blocks) {
+      const hasGenre = block.allFieldPaths.includes('article_model.genre_current');
+      const hasMethod = block.allFieldPaths.includes('article_model.method_status');
+      if (hasGenre || hasMethod) {
+        const lc = block.rawMarkdown.toLowerCase();
+        if (lc.includes('unknown') || lc.includes('не определён') || lc.includes('не определен')) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, [kind, markdown, blocks]);
+
   const handleDecision = useCallback((blockId: string, decision: BlockDecision) => {
     setDecisions(prev => ({ ...prev, [blockId]: decision }));
   }, []);
@@ -467,6 +487,20 @@ export function HumanModelView({ caseId, kind, venueKey, onConfirm, onBack }: Pr
       onConfirm(decisions, overrides, comments, textEvidence);
     }
   }, [onConfirm, decisions, overrides, comments, textEvidence]);
+
+  const handleRerunGenreMethod = useCallback(async () => {
+    setRerunGenreRunning(true);
+    setRerunGenreResult(null);
+    try {
+      const result = await api.rerunArticleModel(caseId, rerunGenreComment || undefined);
+      setRerunGenreResult(result);
+      setRerunGenreComment('');
+    } catch (e) {
+      setRerunGenreResult({ error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setRerunGenreRunning(false);
+    }
+  }, [caseId, rerunGenreComment]);
 
   return (
     <div className="human-view">
@@ -817,6 +851,43 @@ export function HumanModelView({ caseId, kind, venueKey, onConfirm, onBack }: Pr
 
           </div>{/* close human-view-split */}
         </>
+      )}
+      {kind === 'article' && markdown && !loading && !isConfirmed && hasUnknownGenreOrMethod && (
+        <div className="genre-method-rerun-section">
+          <h4>Жанр или метод не определены</h4>
+          <p className="genre-method-rerun-hint">
+            Детерминированный анализ не смог определить жанр или метод статьи.
+            Запустите повторный анализ через LLM для получения обоснованного результата.
+          </p>
+          <textarea
+            className="genre-method-rerun-comment"
+            placeholder="Комментарий для LLM: гипотеза о жанре, указание на метод, контекст…"
+            value={rerunGenreComment}
+            onChange={e => setRerunGenreComment(e.target.value)}
+            rows={2}
+          />
+          <button
+            className="btn btn-primary"
+            onClick={handleRerunGenreMethod}
+            disabled={rerunGenreRunning}
+          >
+            {rerunGenreRunning ? 'Анализ…' : 'Повторить анализ жанра/метода с помощью LLM'}
+          </button>
+          {rerunGenreResult && !rerunGenreResult.error && (
+            <div className="genre-method-rerun-result">
+              {rerunGenreResult.genre && (
+                <p>Жанр: <strong>{rerunGenreResult.genre.old}</strong> → <strong>{rerunGenreResult.genre.new}</strong></p>
+              )}
+              {rerunGenreResult.method && (
+                <p>Метод: <strong>{rerunGenreResult.method.old}</strong> → <strong>{rerunGenreResult.method.new}</strong></p>
+              )}
+              <p className="genre-method-rerun-source">Источник: LLM-анализ</p>
+            </div>
+          )}
+          {rerunGenreResult?.error && (
+            <div className="genre-method-rerun-error">{rerunGenreResult.error}</div>
+          )}
+        </div>
       )}
       {onConfirm && kind === 'article' && markdown && !loading && !isConfirmed && (
         <div className="human-view-actions">

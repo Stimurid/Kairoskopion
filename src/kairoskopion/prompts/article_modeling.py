@@ -111,9 +111,24 @@ ARTICLE_MODELING_OUTPUT_SCHEMA: dict = {
         "core_claims": {"type": "array", "items": {"type": "string"}},
         "secondary_claims": {"type": "array", "items": {"type": "string"}},
         "argument_structure": {"type": ["string", "null"]},
-        "method_status": {"type": "string"},
+        "method_status": {
+            "type": "string",
+            "enum": [
+                "no_method", "implicit_method", "conceptual_method",
+                "empirical_method", "case_based", "review_method",
+                "mixed", "unknown",
+            ],
+        },
         "method_description": {"type": ["string", "null"]},
-        "genre_current": {"type": "string"},
+        "genre_current": {
+            "type": "string",
+            "enum": [
+                "research_article", "conceptual_article", "theoretical_essay",
+                "review", "systematic_review", "position_paper", "commentary",
+                "conference_paper", "forum_piece", "book_symposium_piece",
+                "unknown",
+            ],
+        },
         "disciplinary_register_current": {"type": ["string", "null"]},
         "novelty_mode": {
             "type": "string",
