@@ -217,7 +217,7 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
     }
   }, [caseId, handleIntakeResult]);
 
-  const handleIntakeFile = useCallback(async (file: File, inputType: string, searchDepth: string, region: string) => {
+  const handleIntakeFile = useCallback(async (file: File, inputType: string, _searchDepth: string, region: string) => {
     setIsLoading(true);
     setError(null);
     try {

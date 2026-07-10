@@ -4,7 +4,6 @@ import type {
   AgentMapData,
   AgentMapAgent,
   AgentMapWorkflow,
-  AgentMapWorkflowStep,
   AgentMapPrompt,
 } from '../api/client';
 
