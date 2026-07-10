@@ -51,15 +51,15 @@ sudo systemctl restart kairoskopion-api
 curl http://127.0.0.1:8088/health
 ```
 
-### SSH Connectivity Notes
+### SSH Access Status
 
-The server has intermittent SSH connectivity. If connections timeout:
+**SSH is disabled by owner environment policy (2026-07-10).**
+SSH retry limit: **zero**. Do not attempt SSH, SCP, SFTP, or port-22 probes.
 
-```bash
-ssh -o ConnectTimeout=30 -o ServerAliveInterval=30 deploy@81.26.176.248
-```
+Use non-SSH deployment contour only. If none available, push main and
+return `DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR` with the exact merge commit.
 
-Retry on failure — the server is up, network path is flaky.
+See `docs/operations/ENVIRONMENT_INVARIANTS.md` for the full policy.
 
 ## Rollback
 
