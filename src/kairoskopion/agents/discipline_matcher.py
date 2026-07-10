@@ -139,6 +139,28 @@ class DisciplineMatcherAgent(AgentRole):
                 ),
             )
 
+        truncated = response.finish_reason == "length"
+        if truncated:
+            logger.warning(
+                "Discipline matcher output truncated (finish_reason=length, "
+                "output_tokens=%s, max_tokens=8192)",
+                response.output_tokens,
+            )
+            return self._deterministic_with_attempt(
+                candidates,
+                LLMAttemptMetadata.fallback(
+                    reason="output_truncated",
+                    provider="openai_compatible",
+                    validation_errors=[
+                        f"finish_reason=length; output_tokens={response.output_tokens}; "
+                        f"model={response.effective_model or response.model}"
+                    ],
+                    attempts=list(response.attempts),
+                    final_error_code="OUTPUT_TRUNCATED",
+                    agent_role="discipline_matcher",
+                ),
+            )
+
         parsed = response.parsed
         if not isinstance(parsed, dict):
             outcome = repair_and_parse(
@@ -149,13 +171,17 @@ class DisciplineMatcherAgent(AgentRole):
                 PARSE_STATUS_PARSED_OK, PARSE_STATUS_REPAIRED_OK,
             ):
                 logger.warning(
-                    "Discipline matcher returned non-JSON / unrepairable",
+                    "Discipline matcher returned non-JSON / unrepairable "
+                    "(finish_reason=%s)",
+                    response.finish_reason,
                 )
                 return self._deterministic_with_attempt(
                     candidates,
                     LLMAttemptMetadata.fallback(
                         reason="invalid_json",
                         provider="openai_compatible",
+                        attempts=list(response.attempts),
+                        agent_role="discipline_matcher",
                     ),
                 )
 
