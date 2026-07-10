@@ -583,6 +583,21 @@ def confirm_article_model(
     return result
 
 
+class RerunArticleModelRequest(BaseModel):
+    comment: str | None = None
+
+
+@app.post("/cases/{case_id}/article-model/rerun")
+def rerun_article_model(
+    req: RerunArticleModelRequest, case: Case = Depends(_user_case),
+):
+    if not case.article_model:
+        raise HTTPException(400, "Article model not built yet")
+    result = case.rerun_article_model(comment=req.comment)
+    store.save(case)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Source text (for text-evidence binding in the UI)
 # ---------------------------------------------------------------------------

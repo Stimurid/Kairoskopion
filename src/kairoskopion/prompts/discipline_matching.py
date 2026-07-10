@@ -296,3 +296,173 @@ DISCIPLINE_MATCHING_V2_FAMILY = {
     "output_schema": DISCIPLINE_MATCHING_V2_OUTPUT_SCHEMA,
     "validator": validate_discipline_match,
 }
+
+
+# ---------------------------------------------------------------------------
+# v3: 10-candidate ranked analysis with detailed rationale
+# ---------------------------------------------------------------------------
+
+DISCIPLINE_MATCHING_V3_SYSTEM = """\
+You are Discipline Matcher — an agent in Kairoskopion's disciplinary \
+landscape registry.
+""" + _OPEN_FIELD_DOCTRINE + """
+
+Your job: given a short summary of an article and a list of candidate \
+disciplines from the registry, produce a RANKED LIST of exactly 10 \
+discipline candidates, ordered from most to least relevant.
+
+## Hard rules
+
+- The candidates come from the registry. Each is summarized by its \
+  legitimate_objects, canonical_questions, forms_of_evidence, and \
+  what it does NOT admit. Read those carefully.
+- Do NOT match a discipline whose ``illegitimate_or_borderline_objects`` \
+  exclude the article's object.
+- You MUST return exactly 10 candidates. If the registry has fewer \
+  than 10, return all available candidates.
+- Each candidate MUST have a detailed rationale of 7-10 complete \
+  Russian sentences explaining WHY this discipline fits or does not \
+  fit, what specific textual evidence supports the match, and what \
+  contradicts it.
+- Rank candidates by decreasing relevance. The first candidate is the \
+  best disciplinary home for this article.
+- A new_candidate must be evidently distinct from EVERY existing \
+  candidate and must be a real academic discipline, not an article topic.
+
+## Output rules
+
+Return JSON with:
+- ``matched`` — list of exactly 10 objects, each with:
+  - ``discipline_id`` (from the candidates list, verbatim)
+  - ``display_name`` — Russian display name of the discipline
+  - ``strength`` ∈ ``primary`` / ``strong_adjacent`` / ``partial`` / ``tangential``
+  - ``confidence`` ∈ ``high`` / ``medium`` / ``low``
+  - ``relation_type_ru`` — one of: "основное дисциплинарное поле", \
+    "сильное смежное соответствие", "частичное соответствие", \
+    "слабое боковое соответствие"
+  - ``why`` — 7-10 complete sentences in Russian. Explain: what makes \
+    this discipline relevant, what specific textual features match, \
+    what the article's object/method/vocabulary share with this \
+    discipline's legitimate objects and canonical questions, and what \
+    limits or contradicts the match.
+  - ``supporting_evidence`` — list of 2-5 specific textual features \
+    that support this match (terms, methods, objects, traditions)
+  - ``contradicting_evidence`` — list of 0-3 features that weaken or \
+    contradict this match
+  - ``position_rationale`` — one sentence explaining why this candidate \
+    is ranked above or below its neighbors
+- ``new_candidate`` (or null) — same as v2
+- ``confidence`` ∈ ``high`` / ``medium`` / ``low``
+- ``reasoning`` — 3-5 sentences in Russian, summary of the overall \
+  disciplinary positioning decision
+
+If the registry has fewer than 10 candidates, return all available.
+"""
+
+DISCIPLINE_MATCHING_V3_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "matched": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "discipline_id": {"type": "string"},
+                    "display_name": {"type": "string"},
+                    "strength": {
+                        "type": "string",
+                        "enum": ["primary", "strong_adjacent", "partial", "tangential"],
+                    },
+                    "confidence": {
+                        "type": "string",
+                        "enum": ["high", "medium", "low"],
+                    },
+                    "relation_type_ru": {"type": "string"},
+                    "why": {"type": "string"},
+                    "supporting_evidence": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "contradicting_evidence": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "position_rationale": {"type": "string"},
+                },
+                "required": [
+                    "discipline_id", "display_name", "strength",
+                    "confidence", "relation_type_ru", "why",
+                    "supporting_evidence", "contradicting_evidence",
+                    "position_rationale",
+                ],
+            },
+            "minItems": 1,
+            "maxItems": 10,
+        },
+        "new_candidate": {
+            "anyOf": [
+                {"type": "null"},
+                {
+                    "type": "object",
+                    "properties": {
+                        "proposed_name_ru": {"type": "string"},
+                        "proposed_name_en": {"type": "string"},
+                        "why_existing_insufficient": {"type": "string"},
+                        "proposed_legitimate_objects": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "minItems": 1,
+                            "maxItems": 8,
+                        },
+                        "source_acquisition_needed": {
+                            "type": "boolean",
+                        },
+                    },
+                    "required": [
+                        "proposed_name_ru",
+                        "proposed_name_en",
+                        "why_existing_insufficient",
+                        "proposed_legitimate_objects",
+                    ],
+                },
+            ]
+        },
+        "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+        },
+        "reasoning": {"type": "string"},
+    },
+    "required": ["matched", "new_candidate", "confidence", "reasoning"],
+}
+
+
+def validate_discipline_match_v3(data: dict) -> list[str]:
+    warnings: list[str] = []
+    matched = data.get("matched") or []
+    if len(matched) < 1:
+        warnings.append("matched is empty — expected up to 10 candidates")
+    seen_ids: set[str] = set()
+    for m in matched:
+        did = m.get("discipline_id")
+        if did in seen_ids:
+            warnings.append(f"duplicate discipline_id: {did}")
+        seen_ids.add(did)
+        why = m.get("why", "")
+        sentences = [s.strip() for s in why.split(".") if s.strip()]
+        if len(sentences) < 5:
+            warnings.append(
+                f"{did}: rationale has {len(sentences)} sentences, expected 7-10"
+            )
+    return warnings
+
+
+DISCIPLINE_MATCHING_V3_FAMILY = {
+    "family_id": "discipline_matching_v3",
+    "agent_role_id": "discipline_matcher",
+    "version": "3.0.0",
+    "system_prompt": DISCIPLINE_MATCHING_V3_SYSTEM,
+    "user_prompt_template": DISCIPLINE_MATCHING_USER_TEMPLATE,
+    "output_schema": DISCIPLINE_MATCHING_V3_OUTPUT_SCHEMA,
+    "validator": validate_discipline_match_v3,
+}
