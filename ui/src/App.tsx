@@ -207,9 +207,9 @@ export default function App() {
       )}
 
       <div className="app-body">
-        {appView === 'agents' ? (
-          <AgentMap />
-        ) : (
+        {appView === 'agents' && <AgentMap />}
+
+        {appView === 'cases' && (
           <>
             <nav className="case-sidebar" aria-label="Cases">
               <div className="sidebar-header">

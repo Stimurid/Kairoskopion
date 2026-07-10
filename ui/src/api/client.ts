@@ -201,6 +201,15 @@ export const api = {
       reasoning: string;
     }>(`/cases/${id}/discipline-matches`),
 
+  rerunDisciplineAnalysis: (id: string, comment?: string) =>
+    post<{
+      region_hint: string;
+      matched: { discipline_id: string; strength: string; why: string }[];
+      new_candidate: { display_name: string; reason: string } | null;
+      confidence: 'high' | 'medium' | 'low';
+      reasoning: string;
+    }>(`/cases/${id}/discipline-matches/rerun`, { comment }),
+
   // Article
   getArticleModel: (id: string) => get<ArticleModel>(`/cases/${id}/article-model`),
   confirmArticleModel: (

@@ -303,25 +303,38 @@ def _build_from_llm(
     }
     stage = stage_map.get(_enum_key("article_stage"), ArticleStage.UNKNOWN.value)
 
-    # Map genre
+    # Map genre — cover all enum values + common LLM synonyms
     genre_map = {
         "research_article": Genre.RESEARCH_ARTICLE.value,
         "theoretical_essay": Genre.THEORETICAL_ESSAY.value,
+        "essay": Genre.THEORETICAL_ESSAY.value,
         "systematic_review": Genre.SYSTEMATIC_REVIEW.value,
+        "review": Genre.REVIEW.value,
+        "book_review": Genre.REVIEW.value,
+        "literature_review": Genre.REVIEW.value,
         "commentary": Genre.COMMENTARY.value,
         "conceptual_article": Genre.CONCEPTUAL_ARTICLE.value,
+        "position_paper": Genre.POSITION_PAPER.value,
+        "conference_paper": Genre.CONFERENCE_PAPER.value,
         "forum_piece": Genre.FORUM_PIECE.value,
-        "book_review": Genre.REVIEW.value,
+        "book_symposium_piece": Genre.BOOK_SYMPOSIUM_PIECE.value,
+        "article": Genre.RESEARCH_ARTICLE.value,
         "unknown": Genre.UNKNOWN.value,
     }
     genre = genre_map.get(_enum_key("genre_current"), Genre.UNKNOWN.value)
 
-    # Map method
+    # Map method — cover all enum values + common LLM synonyms
     method_map = {
+        "no_method": MethodStatus.NO_METHOD.value,
+        "implicit_method": MethodStatus.IMPLICIT_METHOD.value,
         "conceptual_method": MethodStatus.CONCEPTUAL_METHOD.value,
+        "conceptual": MethodStatus.CONCEPTUAL_METHOD.value,
         "empirical_method": MethodStatus.EMPIRICAL_METHOD.value,
+        "empirical": MethodStatus.EMPIRICAL_METHOD.value,
         "case_based": MethodStatus.CASE_BASED.value,
+        "case_study": MethodStatus.CASE_BASED.value,
         "mixed": MethodStatus.MIXED.value,
+        "mixed_methods": MethodStatus.MIXED.value,
         "review_method": MethodStatus.REVIEW_METHOD.value,
         "unknown": MethodStatus.UNKNOWN.value,
     }

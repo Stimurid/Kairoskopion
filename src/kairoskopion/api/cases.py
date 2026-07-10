@@ -726,6 +726,67 @@ class Case:
                 out.confidence,
             )
 
+    def rerun_discipline_analysis(self, comment: str | None = None) -> dict[str, Any]:
+        """Re-run discipline matcher, optionally incorporating user comment."""
+        if self.article_model is None:
+            return {"error": "No article model — run intake first"}
+
+        previous = self.discipline_matches
+
+        try:
+            from ..agents.contract import AgentInput as _AI
+            from ..agents.discipline_matcher import DisciplineMatcherAgent
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("DisciplineMatcherAgent unavailable: %s", exc)
+            return {"error": f"Agent unavailable: {exc}"}
+
+        summary_parts: list[str] = []
+        for k in (
+            "title", "problem_statement", "object_of_inquiry",
+            "core_claims", "key_terms", "disciplinary_register_current",
+        ):
+            v = getattr(self.article_model, k, None)
+            if isinstance(v, list):
+                v = "; ".join(str(x) for x in v if x)
+            if v:
+                summary_parts.append(f"{k}: {v}")
+        if comment:
+            summary_parts.append(f"user_comment: {comment}")
+        summary = "\n".join(summary_parts)[:4000]
+
+        agent = DisciplineMatcherAgent()
+        inp = _AI(
+            operation_id="discipline_rerun",
+            agent_role_id="discipline_matcher",
+            raw_text=summary,
+            entities={
+                "article_summary": summary,
+                "region": self.region_hint or "auto",
+                "user_comment": comment or "",
+            },
+        )
+        provider = _get_llm_provider("discipline_matcher")
+        try:
+            if provider is not None:
+                out = agent.execute(inp, provider)
+            else:
+                out = agent.execute_deterministic(inp)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Discipline rerun crashed: %s", exc)
+            out = agent.execute_deterministic(inp)
+
+        if out and out.output_entity:
+            self.discipline_matches = out.output_entity
+            logger.info(
+                "Discipline rerun emitted %d matches (%s)",
+                len(out.output_entity.get("matched", [])),
+                out.confidence,
+            )
+        result = self.discipline_matches or {}
+        if previous:
+            result["previous_run"] = previous
+        return result
+
     def _build_matched_disciplines_context(self) -> str | None:
         """Build a compact block summarizing the matcher's verdict for
         downstream prompts (semantic_profiler). Returns None when no
