@@ -271,7 +271,7 @@ export function HumanModelView({ caseId, kind, venueKey, onConfirm, onBack }: Pr
   // Genre/method LLM rerun
   const [rerunGenreComment, setRerunGenreComment] = useState('');
   const [rerunGenreRunning, setRerunGenreRunning] = useState(false);
-  const [rerunGenreResult, setRerunGenreResult] = useState<{ genre?: { old: string; new: string }; method?: { old: string; new: string }; error?: string } | null>(null);
+  const [rerunGenreResult, setRerunGenreResult] = useState<{ genre?: { old: string | null; new: string }; method?: { old: string | null; new: string }; novelty_mode?: string; source?: string; error?: string } | null>(null);
 
   useEffect(() => {
     if (kind !== 'article') return;
