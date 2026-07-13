@@ -58,9 +58,15 @@ reconstruction. Scopes A-F code complete. Scope G: `RELEASE_READY_AWAITING_NON_S
 - Production runbook SSH sections marked deprecated
 - Repository test: `tests/test_access_transport_policy.py`
 
+**Browser E2E verification**
+- Full user journey executed: login → intake → article model (LLM) →
+  confirm → scenario → investigate venue → select → fit (LLM) →
+  mismatch → rewrite → submission pack → dossier (technical + human)
+- All stages PASS, all API endpoints return 200
+- Committed as `96e3cab`, pushed to remote
+
 ### Pending
 
-- **E2E browser verification** — full user journey not yet executed
 - **Scope G: Production deploy** — `RELEASE_READY_AWAITING_NON_SSH_DEPLOYMENT`
 - **Production acceptance** — requires deployment of new code
 
@@ -68,9 +74,10 @@ reconstruction. Scopes A-F code complete. Scope G: `RELEASE_READY_AWAITING_NON_S
 
 | Gate | Result |
 |------|--------|
-| pytest | pending rerun after policy test addition |
+| pytest | 3313 passed, 8 deselected |
 | TypeScript | clean (noEmit) |
 | Vite build | clean |
+| Browser E2E | PASS |
 | SSH attempts | 0 |
 
 ### Production facts

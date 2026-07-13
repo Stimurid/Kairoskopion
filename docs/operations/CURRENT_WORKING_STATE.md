@@ -1,8 +1,8 @@
 # Current Working State
 
-**Last updated:** 2026-07-13
+**Last updated:** 2026-07-13T16:55+03:00
 **Branch:** `program/baseline-user-journey-reconstruction`
-**Branch HEAD:** `0e1dbf0`
+**Branch HEAD:** `96e3cab`
 **Latest main commit:** `0e1dbf0`
 **Currently deployed commit:** `1fc7c0a`
 **Active task:** `program/baseline-user-journey-reconstruction`
@@ -90,31 +90,40 @@ Code is release-ready; deploy blocked only at `PRODUCTION_DEPLOYMENT_EXECUTION`.
 
 | Gate | Result |
 |------|--------|
-| pytest | 3309 passed, 8 deselected |
+| pytest | 3313 passed, 8 deselected |
 | TypeScript | clean (noEmit) |
 | Vite build | clean |
+| Browser E2E | PASS (full journey, live LLM) |
 | SSH attempts | 0 |
 
-## Files changed (uncommitted)
+## Browser E2E verification (2026-07-13)
 
-### Backend
-- `src/kairoskopion/llm/config.py` — AGENT_MAX_TOKENS, max_tokens_for_role()
-- `src/kairoskopion/llm/attempt_metadata.py` — truncation detection
-- `src/kairoskopion/schema.py` — SemanticHypothesis, SemanticHypothesisEntry
-- `src/kairoskopion/ids.py` — semantic_hypothesis_id()
-- `src/kairoskopion/api/cases.py` — state machine, hypotheses, migration, bug fixes, submission pack fix
-- `src/kairoskopion/api/app.py` — 5 hypothesis endpoints, 3 endpoint fixes, persistence
-- 20 agent files — max_tokens_for_role() wiring
+Full user journey executed against local backend+frontend with live LLM provider:
 
-### Frontend
-- `ui/src/api/client.ts` — 5 semantic hypothesis API methods
-- `ui/src/components/HumanModelView.tsx` — hypothesis panel UI
-- `ui/src/styles/cockpit.css` — hypothesis panel styles
+| Step | Result |
+|------|--------|
+| Login (soft auth) | OK |
+| Create case | OK |
+| Intake (1124 chars, text paste) | OK — article model via LLM |
+| HumanModelView (9 blocks) | OK — all sections rendered |
+| Semantic hypotheses (4 axes) | OK — panel with accept/dispute/rerun |
+| Discipline matches (6) | OK — LLM analysis, high confidence |
+| Accept all + Confirm model | OK |
+| Set scenario | OK — stage → scenario |
+| Investigate venue (text) | OK — deterministic fallback |
+| Select venue → auto-chain | OK — fit via LLM |
+| FitAssessment (12-axis) | OK |
+| MismatchMap | OK |
+| RewritePlan | OK |
+| SubmissionPack | OK |
+| Dossier (technical + human) | OK — both endpoints 200 |
+| UI pipeline navigation | OK — all completed stages |
 
-### Tests
-- `tests/test_api_cases.py` — 10 new tests (stage, hypothesis, migration, fixes)
+### Known non-blocking issues
+- LLM venue profiling failed with "unhashable type: dict" → fell back to deterministic
+- FPM fit returned "not_enough_data" (expected for minimal venue text)
 
-### Docs
-- `docs/operations/BASELINE_PRODUCT_RECONSTRUCTION_INVENTORY.md`
-- `docs/operations/CURRENT_WORKING_STATE.md`
-- `docs/operations/SESSION_HANDOFF.md`
+## Committed work
+
+All changes committed as `96e3cab` on branch `program/baseline-user-journey-reconstruction`
+and pushed to remote. 38 files, 1581 insertions.
