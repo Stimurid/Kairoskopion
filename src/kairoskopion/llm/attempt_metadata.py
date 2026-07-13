@@ -334,6 +334,7 @@ def classify_llm_response(
     schema,
     *,
     provider_name: str = "openai_compatible",
+    agent_role: str = "",
 ) -> tuple[Any | None, "LLMAttemptMetadata", list[str], list[str]]:
     """Run the standard parse → repair → schema-validate decision tree.
 
@@ -363,8 +364,37 @@ def classify_llm_response(
     effective_model = getattr(response, "effective_model", None)
     attempt_count = getattr(response, "attempt_count", 1)
     attempts = getattr(response, "attempts", [])
-    resp_agent_role = getattr(response, "agent_role", "")
+    resp_agent_role = getattr(response, "agent_role", "") or agent_role
     fallback_used = getattr(response, "fallback_used", False)
+    finish_reason = getattr(response, "finish_reason", None)
+    output_tokens = getattr(response, "output_tokens", None)
+
+    if finish_reason == "length":
+        import logging
+        logging.getLogger(__name__).warning(
+            "LLM output truncated (finish_reason=length, "
+            "output_tokens=%s, agent=%s)",
+            output_tokens, resp_agent_role,
+        )
+        errors = [
+            f"finish_reason=length; output_tokens={output_tokens}; "
+            f"model={effective_model or provider_model}"
+        ]
+        meta = LLMAttemptMetadata.fallback(
+            reason="output_truncated",
+            provider=provider_name,
+            model=provider_model,
+            latency_ms=latency_ms,
+            content_present=content_present,
+            validation_errors=errors,
+            attempts=list(attempts),
+            final_error_code="OUTPUT_TRUNCATED",
+            agent_role=resp_agent_role,
+            requested_model=requested_model,
+            effective_model=effective_model,
+            attempt_count=attempt_count,
+        )
+        return None, meta, [], errors
 
     # Fast path: provider already parsed a dict
     if isinstance(parsed, dict):

@@ -1,6 +1,6 @@
 # Session Handoff
 
-**Date:** 2026-07-10
+**Date:** 2026-07-11
 **Purpose:** Durable record of session state for continuation across context boundaries.
 
 ---
@@ -15,39 +15,68 @@
 5. Read `ENVIRONMENT_INVARIANTS.md` for deployment and access rules.
 6. Do not rely on chat memory for commit hashes, test results, or deployment state.
 
-## Current session state (2026-07-10)
+## Current session state (2026-07-13)
 
-### Completed
+### Active task
 
-- BLOCKER A-D fixes deployed to production (commit `1fc7c0a`)
-- BLOCKER E (discipline output truncation) fixed on branch `fix/discipline-output-truncation`
-  - Root cause: `max_tokens=4096` insufficient for V3 prompt
-  - Fix: raised to 8192, added truncation detection, 16 regression tests
-  - All gates pass: 3299 tests, TS clean, Vite clean
+`program/baseline-user-journey-reconstruction` — full product pipeline
+reconstruction. Scopes A-F code complete. Scope G: `RELEASE_READY_AWAITING_NON_SSH_DEPLOYMENT`.
+
+### SSH policy
+
+> **Canonical:** `docs/operations/ACCESS_AND_TRANSPORT_POLICY.md`
+
+- `SSH_POLICY=DISABLED_BY_DEFAULT` · `SSH_AUTOMATIC_RETRY_LIMIT=0`
+- **Next session MUST NOT** probe SSH, retry SSH, or treat SSH absence as a blocker.
+- SSH unavailability blocks only `PRODUCTION_DEPLOYMENT_EXECUTION`.
+
+### Completed — all code phases
+
+**Phase 1: Infrastructure**
+- Unified LLM runtime (AGENT_MAX_TOKENS, max_tokens_for_role, truncation detection)
+- All 20 agents wired to centralized config
+- SemanticHypothesis model + Case integration + 5 API endpoints
+- State machine guards (ALLOWED_STAGE_TRANSITIONS + _transition_to)
+- Old case migration (schema_version=2, provenance markers)
+- 3 broken endpoint fixes, 5 missing persistence fixes
+
+**Phase 2: Semantic review/rerun**
+- Hypothesis rerun endpoint (POST /semantic-hypotheses/{axis}/rerun)
+- UI panel in HumanModelView with accept/dispute/rerun per axis
+- CSS styling for hypothesis cards with status badges
+- API client methods for all 5 hypothesis operations
+
+**Phase 3-4: Venue + Fit pipeline**
+- Full pipeline already operational (verified by audit)
+- `build_submission_pack_api` fixed to use selected_venue or investigated_venue
+- Added decision log entry for submission pack build
+
+**SSH policy canonicalization**
+- `docs/operations/ACCESS_AND_TRANSPORT_POLICY.md` created
+- CLAUDE.md updated to reference it
+- ENVIRONMENT_INVARIANTS.md, SESSION_HANDOFF.md, CURRENT_WORKING_STATE.md updated
+- Production runbook SSH sections marked deprecated
+- Repository test: `tests/test_access_transport_policy.py`
 
 ### Pending
 
-- Merge fix branch → main, push, deploy
-- SSH is **disabled** — see `ENVIRONMENT_INVARIANTS.md`
-- 12-step production acceptance protocol incomplete (Steps 3-12)
-- Genre/method resolution pending production retest
-- Finalization persistence pending production test
+- **E2E browser verification** — full user journey not yet executed
+- **Scope G: Production deploy** — `RELEASE_READY_AWAITING_NON_SSH_DEPLOYMENT`
+- **Production acceptance** — requires deployment of new code
 
-### Key files changed (fix branch)
+### Gate results
 
-| File | Change |
+| Gate | Result |
 |------|--------|
-| `src/kairoskopion/agents/discipline_matcher.py` | max_tokens 4096→8192, truncation detection |
-| `tests/test_discipline_truncation.py` | 16 regression tests |
-| `docs/operations/ENVIRONMENT_INVARIANTS.md` | Created — SSH disabled, deploy rules |
-| `docs/operations/CURRENT_WORKING_STATE.md` | Created — current blockers and next steps |
-| `docs/operations/SESSION_HANDOFF.md` | This file |
+| pytest | pending rerun after policy test addition |
+| TypeScript | clean (noEmit) |
+| Vite build | clean |
+| SSH attempts | 0 |
 
 ### Production facts
 
 - **Host:** 81.26.176.248 (kairoskop.mindkampf.ru)
 - **Currently deployed commit:** `1fc7c0a`
 - **Service:** kairoskopion-api on port 8088
-- **Frontend build hash:** index-L64GH2xn.js
-- **Test case:** case_7e32bee4bd76 (article model exists, discipline LLM failed due to truncation)
+- **SSH:** DISABLED — zero retry budget, do not probe
 - **LLM provider:** OpenAI-compatible (302.ai proxy), model claude-sonnet-4-5-20250929

@@ -27,6 +27,7 @@ from ..llm.json_repair import (
     PARSE_STATUS_REPAIRED_OK,
     repair_and_parse,
 )
+from ..llm.config import max_tokens_for_role
 from ..llm.provider import LLMProvider
 from ..prompts.discipline_seeding import (
     DISCIPLINE_SEEDING_FAMILY,
@@ -104,7 +105,7 @@ class DisciplineSeederAgent(AgentRole):
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.3,
-                max_tokens=4000,
+                max_tokens=max_tokens_for_role(self.role_id),
                 agent_role="discipline_seeder",
             )
         except Exception as exc:  # noqa: BLE001

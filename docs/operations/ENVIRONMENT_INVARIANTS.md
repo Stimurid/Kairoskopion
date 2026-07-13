@@ -9,20 +9,35 @@ Chat context is temporary — these files are the source of truth.
 
 ## SSH is disabled
 
-- SSH access to the production host is **disabled by owner environment policy**.
-- SSH retry limit: **zero**.
+> **Canonical policy:** `docs/operations/ACCESS_AND_TRANSPORT_POLICY.md`
+
+- `SSH_POLICY=DISABLED_BY_DEFAULT`
+- `SSH_AUTOMATIC_RETRY_LIMIT=0`
 - No SSH, SCP, SFTP, port-22 probes, or SSH retries are permitted.
-- Any deployment workflow that depends on SSH must use an alternative
-  contour or return `DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR`.
+- SSH unavailability blocks only `PRODUCTION_DEPLOYMENT_EXECUTION`.
+- Correct status when deploy is blocked: `RELEASE_READY_AWAITING_NON_SSH_DEPLOYMENT`.
+- ~~`DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR`~~ — **deprecated**, do not use.
 
 ## Deployment contour
 
 - **Production host:** 81.26.176.248 (kairoskop.mindkampf.ru)
-- **Service:** `kairoskopion-api` on port 8088 behind nginx
+- **Service:** `kairoskopion-api` on port 8088 behind Caddy (reverse proxy)
 - **App path:** `/opt/kairoskopion/app`
-- **Deploy method:** Non-SSH contour required. If no working non-SSH
-  deployment path is available, push main and return
-  `DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR` with the exact merge commit.
+- **Deploy method:** Non-SSH contour required. See `ACCESS_AND_TRANSPORT_POLICY.md`
+  fallback ladder. If no working non-SSH deployment path is available, push main
+  and report `RELEASE_READY_AWAITING_NON_SSH_DEPLOYMENT`.
+
+### Available transports (2026-07-13)
+
+| Transport | Status |
+|-----------|--------|
+| Local code & tests | Available |
+| Browser / UI | Available |
+| HTTP API (prod) | Available (basic auth) |
+| GitHub push | Available |
+| SSH / SCP / SFTP | Disabled |
+| Cloud control plane | Not configured |
+| Pull-based deploy | Not configured |
 
 ## Session handoff rules
 

@@ -28,6 +28,7 @@ from ..llm.attempt_metadata import (
     FALLBACK_REASON_PROVIDER_ERROR,
     LLMAttemptMetadata,
 )
+from ..llm.config import max_tokens_for_role
 from ..llm.json_repair import (
     PARSE_STATUS_PARSED_OK,
     PARSE_STATUS_REPAIRED_OK,
@@ -118,12 +119,13 @@ class DisciplineMatcherAgent(AgentRole):
             {"role": "user", "content": user_prompt},
         ]
 
+        role_max_tokens = max_tokens_for_role(self.role_id)
         try:
             response = provider.complete(
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.0,
-                max_tokens=8192,
+                max_tokens=role_max_tokens,
                 agent_role="discipline_matcher",
             )
         except Exception as exc:  # noqa: BLE001
@@ -143,8 +145,8 @@ class DisciplineMatcherAgent(AgentRole):
         if truncated:
             logger.warning(
                 "Discipline matcher output truncated (finish_reason=length, "
-                "output_tokens=%s, max_tokens=8192)",
-                response.output_tokens,
+                "output_tokens=%s, max_tokens=%s)",
+                response.output_tokens, role_max_tokens,
             )
             return self._deterministic_with_attempt(
                 candidates,

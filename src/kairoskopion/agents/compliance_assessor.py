@@ -15,6 +15,7 @@ from ..llm.attempt_metadata import (
     LLMAttemptMetadata,
     classify_llm_response,
 )
+from ..llm.config import max_tokens_for_role
 from ..llm.provider import LLMProvider
 from ..prompts.compliance_assessment import (
     COMPLIANCE_ASSESSMENT_FAMILY,
@@ -96,7 +97,7 @@ class ComplianceAssessorAgent(AgentRole):
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.1,
-                max_tokens=4096,
+                max_tokens=max_tokens_for_role(self.role_id),
                 agent_role="compliance_assessor",
             )
         except Exception as exc:  # noqa: BLE001

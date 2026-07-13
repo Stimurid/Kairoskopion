@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from ..llm.config import max_tokens_for_role
 from ..llm.provider import LLMProvider
 from ..prompts.field_positioning import ARTICLE_FIELD_POSITION_FAMILY
 from ..schema import FieldPositionModel
@@ -39,7 +40,7 @@ class ArticleFieldPositionerAgent(AgentRole):
                 "manuscript_text": text[:8000] if text else "(no raw text available)",
             },
             temperature=0.2,
-            max_tokens=4096,
+            max_tokens=max_tokens_for_role(self.role_id),
         )
         if result is None:
             return self.execute_deterministic(inp)

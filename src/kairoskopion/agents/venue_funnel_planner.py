@@ -15,6 +15,7 @@ from ..llm.attempt_metadata import (
     LLMAttemptMetadata,
     classify_llm_response,
 )
+from ..llm.config import max_tokens_for_role
 from ..llm.provider import LLMProvider
 from ..prompts.venue_funnel_planning import (
     VENUE_FUNNEL_FAMILY,
@@ -80,7 +81,7 @@ class VenueFunnelPlannerAgent(AgentRole):
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.3,
-                max_tokens=3072,
+                max_tokens=max_tokens_for_role(self.role_id),
                 agent_role="venue_funnel_planner",
             )
         except Exception as exc:  # noqa: BLE001

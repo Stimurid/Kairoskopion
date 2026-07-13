@@ -18,6 +18,7 @@ from ..enums import (
     VenueType,
 )
 from ..ids import publication_regime_id, venue_model_id
+from ..llm.config import max_tokens_for_role
 from ..llm.provider import LLMProvider
 from ..prompts.venue_fact_extraction import (
     VENUE_FACT_EXTRACTION_FAMILY,
@@ -61,7 +62,7 @@ class VenueProfilerAgent(AgentRole):
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.1,
-                max_tokens=4096,
+                max_tokens=max_tokens_for_role(self.role_id),
                 agent_role="venue_profiler",
             )
         except Exception as e:

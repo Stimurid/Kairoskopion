@@ -72,6 +72,7 @@ from .ids import (
     published_article_corpus_id,
     source_evidence_packet_id,
     protected_core_policy_id,
+    semantic_hypothesis_id,
     evidence_policy_id,
     venue_profile_package_id,
     editorial_board_cloud_id,
@@ -793,6 +794,41 @@ class ArticleSemanticProfile(_DictMixin):
     # LLM attempt audit per llm.attempt_metadata.LLMAttemptMetadata.
     # Same vocabulary as ArticleModel and DisciplinaryPathway.
     extraction_attempt: dict[str, Any] | None = _field()
+
+
+@dc.dataclass
+class SemanticHypothesisEntry(_DictMixin):
+    """One ranked alternative within a semantic hypothesis."""
+    value: str | None = _field()
+    confidence: str | None = _field()
+    reasoning: str | None = _field()
+    supporting_evidence: list[str] = _list()
+    contradicting_evidence: list[str] = _list()
+    source: str | None = _field()
+    rank: int | None = _field()
+
+
+@dc.dataclass
+class SemanticHypothesis(_DictMixin):
+    """Unified hypothesis for a semantic axis of article analysis.
+
+    Covers discipline, genre, method, contribution type, publication
+    regime, and any future semantic axis. Each hypothesis has a primary
+    value plus ranked alternatives, user acceptance state, evidence,
+    contradictions, and version history.
+    """
+    hypothesis_id: str = dc.field(default_factory=semantic_hypothesis_id)
+    case_id: str | None = _field()
+    axis: str | None = _field()
+    primary: SemanticHypothesisEntry | None = _field()
+    alternatives: list[dict[str, Any]] = _list()
+    user_status: str = dc.field(default="pending")
+    user_comment: str | None = _field()
+    version: int = dc.field(default=1)
+    version_history: list[dict[str, Any]] = _list()
+    extraction_attempt: dict[str, Any] | None = _field()
+    created_at: str = dc.field(default_factory=_now)
+    updated_at: str = dc.field(default_factory=_now)
 
 
 @dc.dataclass

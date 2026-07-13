@@ -15,6 +15,7 @@ from ..llm.attempt_metadata import (
     LLMAttemptMetadata,
     classify_llm_response,
 )
+from ..llm.config import max_tokens_for_role
 from ..llm.provider import LLMProvider
 from ..prompts.discipline_intent_parsing import (
     DISCIPLINE_INTENT_FAMILY,
@@ -75,7 +76,7 @@ class DisciplineIntentParserAgent(AgentRole):
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.2,
-                max_tokens=2048,
+                max_tokens=max_tokens_for_role(self.role_id),
                 agent_role="discipline_intent_parser",
             )
         except Exception as exc:  # noqa: BLE001

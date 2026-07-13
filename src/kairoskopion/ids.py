@@ -286,6 +286,9 @@ def epistemic_framework_record_id() -> str:
 tribe_or_framework_record_id = epistemic_framework_record_id
 
 
+def semantic_hypothesis_id() -> str:
+    return generate_id("semhyp")
+
 def venue_section_record_id() -> str:
     return generate_id("vsrec")
 

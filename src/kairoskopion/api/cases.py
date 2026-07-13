@@ -26,6 +26,8 @@ from ..schema import (
     RewritePlan,
     CitationPlan,
     RiskReport,
+    SemanticHypothesis,
+    SemanticHypothesisEntry,
     SourceEvidencePacket,
     SubmissionPack,
     SubmissionScenario,
@@ -60,6 +62,69 @@ class CaseStage(str, enum.Enum):
     ADAPTING = "adapting"
     SUBMISSION_PACK = "submission_pack"
     DOSSIER = "dossier"
+
+
+ALLOWED_STAGE_TRANSITIONS: dict[CaseStage, set[CaseStage]] = {
+    CaseStage.EMPTY: {CaseStage.INTAKE},
+    CaseStage.INTAKE: {
+        CaseStage.INTAKE,
+        CaseStage.ARTICLE_MODEL,
+    },
+    CaseStage.ARTICLE_MODEL: {
+        CaseStage.INTAKE,
+        CaseStage.ARTICLE_MODEL,
+        CaseStage.SCENARIO,
+        CaseStage.VENUE_SELECTED,
+        CaseStage.FIT_ASSESSED,
+        CaseStage.ADAPTING,
+    },
+    CaseStage.SCENARIO: {
+        CaseStage.INTAKE,
+        CaseStage.PATHWAYS,
+        CaseStage.SCENARIO,
+        CaseStage.VENUE_POOL,
+    },
+    CaseStage.PATHWAYS: {
+        CaseStage.INTAKE,
+        CaseStage.VENUE_POOL,
+        CaseStage.PATHWAYS,
+    },
+    CaseStage.VENUE_POOL: {
+        CaseStage.INTAKE,
+        CaseStage.VENUE_SELECTED,
+        CaseStage.VENUE_POOL,
+    },
+    CaseStage.VENUE_SELECTED: {
+        CaseStage.INTAKE,
+        CaseStage.VENUE_SELECTED,
+        CaseStage.FIT_ASSESSED,
+        CaseStage.ADAPTING,
+        CaseStage.VENUE_POOL,
+    },
+    CaseStage.FIT_ASSESSED: {
+        CaseStage.INTAKE,
+        CaseStage.ADAPTING,
+        CaseStage.VENUE_SELECTED,
+        CaseStage.FIT_ASSESSED,
+    },
+    CaseStage.ADAPTING: {
+        CaseStage.INTAKE,
+        CaseStage.SUBMISSION_PACK,
+        CaseStage.ADAPTING,
+        CaseStage.VENUE_SELECTED,
+    },
+    CaseStage.SUBMISSION_PACK: {
+        CaseStage.INTAKE,
+        CaseStage.DOSSIER,
+        CaseStage.VENUE_SELECTED,
+        CaseStage.SUBMISSION_PACK,
+    },
+    CaseStage.DOSSIER: {
+        CaseStage.INTAKE,
+        CaseStage.VENUE_SELECTED,
+        CaseStage.DOSSIER,
+    },
+}
 
 
 def _get_llm_provider(role_id: str | None = None) -> OpenAICompatProvider | None:
@@ -190,6 +255,14 @@ class Case:
         # Operator hint: region of work — drives matcher slice.
         # Pulled from intake_text(region=...) or defaults to "auto".
         self.region_hint: str = "auto"
+        # Unified semantic hypotheses per axis (discipline, genre,
+        # method, contribution, publication_regime). Each axis has a
+        # primary hypothesis, ranked alternatives, user acceptance
+        # state, evidence, contradictions, and version history.
+        self.semantic_hypotheses: dict[str, dict[str, Any]] = {}
+
+        self.schema_version: int = 2
+        self.provenance: dict[str, Any] = {}
 
     # -- Stage tracking --
 
@@ -204,6 +277,15 @@ class Case:
             "fit_assessed": self.fit_assessment is not None,
             "adaptation_plan": self.rewrite_plan is not None,
         }
+
+    def _transition_to(self, target: CaseStage) -> None:
+        allowed = ALLOWED_STAGE_TRANSITIONS.get(self.stage, set())
+        if target not in allowed:
+            logger.warning(
+                "Unexpected stage transition: %s → %s (case %s)",
+                self.stage.value, target.value, self.case_id,
+            )
+        self.stage = target
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -225,7 +307,10 @@ class Case:
             "input_type": self.input_type,
             "decision_log_count": len(self.decision_log),
             "quality_gates": self.quality_gates,
+            "schema_version": self.schema_version,
         }
+        if self.provenance:
+            result["provenance"] = self.provenance
         if self.article_model:
             result["article_model_id"] = self.article_model.article_model_id
         if self.scenario:
@@ -284,7 +369,7 @@ class Case:
         # /intake/override it gets reassigned and the pipeline reruns.
         self.effective_input_type = self.input_type
 
-        self.stage = CaseStage.INTAKE
+        self._transition_to(CaseStage.INTAKE)
 
         enrichment_result: dict[str, Any] = {}
 
@@ -402,7 +487,7 @@ class Case:
         self._llm_input_truncation = truncation
 
         enrichment_result: dict[str, Any] = {}
-        self.stage = CaseStage.INTAKE
+        self._transition_to(CaseStage.INTAKE)
         if chosen_type in ARTICLE_PIPELINE_TYPES:
             self._build_article_model()
         elif chosen_type in VENUE_PIPELINE_TYPES:
@@ -580,7 +665,7 @@ class Case:
             if self.title in default_titles:
                 self.title = self.article_model.title_current[:80]
 
-        self.stage = CaseStage.ARTICLE_MODEL
+        self._transition_to(CaseStage.ARTICLE_MODEL)
 
         # Phase B2: route through DisciplineMatcherAgent BEFORE
         # semantic_profile so the profiler sees registry-narrowed
@@ -620,6 +705,63 @@ class Case:
             self.semantic_profile = build_article_semantic_profile(self.article_model)
 
         self._build_article_field_position()
+        self._populate_semantic_hypotheses_from_article()
+
+    def _populate_semantic_hypotheses_from_article(self) -> None:
+        if self.article_model is None:
+            return
+
+        ea = self.article_model.extraction_attempt
+        source = "llm" if (ea and ea.get("llm_attempted") and not ea.get("fallback_used")) else "deterministic"
+
+        genre = self.article_model.genre_current
+        if genre:
+            self.set_semantic_hypothesis(
+                axis="genre", primary_value=genre, source=source,
+                confidence="medium" if source == "llm" else "low",
+                extraction_attempt=ea,
+            )
+
+        method = self.article_model.method_status
+        if method:
+            self.set_semantic_hypothesis(
+                axis="method", primary_value=method, source=source,
+                confidence="medium" if source == "llm" else "low",
+                extraction_attempt=ea,
+            )
+
+        novelty = self.article_model.novelty_mode
+        if novelty:
+            self.set_semantic_hypothesis(
+                axis="novelty_mode", primary_value=novelty, source=source,
+                confidence="medium" if source == "llm" else "low",
+                extraction_attempt=ea,
+            )
+
+        if self.discipline_matches:
+            matched = self.discipline_matches.get("matched", [])
+            disc_ea = self.discipline_matches.get("extraction_attempt")
+            disc_source = "llm" if (not disc_ea or not disc_ea.get("fallback_used")) else "deterministic"
+            if matched:
+                primary = matched[0]
+                alternatives = [
+                    {
+                        "value": m.get("discipline_id"),
+                        "confidence": m.get("confidence", "low"),
+                        "reasoning": m.get("why"),
+                        "rank": i + 2,
+                    }
+                    for i, m in enumerate(matched[1:])
+                ]
+                self.set_semantic_hypothesis(
+                    axis="discipline",
+                    primary_value=primary.get("discipline_id", "unknown"),
+                    confidence=self.discipline_matches.get("confidence", "low"),
+                    reasoning=primary.get("why"),
+                    alternatives=alternatives,
+                    source=disc_source,
+                    extraction_attempt=disc_ea,
+                )
 
     def _run_discipline_matcher(self) -> None:
         """Phase B2: discipline analysis via LLM when available.
@@ -1180,7 +1322,8 @@ class Case:
 
     def build_submission_pack_api(self) -> dict[str, Any]:
         """Build submission pack via API."""
-        if not self.article_model or not self.investigated_venue:
+        venue = self.selected_venue or self.investigated_venue
+        if not self.article_model or not venue:
             return {"status": "not_ready", "hint": "Need article and venue."}
         if not self.scenario:
             from ..schema import SubmissionScenario as _SS
@@ -1190,13 +1333,16 @@ class Case:
         from ..services.submission_pack import build_submission_pack
         pack = build_submission_pack(
             article=self.article_model,
-            venue=self.investigated_venue,
+            venue=venue,
             scenario=scenario,
             fit=self.fit_assessment,
             risk=self.risk_report,
             compliance=self.compliance_checklist,
         )
         self.submission_pack = pack
+        self._log_decision("submission_pack_built", {
+            "readiness": pack.ready_status,
+        })
         return pack.to_dict()
 
     # -- Phase 3: Track A — Discipline to Venue Funnel --
@@ -1643,6 +1789,166 @@ class Case:
     def get_refinement_chat(self) -> list[dict[str, Any]]:
         return self.refinement_chat
 
+    # -- Semantic Hypotheses --
+
+    def get_semantic_hypotheses(self) -> dict[str, dict[str, Any]]:
+        return dict(self.semantic_hypotheses)
+
+    def get_semantic_hypothesis(self, axis: str) -> dict[str, Any] | None:
+        return self.semantic_hypotheses.get(axis)
+
+    def set_semantic_hypothesis(
+        self,
+        axis: str,
+        primary_value: str,
+        confidence: str = "low",
+        reasoning: str | None = None,
+        alternatives: list[dict[str, Any]] | None = None,
+        source: str = "deterministic",
+        extraction_attempt: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        existing = self.semantic_hypotheses.get(axis)
+        version = 1
+        version_history: list[dict[str, Any]] = []
+        if existing:
+            version = existing.get("version", 1) + 1
+            version_history = list(existing.get("version_history", []))
+            version_history.append({
+                "version": existing.get("version", 1),
+                "primary_value": (existing.get("primary") or {}).get("value"),
+                "user_status": existing.get("user_status"),
+                "updated_at": existing.get("updated_at"),
+                "source": (existing.get("primary") or {}).get("source"),
+            })
+
+        hyp = SemanticHypothesis(
+            case_id=self.case_id,
+            axis=axis,
+            primary=SemanticHypothesisEntry(
+                value=primary_value,
+                confidence=confidence,
+                reasoning=reasoning,
+                source=source,
+                rank=1,
+            ),
+            alternatives=alternatives or [],
+            user_status="pending",
+            version=version,
+            version_history=version_history,
+            extraction_attempt=extraction_attempt,
+        )
+        self.semantic_hypotheses[axis] = hyp.to_dict()
+        self._log_decision("semantic_hypothesis_set", {
+            "axis": axis,
+            "value": primary_value,
+            "confidence": confidence,
+            "version": version,
+            "source": source,
+        })
+        return hyp.to_dict()
+
+    def accept_semantic_hypothesis(
+        self, axis: str, comment: str | None = None,
+    ) -> dict[str, Any]:
+        hyp = self.semantic_hypotheses.get(axis)
+        if not hyp:
+            return {"error": f"No hypothesis for axis {axis}"}
+        hyp["user_status"] = "accepted"
+        hyp["user_comment"] = comment
+        hyp["updated_at"] = _now()
+        self._log_decision("semantic_hypothesis_accepted", {
+            "axis": axis,
+            "value": (hyp.get("primary") or {}).get("value"),
+            "comment": comment,
+        })
+        return hyp
+
+    def dispute_semantic_hypothesis(
+        self, axis: str, comment: str,
+    ) -> dict[str, Any]:
+        hyp = self.semantic_hypotheses.get(axis)
+        if not hyp:
+            return {"error": f"No hypothesis for axis {axis}"}
+        hyp["user_status"] = "disputed"
+        hyp["user_comment"] = comment
+        hyp["updated_at"] = _now()
+        self._log_decision("semantic_hypothesis_disputed", {
+            "axis": axis,
+            "value": (hyp.get("primary") or {}).get("value"),
+            "comment": comment,
+        })
+        return hyp
+
+    def rerun_semantic_hypothesis(
+        self, axis: str, comment: str | None = None,
+    ) -> dict[str, Any]:
+        text = self.article_input_text or self.input_text or ""
+        if len(text) < 100:
+            return {"error": "Insufficient text for re-analysis"}
+        provider = _get_llm_provider("article_modeler")
+        if provider is None:
+            return {"error": "LLM provider not configured"}
+        try:
+            from ..agents.article_modeler import ArticleModelerAgent
+            from ..agents.contract import AgentInput as _AI
+        except Exception as exc:
+            return {"error": f"Agent unavailable: {exc}"}
+
+        rerun_text = text
+        if comment:
+            rerun_text = f"[Комментарий оператора: {comment}]\n\n{text}"
+        agent = ArticleModelerAgent()
+        inp = _AI(
+            operation_id=f"hypothesis_rerun_{axis}",
+            agent_role_id="article_modeler",
+            raw_text=rerun_text,
+        )
+        try:
+            out = agent.execute(inp, provider)
+        except Exception as exc:
+            logger.warning("Hypothesis rerun for %s failed: %s", axis, exc)
+            return {"error": f"LLM call failed: {exc}"}
+        if not (out and out.output_entity):
+            return {"error": "LLM returned no output entity"}
+
+        entity = out.output_entity
+        axis_field_map: dict[str, str] = {
+            "genre": "genre_current",
+            "method": "method_status",
+            "novelty_mode": "novelty_mode",
+            "discipline": "discipline_current",
+        }
+        field = axis_field_map.get(axis)
+        new_value = entity.get(field or axis)
+        if new_value is None:
+            return {"error": f"LLM output has no field for axis '{axis}'"}
+
+        old_value = None
+        hyp = self.semantic_hypotheses.get(axis)
+        if hyp:
+            old_value = (hyp.get("primary") or {}).get("value")
+
+        self.set_semantic_hypothesis(
+            axis, new_value, "high",
+            f"LLM rerun (axis={axis})",
+            source="llm_rerun",
+        )
+        if self.article_model and field:
+            setattr(self.article_model, field, new_value)
+
+        self._log_decision("semantic_hypothesis_rerun", {
+            "axis": axis,
+            "old": old_value,
+            "new": new_value,
+            "comment": comment,
+        })
+        return {
+            "axis": axis,
+            "old": old_value,
+            "new": new_value,
+            "source": "llm_rerun",
+        }
+
     # -- Scenario --
 
     def set_scenario(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -1665,7 +1971,7 @@ class Case:
             ),
             **mapped,
         )
-        self.stage = CaseStage.SCENARIO
+        self._transition_to(CaseStage.SCENARIO)
 
         self._log_decision("set_scenario", {
             "goal": data.get("goal", ""),
@@ -1731,7 +2037,7 @@ class Case:
                     DisciplinaryPathway(**p) if isinstance(p, dict) else p
                     for p in raw
                 ]
-            self.stage = CaseStage.PATHWAYS
+            self._transition_to(CaseStage.PATHWAYS)
         return [
             p.to_dict() if hasattr(p, "to_dict") else p
             for p in self.pathways
@@ -1801,7 +2107,7 @@ class Case:
                 )
                 registry_stored += 1
 
-        self.stage = CaseStage.VENUE_POOL
+        self._transition_to(CaseStage.VENUE_POOL)
         self._log_decision("discover_venues", {
             "candidate_count": len(self.venue_pool.candidates) if self.venue_pool else 0,
             "registry_stored": registry_stored,
@@ -1838,7 +2144,7 @@ class Case:
             candidate_dict = self._resolve_candidate(venue_id)
             if candidate_dict:
                 self.selected_venue = self._venue_model_from_candidate(candidate_dict)
-        self.stage = CaseStage.VENUE_SELECTED
+        self._transition_to(CaseStage.VENUE_SELECTED)
         self._log_decision("select_venue", {"venue_id": venue_id})
 
         # Build venue FPM for the selected venue (if not already produced)
@@ -1954,7 +2260,7 @@ class Case:
                 logger.warning("Deterministic fit assessment failed: %s", exc)
                 return
 
-        self.stage = CaseStage.FIT_ASSESSED
+        self._transition_to(CaseStage.FIT_ASSESSED)
         self._log_decision("fit_assessed", {
             "overall_label": self.fit_assessment.overall_label,
             "axes_count": len(self.fit_assessment.axes),
@@ -2285,7 +2591,7 @@ class Case:
                     rewrite_provider,
                     raw_article_text=getattr(self, "article_input_text", None),
                 )
-                self.stage = CaseStage.ADAPTING
+                self._transition_to(CaseStage.ADAPTING)
                 self._log_decision("rewrite_planned", {
                     "changes_count": len(self.rewrite_plan.changes),
                     "effort": self.rewrite_plan.estimated_effort,
@@ -2588,7 +2894,7 @@ class Case:
         self.rewrite_plan, iteration = apply_user_decisions(
             self.rewrite_plan, decisions, protected_core,
         )
-        self.stage = CaseStage.ADAPTING
+        self._transition_to(CaseStage.ADAPTING)
 
         for d in decisions_data:
             self._log_decision(f"decision_{d['action']}", {
@@ -3048,6 +3354,8 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         ),
         "decision_log": case.decision_log,
         "quality_gates": case.quality_gates,
+        "schema_version": case.schema_version,
+        "provenance": case.provenance,
     }
     for attr, key in [
         ("article_model", "article_model"),
@@ -3124,6 +3432,9 @@ def _case_to_snapshot(case: Case) -> dict[str, Any]:
         snap["depth_mode"] = case.depth_mode
     if case.budget_constraints is not None:
         snap["budget_constraints"] = case.budget_constraints
+
+    if case.semantic_hypotheses:
+        snap["semantic_hypotheses"] = dict(case.semantic_hypotheses)
 
     return snap
 
@@ -3247,6 +3558,24 @@ def _case_from_snapshot(data: dict[str, Any]) -> Case:
                 case.pathways.append(p)
         else:
             case.pathways.append(p)
+
+    sh = data.get("semantic_hypotheses")
+    if isinstance(sh, dict):
+        case.semantic_hypotheses = sh
+
+    stored_version = data.get("schema_version", 1)
+    case.schema_version = stored_version
+    case.provenance = data.get("provenance", {})
+
+    if stored_version < 2:
+        case.provenance["migrated_from_schema"] = 1
+        case.provenance["migration_note"] = (
+            "Pre-reconstruction case. SemanticHypothesis, stage guards, "
+            "and unified LLM runtime were not available at creation time. "
+            "Rerun from article model to populate missing fields."
+        )
+        case.provenance["rerun_available"] = True
+        case.schema_version = 2
 
     return case
 

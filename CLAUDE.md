@@ -51,10 +51,12 @@ For deep spec questions, read:
 - `docs/DECISIONS.md` — architectural decisions and rationale
 
 **Before deploying to production**, read:
-- **`docs/operations/ENVIRONMENT_INVARIANTS.md`** — SSH is **disabled**,
-  retry limit is **zero**. No SSH/SCP/SFTP/port-22 probes. Use non-SSH
-  deployment contour only. If none available, push main and return
-  `DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR`.
+- **`docs/operations/ACCESS_AND_TRANSPORT_POLICY.md`** — canonical SSH
+  policy (`DISABLED_BY_DEFAULT`), fallback ladder, non-blocking rule.
+  SSH unavailability never blocks code, tests, commits, or pushes —
+  only `PRODUCTION_DEPLOYMENT_EXECUTION`. Correct status when deploy
+  is unavailable: `RELEASE_READY_AWAITING_NON_SSH_DEPLOYMENT`.
+- **`docs/operations/ENVIRONMENT_INVARIANTS.md`** — environment constraints.
 - **`docs/operations/KAIROSKOPION_PRODUCTION_DEPLOY_RUNBOOK.md`** — host,
   app path, service name, deploy/rollback commands, env notes.
   Do not rely on chat memory.

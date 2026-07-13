@@ -24,6 +24,38 @@ DEFAULT_MAX_TOKENS = 4096
 DEFAULT_TEMPERATURE = 0.2
 DEFAULT_MAX_RETRIES = 3
 
+AGENT_MAX_TOKENS: dict[str, int] = {
+    "input_classifier": 512,
+    "depth_recommendation": 1024,
+    "discipline_source_acquisition": 1500,
+    "discipline_intent_parser": 2048,
+    "mismatch_narrator": 2048,
+    "venue_family_context_builder": 2048,
+    "venue_funnel_planner": 3072,
+    "discipline_seeder": 4000,
+    "article_modeler": 4096,
+    "article_field_positioner": 4096,
+    "article_semantic_profiler": 4096,
+    "citation_planner": 4096,
+    "compliance_assessor": 4096,
+    "disciplinary_pathway_mapper": 4096,
+    "fit_assessor": 4096,
+    "rewrite_planner": 4096,
+    "venue_field_positioner": 4096,
+    "venue_matrix_assessor": 4096,
+    "venue_profiler": 4096,
+    "fit_assessor_vpkg": 6144,
+    "discipline_matcher": 8192,
+}
+
+
+def max_tokens_for_role(role_id: str) -> int:
+    env_name = f"KAIROSKOPION_LLM_MAX_TOKENS_{role_id.upper().replace('-', '_')}"
+    override = os.environ.get(env_name, "").strip()
+    if override and override.isdigit():
+        return int(override)
+    return AGENT_MAX_TOKENS.get(role_id, DEFAULT_MAX_TOKENS)
+
 
 MODEL_PRESETS = [
     {

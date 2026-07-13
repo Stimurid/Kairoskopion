@@ -53,13 +53,16 @@ curl http://127.0.0.1:8088/health
 
 ### SSH Access Status
 
-**SSH is disabled by owner environment policy (2026-07-10).**
-SSH retry limit: **zero**. Do not attempt SSH, SCP, SFTP, or port-22 probes.
+> **Canonical policy:** `docs/operations/ACCESS_AND_TRANSPORT_POLICY.md`
 
-Use non-SSH deployment contour only. If none available, push main and
-return `DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR` with the exact merge commit.
+`SSH_POLICY=DISABLED_BY_DEFAULT` · `SSH_AUTOMATIC_RETRY_LIMIT=0`
 
-See `docs/operations/ENVIRONMENT_INVARIANTS.md` for the full policy.
+SSH, SCP, SFTP, port-22 are **disabled**. Do not probe, retry, or increase
+timeout. The deploy and rollback procedures above are **historical references
+only** — they require SSH and cannot be executed under current policy.
+
+Status when deploy is blocked: `RELEASE_READY_AWAITING_NON_SSH_DEPLOYMENT`.
+~~`DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR`~~ — deprecated.
 
 ## Rollback
 
@@ -136,10 +139,16 @@ Temporary smoke scripts (untracked, not committed):
 - `_smoke3_http.py` — full API smoke via HTTP (auth, intake, venue, fit, risk, dossier)
 
 To run HTTP smoke on prod:
+
+> **⚠ DEPRECATED** — the `scp`/`ssh` commands below require SSH, which is
+> disabled under current policy. Use the HTTP API directly from any machine
+> that can reach `kairoskop.mindkampf.ru`.
+
 ```bash
-scp _smoke3_http.py deploy@81.26.176.248:/opt/kairoskopion/app/
-ssh deploy@81.26.176.248
-cd /opt/kairoskopion/app
-source .venv/bin/activate
-python _smoke3_http.py
+# DEPRECATED — SSH disabled
+# scp _smoke3_http.py deploy@81.26.176.248:/opt/kairoskopion/app/
+# ssh deploy@81.26.176.248
+# cd /opt/kairoskopion/app
+# source .venv/bin/activate
+# python _smoke3_http.py
 ```

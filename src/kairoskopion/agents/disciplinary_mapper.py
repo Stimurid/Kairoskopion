@@ -29,6 +29,7 @@ from ..llm.json_repair import (
     PARSE_STATUS_SCHEMA_VALIDATION_FAILED,
     repair_and_parse,
 )
+from ..llm.config import max_tokens_for_role
 from ..llm.provider import LLMProvider
 from ..prompts.disciplinary_mapping import (
     DISCIPLINARY_MAPPING_FAMILY,
@@ -78,7 +79,7 @@ class DisciplinaryPathwayMapperAgent(AgentRole):
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.3,
-                max_tokens=4096,
+                max_tokens=max_tokens_for_role(self.role_id),
                 agent_role="disciplinary_pathway_mapper",
             )
         except Exception as e:

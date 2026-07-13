@@ -15,6 +15,7 @@ from ..llm.attempt_metadata import (
     LLMAttemptMetadata,
     classify_llm_response,
 )
+from ..llm.config import max_tokens_for_role
 from ..llm.provider import LLMProvider
 from ..prompts.venue_matrix_assessment import (
     VENUE_MATRIX_FAMILY,
@@ -84,7 +85,7 @@ class VenueMatrixAssessorAgent(AgentRole):
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.2,
-                max_tokens=4096,
+                max_tokens=max_tokens_for_role(self.role_id),
                 agent_role="venue_matrix_assessor",
             )
         except Exception as exc:  # noqa: BLE001

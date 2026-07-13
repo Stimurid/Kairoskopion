@@ -33,6 +33,7 @@ from ..llm.json_repair import (
     PARSE_STATUS_SCHEMA_VALIDATION_FAILED,
     repair_and_parse,
 )
+from ..llm.config import max_tokens_for_role
 from ..llm.provider import LLMProvider
 from ..prompts.article_modeling import (
     ARTICLE_MODELING_FAMILY,
@@ -77,7 +78,7 @@ class ArticleModelerAgent(AgentRole):
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.2,
-                max_tokens=4096,
+                max_tokens=max_tokens_for_role(self.role_id),
                 agent_role="article_modeler",
             )
         except Exception as e:

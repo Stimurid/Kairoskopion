@@ -233,6 +233,23 @@ export const api = {
       { protected_core: protectedCore, corrections },
     ),
 
+  // Semantic hypotheses
+  getSemanticHypotheses: (id: string) =>
+    get<Record<string, unknown>>(`/cases/${id}/semantic-hypotheses`),
+
+  getSemanticHypothesis: (id: string, axis: string) =>
+    get<Record<string, unknown>>(`/cases/${id}/semantic-hypotheses/${axis}`),
+
+  acceptSemanticHypothesis: (id: string, axis: string, comment?: string) =>
+    post<Record<string, unknown>>(`/cases/${id}/semantic-hypotheses/${axis}/accept`, { comment }),
+
+  disputeSemanticHypothesis: (id: string, axis: string, comment: string) =>
+    post<Record<string, unknown>>(`/cases/${id}/semantic-hypotheses/${axis}/dispute`, { comment }),
+
+  rerunSemanticHypothesis: (id: string, axis: string, comment?: string) =>
+    post<{ axis: string; old: string | null; new: string; source: string; error?: string }>(
+      `/cases/${id}/semantic-hypotheses/${axis}/rerun`, { comment }),
+
   // Refinement dialog (M-8)
   refineArticleModel: (id: string, message: string) =>
     post<{ reply: string; suggestions: { field: string; value: string; reason: string }[]; llm_available: boolean }>(

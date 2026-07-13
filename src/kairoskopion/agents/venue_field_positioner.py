@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from ..llm.config import max_tokens_for_role
 from ..llm.provider import LLMProvider
 from ..prompts.field_positioning import VENUE_FIELD_POSITION_FAMILY
 from ..schema import FieldPositionModel
@@ -48,7 +49,7 @@ class VenueFieldPositionerAgent(AgentRole):
                 "guidelines_text": guidelines[:4000] if guidelines else "(no guidelines available)",
             },
             temperature=0.2,
-            max_tokens=4096,
+            max_tokens=max_tokens_for_role(self.role_id),
         )
         if result is None:
             return self.execute_deterministic(inp)

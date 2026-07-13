@@ -267,12 +267,21 @@ export function HumanModelView({ caseId, kind, venueKey, onConfirm, onBack }: Pr
   const [rerunGenreRunning, setRerunGenreRunning] = useState(false);
   const [rerunGenreResult, setRerunGenreResult] = useState<{ genre?: { old: string | null; new: string }; method?: { old: string | null; new: string }; novelty_mode?: string; source?: string; error?: string } | null>(null);
 
+  // Semantic hypotheses
+  const [hypotheses, setHypotheses] = useState<Record<string, Record<string, unknown>>>({});
+  const [hypAction, setHypAction] = useState<{ axis: string; type: string } | null>(null);
+  const [hypComment, setHypComment] = useState('');
+  const [hypError, setHypError] = useState<string | null>(null);
+
   useEffect(() => {
     if (kind !== 'article') return;
     api.getCorrectionSignals().then(r => {
       if (r.signals && r.signals.length > 0) setSignals(r.signals);
     }).catch(() => {});
-  }, [kind]);
+    api.getSemanticHypotheses(caseId).then(h => {
+      if (h && typeof h === 'object') setHypotheses(h as Record<string, Record<string, unknown>>);
+    }).catch(() => {});
+  }, [kind, caseId]);
 
   // M-8: LLM refinement dialog
   interface ChatEntry {
@@ -495,6 +504,39 @@ export function HumanModelView({ caseId, kind, venueKey, onConfirm, onBack }: Pr
       setRerunGenreRunning(false);
     }
   }, [caseId, rerunGenreComment]);
+
+  const handleHypAction = useCallback(async (axis: string, action: 'accept' | 'dispute' | 'rerun') => {
+    setHypAction({ axis, type: action });
+    setHypError(null);
+    try {
+      if (action === 'accept') {
+        const result = await api.acceptSemanticHypothesis(caseId, axis, hypComment || undefined);
+        setHypotheses(prev => ({ ...prev, [axis]: result }));
+      } else if (action === 'dispute') {
+        if (!hypComment.trim()) {
+          setHypError('Укажите причину оспаривания');
+          return;
+        }
+        const result = await api.disputeSemanticHypothesis(caseId, axis, hypComment);
+        setHypotheses(prev => ({ ...prev, [axis]: result }));
+      } else if (action === 'rerun') {
+        const result = await api.rerunSemanticHypothesis(caseId, axis, hypComment || undefined);
+        if (result.error) {
+          setHypError(result.error);
+        } else {
+          const refreshed = await api.getSemanticHypotheses(caseId);
+          if (refreshed && typeof refreshed === 'object') {
+            setHypotheses(refreshed as Record<string, Record<string, unknown>>);
+          }
+        }
+      }
+      setHypComment('');
+    } catch (e) {
+      setHypError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setHypAction(null);
+    }
+  }, [caseId, hypComment]);
 
   return (
     <div className="human-view">
@@ -881,6 +923,84 @@ export function HumanModelView({ caseId, kind, venueKey, onConfirm, onBack }: Pr
           {rerunGenreResult?.error && (
             <div className="genre-method-rerun-error">{rerunGenreResult.error}</div>
           )}
+        </div>
+      )}
+      {kind === 'article' && markdown && !loading && Object.keys(hypotheses).length > 0 && (
+        <div className="semantic-hypotheses-panel">
+          <h4>Семантические гипотезы</h4>
+          {Object.entries(hypotheses).map(([axis, hyp]) => {
+            const primary = (hyp as Record<string, unknown>).primary as Record<string, unknown> | undefined;
+            const status = (hyp as Record<string, unknown>).user_status as string;
+            const statusLabel: Record<string, string> = {
+              pending: 'Ожидает',
+              accepted: 'Принято',
+              disputed: 'Оспорено',
+            };
+            const axisLabel: Record<string, string> = {
+              genre: 'Жанр',
+              method: 'Метод',
+              novelty_mode: 'Режим новизны',
+              discipline: 'Дисциплина',
+            };
+            return (
+              <div key={axis} className={`hypothesis-card hypothesis-card--${status}`}>
+                <div className="hypothesis-header">
+                  <span className="hypothesis-axis">{axisLabel[axis] ?? axis}</span>
+                  <span className={`hypothesis-status hypothesis-status--${status}`}>
+                    {statusLabel[status] ?? status}
+                  </span>
+                </div>
+                {primary && (
+                  <div className="hypothesis-value">
+                    <strong>{String(primary.value ?? '—')}</strong>
+                    {primary.confidence && (
+                      <span className="hypothesis-confidence"> ({String(primary.confidence)})</span>
+                    )}
+                    {primary.reasoning && (
+                      <p className="hypothesis-reasoning">{String(primary.reasoning)}</p>
+                    )}
+                  </div>
+                )}
+                {status !== 'accepted' && !isConfirmed && (
+                  <div className="hypothesis-actions">
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => handleHypAction(axis, 'accept')}
+                      disabled={!!hypAction}
+                    >
+                      {hypAction?.axis === axis && hypAction.type === 'accept' ? '…' : 'Принять'}
+                    </button>
+                    <button
+                      className="btn btn-sm btn-warning"
+                      onClick={() => handleHypAction(axis, 'dispute')}
+                      disabled={!!hypAction}
+                    >
+                      {hypAction?.axis === axis && hypAction.type === 'dispute' ? '…' : 'Оспорить'}
+                    </button>
+                    <button
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => handleHypAction(axis, 'rerun')}
+                      disabled={!!hypAction}
+                    >
+                      {hypAction?.axis === axis && hypAction.type === 'rerun' ? '…' : 'Перезапуск LLM'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {!isConfirmed && (
+            <div className="hypothesis-comment-row">
+              <input
+                type="text"
+                className="hypothesis-comment-input"
+                placeholder="Комментарий (для оспаривания или перезапуска)…"
+                value={hypComment}
+                onChange={e => setHypComment(e.target.value)}
+              />
+            </div>
+          )}
+          {hypError && <div className="hypothesis-error">{hypError}</div>}
         </div>
       )}
       {onConfirm && kind === 'article' && markdown && !loading && !isConfirmed && (

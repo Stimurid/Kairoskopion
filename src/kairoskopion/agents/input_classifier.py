@@ -26,6 +26,7 @@ from ..llm.json_repair import (
     PARSE_STATUS_REPAIRED_OK,
     repair_and_parse,
 )
+from ..llm.config import max_tokens_for_role
 from ..llm.provider import LLMProvider
 from ..prompts.input_classification import (
     INPUT_CLASSIFICATION_FAMILY,
@@ -88,7 +89,7 @@ class InputClassifierAgent(AgentRole):
                 messages,
                 response_schema=family["output_schema"],
                 temperature=0.0,
-                max_tokens=512,
+                max_tokens=max_tokens_for_role(self.role_id),
                 agent_role="input_classifier",
             )
         except Exception as exc:  # noqa: BLE001

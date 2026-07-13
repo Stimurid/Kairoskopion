@@ -159,9 +159,11 @@ class TestCaseConfirm(unittest.TestCase):
         self.assertEqual(self.case.article_model.protected_core, ["thesis", "object"])
 
     def test_confirm_logs_decision(self):
+        pre_log_count = len(self.case.decision_log)
         self.case.confirm_article_model(protected_core=["thesis"])
-        self.assertEqual(len(self.case.decision_log), 1)
-        self.assertEqual(self.case.decision_log[0]["action"], "confirm_article_model")
+        new_entries = self.case.decision_log[pre_log_count:]
+        self.assertEqual(len(new_entries), 1)
+        self.assertEqual(new_entries[0]["action"], "confirm_article_model")
 
 
 class TestCaseScenario(unittest.TestCase):
@@ -172,6 +174,7 @@ class TestCaseScenario(unittest.TestCase):
             "through Simondon's philosophy of technology.",
             input_type="article",
         )
+        pre_log_count = len(case.decision_log)
         result = case.set_scenario({
             "goal": "Q1-Q2 Scopus publication",
             "rewrite_depth_allowed": "medium",
@@ -179,7 +182,8 @@ class TestCaseScenario(unittest.TestCase):
         })
         self.assertIn("submission_scenario_id", result)
         self.assertEqual(case.stage, CaseStage.SCENARIO)
-        self.assertEqual(len(case.decision_log), 1)
+        new_entries = case.decision_log[pre_log_count:]
+        self.assertEqual(len(new_entries), 1)
 
 
 class TestCaseSummary(unittest.TestCase):
@@ -225,6 +229,7 @@ class TestCaseVenueInvestigation(unittest.TestCase):
         # used to silently produce a blank venue with fake confidence.
         # Pass meaningful text for the pipeline to run.
         case = Case(title="Venue test")
+        pre_log_count = len(case.decision_log)
         result = case.investigate_venue(
             "# Venue Seed Profile: Philosophy & Technology\n"
             "- **ISSN:** 1234-5678\n"
@@ -241,8 +246,9 @@ class TestCaseVenueInvestigation(unittest.TestCase):
         self.assertIn("venue", result)
         self.assertNotIn("status", result)  # not the needs_more_venue_text path
         self.assertIsNotNone(case.investigated_venue)
-        self.assertEqual(len(case.decision_log), 1)
-        self.assertEqual(case.decision_log[0]["action"], "investigate_venue")
+        new_entries = case.decision_log[pre_log_count:]
+        self.assertEqual(len(new_entries), 1)
+        self.assertEqual(new_entries[0]["action"], "investigate_venue")
 
     def test_intake_venue_auto_investigates(self):
         case = Case()
@@ -259,6 +265,102 @@ class TestCaseEvidence(unittest.TestCase):
         case = Case()
         ev = case.get_evidence("ArticleModel", "genre")
         self.assertEqual(ev["evidence_status"], "UNKNOWN")
+
+
+class TestCaseStageTransitions(unittest.TestCase):
+    def test_valid_forward_transition(self):
+        case = Case()
+        self.assertEqual(case.stage, CaseStage.EMPTY)
+        case._transition_to(CaseStage.INTAKE)
+        self.assertEqual(case.stage, CaseStage.INTAKE)
+
+    def test_unexpected_transition_logs_warning(self):
+        case = Case()
+        import logging
+        with self.assertLogs("kairoskopion.api.cases", level=logging.WARNING) as cm:
+            case._transition_to(CaseStage.FIT_ASSESSED)
+        self.assertIn("Unexpected stage transition", cm.output[0])
+        self.assertEqual(case.stage, CaseStage.FIT_ASSESSED)
+
+    def test_self_transition_allowed(self):
+        case = Case()
+        case._transition_to(CaseStage.INTAKE)
+        case._transition_to(CaseStage.INTAKE)
+        self.assertEqual(case.stage, CaseStage.INTAKE)
+
+    def test_normal_pipeline_progression(self):
+        case = Case()
+        case._transition_to(CaseStage.INTAKE)
+        case._transition_to(CaseStage.ARTICLE_MODEL)
+        case._transition_to(CaseStage.SCENARIO)
+        case._transition_to(CaseStage.PATHWAYS)
+        case._transition_to(CaseStage.VENUE_POOL)
+        case._transition_to(CaseStage.VENUE_SELECTED)
+        case._transition_to(CaseStage.FIT_ASSESSED)
+        case._transition_to(CaseStage.ADAPTING)
+        self.assertEqual(case.stage, CaseStage.ADAPTING)
+
+
+class TestSemanticHypotheses(unittest.TestCase):
+    def setUp(self):
+        self.case = Case()
+        self.case.intake_text(
+            "This paper offers a conceptual analysis of individuation "
+            "in technical objects, drawing on Simondon's philosophy of "
+            "technology to argue that technical objects have genuine "
+            "individuality through their associated milieu.",
+            input_type="article",
+        )
+
+    def test_hypotheses_populated_after_article_model(self):
+        hypotheses = self.case.get_semantic_hypotheses()
+        self.assertIsInstance(hypotheses, dict)
+        self.assertIn("genre", hypotheses)
+
+    def test_accept_hypothesis(self):
+        result = self.case.accept_semantic_hypothesis("genre", "Confirmed by user")
+        self.assertEqual(result["user_status"], "accepted")
+
+    def test_dispute_hypothesis(self):
+        result = self.case.dispute_semantic_hypothesis("genre", "Not right")
+        self.assertEqual(result["user_status"], "disputed")
+
+    def test_set_hypothesis_creates_version_history(self):
+        self.case.set_semantic_hypothesis(
+            "genre", "review_article", "high", "Re-evaluated",
+        )
+        hyp = self.case.get_semantic_hypothesis("genre")
+        self.assertEqual(hyp["primary"]["value"], "review_article")
+        self.assertGreaterEqual(hyp["version"], 2)
+
+
+class TestCaseMigration(unittest.TestCase):
+    def test_old_case_gets_provenance_markers(self):
+        from kairoskopion.api.cases import _case_from_snapshot
+        old_data = {
+            "case_id": "case_old123",
+            "title": "Legacy case",
+            "stage": "article_model",
+            "input_text": "test",
+            "input_type": "article",
+        }
+        case = _case_from_snapshot(old_data)
+        self.assertEqual(case.schema_version, 2)
+        self.assertEqual(case.provenance["migrated_from_schema"], 1)
+        self.assertTrue(case.provenance["rerun_available"])
+
+    def test_current_case_no_migration(self):
+        from kairoskopion.api.cases import _case_from_snapshot
+        current_data = {
+            "case_id": "case_new456",
+            "title": "New case",
+            "stage": "empty",
+            "schema_version": 2,
+            "provenance": {},
+        }
+        case = _case_from_snapshot(current_data)
+        self.assertEqual(case.schema_version, 2)
+        self.assertNotIn("migrated_from_schema", case.provenance)
 
 
 if __name__ == "__main__":

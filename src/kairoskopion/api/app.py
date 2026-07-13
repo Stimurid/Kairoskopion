@@ -408,7 +408,9 @@ class InvestigateVenueByReferenceRequest(BaseModel):
 def investigate_venue(
     req: InvestigateVenueRequest, case: Case = Depends(_user_case),
 ):
-    return case.investigate_venue(req.text)
+    result = case.investigate_venue(req.text)
+    store.save(case)
+    return result
 
 
 @app.post("/cases/{case_id}/investigate-venue-by-reference")
@@ -418,9 +420,11 @@ def investigate_venue_by_reference(
 ):
     if not req.issn and not req.name:
         raise HTTPException(400, "Provide issn or name")
-    return case.investigate_venue_by_reference(
+    result = case.investigate_venue_by_reference(
         issn=req.issn, name=req.name,
     )
+    store.save(case)
+    return result
 
 
 class InvestigateVenueByUrlRequest(BaseModel):
@@ -855,6 +859,65 @@ def get_evidence(
 
 
 # ---------------------------------------------------------------------------
+# Semantic hypotheses
+# ---------------------------------------------------------------------------
+
+@app.get("/cases/{case_id}/semantic-hypotheses")
+def get_semantic_hypotheses(case: Case = Depends(_user_case)):
+    return case.get_semantic_hypotheses()
+
+
+@app.get("/cases/{case_id}/semantic-hypotheses/{axis}")
+def get_semantic_hypothesis(axis: str, case: Case = Depends(_user_case)):
+    hyp = case.get_semantic_hypothesis(axis)
+    if hyp is None:
+        raise HTTPException(404, f"No hypothesis for axis {axis}")
+    return hyp
+
+
+class AcceptHypothesisRequest(BaseModel):
+    comment: str | None = None
+
+
+@app.post("/cases/{case_id}/semantic-hypotheses/{axis}/accept")
+def accept_semantic_hypothesis(
+    axis: str, req: AcceptHypothesisRequest,
+    case: Case = Depends(_user_case),
+):
+    result = case.accept_semantic_hypothesis(axis, comment=req.comment)
+    store.save(case)
+    return result
+
+
+class DisputeHypothesisRequest(BaseModel):
+    comment: str
+
+
+@app.post("/cases/{case_id}/semantic-hypotheses/{axis}/dispute")
+def dispute_semantic_hypothesis(
+    axis: str, req: DisputeHypothesisRequest,
+    case: Case = Depends(_user_case),
+):
+    result = case.dispute_semantic_hypothesis(axis, comment=req.comment)
+    store.save(case)
+    return result
+
+
+class RerunHypothesisRequest(BaseModel):
+    comment: str | None = None
+
+
+@app.post("/cases/{case_id}/semantic-hypotheses/{axis}/rerun")
+def rerun_semantic_hypothesis(
+    axis: str, req: RerunHypothesisRequest,
+    case: Case = Depends(_user_case),
+):
+    result = case.rerun_semantic_hypothesis(axis, comment=req.comment)
+    store.save(case)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Quality gates
 # ---------------------------------------------------------------------------
 
@@ -1069,9 +1132,10 @@ class SetDepthModeRequest(BaseModel):
 
 
 @app.post("/cases/{case_id}/set-depth-mode")
-def set_depth_mode(case_id: str, req: SetDepthModeRequest, user=Depends(get_current_user)):
-    case = _get_case(case_id, user)
-    return case.set_depth_mode(req.mode)
+def set_depth_mode(req: SetDepthModeRequest, case: Case = Depends(_user_case)):
+    result = case.set_depth_mode(req.mode)
+    store.save(case)
+    return result
 
 
 class SetBudgetRequest(BaseModel):
@@ -1080,16 +1144,16 @@ class SetBudgetRequest(BaseModel):
 
 
 @app.post("/cases/{case_id}/set-budget")
-def set_budget(case_id: str, req: SetBudgetRequest, user=Depends(get_current_user)):
-    case = _get_case(case_id, user)
-    return case.set_budget_constraints(
+def set_budget(req: SetBudgetRequest, case: Case = Depends(_user_case)):
+    result = case.set_budget_constraints(
         max_api_calls=req.max_api_calls, max_tokens=req.max_tokens,
     )
+    store.save(case)
+    return result
 
 
 @app.get("/cases/{case_id}/cost-estimate")
-def get_cost_estimate(case_id: str, user=Depends(get_current_user)):
-    case = _get_case(case_id, user)
+def get_cost_estimate(case: Case = Depends(_user_case)):
     return case.get_cost_estimate()
 
 

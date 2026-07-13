@@ -1,120 +1,120 @@
 # Current Working State
 
-**Last updated:** 2026-07-10T16:30+03:00
-**Branch:** `main`
-**Latest main commit:** `6c21124` (merge: discipline output truncation fix)
-**Currently deployed commit:** `1fc7c0a` (prior session's BLOCKER A-D fixes)
+**Last updated:** 2026-07-13
+**Branch:** `program/baseline-user-journey-reconstruction`
+**Branch HEAD:** `0e1dbf0`
+**Latest main commit:** `0e1dbf0`
+**Currently deployed commit:** `1fc7c0a`
+**Active task:** `program/baseline-user-journey-reconstruction`
 
 ---
 
-## Deployment status: BLOCKED
+## Deployment status: RELEASE_READY_AWAITING_NON_SSH_DEPLOYMENT
 
-**`DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR`**
+SSH disabled (`SSH_POLICY=DISABLED_BY_DEFAULT`, `SSH_AUTOMATIC_RETRY_LIMIT=0`).
+Code-phase work complete. Production deploy requires non-SSH contour.
+See `docs/operations/ACCESS_AND_TRANSPORT_POLICY.md`.
 
-Code is on `origin/main` (commit `6c21124`) but cannot be deployed.
-SSH is disabled by owner environment policy. No CI/CD, GitHub Actions,
-webhook, or other non-SSH deployment path is configured.
+### Available transports
 
-**To unblock:** either re-enable SSH or set up an alternative deployment
-contour (GitHub Actions, webhook on git push, etc.).
+| Transport | Status |
+|-----------|--------|
+| Local code & tests | Available |
+| Browser / UI | Available |
+| HTTP API (prod) | Available (basic auth) |
+| GitHub push | Available |
+| SSH / SCP / SFTP | Disabled |
 
-**To deploy manually (when SSH is re-enabled):**
-```bash
-ssh deploy@81.26.176.248
-cd /opt/kairoskopion/app
-git fetch origin && git pull origin main
-source .venv/bin/activate
-pip install -e '.[api]'
-cd ui && npm ci && npx vite build && cd ..
-sudo systemctl restart kairoskopion-api
-curl http://127.0.0.1:8088/health
-```
+## Baseline product reconstruction — status by scope
 
-## What was done this session
+### A. Canonical persisted case runtime — COMPLETE
+- CaseStore JSON persistence with user-scoped paths
+- `schema_version=2`, provenance markers for old cases
+- State machine guards (`ALLOWED_STAGE_TRANSITIONS`, `_transition_to()`)
+- All mutations save to store
 
-### BLOCKER E — Discipline matcher output truncation
+### B. Unified semantic hypothesis mechanism — COMPLETE
+- `SemanticHypothesis` + `SemanticHypothesisEntry` in schema.py
+- 5 Case methods: get/set/accept/dispute/rerun per axis
+- Auto-populated from article model (genre, method, novelty_mode, discipline)
+- 5 API endpoints: GET list, GET axis, POST accept, POST dispute, POST rerun
+- UI panel with accept/dispute/rerun buttons and status badges
+- Version history tracking on updates
 
-**Root cause:** V3 prompt (10 candidates, 7-10 sentence Russian rationales)
-consistently exceeds 4096 output tokens. Production LLM session log shows
-`output_tokens=4096` (hard ceiling) with `parse_status=text_only`. The JSON
-response is truncated mid-object. `repair_and_parse` cannot fix it. Agent
-falls back to keyword-only deterministic results (2-4 candidates, no LLM
-scoring).
+### C. Unified LLM runtime — COMPLETE
+- `AGENT_MAX_TOKENS` with 21 per-agent defaults
+- `max_tokens_for_role(role_id)` with env var override
+- All 20 agent files wired via centralized config
+- Truncation detection in `classify_llm_response`
 
-**Fix (commits 75a549b, 2f928b0):**
-- `discipline_matcher.py`: `max_tokens` raised from 4096 to 8192
-- Added explicit `finish_reason == "length"` truncation detection
-- Truncation classified as `output_truncated` (distinct from `invalid_json`)
-- Attempt metadata (model, tokens, finish_reason) persisted on fallback
-- 16 regression tests in `tests/test_discipline_truncation.py`
+### D. Real pipeline graph — OPERATIONAL (pre-existing)
+- AgentMap component with workflow tabs, layer view, agent details
+- `/agents/map` endpoint serving runtime graph
+- 31 operational agents visible
 
-**Evidence from production session log
-(`/opt/kairoskopion/logs/llm_sessions/20260710_145922_api.jsonl`):**
-```
-agent_role: discipline_matcher
-output_tokens: 4096
-parse_status: text_only
-model: claude-sonnet-4-5-20250929
-latency_ms: 51770.6
-```
+### E. Full user journey — OPERATIONAL
+Pipeline stages all functional:
+1. Intake (text/file/URL) → InputClassifierAgent
+2. ArticleModel → ArticleModelerAgent (LLM + deterministic)
+3. SemanticProfile → ArticleSemanticProfilerAgent
+4. Confirm article → protected core, decisions
+5. Scenario → SubmissionScenario
+6. Pathways → DisciplinaryPathwayMapper
+7. Venue Discovery / Direct Investigation → VenueProfilerAgent
+8. Select Venue → auto-chains fit/mismatch/rewrite
+9. FitAssessment (12-axis) + FPM fit
+10. MismatchMap + MismatchNarrator (batch + per-axis rescue)
+11. RewritePlan (LLM + deterministic)
+12. RiskReport (LLM risk officer)
+13. CitationPlan (structural + LLM upgrade)
+14. ComplianceChecklist (with error placeholder guarantee)
+15. SubmissionPack
+16. Dossier (human + technical views)
 
-### Environment documentation (commit 189d0c5)
+### F. Migration — COMPLETE
+- schema_version field (current=2)
+- Old cases stamped with `migrated_from_schema=1`, `rerun_available=true`
+- Provenance exposed in `to_dict()` for UI migration banners
 
-- `ENVIRONMENT_INVARIANTS.md`: SSH disabled, zero retry, deploy rules
-- `SESSION_HANDOFF.md`: durable session state record
-- `CLAUDE.md`: updated deploy section
-- Deploy runbook: SSH section updated to disabled status
+### G. Production deployment — RELEASE_READY_AWAITING_NON_SSH_DEPLOYMENT
+No non-SSH deployment contour configured.
+Code is release-ready; deploy blocked only at `PRODUCTION_DEPLOYMENT_EXECUTION`.
 
-### Prior session: BLOCKERs A-D (deployed as commit 1fc7c0a)
-
-- A: Discipline LLM wiring (registry-first shortcircuit removed)
-- B: Genre/method rerun endpoint + UI
-- C: Finalization endpoint
-- D: Agent map integrity tests
-
-## What is NOT done (pending deployment)
-
-1. **Production deployment of BLOCKER E fix** — code is on origin/main
-   but not deployed. Blocked on SSH access.
-
-2. **Production acceptance (12-step protocol):**
-   - Step 1 PASS: deployed commit verified (1fc7c0a)
-   - Step 2 PARTIAL: case created, text submitted, article model built via LLM
-   - Step 3 PASS: ArticleModel used LLM (claude-sonnet-4-5, parsed_ok, no fallback)
-   - Step 4 FAIL: discipline LLM truncated (4096 ceiling), keyword fallback only
-   - Steps 5-12: blocked on deployment of BLOCKER E fix
-
-3. **Genre/method resolution** — `genre=unknown`, `method=unknown` on test case.
-   Rerun endpoint exists but needs production test after discipline fix.
-
-4. **Finalization persistence** — not yet tested on production.
+## Bug fixes this session
+- 3 broken API endpoints: `set-depth-mode`, `set-budget`, `cost-estimate` (NameError)
+- 5 missing `store.save(case)` calls
+- `build_submission_pack_api` now uses `selected_venue or investigated_venue`
+- Test fixes: 3 decision_log assertions updated for relative counts
 
 ## Gate results
 
 | Gate | Result |
 |------|--------|
-| pytest | 3299 passed, 8 deselected |
-| Focused discipline tests | 16 passed |
-| Focused blocker regression | 29 passed |
+| pytest | 3309 passed, 8 deselected |
 | TypeScript | clean (noEmit) |
 | Vite build | clean |
 | SSH attempts | 0 |
 
-## Commits in this session
+## Files changed (uncommitted)
 
-| Commit | Description |
-|--------|-------------|
-| `75a549b` | fix: increase discipline matcher max_tokens 4096→8192 |
-| `2f928b0` | fix: detect output truncation in discipline matcher |
-| `189d0c5` | docs: environment invariants, SSH disabled, session handoff |
-| `6c21124` | merge: discipline output truncation fix and environment invariants |
+### Backend
+- `src/kairoskopion/llm/config.py` — AGENT_MAX_TOKENS, max_tokens_for_role()
+- `src/kairoskopion/llm/attempt_metadata.py` — truncation detection
+- `src/kairoskopion/schema.py` — SemanticHypothesis, SemanticHypothesisEntry
+- `src/kairoskopion/ids.py` — semantic_hypothesis_id()
+- `src/kairoskopion/api/cases.py` — state machine, hypotheses, migration, bug fixes, submission pack fix
+- `src/kairoskopion/api/app.py` — 5 hypothesis endpoints, 3 endpoint fixes, persistence
+- 20 agent files — max_tokens_for_role() wiring
 
-## Next steps (for next session)
+### Frontend
+- `ui/src/api/client.ts` — 5 semantic hypothesis API methods
+- `ui/src/components/HumanModelView.tsx` — hypothesis panel UI
+- `ui/src/styles/cockpit.css` — hypothesis panel styles
 
-1. Deploy commit `6c21124` to production (requires SSH or alternative contour)
-2. Create fresh disposable production case
-3. Verify discipline LLM returns 10 candidates with full rationales
-4. Test genre/method rerun on fresh case and existing UNKNOWN case
-5. Test finalization persistence (click, refresh, navigate, verify)
-6. Write `PROD_SEMANTIC_ANALYSIS_FINALIZATION_ACCEPTANCE.md`
-7. Return final RESULT
+### Tests
+- `tests/test_api_cases.py` — 10 new tests (stage, hypothesis, migration, fixes)
+
+### Docs
+- `docs/operations/BASELINE_PRODUCT_RECONSTRUCTION_INVENTORY.md`
+- `docs/operations/CURRENT_WORKING_STATE.md`
+- `docs/operations/SESSION_HANDOFF.md`
