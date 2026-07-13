@@ -208,6 +208,39 @@ class DisciplineMatcherAgent(AgentRole):
                     f"dropped matched id not in candidate set: "
                     f"{m.get('discipline_id')!r}"
                 )
+        # Pad to 10 from remaining candidates if filtering reduced count
+        if len(cleaned) < 10:
+            used_ids = {m.get("discipline_id") for m in cleaned}
+            for d in candidates:
+                if len(cleaned) >= 10:
+                    break
+                if d.discipline_id not in used_ids:
+                    cleaned.append({
+                        "discipline_id": d.discipline_id,
+                        "display_name": (
+                            d.display_names.get("ru")
+                            or d.display_names.get("en", d.discipline_id)
+                        ),
+                        "strength": "tangential",
+                        "confidence": "low",
+                        "relation_type_ru": "дополнено автоматически",
+                        "why": (
+                            "Кандидат добавлен автоматически для "
+                            "заполнения до 10 обязательных позиций. "
+                            "Требует LLM-валидации. "
+                            "Keyword-совпадение с реестром. "
+                            "Рекомендуется перезапуск с LLM."
+                        ),
+                        "supporting_evidence": [],
+                        "contradicting_evidence": [],
+                        "position_rationale": "auto-padded",
+                    })
+                    used_ids.add(d.discipline_id)
+            if len(cleaned) < 10:
+                warnings.append(
+                    f"only {len(cleaned)} candidates available after "
+                    f"padding (pool has {len(candidates)} total)"
+                )
         parsed["matched"] = cleaned
 
         return AgentOutput(
@@ -229,10 +262,25 @@ class DisciplineMatcherAgent(AgentRole):
         matched = [
             {
                 "discipline_id": d.discipline_id,
+                "display_name": (
+                    d.display_names.get("ru")
+                    or d.display_names.get("en", d.discipline_id)
+                ),
                 "strength": "tangential",
-                "why": "Кандидат предложен keyword-фильтром реестра — без LLM-проверки.",
+                "confidence": "low",
+                "relation_type_ru": "keyword-фильтр",
+                "why": (
+                    "Кандидат предложен keyword-фильтром реестра — "
+                    "без LLM-проверки. Требует подтверждения. "
+                    "Совпадение по ключевым словам. "
+                    "Рекомендуется перезапуск с LLM. "
+                    "Точность не гарантирована."
+                ),
+                "supporting_evidence": [],
+                "contradicting_evidence": [],
+                "position_rationale": "deterministic-fallback",
             }
-            for d in candidates[:4]
+            for d in candidates[:10]
         ]
         return AgentOutput(
             output_entity_type="DisciplineMatch",

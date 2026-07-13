@@ -396,7 +396,7 @@ DISCIPLINE_MATCHING_V3_OUTPUT_SCHEMA = {
                     "position_rationale",
                 ],
             },
-            "minItems": 1,
+            "minItems": 10,
             "maxItems": 10,
         },
         "new_candidate": {
@@ -440,8 +440,8 @@ DISCIPLINE_MATCHING_V3_OUTPUT_SCHEMA = {
 def validate_discipline_match_v3(data: dict) -> list[str]:
     warnings: list[str] = []
     matched = data.get("matched") or []
-    if len(matched) < 1:
-        warnings.append("matched is empty — expected up to 10 candidates")
+    if len(matched) < 10:
+        warnings.append(f"matched has {len(matched)} items — expected exactly 10")
     seen_ids: set[str] = set()
     for m in matched:
         did = m.get("discipline_id")

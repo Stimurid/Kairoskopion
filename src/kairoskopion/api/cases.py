@@ -275,7 +275,9 @@ class Case:
             "venue_pool": self.venue_pool is not None,
             "venue_selected": self.selected_venue is not None,
             "fit_assessed": self.fit_assessment is not None,
-            "adaptation_plan": self.rewrite_plan is not None,
+            "adapting": self.rewrite_plan is not None,
+            "submission_pack": self.submission_pack is not None,
+            "dossier": self.stage == CaseStage.DOSSIER,
         }
 
     def _transition_to(self, target: CaseStage) -> None:
@@ -716,17 +718,37 @@ class Case:
 
         genre = self.article_model.genre_current
         if genre:
+            genre_alternatives = []
+            genre_confidence = "medium" if source == "llm" else "low"
+            if genre == "unknown":
+                genre_confidence = "needs_resolution"
+                from ..enums import Genre as _Genre
+                genre_alternatives = [
+                    {"value": g.value, "confidence": "unscored", "reasoning": None, "rank": i + 2}
+                    for i, g in enumerate(g for g in _Genre if g.value != "unknown")
+                ]
             self.set_semantic_hypothesis(
                 axis="genre", primary_value=genre, source=source,
-                confidence="medium" if source == "llm" else "low",
+                confidence=genre_confidence,
+                alternatives=genre_alternatives or None,
                 extraction_attempt=ea,
             )
 
         method = self.article_model.method_status
         if method:
+            method_alternatives = []
+            method_confidence = "medium" if source == "llm" else "low"
+            if method == "unknown":
+                method_confidence = "needs_resolution"
+                from ..enums import MethodStatus as _MS
+                method_alternatives = [
+                    {"value": m.value, "confidence": "unscored", "reasoning": None, "rank": i + 2}
+                    for i, m in enumerate(m for m in _MS if m.value != "unknown")
+                ]
             self.set_semantic_hypothesis(
                 axis="method", primary_value=method, source=source,
-                confidence="medium" if source == "llm" else "low",
+                confidence=method_confidence,
+                alternatives=method_alternatives or None,
                 extraction_attempt=ea,
             )
 
@@ -1340,6 +1362,7 @@ class Case:
             compliance=self.compliance_checklist,
         )
         self.submission_pack = pack
+        self._transition_to(CaseStage.SUBMISSION_PACK)
         self._log_decision("submission_pack_built", {
             "readiness": pack.ready_status,
         })
@@ -3005,6 +3028,10 @@ class Case:
         dossier["decision_log"] = self.decision_log
         dossier["quality_gates"] = self.quality_gates
 
+        self._transition_to(CaseStage.DOSSIER)
+        self._log_decision("dossier_built", {
+            "sections": list(dossier.keys()),
+        })
         return dossier
 
     # -- Decision log --

@@ -187,13 +187,16 @@ def _build_from_llm(
         "conference_proceedings": VenueType.CONFERENCE_PROCEEDINGS.value,
         "special_issue": VenueType.SPECIAL_ISSUE.value,
     }
-    venue_type = vtype_map.get(parsed.get("venue_type", ""), VenueType.JOURNAL.value)
+    venue_type_raw = parsed.get("venue_type", "")
+    if isinstance(venue_type_raw, dict):
+        venue_type_raw = venue_type_raw.get("type", venue_type_raw.get("value", ""))
+    venue_type = vtype_map.get(venue_type_raw, VenueType.JOURNAL.value)
 
     # Regime type
     rtype = RegimeType.CLASSIC_JOURNAL_ARTICLE.value
-    if parsed.get("venue_type") == "special_issue":
+    if venue_type_raw == "special_issue":
         rtype = RegimeType.SPECIAL_ISSUE_ARTICLE.value
-    elif parsed.get("venue_type") == "conference_proceedings":
+    elif venue_type_raw == "conference_proceedings":
         rtype = RegimeType.CONFERENCE_PROCEEDINGS.value
 
     # Open access

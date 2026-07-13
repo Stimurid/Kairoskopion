@@ -671,6 +671,21 @@ export function CaseWorkspace({ caseData, onCaseUpdate, onCaseGone }: Props) {
         return (
           <div className="placeholder-view">
             <h2>Пакет подачи</h2>
+            <button className="btn btn-primary" onClick={async () => {
+              setIsLoading(true);
+              setError(null);
+              try {
+                await api.buildSubmissionPack(caseId);
+                onCaseUpdate();
+                setActiveView('dossier');
+              } catch (e) {
+                handleError(e);
+              } finally {
+                setIsLoading(false);
+              }
+            }} disabled={isLoading}>
+              {isLoading ? 'Формирование…' : 'Сформировать пакет подачи'}
+            </button>
             <DepthModePanel caseId={caseId} />
             <DecisionLog caseId={caseId} />
           </div>

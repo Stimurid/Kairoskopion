@@ -932,7 +932,9 @@ def get_quality_gates(case: Case = Depends(_user_case)):
 
 @app.get("/cases/{case_id}/dossier")
 def get_dossier(case: Case = Depends(_user_case)):
-    return case.build_dossier()
+    result = case.build_dossier()
+    store.save(case)
+    return result
 
 
 @app.get("/cases/{case_id}/human-dossier")
@@ -942,7 +944,9 @@ def get_human_dossier(case: Case = Depends(_user_case)):
     Pure presentation layer: no LLM, no network, no new claims.
     """
     from kairoskopion.services.human_dossier import build_human_dossier
-    return build_human_dossier(case.build_dossier()).to_dict()
+    result = build_human_dossier(case.build_dossier()).to_dict()
+    store.save(case)
+    return result
 
 
 # ---------------------------------------------------------------------------
