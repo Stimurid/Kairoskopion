@@ -223,13 +223,10 @@ class TestCaseDossier(unittest.TestCase):
 
 
 class TestCaseVenueInvestigation(unittest.TestCase):
-    def test_investigate_venue_text(self):
-        # feature/real-cockpit-venue-fit-pass added a ≥200-char minimum-
-        # text guard on investigate_venue (F3) — pasting a 4-line seed
-        # used to silently produce a blank venue with fake confidence.
-        # Pass meaningful text for the pipeline to run.
+    def test_investigate_venue_without_llm_returns_error(self):
+        """ARCH-SEM-001: investigate_venue must NOT produce a VenueModel
+        without LLM. Returns structured error instead."""
         case = Case(title="Venue test")
-        pre_log_count = len(case.decision_log)
         result = case.investigate_venue(
             "# Venue Seed Profile: Philosophy & Technology\n"
             "- **ISSN:** 1234-5678\n"
@@ -243,12 +240,8 @@ class TestCaseVenueInvestigation(unittest.TestCase):
             "postphenomenology, and philosophy of mind.\n"
             "## Review\nDouble-blind peer review.\n"
         )
-        self.assertIn("venue", result)
-        self.assertNotIn("status", result)  # not the needs_more_venue_text path
-        self.assertIsNotNone(case.investigated_venue)
-        new_entries = case.decision_log[pre_log_count:]
-        self.assertEqual(len(new_entries), 1)
-        self.assertEqual(new_entries[0]["action"], "investigate_venue")
+        self.assertEqual(result["status"], "llm_required")
+        self.assertIsNone(case.investigated_venue)
 
     def test_intake_venue_auto_investigates(self):
         case = Case()

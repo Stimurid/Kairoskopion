@@ -57,13 +57,15 @@ class TestWorkflowRegistry(unittest.TestCase):
 
 
 class TestOrchestratorVenueDeepProfile(unittest.TestCase):
-    def test_run_with_minimal_venue(self):
+    def test_run_without_llm_fails_per_arch_sem_001(self):
+        """ARCH-SEM-001: venue_profiler requires LLM, so the workflow
+        must fail when no provider is available."""
         venue = {"name": "Test Journal", "scope": "broad"}
         result = run_workflow(
             VENUE_DEEP_PROFILE,
             initial_entities={"venue": venue},
         )
-        self.assertIn(result.status, ("completed", "partial"))
+        self.assertEqual(result.status, "failed")
         self.assertIsInstance(result.step_results, list)
         self.assertTrue(len(result.step_results) > 0)
 

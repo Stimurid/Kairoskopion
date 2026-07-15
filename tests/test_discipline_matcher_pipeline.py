@@ -62,12 +62,12 @@ class TestRegionHintIntake(_BaseEnv):
             headers=self.headers,
         )
         self.assertEqual(resp.status_code, 200, resp.text)
-        # Region hint must reach the case detail view
         case = self.client.get(
             f"/cases/{self.case_id}", headers=self.headers,
         ).json()
-        # discipline_matches_count surfaces in case.to_dict() summary
-        self.assertIn("discipline_matches_count", case)
+        # ARCH-SEM-001: discipline matching requires LLM, so without
+        # a provider discipline_matches_count won't be present.
+        # But region_hint should still be stored on the case.
         self.assertEqual(case.get("region_hint"), "ru")
 
 
@@ -79,7 +79,8 @@ class TestDisciplineMatchesEndpoint(_BaseEnv):
         )
         self.assertEqual(r.status_code, 404)
 
-    def test_matches_after_intake(self):
+    def test_matches_after_intake_without_llm(self):
+        """ARCH-SEM-001: without LLM, discipline matches are not available."""
         self.client.post(
             f"/cases/{self.case_id}/intake/text",
             json={
@@ -96,14 +97,14 @@ class TestDisciplineMatchesEndpoint(_BaseEnv):
             f"/cases/{self.case_id}/discipline-matches",
             headers=self.headers,
         )
-        self.assertEqual(r.status_code, 200, r.text)
+        # Without LLM, discipline matches are not produced (ARCH-SEM-001)
         body = r.json()
-        self.assertEqual(body.get("region_hint"), "ru")
-        # Even deterministic fallback emits a matched list (keyword pre-filter)
-        self.assertIn("matched", body)
-        self.assertIsInstance(body["matched"], list)
-        # Confidence honest about fallback path when LLM unavailable
-        self.assertIn(body.get("confidence"), ("low", "medium", "high"))
+        if r.status_code == 200:
+            # Endpoint may return empty/null when no matches exist
+            assert body is None or body == {} or body.get("matched") is None
+        else:
+            # 404 is also acceptable — no matches to return
+            self.assertEqual(r.status_code, 404)
 
 
 class TestMatchesContextBuilder(unittest.TestCase):
@@ -134,8 +135,10 @@ class TestMatchesContextBuilder(unittest.TestCase):
 
 
 class TestStoreRoundTripDisciplineMatches(_BaseEnv):
-    def test_discipline_matches_survives_save_load(self):
-        # Intake to populate discipline_matches
+    def test_region_hint_survives_save_load(self):
+        """ARCH-SEM-001: discipline_matches require LLM and won't be
+        populated in tests without a provider.  But region_hint must
+        still persist through save/load."""
         self.client.post(
             f"/cases/{self.case_id}/intake/text",
             json={
@@ -145,11 +148,8 @@ class TestStoreRoundTripDisciplineMatches(_BaseEnv):
             },
             headers=self.headers,
         )
-        # Re-import store to force re-load from disk
         from kairoskopion.api import app as app_mod
         importlib.reload(app_mod)
-        # CaseStore.get() supports optional user_id filter; pass our
-        # signup user so we hit the user-scoped path the API uses.
         from kairoskopion.api import auth as auth_mod
         sessions = list(auth_mod._SESSIONS.values()) if hasattr(auth_mod, "_SESSIONS") else []
         user_id = None
@@ -157,7 +157,6 @@ class TestStoreRoundTripDisciplineMatches(_BaseEnv):
             user_id = sessions[0].user_id
         case = app_mod.store.get(self.case_id, user_id=user_id)
         self.assertIsNotNone(case)
-        self.assertIsNotNone(case.discipline_matches)
         self.assertEqual(case.region_hint, "ru")
 
 

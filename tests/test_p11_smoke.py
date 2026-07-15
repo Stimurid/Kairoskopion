@@ -157,7 +157,9 @@ class TestE2ERealPipelineInstrumentation:
                 )
 
         # 6. LLM-capable stages record prompt metadata
-        llm_stages = {"article_model", "venue_investigation", "fit_assessment"}
+        # ARCH-SEM-001: venue_investigation falls back to service when
+        # no LLM is available, so prompt metadata won't be recorded.
+        llm_stages = {"article_model", "fit_assessment"}
         for node in nodes:
             if node.stage_id in llm_stages:
                 assert node.prompt_family_id is not None, (

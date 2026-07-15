@@ -277,18 +277,16 @@ class TestFitChainWiring(unittest.TestCase):
         os.environ.pop("KAIROSKOPION_LLM_PROVIDER", None)
 
     def test_fit_chain_runs_narrator_deterministic(self):
+        """Fit chain with manually-set venue (bypassing LLM-only
+        investigate_venue) still runs narrator deterministically."""
         from kairoskopion.api.cases import Case
+        from kairoskopion.schema import VenueModel
         case = Case(title="t")
         case.intake_text("Article body. " * 60, input_type="article")
-        case.investigate_venue(
-            "# Test Venue\n**Publisher:** X\n## Aims and Scope\n"
-            + ("Empirical only. " * 30)
-        )
+        # ARCH-SEM-001: investigate_venue requires LLM, so set venue directly
+        case.investigated_venue = VenueModel(canonical_name="Test Venue")
         case.select_venue("investigated")
-        # Mismatch map exists, narrator ran in deterministic mode.
         self.assertIsNotNone(case.mismatch_map)
-        # venue_side stays empty (honest fallback), so the UI italic hint
-        # would render. No fake content was filled in.
         for m in case.mismatch_map.mismatches:
             vs = m.get("venue_side", "") if isinstance(m, dict) else getattr(m, "venue_side", "")
             self.assertEqual(vs, "")

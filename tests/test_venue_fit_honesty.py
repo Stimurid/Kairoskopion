@@ -132,7 +132,8 @@ class TestInvestigateVenueMinimumGuard(unittest.TestCase):
         self.assertIn("hint", result)
         self.assertIsNone(case.investigated_venue)
 
-    def test_meaningful_text_runs_pipeline(self):
+    def test_meaningful_text_requires_llm(self):
+        """ARCH-SEM-001: investigate_venue requires LLM."""
         from kairoskopion.api.cases import Case
         case = Case(title="test")
         text = (
@@ -140,12 +141,9 @@ class TestInvestigateVenueMinimumGuard(unittest.TestCase):
             + ("This journal covers the philosophy of technology. " * 20)
         )
         result = case.investigate_venue(text)
-        self.assertNotIn("status", result)
-        self.assertIn("venue", result)
-        self.assertIn("used_llm", result)
-        self.assertFalse(result["used_llm"])  # no provider configured
-        self.assertIn("venue_field_position", result)
-        self.assertIsNotNone(case.investigated_venue)
+        self.assertEqual(result["status"], "llm_required")
+        self.assertIsNone(case.investigated_venue)
+        self.assertIsNotNone(case.venue_source_metadata)
 
 
 # ---------------------------------------------------------------------------

@@ -301,31 +301,23 @@ class TestLiveOverridesSeed(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestDisciplineMatcherAgent(unittest.TestCase):
-    def test_deterministic_fallback_returns_candidates(self):
+    def test_deterministic_raises_arch_sem_001(self):
+        """ARCH-SEM-001: execute_deterministic must raise, not return matches."""
         from kairoskopion.agents.discipline_matcher import (
             DisciplineMatcherAgent,
         )
         from kairoskopion.agents.contract import AgentInput
+        from kairoskopion.llm.openai_compat import SemanticLLMRequiredError
 
         agent = DisciplineMatcherAgent()
         inp = AgentInput(
             operation_id="match-test",
             agent_role_id="discipline_matcher",
-            raw_text=(
-                # Use nominative form so the substring-based keyword
-                # pre-filter (not the LLM matcher) catches the alias.
-                "Статья — Философия техники и Heidegger."
-            ),
+            raw_text="Статья — Философия техники и Heidegger.",
             entities={"region": "ru"},
         )
-        out = agent.execute_deterministic(inp)
-        self.assertIsNotNone(out.output_entity)
-        matched = out.output_entity.get("matched", [])
-        self.assertGreater(len(matched), 0)
-        ids = {m["discipline_id"] for m in matched}
-        self.assertIn("ru-philosophy-of-technology", ids)
-        # Honest fallback: marked low confidence, not pretending to be LLM
-        self.assertEqual(out.output_entity.get("confidence"), "low")
+        with self.assertRaises(SemanticLLMRequiredError):
+            agent.execute_deterministic(inp)
 
 
 if __name__ == "__main__":

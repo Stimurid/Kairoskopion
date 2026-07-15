@@ -1,6 +1,6 @@
 """Regression tests for stage progression, _objects_present keys,
-venue profiler dict guard, discipline matcher 10-candidate contract,
-and genre/method unknown resolution.
+venue profiler dict guard, discipline matcher ARCH-SEM-001 enforcement,
+and genre/method hypothesis handling.
 """
 
 from __future__ import annotations
@@ -47,13 +47,22 @@ class TestStageProgression:
         assert "status" not in result or result.get("status") != "not_ready"
         assert case.stage == CaseStage.SUBMISSION_PACK
 
-    def test_build_dossier_transitions_to_dossier(self):
+    def test_finalize_dossier_transitions_to_dossier(self):
+        case = _case_at_submission_pack()
+        assert case.stage == CaseStage.SUBMISSION_PACK
+
+        result = case.finalize_dossier()
+        assert isinstance(result, dict)
+        assert case.stage == CaseStage.DOSSIER
+
+    def test_build_dossier_does_not_transition(self):
+        """GET-safe build_dossier must NOT mutate stage."""
         case = _case_at_submission_pack()
         assert case.stage == CaseStage.SUBMISSION_PACK
 
         result = case.build_dossier()
         assert isinstance(result, dict)
-        assert case.stage == CaseStage.DOSSIER
+        assert case.stage == CaseStage.SUBMISSION_PACK
 
     def test_build_submission_pack_requires_article_and_venue(self):
         case = Case()
@@ -122,7 +131,6 @@ class TestVenueProfilerDictGuard:
         }
         venue, regime = _build_from_llm(parsed, "some text", "test-ref")
         assert venue.canonical_name == "Test Journal"
-        # Should resolve to the journal venue type value
         from kairoskopion.enums import VenueType
         assert venue.venue_type == VenueType.JOURNAL.value
 
@@ -161,96 +169,50 @@ class TestVenueProfilerDictGuard:
 
 
 # ---------------------------------------------------------------------------
-# 4. Discipline matcher 10-candidate contract
+# 4. ARCH-SEM-001: discipline matcher prohibits deterministic semantic output
 # ---------------------------------------------------------------------------
 
-class TestDisciplineMatcherCandidateContract:
+class TestDisciplineMatcherArchSem001:
 
-    def _make_candidates(self, n: int):
-        """Create n minimal DisciplineRecord objects."""
-        from kairoskopion.registry.models import DisciplineRecord
-        return [
-            DisciplineRecord(
-                discipline_id=f"disc_{i:03d}",
-                display_names={"en": f"Discipline {i}", "ru": f"Дисциплина {i}"},
-                aliases=[f"alias_{i}"],
-            )
-            for i in range(n)
-        ]
-
-    def test_deterministic_fallback_returns_up_to_10(self):
+    def test_execute_deterministic_raises_semantic_error(self):
         from kairoskopion.agents.discipline_matcher import DisciplineMatcherAgent
         from kairoskopion.agents.contract import AgentInput
-        from kairoskopion.llm.attempt_metadata import LLMAttemptMetadata
+        from kairoskopion.llm.openai_compat import SemanticLLMRequiredError
 
         agent = DisciplineMatcherAgent()
-        candidates = self._make_candidates(15)
-        attempt = LLMAttemptMetadata.fallback(
-            reason="test", provider="none",
+        inp = AgentInput(
+            operation_id="test",
+            agent_role_id="discipline_matcher",
+            raw_text="test article",
+            entities={"article_summary": "test", "region": "auto"},
         )
-        output = agent._deterministic_with_attempt(candidates, attempt)
-        matched = output.output_entity.get("matched", [])
-        assert len(matched) == 10
+        with pytest.raises(SemanticLLMRequiredError):
+            agent.execute_deterministic(inp)
 
-    def test_deterministic_fallback_fewer_than_10_still_works(self):
-        from kairoskopion.agents.discipline_matcher import DisciplineMatcherAgent
-        from kairoskopion.llm.attempt_metadata import LLMAttemptMetadata
+    def test_venue_profiler_execute_deterministic_raises_semantic_error(self):
+        from kairoskopion.agents.venue_profiler import VenueProfilerAgent
+        from kairoskopion.agents.contract import AgentInput
+        from kairoskopion.llm.openai_compat import SemanticLLMRequiredError
 
-        agent = DisciplineMatcherAgent()
-        candidates = self._make_candidates(3)
-        attempt = LLMAttemptMetadata.fallback(
-            reason="test", provider="none",
+        agent = VenueProfilerAgent()
+        inp = AgentInput(
+            operation_id="test",
+            agent_role_id="venue_profiler",
+            raw_text="test venue text",
         )
-        output = agent._deterministic_with_attempt(candidates, attempt)
-        matched = output.output_entity.get("matched", [])
-        assert len(matched) == 3
-
-    def test_post_processing_pads_after_hallucinated_ids_filtered(self):
-        """When LLM returns IDs not in the candidate set, they are
-        dropped and the result is padded back to 10 from remaining
-        candidates."""
-        from kairoskopion.agents.discipline_matcher import DisciplineMatcherAgent
-
-        agent = DisciplineMatcherAgent()
-        candidates = self._make_candidates(12)
-        valid_ids = {c.discipline_id for c in candidates}
-
-        # Simulate parsed LLM output with some hallucinated IDs
-        parsed = {
-            "matched": [
-                {"discipline_id": "disc_000", "strength": "core", "confidence": "high"},
-                {"discipline_id": "HALLUCINATED_1", "strength": "core", "confidence": "high"},
-                {"discipline_id": "disc_001", "strength": "related", "confidence": "medium"},
-                {"discipline_id": "HALLUCINATED_2", "strength": "related", "confidence": "medium"},
-            ],
-            "confidence": "medium",
-        }
-
-        # After filtering: 2 valid, 2 hallucinated dropped.
-        # Padding should bring total to 10.
-        cleaned = [m for m in parsed["matched"] if m.get("discipline_id") in valid_ids]
-        assert len(cleaned) == 2  # sanity: only 2 survive filtering
-
-        # The actual post-processing code pads from candidates
-        # We verify the contract by calling the full execute path indirectly
-        # via _deterministic_with_attempt (which always produces up to 10).
-        from kairoskopion.llm.attempt_metadata import LLMAttemptMetadata
-        attempt = LLMAttemptMetadata.fallback(reason="test", provider="none")
-        output = agent._deterministic_with_attempt(candidates, attempt)
-        matched = output.output_entity.get("matched", [])
-        assert len(matched) == 10
-        # All IDs should be valid candidate IDs
-        for m in matched:
-            assert m["discipline_id"] in valid_ids
+        with pytest.raises(SemanticLLMRequiredError):
+            agent.execute_deterministic(inp)
 
 
 # ---------------------------------------------------------------------------
-# 5. Genre/method unknown resolution — semantic hypotheses
+# 5. Genre/method unknown — no enum-list alternatives (ARCH-SEM-001)
 # ---------------------------------------------------------------------------
 
-class TestGenreMethodUnknownResolution:
+class TestGenreMethodNoEnumListing:
 
-    def test_genre_unknown_produces_alternatives(self):
+    def test_genre_unknown_has_needs_resolution_but_no_enum_alternatives(self):
+        """ARCH-SEM-001: unknown genre must NOT enumerate all Genre values
+        as alternatives — that's deterministic semantic content."""
         case = Case()
         case.article_model = ArticleModel(
             genre_current=Genre.UNKNOWN.value,
@@ -264,14 +226,9 @@ class TestGenreMethodUnknownResolution:
         primary = hyp.get("primary", {})
         assert primary["confidence"] == "needs_resolution"
         alternatives = hyp.get("alternatives")
-        assert alternatives is not None
-        assert len(alternatives) > 0
-        # All Genre values except "unknown" should appear
-        non_unknown_genres = [g.value for g in Genre if g.value != "unknown"]
-        alt_values = [a["value"] for a in alternatives]
-        assert set(alt_values) == set(non_unknown_genres)
+        assert not alternatives, "enum-list alternatives are prohibited by ARCH-SEM-001"
 
-    def test_method_unknown_produces_alternatives(self):
+    def test_method_unknown_has_needs_resolution_but_no_enum_alternatives(self):
         case = Case()
         case.article_model = ArticleModel(
             genre_current=Genre.RESEARCH_ARTICLE.value,
@@ -285,11 +242,7 @@ class TestGenreMethodUnknownResolution:
         primary = hyp.get("primary", {})
         assert primary["confidence"] == "needs_resolution"
         alternatives = hyp.get("alternatives")
-        assert alternatives is not None
-        assert len(alternatives) > 0
-        non_unknown_methods = [m.value for m in MethodStatus if m.value != "unknown"]
-        alt_values = [a["value"] for a in alternatives]
-        assert set(alt_values) == set(non_unknown_methods)
+        assert not alternatives, "enum-list alternatives are prohibited by ARCH-SEM-001"
 
     def test_known_genre_has_no_alternatives(self):
         case = Case()
@@ -304,7 +257,6 @@ class TestGenreMethodUnknownResolution:
         assert hyp is not None
         primary = hyp.get("primary", {})
         assert primary["confidence"] != "needs_resolution"
-        # alternatives should be empty when genre is known
         alternatives = hyp.get("alternatives")
         assert not alternatives
 

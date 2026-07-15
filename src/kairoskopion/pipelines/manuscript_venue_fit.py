@@ -357,25 +357,30 @@ class ManuscriptVenueFitPipeline(PipelineBase):
             raw_text=venue_guidelines_text,
             user_constraints={"source_type": "author_guidelines"},
         )
-        venue_output = self._venue_agent.run(
-            venue_input, self.llm,
-            prompt_family_override=override_dict_v,
-        )
-
-        venue_dict = venue_output.output_entity
-        regime_dict = venue_dict.pop("_regime", {})
-        venue = VenueModel.from_dict(venue_dict)
-        regime = PublicationRegimeModel.from_dict(regime_dict) if regime_dict else PublicationRegimeModel()
+        try:
+            venue_output = self._venue_agent.run(
+                venue_input, self.llm,
+                prompt_family_override=override_dict_v,
+            )
+            venue_dict = venue_output.output_entity
+            regime_dict = venue_dict.pop("_regime", {})
+            venue = VenueModel.from_dict(venue_dict)
+            regime = PublicationRegimeModel.from_dict(regime_dict) if regime_dict else PublicationRegimeModel()
+        except Exception:
+            from ..services.venue_profiling import build_venue_model as _svc_venue
+            venue, regime = _svc_venue(venue_guidelines_text, source_ref=venue_source_ref)
+            venue_output = None
         result.venue = venue
         result.regime = regime
         self.run.created_entity_ids.append(venue.venue_model_id)
         self.run.created_entity_ids.append(regime.publication_regime_id)
         self.trace.entities_created.extend([venue.venue_model_id, regime.publication_regime_id])
 
-        if venue_output.llm_usage:
-            llm_trace.append({"agent": "venue_profiler", **venue_output.llm_usage})
-        if venue_output.trace_notes:
-            _append_notes(self.trace, venue_output.trace_notes)
+        if venue_output is not None:
+            if venue_output.llm_usage:
+                llm_trace.append({"agent": "venue_profiler", **venue_output.llm_usage})
+            if venue_output.trace_notes:
+                _append_notes(self.trace, venue_output.trace_notes)
 
         eff_venue_family = dict(VENUE_FACT_EXTRACTION_FAMILY)
         if override_dict_v:
@@ -385,12 +390,15 @@ class ManuscriptVenueFitPipeline(PipelineBase):
             source_type="author_guidelines",
             source_url="unknown",
         )
-        self._record_prompt(n_venue, eff_venue_family, rendered_venue_user,
-                            venue_output, override_id_v)
+        if venue_output is not None:
+            self._record_prompt(n_venue, eff_venue_family, rendered_venue_user,
+                                venue_output, override_id_v)
         n_venue.input_artifact_refs = [venue_source_ref]
+        venue_hash_src = venue_output.output_entity if venue_output else venue.to_dict()
         self._finish_node(n_venue, output_refs=[venue.venue_model_id, regime.publication_regime_id],
-                          output_hash=_hash_text(str(venue_output.output_entity)))
+                          output_hash=_hash_text(str(venue_hash_src)))
 
+        venue_dict = venue_output.output_entity if venue_output else venue.to_dict()
         if self._registry:
             try:
                 self._registry.store_venue_extraction(

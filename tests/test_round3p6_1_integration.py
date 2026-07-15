@@ -148,16 +148,16 @@ class TestDisciplineProductPathViaCase:
             disciplinary_register_current="economics",
         )
 
-        case._run_discipline_matcher()
-
-        assert case.discipline_matches is not None
-        matched = case.discipline_matches.get("matched", [])
-        assert len(matched) >= 1
+        # ARCH-SEM-001: discipline matching requires LLM
+        from kairoskopion.llm.openai_compat import SemanticLLMRequiredError
+        with pytest.raises(SemanticLLMRequiredError):
+            case._run_discipline_matcher()
 
     def test_case_discipline_miss_falls_to_agent(self, tmp_path):
-        """Case falls through to DisciplineMatcherAgent when no registry hit."""
+        """ARCH-SEM-001: without LLM, discipline matcher raises."""
         from kairoskopion.api.cases import Case
         from kairoskopion.schema import ArticleModel
+        from kairoskopion.llm.openai_compat import SemanticLLMRequiredError
 
         hub = RegistryHub(data_dir=tmp_path)
         svc = RegistryIntegrationService(hub=hub)
@@ -167,13 +167,8 @@ class TestDisciplineProductPathViaCase:
             title_current="Study of unusual phenomena",
         )
 
-        case._run_discipline_matcher()
-
-        # No registry hit — should have called agent (deterministic path)
-        # discipline_matches may be set by the agent or None if agent not found
-        # Key assertion: registry_first should NOT be set
-        if case.discipline_matches:
-            assert case.discipline_matches.get("registry_first") is not True
+        with pytest.raises(SemanticLLMRequiredError):
+            case._run_discipline_matcher()
 
 
 # ====================================================================
@@ -582,8 +577,8 @@ class TestVenueFactExtractionViaCase:
             "ГОСТ Р 7.0.5-2008. Язык: русский, английский."
         )
 
-    def test_case_investigate_venue_creates_registry_records(self, tmp_path):
-        """Case.investigate_venue stores extraction as provisional records."""
+    def test_case_investigate_venue_requires_llm(self, tmp_path):
+        """ARCH-SEM-001: investigate_venue returns llm_required without LLM."""
         from kairoskopion.api.cases import Case
 
         hub = RegistryHub(data_dir=tmp_path)
@@ -592,12 +587,11 @@ class TestVenueFactExtractionViaCase:
 
         result = case.investigate_venue(self._make_venue_text())
 
-        assert "registry_records_created" in result
-        assert result["registry_records_created"] >= 1
-        assert hub.venues().list_all()
+        assert result["status"] == "llm_required"
+        assert case.investigated_venue is None
 
-    def test_case_investigate_venue_builds_family_context(self, tmp_path):
-        """Case.investigate_venue populates venue_family_context from registry."""
+    def test_case_investigate_venue_sets_metadata_without_llm(self, tmp_path):
+        """Even without LLM, venue_source_metadata is set (structural data)."""
         from kairoskopion.api.cases import Case
 
         hub = RegistryHub(data_dir=tmp_path)
@@ -606,9 +600,9 @@ class TestVenueFactExtractionViaCase:
 
         case.investigate_venue(self._make_venue_text())
 
-        assert case.venue_family_context is not None
-        assert "registry_venue_id" in case.venue_family_context
-        assert case.venue_family_context.get("registry_family") is not None
+        assert case.venue_source_metadata is not None
+        assert case.venue_source_metadata["source_type"] == "text_paste"
+        assert "content_hash" in case.venue_source_metadata
 
 
 # ====================================================================
@@ -819,14 +813,12 @@ class TestBypassAudit:
             disciplinary_register_current="math",
         )
 
-        case._run_discipline_matcher()
+        from kairoskopion.llm.openai_compat import SemanticLLMRequiredError
+        with pytest.raises(SemanticLLMRequiredError):
+            case._run_discipline_matcher()
 
-        assert case.discipline_matches is not None
-        matched = case.discipline_matches.get("matched", [])
-        assert len(matched) >= 1
-
-    def test_store_venue_extraction_called_by_investigate(self, tmp_path):
-        """Case.investigate_venue calls store_venue_extraction."""
+    def test_store_venue_extraction_requires_llm(self, tmp_path):
+        """ARCH-SEM-001: investigate_venue returns llm_required without LLM."""
         from kairoskopion.api.cases import Case
 
         hub = RegistryHub(data_dir=tmp_path)
@@ -844,7 +836,5 @@ class TestBypassAudit:
 
         result = case.investigate_venue(text)
 
-        # Registry records must have been created
-        assert result.get("registry_records_created", 0) >= 1
-        # Hub should have at least one venue
-        assert len(hub.venues().list_all()) >= 1
+        assert result["status"] == "llm_required"
+        assert len(hub.venues().list_all()) == 0

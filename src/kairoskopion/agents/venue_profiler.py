@@ -1,7 +1,10 @@
 """Venue Profiler agent (spec §56).
 
-LLM-backed extraction of VenueModel from venue guidelines/pages,
-with deterministic fallback to regex heuristics.
+LLM-backed extraction of VenueModel from venue guidelines/pages.
+
+ARCH-SEM-001: semantic venue profiling requires LLM. If LLM is
+unavailable or returns invalid output, SemanticLLMRequiredError
+is raised — no deterministic semantic fallback.
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ from ..enums import (
 )
 from ..ids import publication_regime_id, venue_model_id
 from ..llm.config import max_tokens_for_role
+from ..llm.openai_compat import SemanticLLMRequiredError
 from ..llm.provider import LLMProvider
 from ..prompts.venue_fact_extraction import (
     VENUE_FACT_EXTRACTION_FAMILY,
@@ -66,16 +70,23 @@ class VenueProfilerAgent(AgentRole):
                 agent_role="venue_profiler",
             )
         except Exception as e:
-            logger.warning("LLM call failed for venue_profiler, falling back: %s", e)
-            return self.execute_deterministic(inp)
+            logger.warning("LLM call failed for venue_profiler: %s", e)
+            raise SemanticLLMRequiredError(
+                f"Venue profiling requires LLM — provider error: {e}",
+                agent_role="venue_profiler",
+                error_code="SEMANTIC_LLM_REQUIRED",
+            ) from e
 
         parsed = response.parsed
         if not parsed:
             try:
                 parsed = json.loads(response.content)
-            except (json.JSONDecodeError, TypeError):
-                logger.warning("LLM returned non-JSON, falling back to deterministic")
-                return self.execute_deterministic(inp)
+            except (json.JSONDecodeError, TypeError) as parse_err:
+                raise SemanticLLMRequiredError(
+                    "Venue profiling LLM returned non-JSON output",
+                    agent_role="venue_profiler",
+                    error_code="INVALID_JSON",
+                ) from parse_err
 
         validation_warnings = validate_venue_extraction(parsed)
 
@@ -110,26 +121,12 @@ class VenueProfilerAgent(AgentRole):
         )
 
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
-        text = inp.raw_text or ""
-        source_ref = inp.source_refs[0] if inp.source_refs else None
-
-        venue, regime = _deterministic_venue(text, source_ref=source_ref)
-
-        output = venue.to_dict()
-        output["_regime"] = regime.to_dict()
-
-        return AgentOutput(
-            output_entity_type="VenueModel",
-            output_entity=output,
-            evidence_refs=[source_ref] if source_ref else [],
-            unknowns=venue.unknowns,
-            assumptions=[],
-            confidence=venue.confidence or "low",
-            warnings=["Deterministic extraction: limited accuracy"],
-            questions_for_user=[],
-            quality_gate_status="preliminary",
-            trace_notes=["Deterministic heuristic extraction (no LLM)"],
-            evidence_status="heuristic",
+        """ARCH-SEM-001: deterministic semantic venue profiling is prohibited."""
+        raise SemanticLLMRequiredError(
+            "Venue profiling requires LLM — deterministic semantic fallback "
+            "is prohibited by ARCH-SEM-001",
+            agent_role="venue_profiler",
+            error_code="SEMANTIC_LLM_REQUIRED",
         )
 
 

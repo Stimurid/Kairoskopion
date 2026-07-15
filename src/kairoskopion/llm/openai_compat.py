@@ -38,6 +38,30 @@ class LLMError(Exception):
         self.error_code = error_code
 
 
+class SemanticLLMRequiredError(Exception):
+    """Raised when a semantic operation cannot produce a result without LLM.
+
+    ARCH-SEM-001: deterministic semantic fallback is prohibited.
+    This error signals that the stage failed and must be retried with
+    a working LLM provider, not masked with heuristic output.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        agent_role: str = "",
+        error_code: str = "SEMANTIC_LLM_REQUIRED",
+        attempts: list | None = None,
+        previous_valid_result: dict | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.agent_role = agent_role
+        self.error_code = error_code
+        self.attempts = attempts or []
+        self.previous_valid_result = previous_valid_result
+
+
 class OpenAICompatProvider:
     """LLM provider using the OpenAI chat completions API."""
 

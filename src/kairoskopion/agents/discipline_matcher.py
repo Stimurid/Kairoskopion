@@ -1,22 +1,12 @@
 """DisciplineMatcherAgent (Phase B).
 
-Picks 0-4 disciplines from the registry that the article would
+Picks up to 10 disciplines from the registry that the article would
 legitimately be read in. May propose ONE new_candidate per call.
 
-Inputs (via AgentInput.entities):
-- ``article_summary`` (str) — concise summary of the article (built
-  by the caller from ArticleModel + semantic profile)
-- ``region`` (str) — operator hint: ``ru`` / ``international`` / etc.
-  Drives initial candidate filtering. Cross-region matching still
-  works because ``international_mapping`` is honored.
-
-The LLM path scores the candidates and may propose new_candidates.
-The deterministic fallback is honest: it returns the keyword-matcher's
-output verbatim and marks the verdict ``confidence='low'``, asking the
-caller to surface "no LLM matcher available, here's the keyword hint".
-
-NEVER returns a single ``unknown`` placeholder pretending to be a
-discipline. If nothing matches, returns an empty list.
+ARCH-SEM-001: all matched disciplines MUST be LLM-produced.
+Deterministic candidate retrieval is used only as INPUT to the prompt,
+never as user-facing output. If LLM is unavailable or fails,
+SemanticLLMRequiredError is raised — no silent fallback.
 """
 
 from __future__ import annotations
@@ -29,6 +19,7 @@ from ..llm.attempt_metadata import (
     LLMAttemptMetadata,
 )
 from ..llm.config import max_tokens_for_role
+from ..llm.openai_compat import SemanticLLMRequiredError
 from ..llm.json_repair import (
     PARSE_STATUS_PARSED_OK,
     PARSE_STATUS_REPAIRED_OK,
@@ -132,14 +123,12 @@ class DisciplineMatcherAgent(AgentRole):
             logger.warning(
                 "LLM call failed for discipline_matcher: %s", exc,
             )
-            return self._deterministic_with_attempt(
-                candidates,
-                LLMAttemptMetadata.fallback(
-                    reason=FALLBACK_REASON_PROVIDER_ERROR,
-                    provider="openai_compatible",
-                    validation_errors=[str(exc)[:240]],
-                ),
-            )
+            raise SemanticLLMRequiredError(
+                f"Discipline matching requires LLM — provider error: {exc}",
+                agent_role="discipline_matcher",
+                error_code="SEMANTIC_LLM_REQUIRED",
+                attempts=[str(exc)[:240]],
+            ) from exc
 
         truncated = response.finish_reason == "length"
         if truncated:
@@ -148,19 +137,14 @@ class DisciplineMatcherAgent(AgentRole):
                 "output_tokens=%s, max_tokens=%s)",
                 response.output_tokens, role_max_tokens,
             )
-            return self._deterministic_with_attempt(
-                candidates,
-                LLMAttemptMetadata.fallback(
-                    reason="output_truncated",
-                    provider="openai_compatible",
-                    validation_errors=[
-                        f"finish_reason=length; output_tokens={response.output_tokens}; "
-                        f"model={response.effective_model or response.model}"
-                    ],
-                    attempts=list(response.attempts),
-                    final_error_code="OUTPUT_TRUNCATED",
-                    agent_role="discipline_matcher",
-                ),
+            raise SemanticLLMRequiredError(
+                "Discipline matching output truncated — increase max_tokens or reduce input",
+                agent_role="discipline_matcher",
+                error_code="OUTPUT_TRUNCATED",
+                attempts=[
+                    f"finish_reason=length; output_tokens={response.output_tokens}; "
+                    f"model={response.effective_model or response.model}"
+                ],
             )
 
         parsed = response.parsed
@@ -177,14 +161,11 @@ class DisciplineMatcherAgent(AgentRole):
                     "(finish_reason=%s)",
                     response.finish_reason,
                 )
-                return self._deterministic_with_attempt(
-                    candidates,
-                    LLMAttemptMetadata.fallback(
-                        reason="invalid_json",
-                        provider="openai_compatible",
-                        attempts=list(response.attempts),
-                        agent_role="discipline_matcher",
-                    ),
+                raise SemanticLLMRequiredError(
+                    "Discipline matching LLM returned non-JSON / unrepairable output",
+                    agent_role="discipline_matcher",
+                    error_code="INVALID_JSON",
+                    attempts=list(response.attempts),
                 )
 
         validator = (
@@ -208,39 +189,13 @@ class DisciplineMatcherAgent(AgentRole):
                     f"dropped matched id not in candidate set: "
                     f"{m.get('discipline_id')!r}"
                 )
-        # Pad to 10 from remaining candidates if filtering reduced count
+        # ARCH-SEM-001: no deterministic padding. If LLM returned <10,
+        # record the count as-is. The caller may request a repair call.
         if len(cleaned) < 10:
-            used_ids = {m.get("discipline_id") for m in cleaned}
-            for d in candidates:
-                if len(cleaned) >= 10:
-                    break
-                if d.discipline_id not in used_ids:
-                    cleaned.append({
-                        "discipline_id": d.discipline_id,
-                        "display_name": (
-                            d.display_names.get("ru")
-                            or d.display_names.get("en", d.discipline_id)
-                        ),
-                        "strength": "tangential",
-                        "confidence": "low",
-                        "relation_type_ru": "дополнено автоматически",
-                        "why": (
-                            "Кандидат добавлен автоматически для "
-                            "заполнения до 10 обязательных позиций. "
-                            "Требует LLM-валидации. "
-                            "Keyword-совпадение с реестром. "
-                            "Рекомендуется перезапуск с LLM."
-                        ),
-                        "supporting_evidence": [],
-                        "contradicting_evidence": [],
-                        "position_rationale": "auto-padded",
-                    })
-                    used_ids.add(d.discipline_id)
-            if len(cleaned) < 10:
-                warnings.append(
-                    f"only {len(cleaned)} candidates available after "
-                    f"padding (pool has {len(candidates)} total)"
-                )
+            warnings.append(
+                f"LLM returned {len(cleaned)} disciplines (contract asks 10) — "
+                f"consider a repair call"
+            )
         parsed["matched"] = cleaned
 
         return AgentOutput(
@@ -251,63 +206,11 @@ class DisciplineMatcherAgent(AgentRole):
             quality_gate_status="preliminary",
         )
 
-    def _deterministic_with_attempt(
-        self,
-        candidates,
-        attempt: LLMAttemptMetadata,
-    ) -> AgentOutput:
-        """Fallback that NEVER fabricates a match. Returns the keyword
-        candidates verbatim, tagged with confidence='low' and a
-        Russian reasoning sentence."""
-        matched = [
-            {
-                "discipline_id": d.discipline_id,
-                "display_name": (
-                    d.display_names.get("ru")
-                    or d.display_names.get("en", d.discipline_id)
-                ),
-                "strength": "tangential",
-                "confidence": "low",
-                "relation_type_ru": "keyword-фильтр",
-                "why": (
-                    "Кандидат предложен keyword-фильтром реестра — "
-                    "без LLM-проверки. Требует подтверждения. "
-                    "Совпадение по ключевым словам. "
-                    "Рекомендуется перезапуск с LLM. "
-                    "Точность не гарантирована."
-                ),
-                "supporting_evidence": [],
-                "contradicting_evidence": [],
-                "position_rationale": "deterministic-fallback",
-            }
-            for d in candidates[:10]
-        ]
-        return AgentOutput(
-            output_entity_type="DisciplineMatch",
-            output_entity={
-                "matched": matched,
-                "new_candidate": None,
-                "confidence": "low",
-                "reasoning": (
-                    "LLM-матчер недоступен; показаны kandidatы из "
-                    "keyword-фильтра. Перезапустите при доступном "
-                    "LLM-провайдере."
-                ),
-                "extraction_attempt": attempt.to_dict(),
-            },
-            confidence="low",
-            warnings=["LLM matcher unavailable — keyword fallback only"],
-            quality_gate_status="preliminary",
-        )
-
     def execute_deterministic(self, inp: AgentInput) -> AgentOutput:
-        summary = (inp.entities.get("article_summary") or inp.raw_text or "").strip()
-        region = (inp.entities.get("region") or "auto").strip() or "auto"
-        candidates = self._gather_candidates(summary, region)
-        return self._deterministic_with_attempt(
-            candidates,
-            LLMAttemptMetadata.fallback(
-                reason=FALLBACK_REASON_LLM_UNAVAILABLE,
-                provider="none",
-            ),
+        """ARCH-SEM-001: deterministic semantic discipline matching is prohibited."""
+        raise SemanticLLMRequiredError(
+            "Discipline matching requires LLM — deterministic semantic fallback "
+            "is prohibited by ARCH-SEM-001",
+            agent_role="discipline_matcher",
+            error_code="SEMANTIC_LLM_REQUIRED",
         )

@@ -32,7 +32,9 @@ class TestInvestigateVenueByUrl(unittest.TestCase):
         self.assertEqual(result["status"], "fetch_failed")
         self.assertIn("timeout", result["error"])
 
-    def test_successful_url_intake(self):
+    def test_successful_url_intake_without_llm(self):
+        """ARCH-SEM-001: without LLM, investigate_venue returns error
+        but venue_source_metadata is still populated from URL fetch."""
         case = self._make_case()
         long_text = "This is a journal about philosophy and technology. " * 20
         fake_result = MagicMock()
@@ -43,8 +45,7 @@ class TestInvestigateVenueByUrl(unittest.TestCase):
             return_value=fake_result,
         ):
             result = case.investigate_venue_by_url("https://example.com/journal")
-        self.assertIn("venue", result)
-        self.assertIsNotNone(case.investigated_venue)
+        self.assertEqual(result["status"], "llm_required")
 
     def test_source_metadata_populated_on_url_intake(self):
         case = self._make_case()

@@ -186,15 +186,16 @@ class TestPipelineLegacyBypass:
 class TestStatusPropagation:
     """All registry-relevant outputs carry _registry_status."""
 
-    def test_investigate_venue_propagates(self, tmp_path):
+    def test_investigate_venue_requires_llm(self, tmp_path):
+        """ARCH-SEM-001: investigate_venue requires LLM for semantic profiling."""
         from kairoskopion.api.cases import Case
 
         svc = _make_service(tmp_path)
         case = Case(registry_service=svc)
 
-        text = "# Тестовый журнал\n\nJournal: Тестовый журнал"
+        text = "Philosophy journal about continental philosophy and STS. " * 20
         result = case.investigate_venue(text)
-        assert result.get("registry_records_created", 0) >= 0
+        assert result["status"] == "llm_required"
 
     def test_venue_matrix_propagates(self, tmp_path):
         from kairoskopion.api.cases import Case
@@ -332,8 +333,8 @@ class TestE2EAcceptanceSmoke:
         assert result["usage_status"] == "canonical"
         assert result["record"].discipline_id == disc.discipline_id
 
-    def test_scenario_b_venue_investigation_creates_records(self, tmp_path):
-        """Scenario B: venue investigation → provisional records in registry."""
+    def test_scenario_b_venue_investigation_requires_llm(self, tmp_path):
+        """ARCH-SEM-001: venue investigation requires LLM."""
         from kairoskopion.api.cases import Case
 
         svc = _make_service(tmp_path)
@@ -350,10 +351,8 @@ class TestE2EAcceptanceSmoke:
             "этику, эстетику, логику, философию науки и историю философии.\n"
         )
         result = case.investigate_venue(text)
-        assert result.get("registry_records_created", 0) >= 1
-
-        venues = svc.hub.venues().list_all()
-        assert any(v.canonical_name == "Вопросы философии" for v in venues)
+        assert result["status"] == "llm_required"
+        assert case.venue_source_metadata is not None
 
     def test_scenario_c_venue_matrix_enrichment(self, tmp_path):
         """Scenario C: venue matrix enriches with provenance from registry."""

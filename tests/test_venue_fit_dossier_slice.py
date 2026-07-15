@@ -69,20 +69,24 @@ class TestSelectInvestigatedVenue(unittest.TestCase):
         os.environ.pop("KAIROSKOPION_DATA_DIR", None)
         os.environ.pop("KAIROSKOPION_LLM_PROVIDER", None)
 
+    def _set_venue(self, case):
+        """ARCH-SEM-001: set venue directly instead of investigate_venue."""
+        from kairoskopion.schema import VenueModel
+        case.investigated_venue = VenueModel(
+            canonical_name="Journal of X",
+            scope_summary="Philosophy of technology, postphenomenology, STS",
+        )
+
     def test_select_investigated_token(self):
         from kairoskopion.api.cases import Case
         case = Case(title="t")
-        # Set up a manuscript intake first
         case.intake_text("Article body. " * 60, input_type="article")
         self.assertIsNotNone(case.article_model)
-        # Now investigate a venue
-        case.investigate_venue(_meaningful_venue_text())
+        self._set_venue(case)
         self.assertIsNotNone(case.investigated_venue)
-        # Select investigated venue by token
         result = case.select_venue("investigated")
         self.assertEqual(case.selected_venue, case.investigated_venue)
         self.assertEqual(result["selected_venue_id"], "investigated")
-        # Fit auto-ran because both article + venue present
         self.assertTrue(result["fit_available"])
         self.assertIsNotNone(case.fit_assessment)
 
@@ -90,7 +94,7 @@ class TestSelectInvestigatedVenue(unittest.TestCase):
         from kairoskopion.api.cases import Case
         case = Case(title="t")
         case.intake_text("Article body. " * 60, input_type="article")
-        case.investigate_venue(_meaningful_venue_text())
+        self._set_venue(case)
         real_id = case.investigated_venue.venue_model_id
         result = case.select_venue(real_id)
         self.assertEqual(case.selected_venue, case.investigated_venue)
@@ -100,16 +104,15 @@ class TestSelectInvestigatedVenue(unittest.TestCase):
 class TestFitChainSynthesizesPreliminaryScenario(unittest.TestCase):
     def test_preliminary_scenario_marker_set(self):
         from kairoskopion.api.cases import Case
+        from kairoskopion.schema import VenueModel
         case = Case(title="t")
         case.intake_text("Article body. " * 60, input_type="article")
-        case.investigate_venue(_meaningful_venue_text())
+        case.investigated_venue = VenueModel(
+            canonical_name="Journal of X",
+            scope_summary="Philosophy of technology, postphenomenology, STS",
+        )
         case.select_venue("investigated")
-        # Fit ran. case.scenario is still None (user never provided one),
-        # but the FitAssessment exists. The synthesized scenario inside
-        # _run_fit_chain was preliminary — its id is stamped on the
-        # FitAssessment, so we verify the marker via the fit itself.
         self.assertIsNotNone(case.fit_assessment)
-        # Verify a risk_report and (optional) citation_plan were attempted
         self.assertIsNotNone(case.risk_report)
 
 
@@ -129,7 +132,8 @@ class TestVenueStatusInIntakeResult(unittest.TestCase):
         self.assertIn("venue_min_chars", result)
         self.assertEqual(result["venue_min_chars"], 200)
 
-    def test_meaningful_venue_text_surfaces_used_llm(self):
+    def test_meaningful_venue_text_without_llm(self):
+        """ARCH-SEM-001: without LLM, venue investigation returns llm_required."""
         from kairoskopion.api.cases import Case
         case = Case(title="t")
         result = case.intake_text(
@@ -137,17 +141,20 @@ class TestVenueStatusInIntakeResult(unittest.TestCase):
             input_type="journal_or_venue",
         )
         self.assertNotIn("venue_status", result)
-        # No LLM provider configured in this test → deterministic path
-        self.assertEqual(result.get("venue_used_llm"), False)
-        self.assertTrue(result["venue_investigated"])
+        self.assertIsNone(result.get("venue_used_llm"))
+        self.assertFalse(result["venue_investigated"])
 
 
 class TestRiskReportPopulatedByFitChain(unittest.TestCase):
     def test_risk_report_built(self):
         from kairoskopion.api.cases import Case
+        from kairoskopion.schema import VenueModel
         case = Case(title="t")
         case.intake_text("Article body. " * 60, input_type="article")
-        case.investigate_venue(_meaningful_venue_text())
+        case.investigated_venue = VenueModel(
+            canonical_name="Journal of X",
+            scope_summary="Philosophy of technology, postphenomenology, STS",
+        )
         case.select_venue("investigated")
         self.assertIsNotNone(case.risk_report)
 
@@ -158,9 +165,13 @@ class TestAntiLeakInDossierSlice(unittest.TestCase):
     def test_no_leak_in_intake_result(self):
         import json
         from kairoskopion.api.cases import Case
+        from kairoskopion.schema import VenueModel
         case = Case(title="t")
         case.intake_text("Article body. " * 60, input_type="article")
-        case.investigate_venue(_meaningful_venue_text())
+        case.investigated_venue = VenueModel(
+            canonical_name="Journal of X",
+            scope_summary="Philosophy of technology",
+        )
         result = case.select_venue("investigated")
         blob = json.dumps(result, ensure_ascii=False)
         self.assertNotIn("Traceback", blob)
@@ -192,25 +203,27 @@ class TestDossierAPI(unittest.TestCase):
         os.environ.pop("KAIROSKOPION_LLM_PROVIDER", None)
 
     def test_dossier_after_full_chain(self):
-        case = self.client.post(
+        """ARCH-SEM-001: venue is set directly since investigate_venue requires LLM."""
+        from kairoskopion.api import app as app_mod
+        from kairoskopion.schema import VenueModel
+
+        case_resp = self.client.post(
             "/cases", json={"title": "dossier-chain"}, headers=self.headers,
         ).json()
-        cid = case["case_id"]
+        cid = case_resp["case_id"]
         # 1. intake article
         self.client.post(
             f"/cases/{cid}/intake/text",
             json={"text": "Article body. " * 60, "input_type": "article"},
             headers=self.headers,
         )
-        # 2. intake venue
-        r = self.client.post(
-            f"/cases/{cid}/intake/text",
-            json={
-                "text": _meaningful_venue_text(),
-                "input_type": "journal_or_venue",
-            },
-            headers=self.headers,
+        # 2. set venue directly (investigate_venue requires LLM)
+        case = app_mod.store.get(cid)
+        case.investigated_venue = VenueModel(
+            canonical_name="Journal of X",
+            scope_summary="Philosophy of technology, postphenomenology, STS",
         )
+        app_mod.store.save(case)
         # 3. select investigated venue
         r2 = self.client.post(
             f"/cases/{cid}/select-venue/investigated",
@@ -224,13 +237,10 @@ class TestDossierAPI(unittest.TestCase):
         d = self.client.get(f"/cases/{cid}/dossier", headers=self.headers)
         self.assertEqual(d.status_code, 200)
         dossier = d.json()
-        # selected_venue + fit_assessment + mismatch_map should all be present
         self.assertIsNotNone(dossier.get("selected_venue"))
         self.assertIsNotNone(dossier.get("fit_assessment"))
-        # risk_report built by fit chain
         self.assertIsNotNone(dossier.get("risk_report"))
 
-        # No leaks anywhere
         import json
         blob = json.dumps(dossier, ensure_ascii=False)
         self.assertNotIn("Traceback", blob)

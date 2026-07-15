@@ -175,12 +175,14 @@ class TestCaseOrchestratorByReference(unittest.TestCase):
         self.assertEqual(result["status"], "evidence_pack_not_found")
 
     def test_investigate_by_issn_logos(self):
+        """ARCH-SEM-001: without LLM, reference lookup finds pack but
+        investigate_venue returns llm_required."""
         from kairoskopion.api.cases import Case
         case = Case(case_id="test", user_id="test")
         result = case.investigate_venue_by_reference(issn="0869-5377")
         if result.get("status") == "evidence_pack_not_found":
             self.skipTest("Logos evidence pack not found")
-        self.assertIn("venue", result)
+        self.assertEqual(result["status"], "llm_required")
 
 
 if __name__ == "__main__":

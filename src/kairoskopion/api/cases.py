@@ -324,6 +324,7 @@ class Case:
         if self.discipline_matches:
             matched_count = len(self.discipline_matches.get("matched") or [])
             result["discipline_matches_count"] = matched_count
+        if self.region_hint and self.region_hint != "auto":
             result["region_hint"] = self.region_hint
         return result
 
@@ -671,10 +672,12 @@ class Case:
 
         # Phase B2: route through DisciplineMatcherAgent BEFORE
         # semantic_profile so the profiler sees registry-narrowed
-        # disciplines instead of falling back to keyword pre-filter
-        # implicitly. Honest fallback: if LLM unavailable, matcher
-        # still emits keyword candidates marked confidence=low.
-        self._run_discipline_matcher()
+        # disciplines. ARCH-SEM-001: if LLM is unavailable, discipline
+        # matching is skipped (no deterministic semantic fallback).
+        try:
+            self._run_discipline_matcher()
+        except Exception as exc:
+            logger.info("Discipline matching skipped (LLM required): %s", exc)
 
         # Semantic profile: try LLM agent, fall back to deterministic.
         # known_disciplines_context comes from the matcher output
@@ -718,37 +721,23 @@ class Case:
 
         genre = self.article_model.genre_current
         if genre:
-            genre_alternatives = []
             genre_confidence = "medium" if source == "llm" else "low"
             if genre == "unknown":
                 genre_confidence = "needs_resolution"
-                from ..enums import Genre as _Genre
-                genre_alternatives = [
-                    {"value": g.value, "confidence": "unscored", "reasoning": None, "rank": i + 2}
-                    for i, g in enumerate(g for g in _Genre if g.value != "unknown")
-                ]
             self.set_semantic_hypothesis(
                 axis="genre", primary_value=genre, source=source,
                 confidence=genre_confidence,
-                alternatives=genre_alternatives or None,
                 extraction_attempt=ea,
             )
 
         method = self.article_model.method_status
         if method:
-            method_alternatives = []
             method_confidence = "medium" if source == "llm" else "low"
             if method == "unknown":
                 method_confidence = "needs_resolution"
-                from ..enums import MethodStatus as _MS
-                method_alternatives = [
-                    {"value": m.value, "confidence": "unscored", "reasoning": None, "rank": i + 2}
-                    for i, m in enumerate(m for m in _MS if m.value != "unknown")
-                ]
             self.set_semantic_hypothesis(
                 axis="method", primary_value=method, source=source,
                 confidence=method_confidence,
-                alternatives=method_alternatives or None,
                 extraction_attempt=ea,
             )
 
@@ -826,18 +815,16 @@ class Case:
             },
         )
         provider = _get_llm_provider("discipline_matcher")
-        try:
-            if provider is not None:
-                out = agent.execute(inp, provider)
-            else:
-                out = agent.execute_deterministic(inp)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Discipline matcher crashed: %s", exc)
-            out = agent.execute_deterministic(inp)
+        if provider is None:
+            from ..llm.openai_compat import SemanticLLMRequiredError
+            raise SemanticLLMRequiredError(
+                "Discipline matching requires LLM — no provider configured",
+                agent_role="discipline_matcher",
+            )
+        out = agent.execute(inp, provider)
         if out and out.output_entity:
             self.discipline_matches = out.output_entity
-            if provider is not None:
-                self.discipline_matches["source"] = "llm"
+            self.discipline_matches["source"] = "llm"
             logger.info(
                 "Discipline matcher emitted %d matches (%s)",
                 len(out.output_entity.get("matched", [])),
@@ -884,14 +871,9 @@ class Case:
             },
         )
         provider = _get_llm_provider("discipline_matcher")
-        try:
-            if provider is not None:
-                out = agent.execute(inp, provider)
-            else:
-                out = agent.execute_deterministic(inp)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Discipline rerun crashed: %s", exc)
-            out = agent.execute_deterministic(inp)
+        if provider is None:
+            return {"error": "LLM provider not configured — discipline matching requires LLM (ARCH-SEM-001)"}
+        out = agent.execute(inp, provider)
 
         if out and out.output_entity:
             self.discipline_matches = out.output_entity
@@ -1085,39 +1067,6 @@ class Case:
                 ),
             }
 
-        provider = _get_llm_provider("venue_profiler")
-        venue = None
-        regime = None
-        used_llm = False
-
-        if provider is not None:
-            from ..agents.venue_profiler import VenueProfilerAgent
-            from ..agents.contract import AgentInput
-            agent = VenueProfilerAgent()
-            inp = AgentInput(
-                operation_id="investigate_venue",
-                agent_role_id="venue_profiler",
-                raw_text=text,
-            )
-            try:
-                output = agent.execute(inp, provider)
-                if output.output_entity:
-                    entity = output.output_entity
-                    regime_dict = entity.pop("_regime", None)
-                    venue = VenueModel.from_dict(entity)
-                    if regime_dict:
-                        regime = PublicationRegimeModel.from_dict(regime_dict)
-                    used_llm = True
-                    logger.info("Venue profiled via LLM")
-            except Exception as exc:
-                logger.warning("LLM venue profiling failed, falling back: %s", exc)
-
-        if venue is None:
-            from ..services.venue_profiling import build_venue_model
-            venue, regime = build_venue_model(text)
-
-        self.investigated_venue = venue
-        self.publication_regime = regime
         if self.venue_source_metadata is None:
             import hashlib
             self.venue_source_metadata = {
@@ -1127,6 +1076,46 @@ class Case:
                 "content_hash": hashlib.sha256(text.encode()).hexdigest()[:16],
                 "char_count": len(text),
             }
+
+        provider = _get_llm_provider("venue_profiler")
+        if provider is None:
+            self._log_decision("investigate_venue_skipped", {
+                "reason": "llm_required",
+                "error_code": "SEMANTIC_LLM_REQUIRED",
+            })
+            return {
+                "status": "llm_required",
+                "error": (
+                    "Venue profiling requires LLM (ARCH-SEM-001). "
+                    "Configure LLM provider and retry."
+                ),
+            }
+
+        from ..agents.venue_profiler import VenueProfilerAgent
+        from ..agents.contract import AgentInput
+        agent = VenueProfilerAgent()
+        inp = AgentInput(
+            operation_id="investigate_venue",
+            agent_role_id="venue_profiler",
+            raw_text=text,
+        )
+        output = agent.execute(inp, provider)
+        if not output.output_entity:
+            return {
+                "status": "llm_empty_output",
+                "error": "Venue profiling LLM returned empty output",
+            }
+        entity = output.output_entity
+        regime_dict = entity.pop("_regime", None)
+        venue = VenueModel.from_dict(entity)
+        regime = None
+        if regime_dict:
+            regime = PublicationRegimeModel.from_dict(regime_dict)
+        used_llm = True
+        logger.info("Venue profiled via LLM")
+
+        self.investigated_venue = venue
+        self.publication_regime = regime
 
         # P6.1 Track 7: store extraction output as provisional records
         source_url = (self.venue_source_metadata or {}).get("source_url")
@@ -3027,7 +3016,11 @@ class Case:
 
         dossier["decision_log"] = self.decision_log
         dossier["quality_gates"] = self.quality_gates
+        return dossier
 
+    def finalize_dossier(self) -> dict[str, Any]:
+        """Build dossier AND transition to DOSSIER stage (POST-only)."""
+        dossier = self.build_dossier()
         self._transition_to(CaseStage.DOSSIER)
         self._log_decision("dossier_built", {
             "sections": list(dossier.keys()),

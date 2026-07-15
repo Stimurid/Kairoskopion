@@ -114,10 +114,9 @@ class TestCaseIntakeBuildsArticleFPM(unittest.TestCase):
         self.assertIsNotNone(case.article_field_position)
         self.assertEqual(case.article_field_position.entity_type, "article")
 
-    def test_intake_venue_populates_venue_fpm(self):
-        # feature/real-cockpit-venue-fit-pass added a ≥200-char
-        # minimum-text guard on investigate_venue. Provide enough text
-        # for the pipeline (and venue_field_positioner) to run.
+    def test_intake_venue_without_llm_skips_investigation(self):
+        """ARCH-SEM-001: without LLM, venue investigation returns error
+        and does NOT produce a VenueModel."""
         case = Case(title="t")
         text = (
             "Author guidelines for the journal. The scope of the journal: "
@@ -128,9 +127,7 @@ class TestCaseIntakeBuildsArticleFPM(unittest.TestCase):
             "engineering ethics. Submissions undergo double-blind review."
         )
         case.intake_text(text, input_type="venue", search_depth="none")
-        self.assertIsNotNone(case.investigated_venue)
-        self.assertIsNotNone(case.venue_field_position)
-        self.assertEqual(case.venue_field_position.entity_type, "venue")
+        self.assertIsNone(case.investigated_venue)
 
 
 class TestFitChainComputesFPMFit(unittest.TestCase):

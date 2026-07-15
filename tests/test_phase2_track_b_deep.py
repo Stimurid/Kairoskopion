@@ -9,10 +9,12 @@ from kairoskopion.schema import VenueModel, ArticleModel, PublicationRegimeModel
 
 
 def _make_venue_case() -> Case:
-    """Case with a venue already investigated."""
+    """Case with a venue set directly (ARCH-SEM-001: investigate_venue requires LLM)."""
     case = Case(case_id="test_p2", user_id="u1")
-    text = "Philosophy journal about continental philosophy and STS. " * 20
-    case.investigate_venue(text)
+    case.investigated_venue = VenueModel(
+        canonical_name="Continental Philosophy Journal",
+        scope_summary="Continental philosophy and STS",
+    )
     return case
 
 
@@ -21,8 +23,10 @@ def _make_full_case() -> Case:
     case = Case(case_id="test_p2_full", user_id="u1")
     article_text = "This article examines the philosophy of technology. " * 50
     case.intake_text(article_text, input_type="article")
-    venue_text = "A journal devoted to continental philosophy. " * 20
-    case.investigate_venue(venue_text)
+    case.investigated_venue = VenueModel(
+        canonical_name="Continental Philosophy Journal",
+        scope_summary="Continental philosophy and STS",
+    )
     return case
 
 

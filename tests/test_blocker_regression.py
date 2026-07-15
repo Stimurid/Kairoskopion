@@ -52,27 +52,28 @@ class TestDisciplineLLMWiring:
         assert '"source"' in method_src
         assert '"llm"' in method_src
 
-    def test_deterministic_fallback_on_exception(self):
-        """On LLM exception, agent.execute_deterministic must be called."""
+    def test_no_deterministic_fallback_arch_sem_001(self):
+        """ARCH-SEM-001: _run_discipline_matcher must NOT fall back to
+        execute_deterministic — it must raise when LLM is unavailable."""
         from kairoskopion.api import cases as mod
         src = Path(mod.__file__).read_text(encoding="utf-8")
         method_src = _extract_method_source(src, "_run_discipline_matcher")
         assert method_src is not None
-        assert "execute_deterministic" in method_src
+        assert "execute_deterministic" not in method_src
 
-    def test_discipline_matcher_produces_matched_list(self, tmp_path):
-        """Deterministic path still produces a matched list."""
+    def test_discipline_matcher_requires_llm(self, tmp_path):
+        """Without LLM, _run_discipline_matcher raises SemanticLLMRequiredError."""
         from kairoskopion.api.cases import Case
         from kairoskopion.schema import ArticleModel
+        from kairoskopion.llm.openai_compat import SemanticLLMRequiredError
 
         case = Case()
         case.article_model = ArticleModel(
             title_current="Philosophy of science",
             disciplinary_register_current="philosophy",
         )
-        case._run_discipline_matcher()
-        assert case.discipline_matches is not None
-        assert "matched" in case.discipline_matches
+        with pytest.raises(SemanticLLMRequiredError):
+            case._run_discipline_matcher()
 
 
 # ==================================================================

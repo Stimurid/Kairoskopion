@@ -51,21 +51,23 @@ class TestSetDisciplineIntent(unittest.TestCase):
 
 
 class TestVenueFamilyFromVenue(unittest.TestCase):
-    def test_venue_investigation_sets_blocked_family_context(self):
+    def test_venue_investigation_without_llm_returns_error(self):
+        """ARCH-SEM-001: investigate_venue requires LLM; without it returns error."""
         case = Case(case_id="test_vfc", user_id="u1")
         text = "A journal about continental philosophy and STS. " * 20
-        case.investigate_venue(text)
-        self.assertIsNotNone(case.venue_family_context)
-        self.assertEqual(
-            case.venue_family_context["families_status"],
-            "BLOCKED_NEEDS_LLM",
-        )
-        self.assertEqual(case.venue_family_context["families"], [])
+        result = case.investigate_venue(text)
+        self.assertEqual(result["status"], "llm_required")
+        self.assertIsNone(case.investigated_venue)
 
-    def test_family_context_has_source_venue(self):
+    def test_family_context_set_when_venue_exists(self):
+        """Family context is set when venue is provided directly."""
+        from kairoskopion.schema import VenueModel
         case = Case(case_id="test_vfc2", user_id="u1")
-        text = "A journal about philosophy and technology. " * 20
-        case.investigate_venue(text)
+        case.investigated_venue = VenueModel(
+            canonical_name="Philosophy Journal",
+            scope_summary="Continental philosophy and STS",
+        )
+        case._build_venue_family_from_venue()
         if case.venue_family_context:
             self.assertIn("source_venue", case.venue_family_context)
 
@@ -117,14 +119,15 @@ class TestPhase3Persistence(unittest.TestCase):
         self.assertEqual(restored.discipline_intent["region"], "ru")
         self.assertEqual(restored.discipline_intent["intent_parse_status"], "needs_llm")
 
-    def test_venue_family_context_roundtrip(self):
+    def test_venue_source_metadata_roundtrip(self):
+        """venue_source_metadata is set even without LLM and survives roundtrip."""
         case = Case(case_id="test_p3_rt2", user_id="u1")
         text = "Continental philosophy journal. " * 20
         case.investigate_venue(text)
+        self.assertIsNotNone(case.venue_source_metadata)
         snap = _case_to_snapshot(case)
         restored = _case_from_snapshot(snap)
-        if case.venue_family_context:
-            self.assertIsNotNone(restored.venue_family_context)
+        self.assertIsNotNone(restored.venue_source_metadata)
 
 
 class TestSemanticDoctrineInvariants(unittest.TestCase):
