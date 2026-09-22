@@ -73,6 +73,11 @@ def manifest_from_openalex_works(
             notes.append("abstract_available")
         if locator:
             notes.append(f"{locator_kind}_locator:{locator}")
+        provider = str(w.get("_provider") or "openalex").lower()
+        evidence_status = (
+            "metadata_api_crossref" if provider == "crossref"
+            else "metadata_api_openalex"
+        )
         artifacts.append(
             CorpusArtifact(
                 source_ref=str(refs),
@@ -82,18 +87,24 @@ def manifest_from_openalex_works(
                 doi=w.get("doi"),
                 acquisition_state=state,
                 local_ref=None,
-                evidence_status="metadata_api_openalex",
+                evidence_status=evidence_status,
                 notes=notes,
             )
         )
+    providers = sorted({
+        str(w.get("_provider") or "openalex").lower()
+        for w in works
+    })
+    provider_note = (
+        f"Corpus metadata providers: {', '.join(providers)}. "
+        "Coverage and ranking may not represent the full venue corpus."
+    )
     return CorpusArtifactManifest(
         target_id=target_id,
         selection_strategy=selection_strategy,
         artifacts=artifacts,
         time_range=f"{min(years)}-{max(years)}" if years else None,
-        bias_notes=[
-            "OpenAlex source coverage and ranking are not guaranteed representative of the full venue corpus"
-        ],
+        bias_notes=[provider_note],
         unknowns=[] if artifacts else ["no works acquired for target"],
     )
 
