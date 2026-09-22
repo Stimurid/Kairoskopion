@@ -42,6 +42,12 @@ _SCRIPT_RE = re.compile(r"<script.*?</script>", re.DOTALL | re.IGNORECASE)
 _STYLE_RE = re.compile(r"<style.*?</style>", re.DOTALL | re.IGNORECASE)
 _WS_RE = re.compile(r"\s+")
 
+_TOTAL_LENGTH_RE = re.compile(
+    r"(?:total\s+(?:length|word\s+count)|manuscript\s+(?:length|word\s+count))"
+    r"[^0-9]{0,50}(?:not\s+exceed|maximum|max\.?|up\s+to)?[^0-9]{0,20}"
+    r"(\d{3,6})\s*words?",
+    re.IGNORECASE,
+)
 _WORD_LIMIT_RE = re.compile(
     r"(?:word\s+(?:limit|count|length)|maximum|max\.?|up\s+to)"
     r"[^0-9]{0,30}(\d{3,6})(?:\s*[-–—to]\s*(\d{3,6}))?\s*words?",
@@ -160,11 +166,18 @@ def extract_formal_submission_profile(
 
     result["access_status"] = result.get("access_status", "opened") or "opened"
 
-    # Word limits
-    wl = _WORD_LIMIT_RE.search(text)
+    # Word limits. Prefer explicit manuscript/total-length statements.
+    # The generic regex is guarded against nearby "abstract" text so an
+    # "abstract up to 150 words" clause cannot become the manuscript limit.
+    total = _TOTAL_LENGTH_RE.search(text)
+    wl = total or _WORD_LIMIT_RE.search(text)
+    if wl and not total:
+        ctx = text[max(0, wl.start() - 100):wl.end() + 40].lower()
+        if "abstract" in ctx:
+            wl = None
     if wl:
         lo = int(wl.group(1))
-        hi = int(wl.group(2)) if wl.group(2) else None
+        hi = int(wl.group(2)) if (not total and wl.lastindex and wl.lastindex >= 2 and wl.group(2)) else None
         result["fields_present"]["word_limit"] = {
             "min": lo if hi else None, "max": hi or lo,
             "evidence": "external_claim_html",
