@@ -408,3 +408,21 @@ def test_techne_editorial_fixture_preserves_names_and_roles():
     assert by_name["Stacey O. Irwin"]["role_hint"] == "editor_in_chief"
     assert by_name["Marco Tamborini"]["role_hint"] == "special_issue_editor"
     assert by_name["Vincent Blok"]["affiliation_hint"].startswith("Erasmus University")
+
+
+def test_fulltext_heading_detector_rejects_pdf_headers_and_footnotes():
+    from kairoskopion.kairon_provider.fulltext_models import model_article_text
+
+    text = """
+    1 Introduction
+    Opening paragraph.
+    18 Page 2 of 18
+    3 This is a minimal sense of agency, which we compare to other accounts of agency in Sect. 7.
+    2 LLMs and Minds
+    Body.
+    107 Page 4 of 27
+    8 Conclusion
+    Closing paragraph.
+    """
+    model = model_article_text(text, source_ref="fixture:pdf")
+    assert model["headings"] == ["1 Introduction", "2 LLMs and Minds", "8 Conclusion"]
