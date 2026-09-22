@@ -145,6 +145,32 @@ def reconcile_target_pressure_pack(
                 source_kind="target_world_reconciliation",
             ))
 
+    # Language is a property of the current artifact, not the desired target.
+    # A whole-manuscript target-language realization is an identity-preserving
+    # sibling variant and therefore branches from the accepted base state.
+    target_language = (venue.language_policy or "").strip().lower()
+    article_language = (article.language or "").strip().lower()
+    if target_language and article_language and article_language not in target_language:
+        if any(x.dimension == "language_register" for x in items):
+            conflicts.append(
+                "legacy language mismatch retyped: target-language realization "
+                "requires a sibling TARGET_VARIANT rather than identity change"
+            )
+        items = _drop_dimensions(items, {"language_register"})
+        items.append(TargetPressureItem(
+            pressure_id="target:language:translation",
+            dimension="language_register",
+            observation=(
+                f"Current artifact language is {article.language}; target publication "
+                f"language is {venue.language_policy}. Build a target-language sibling variant."
+            ),
+            evidence_refs=list(venue.source_refs or []),
+            evidence_status="target_constraint",
+            severity="major",
+            transformation_depth_hint="target_variant_branch",
+            source_kind="target_world_reconciliation",
+        ))
+
     fields = _formal_fields(formal_profile)
 
     word_limit = fields.get("word_limit")
@@ -233,6 +259,8 @@ def derive_transition_class(pack: TargetPressurePack) -> str:
     if not consequential:
         return "KEEP"
     depths = {x.transformation_depth_hint for x in consequential}
+    if "target_variant_branch" in depths:
+        return "BRANCH"
     if "identity_or_reseed_review" in depths:
         return "REARCHITECT"
     if "structural_or_deeper" in depths:
