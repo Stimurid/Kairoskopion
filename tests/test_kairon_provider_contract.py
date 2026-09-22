@@ -725,3 +725,38 @@ def test_reconciliation_suppresses_false_topic_and_genre_pressure():
     assert any(x.pressure_id == "target:formal:ai_disclosure" for x in pack.items)
     assert len(pack.conflicts) >= 2
     assert derive_transition_class(pack) == "LOCAL_ADAPT"
+
+
+def test_language_translation_creates_target_variant_branch_not_identity_rewrite():
+    from kairoskopion.schema import ArticleModel, VenueModel
+    from kairoskopion.kairon_provider import (
+        TargetPressureItem, TargetPressurePack,
+        reconcile_target_pressure_pack, derive_transition_class,
+    )
+    article = ArticleModel(
+        title_current="Русская рукопись",
+        language="ru",
+        genre_current="conceptual_article",
+        core_claims=["protected claim"],
+    )
+    venue = VenueModel(
+        canonical_name="English target",
+        language_policy="English",
+        source_refs=["target:official"],
+    )
+    base = TargetPressurePack(
+        target_id="v1", snapshot_id="s1",
+        items=[TargetPressureItem(
+            pressure_id="fit:language_register:7",
+            dimension="language_register",
+            observation="Language mismatch",
+            severity="bad",
+            transformation_depth_hint="local_or_structural",
+        )],
+    )
+    pack = reconcile_target_pressure_pack(
+        article=article, venue=venue, base_pack=base,
+    )
+    item = next(x for x in pack.items if x.pressure_id == "target:language:translation")
+    assert item.transformation_depth_hint == "target_variant_branch"
+    assert derive_transition_class(pack) == "BRANCH"
