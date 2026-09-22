@@ -303,3 +303,17 @@ def test_article_fulltext_structural_model_detects_sections_and_moves():
     assert "claim" in moves
     assert "problem" in moves
     assert model["word_count"] > 20
+
+
+def test_editor_identity_gate_rejects_wrong_people_and_accepts_affiliation():
+    from kairoskopion.adapters.venue.editorial_board import (
+        _name_identity_ok,
+        _affiliation_identity_ok,
+    )
+    assert _name_identity_ok("Francesco Bianchini", "Francesco Bianchini")
+    assert not _name_identity_ok("Francesco Bianchini", "Francesco Burzotta")
+    assert _name_identity_ok("Matt Zook", "M. Zook")
+    assert not _name_identity_ok("Dhiraj Murthy", "D. N. Prabhakar Murthy")
+    assert _affiliation_identity_ok("Yale University", "Yale University")
+    assert _affiliation_identity_ok("University of Texas at Austin", "The University of Texas at Austin")
+    assert not _affiliation_identity_ok("University of Brighton", "University of Toronto")
