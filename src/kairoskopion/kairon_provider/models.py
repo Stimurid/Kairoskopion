@@ -113,6 +113,7 @@ class TargetModelBundle(_DictModel):
     citation_patterns: dict[str, Any] = field(default_factory=dict)
     register_patterns: list[dict[str, Any]] = field(default_factory=list)
     novelty_patterns: list[dict[str, Any]] = field(default_factory=list)
+    article_models: list[dict[str, Any]] = field(default_factory=list)
     evidence_refs: list[str] = field(default_factory=list)
     confidence: str = "low"
     limitations: list[str] = field(default_factory=list)
