@@ -176,8 +176,8 @@ def extract_formal_submission_profile(
         if "abstract" in ctx:
             wl = None
     if wl:
-        lo = int(wl.group(1))
-        hi = int(wl.group(2)) if (not total and wl.lastindex and wl.lastindex >= 2 and wl.group(2)) else None
+        lo = int(wl.group(1).replace(",", ""))
+        hi = int(wl.group(2).replace(",", "")) if (not total and wl.lastindex and wl.lastindex >= 2 and wl.group(2)) else None
         result["fields_present"]["word_limit"] = {
             "min": lo if hi else None, "max": hi or lo,
             "evidence": "external_claim_html",
