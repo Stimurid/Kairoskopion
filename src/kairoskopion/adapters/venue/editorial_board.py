@@ -67,6 +67,11 @@ _NAME_AFFIL_RE = re.compile(
     r"([^,\)\n\r<]{4,120})"
 )
 
+_INSTITUTION_TAIL_TOKENS = {
+    "Academy", "College", "University", "Institute", "Institution",
+    "Department", "School", "Centre", "Center", "Faculty",
+}
+
 _COUNTRY_PREFIXES = (
     "USA ", "UK ", "China ", "Sweden ", "Austria ", "Australia ",
     "The Netherlands ", "Netherlands ", "Germany ", "Italy ",
@@ -251,7 +256,10 @@ def _clean_name(name: str) -> str:
         if out.startswith(prefix):
             out = out[len(prefix):].strip()
             break
-    return out
+    parts = out.split()
+    while parts and parts[-1] in _INSTITUTION_TAIL_TOKENS:
+        parts.pop()
+    return " ".join(parts)
 
 
 def _explicit_role_candidates(text: str) -> list[dict[str, Any]]:
