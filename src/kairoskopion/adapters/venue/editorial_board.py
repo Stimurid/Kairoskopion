@@ -199,22 +199,52 @@ def _norm_person_name(value: str) -> list[str]:
 def _name_identity_ok(query_name: str, candidate_name: str) -> bool:
     """Conservative person-name gate.
 
-    Require matching surname plus compatible given-name/initial evidence.
+    Require exact surname plus compatible given-name evidence. Initial forms
+    are accepted only when the remaining unmatched given-name tokens are also
+    initials. This prevents a query like "Dhiraj Murthy" from accepting
+    "D. N. Prabhakar Murthy" merely because the surname and first initial match.
     Search rank alone is never accepted as identity.
     """
     q = _norm_person_name(query_name)
     c = _norm_person_name(candidate_name)
     if not q or not c or q[-1] != c[-1]:
         return False
-    q_first, c_first = q[0], c[0]
-    if q_first == c_first:
+
+    q_given, c_given = q[:-1], c[:-1]
+    if not q_given or not c_given:
+        return False
+    if q_given == c_given:
         return True
-    # Allow an initial on either side, but only with exact surname.
-    if len(q_first) == 1 and c_first.startswith(q_first):
-        return True
-    if len(c_first) == 1 and q_first.startswith(c_first):
-        return True
-    return False
+
+    q_first, c_first = q_given[0], c_given[0]
+    first_compatible = (
+        q_first == c_first
+        or (len(q_first) == 1 and c_first.startswith(q_first))
+        or (len(c_first) == 1 and q_first.startswith(c_first))
+    )
+    if not first_compatible:
+        return False
+
+    # Extra given-name evidence may be initials ("Matt J Zook" vs
+    # "M. J. Zook"), but an unmatched full name is a different person signal.
+    q_extra = q_given[1:]
+    c_extra = c_given[1:]
+    if any(len(t) > 1 for t in q_extra + c_extra):
+        # Full middle names are safe only when they occur on both sides
+        # at the same ordinal position.
+        common = min(len(q_extra), len(c_extra))
+        for i in range(common):
+            a, b = q_extra[i], c_extra[i]
+            if len(a) > 1 or len(b) > 1:
+                if not (
+                    a == b
+                    or (len(a) == 1 and b.startswith(a))
+                    or (len(b) == 1 and a.startswith(b))
+                ):
+                    return False
+        if any(len(t) > 1 for t in q_extra[common:] + c_extra[common:]):
+            return False
+    return True
 
 
 def _affiliation_identity_ok(hint: str | None, candidate_inst: str | None) -> bool:
