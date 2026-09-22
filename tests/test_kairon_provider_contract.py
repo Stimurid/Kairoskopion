@@ -183,3 +183,16 @@ def test_provider_api_router_imports():
     assert "/kairon/provider/pressure-pack" in paths
     assert "/kairon/provider/target-world" in paths
     assert "/kairon/provider/re-evaluate" in paths
+
+
+def test_target_world_store_round_trip(tmp_path=None):
+    import tempfile
+    from pathlib import Path
+    from kairoskopion.kairon_provider.storage import TargetWorldStore
+
+    root = Path(tempfile.mkdtemp()) if tmp_path is None else tmp_path
+    store = TargetWorldStore(root)
+    payload = {"snapshot_id": "snap:persistent:1", "target_id": "venue-1", "evidence_refs": ["src:1"]}
+    store.put(payload)
+    assert store.get("snap:persistent:1") == payload
+    assert "snap:persistent:1" in store.list_ids()
