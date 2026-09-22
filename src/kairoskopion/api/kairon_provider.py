@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from typing import Any
+import os
+from pathlib import Path
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -15,8 +17,10 @@ from ..kairon_provider.models import (
 )
 from ..kairon_provider.round_trip import compare_round_trip
 from ..kairon_provider.target_world import build_target_world_snapshot
+from ..kairon_provider.storage import TargetWorldStore
 
 router = APIRouter(prefix="/kairon/provider", tags=["kairon-provider"])
+_store = TargetWorldStore(Path(os.environ.get("KAIROSKOPION_DATA_DIR") or ".kairoskopion"))
 
 
 class PressurePackRequest(BaseModel):
@@ -90,7 +94,23 @@ def build_target_world(req: TargetWorldRequest):
         selection_strategy=req.selection_strategy,
         provider_commit=req.provider_commit,
     )
-    return snapshot.to_dict()
+    data = snapshot.to_dict()
+    _store.put(data)
+    return data
+
+
+@router.get("/target-world/{snapshot_id}")
+def get_target_world(snapshot_id: str):
+    data = _store.get(snapshot_id)
+    if data is None:
+        from fastapi import HTTPException
+        raise HTTPException(404, "target world snapshot not found")
+    return data
+
+
+@router.get("/target-world")
+def list_target_worlds():
+    return {"snapshot_ids": _store.list_ids()}
 
 
 @router.post("/re-evaluate")
