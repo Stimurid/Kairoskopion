@@ -275,74 +275,101 @@ def _clean_html_text(fragment: str) -> str:
 
 
 def extract_candidate_members_html(raw_html: str) -> list[dict[str, Any]]:
-    """Extract editors from structured HTML before flattening.
+    """Extract editor names/roles before HTML flattening.
 
-    Handles two common patterns that are lost by plain-text flattening:
-    1) <li>Name, Affiliation, Country</li> advisory-board rows;
-    2) role heading + <b>Name</b><br>Affiliation blocks.
-    It is conservative: malformed/very long names are ignored.
+    Role headings define bounded sections. Names are read from bold tags or
+    list rows inside each section, so adjacent addresses/countries cannot be
+    glued onto the person's name by whitespace flattening.
     """
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
 
-    # Advisory/list rows: first comma separates person from affiliation.
-    for m in re.finditer(r"<li[^>]*>(.*?)(?=<li|</ul>)", raw_html, re.I | re.S):
-        txt = _clean_html_text(m.group(1))
-        if "," not in txt:
-            continue
-        name, rest = [x.strip() for x in txt.split(",", 1)]
-        if not (2 <= len(name.split()) <= 5) or len(name) > 100:
-            continue
-        key = name.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append({
-            "full_name": name,
-            "affiliation_hint": rest[:180],
-            "role_hint": "board_member",
-        })
-
-    # Role blocks with bold person names. Limit to the editorial-team body
-    # when such a marker exists, which avoids navigation/menu bold tags.
     body = raw_html
     marker = re.search(r"EDITORIAL\s+TEAM", body, re.I)
     if marker:
         body = body[marker.start():]
-    role = "board_member"
-    role_map = [
-        (re.compile(r"Editors?-in-Chief", re.I), "editor_in_chief"),
-        (re.compile(r"Special Issues? Editor", re.I), "special_issue_editor"),
-        (re.compile(r"Managing Editor", re.I), "managing_editor"),
-        (re.compile(r"Book Review Editor", re.I), "book_review_editor"),
-        (re.compile(r"Editorial Assistants?", re.I), "editorial_assistant"),
-        (re.compile(r"Editorial Advisory Board", re.I), "board_member"),
+
+    role_specs = [
+        (r"Editors?-in-Chief", "editor_in_chief"),
+        (r"Special Issues? Editor", "special_issue_editor"),
+        (r"Managing Editor", "managing_editor"),
+        (r"Book Review Editor", "book_review_editor"),
+        (r"Editorial Assistants?", "editorial_assistant"),
+        (r"Editorial Advisory Board", "board_member"),
     ]
-    tokens = re.finditer(r"<(?:b|strong)[^>]*>(.*?)</(?:b|strong)>", body, re.I | re.S)
-    for tm in tokens:
-        label = _clean_html_text(tm.group(1))
-        if not label:
-            continue
-        matched_role = next((r for p, r in role_map if p.fullmatch(label)), None)
-        if matched_role:
-            role = matched_role
-            continue
-        if not (2 <= len(label.split()) <= 5) or len(label) > 100:
-            continue
-        if any(x in label.lower() for x in ("editorial team", "submission", "journal", "copyright")):
-            continue
-        after = body[tm.end():tm.end() + 500]
-        aff = _clean_html_text(after.split("<br", 2)[1] if "<br" in after else after)[:180]
-        key = label.lower()
-        if key in seen:
-            continue
-        seen.add(key)
+    role_re = re.compile(
+        "|".join(f"(?P<R{i}>{pat})" for i, (pat, _) in enumerate(role_specs)),
+        re.I,
+    )
+    role_matches = list(role_re.finditer(body))
+
+    def role_for(match: re.Match) -> str:
+        for i, (_, role_name) in enumerate(role_specs):
+            if match.groupdict().get(f"R{i}"):
+                return role_name
+        return "board_member"
+
+    def add(name: str, affiliation: str | None, role: str) -> None:
+        name = _clean_html_text(name)
+        if not (2 <= len(name.split()) <= 5) or len(name) > 100:
+            return
+        low = name.lower()
+        if any(x in low for x in (
+            "editorial team", "submission", "journal", "copyright",
+            "special issue", "managing editor", "book review editor",
+        )):
+            return
+        if low in seen:
+            return
+        seen.add(low)
         out.append({
-            "full_name": label,
-            "affiliation_hint": aff or None,
+            "full_name": name,
+            "affiliation_hint": _clean_html_text(affiliation or "")[:180] or None,
             "role_hint": role,
         })
+
+    if role_matches:
+        for i, rm in enumerate(role_matches):
+            role = role_for(rm)
+            section_end = role_matches[i + 1].start() if i + 1 < len(role_matches) else len(body)
+            section = body[rm.end():section_end]
+
+            # Advisory-board style rows.
+            for lm in re.finditer(r"<li[^>]*>(.*?)(?=<li|</ul>)", section, re.I | re.S):
+                txt = _clean_html_text(lm.group(1))
+                if "," in txt:
+                    name, rest = [x.strip() for x in txt.split(",", 1)]
+                    add(name, rest, role)
+
+            # Named staff in bold tags; multiple names can live in one <ul>.
+            bolds = list(re.finditer(
+                r"<(?:b|strong)[^>]*>(.*?)</(?:b|strong)>",
+                section, re.I | re.S,
+            ))
+            for j, bm in enumerate(bolds):
+                name = _clean_html_text(bm.group(1))
+                tail_end = bolds[j + 1].start() if j + 1 < len(bolds) else len(section)
+                tail = section[bm.end():tail_end]
+                chunks = [
+                    _clean_html_text(x)
+                    for x in re.split(r"<br\s*/?>", tail, flags=re.I)
+                ]
+                chunks = [
+                    x for x in chunks
+                    if x and "email" not in x.lower() and "@" not in x
+                ]
+                affiliation = chunks[0] if chunks else None
+                add(name, affiliation, role)
+        return out
+
+    # Generic fallback for pages without recognizable role headings.
+    for m in re.finditer(r"<li[^>]*>(.*?)(?=<li|</ul>)", body, re.I | re.S):
+        txt = _clean_html_text(m.group(1))
+        if "," in txt:
+            name, rest = [x.strip() for x in txt.split(",", 1)]
+            add(name, rest, "board_member")
     return out
+
 
 # -----------------------------------------------------------------------
 # Identity resolution
