@@ -17,24 +17,32 @@ def _authors(work: dict[str, Any]) -> list[str]:
     return out
 
 
-def _best_fulltext_ref(work: dict[str, Any]) -> str | None:
-    candidates = []
+def _best_content_ref(work: dict[str, Any]) -> tuple[str | None, str]:
+    """Return (locator, kind) where kind is fulltext or landing.
+
+    DOI/article landing pages are evidence locators but are not automatically
+    full text. This distinction is required before download/validation.
+    """
     oa = work.get("open_access") or {}
     if oa.get("oa_url"):
-        candidates.append(oa.get("oa_url"))
+        return oa.get("oa_url"), "fulltext"
     for loc_key in ("best_oa_location", "primary_location"):
         loc = work.get(loc_key) or {}
-        for k in ("pdf_url", "landing_page_url"):
-            if loc.get(k):
-                candidates.append(loc.get(k))
-    for loc in work.get("locations") or []:
-        if not isinstance(loc, dict):
-            continue
         if loc.get("pdf_url"):
-            candidates.append(loc.get("pdf_url"))
-        elif loc.get("landing_page_url"):
-            candidates.append(loc.get("landing_page_url"))
-    return next((x for x in candidates if x), None)
+            return loc.get("pdf_url"), "fulltext"
+    for loc in work.get("locations") or []:
+        if isinstance(loc, dict) and loc.get("pdf_url"):
+            return loc.get("pdf_url"), "fulltext"
+    for loc_key in ("best_oa_location", "primary_location"):
+        loc = work.get(loc_key) or {}
+        if loc.get("landing_page_url"):
+            return loc.get("landing_page_url"), "landing"
+    for loc in work.get("locations") or []:
+        if isinstance(loc, dict) and loc.get("landing_page_url"):
+            return loc.get("landing_page_url"), "landing"
+    if work.get("doi"):
+        return str(work.get("doi")), "landing"
+    return None, "none"
 
 
 def manifest_from_openalex_works(
@@ -52,14 +60,19 @@ def manifest_from_openalex_works(
         abstract = w.get("_reconstructed_abstract")
         if abstract is None:
             abstract = reconstruct_abstract(w.get("abstract_inverted_index"))
-        fulltext = _best_fulltext_ref(w)
-        state = "fulltext_locator" if fulltext else ("abstract" if abstract else "metadata_only")
+        locator, locator_kind = _best_content_ref(w)
+        state = (
+            "fulltext_locator" if locator_kind == "fulltext"
+            else "landing_locator" if locator_kind == "landing"
+            else "abstract" if abstract
+            else "metadata_only"
+        )
         refs = w.get("id") or w.get("doi") or f"openalex:unknown:{len(artifacts)}"
         notes = []
         if abstract:
             notes.append("abstract_available")
-        if fulltext:
-            notes.append(f"fulltext_locator:{fulltext}")
+        if locator:
+            notes.append(f"{locator_kind}_locator:{locator}")
         artifacts.append(
             CorpusArtifact(
                 source_ref=str(refs),
