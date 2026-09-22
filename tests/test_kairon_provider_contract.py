@@ -196,3 +196,82 @@ def test_target_world_store_round_trip(tmp_path=None):
     store.put(payload)
     assert store.get("snap:persistent:1") == payload
     assert "snap:persistent:1" in store.list_ids()
+
+
+def test_fulltext_fixture_upgrades_manifest_to_validated_artifact():
+    import tempfile
+    from pathlib import Path
+    from kairoskopion.kairon_provider.fulltext import acquire_manifest_fulltexts
+    from kairoskopion.kairon_provider.models import CorpusArtifact, CorpusArtifactManifest
+
+    url = "https://example.org/paper.pdf"
+    manifest = CorpusArtifactManifest(
+        target_id="venue-1",
+        selection_strategy="fixture",
+        artifacts=[
+            CorpusArtifact(
+                source_ref="W1",
+                title="Paper",
+                acquisition_state="fulltext_locator",
+                notes=[f"fulltext_locator:{url}"],
+            )
+        ],
+    )
+    root = Path(tempfile.mkdtemp())
+    result = acquire_manifest_fulltexts(
+        manifest,
+        output_dir=root,
+        fixtures={url: (b"%PDF-1.4\nfixture\n", "application/pdf")},
+    )
+    assert result["validated"] == 1
+    assert manifest.artifacts[0].acquisition_state == "validated_artifact"
+    assert manifest.artifacts[0].content_hash
+    assert Path(manifest.artifacts[0].local_ref).is_file()
+
+
+def test_target_page_bundle_extracts_guidelines_and_cfp_snapshot_from_fixtures():
+    from kairoskopion.kairon_provider.target_pages import build_target_page_bundle
+
+    g = "https://example.org/authors"
+    c = "https://example.org/special-issue"
+    html = """
+    <html><body><h1>Author Guidelines</h1>
+    <p>Maximum 8000 words. Abstract 200 words. APA style.
+    Research article. Manuscripts must be submitted in English.
+    Open access. Authors must disclose generative AI tools.</p>
+    </body></html>
+    """
+    bundle = build_target_page_bundle(
+        homepage_url="https://example.org",
+        discovered={"guidelines": [g], "cfp_special_issue": [c]},
+        provided_html={
+            g: html,
+            c: "<html><body><h1>Call for papers</h1><p>Special issue deadline.</p></body></html>",
+        },
+    )
+    roles = {p.role for p in bundle.pages}
+    assert "guidelines" in roles
+    assert "cfp_special_issue" in roles
+    gp = next(p for p in bundle.pages if p.role == "guidelines")
+    assert "formal_submission_profile" in gp.extracted
+
+
+def test_provider_run_store_round_trip():
+    import tempfile
+    from pathlib import Path
+    from kairoskopion.kairon_provider.storage import ProviderRunStore
+
+    store = ProviderRunStore(Path(tempfile.mkdtemp()))
+    run = {"run_id": "run:1", "status": "running", "stage_status": {"target": "completed"}}
+    store.put(run)
+    assert store.get("run:1") == run
+    assert store.list_ids() == ["run:1"]
+
+
+def test_provider_api_exposes_deep_run_routes():
+    from kairoskopion.api.kairon_provider import router
+    paths = {route.path for route in router.routes}
+    assert "/kairon/provider/target-world/{snapshot_id}/pages" in paths
+    assert "/kairon/provider/target-world/{snapshot_id}/acquire-fulltext" in paths
+    assert "/kairon/provider/runs" in paths
+    assert "/kairon/provider/runs/{run_id}/stage" in paths
