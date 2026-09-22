@@ -317,3 +317,52 @@ def test_editor_identity_gate_rejects_wrong_people_and_accepts_affiliation():
     assert _affiliation_identity_ok("Yale University", "Yale University")
     assert _affiliation_identity_ok("University of Texas at Austin", "The University of Texas at Austin")
     assert not _affiliation_identity_ok("University of Brighton", "University of Toronto")
+
+
+def test_structured_editorial_board_parser_preserves_real_names():
+    from kairoskopion.adapters.venue.editorial_board import _extract_structured_board_candidates
+
+    springer = """
+    <section>
+      <h2 data-test="editorDisplayRole">Editor-in-Chief</h2>
+      <div class="app-avatar-card__header">
+        <h3 data-test="editorListing">Luciano Floridi PhD</h3>
+        <div class="u-text-default u-line-height-tight">Yale University, New Haven, United States</div>
+      </div>
+    </section>
+    <section>
+      <h2 data-test="editorDisplayRole">Managing Editor</h2>
+      <div class="app-avatar-card__header">
+        <h3 data-test="editorListing">Elisabetta Bulla PhD</h3>
+        <div class="u-text-default u-line-height-tight">Independent Scholar, Brescia, Italy</div>
+      </div>
+    </section>
+    """
+    rows = _extract_structured_board_candidates(springer)
+    assert rows[0]["full_name"] == "Luciano Floridi"
+    assert rows[0]["role_hint"] == "Editor-in-Chief"
+    assert "Yale University" in rows[0]["affiliation_hint"]
+    assert rows[1]["full_name"] == "Elisabetta Bulla"
+
+
+def test_structured_pdc_editorial_team_parser():
+    from kairoskopion.adapters.venue.editorial_board import _extract_structured_board_candidates
+
+    pdc = """
+    <b><p>Editors-in-Chief</b></p>
+    <ul>
+    <b>Levi Checketts</b><br>
+    Centre for Applied Ethics<br>
+    Hong Kong Baptist University<br>
+    Kowloon Tong, Hong Kong SAR<br>
+    <br>
+    <b>Stacey O. Irwin</b><br>
+    College of Arts, Humanities and Social Sciences<br>
+    Millersville University of Pennsylvania<br>
+    Millersville, PA 17551 - USA
+    </ul>
+    """
+    rows = _extract_structured_board_candidates(pdc)
+    names = [r["full_name"] for r in rows]
+    assert names == ["Levi Checketts", "Stacey O. Irwin"]
+    assert all(r["role_hint"] == "Editors-in-Chief" for r in rows)
