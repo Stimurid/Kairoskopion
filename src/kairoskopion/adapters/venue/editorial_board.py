@@ -70,6 +70,11 @@ _NAME_AFFIL_RE = re.compile(
 _INSTITUTION_TAIL_TOKENS = {
     "Academy", "College", "University", "Institute", "Institution",
     "Department", "School", "Centre", "Center", "Faculty",
+    "of", "for", "and", "the",
+}
+_ROLE_GARBAGE_TOKENS = {
+    "editor", "editors", "editorial", "team", "managing", "special",
+    "issues", "chief", "overview", "login", "dashboard",
 }
 
 _COUNTRY_PREFIXES = (
@@ -79,20 +84,16 @@ _COUNTRY_PREFIXES = (
 
 _EXPLICIT_ROLE_NAME_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
     ("editor_in_chief", re.compile(
-        r"Editors?-in-Chief\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
-        re.IGNORECASE,
+        r"(?i:Editors?-in-Chief)\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
     )),
     ("special_issues_editor", re.compile(
-        r"Special\s+Issues?\s+Editor\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
-        re.IGNORECASE,
+        r"(?i:Special\s+Issues?\s+Editor)\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
     )),
     ("managing_editor", re.compile(
-        r"Managing\s+Editor\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
-        re.IGNORECASE,
+        r"(?i:Managing\s+Editor)\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
     )),
     ("book_review_editor", re.compile(
-        r"Book\s+Review\s+Editor\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
-        re.IGNORECASE,
+        r"(?i:Book\s+Review\s+Editor)\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
     )),
 )
 
@@ -257,9 +258,25 @@ def _clean_name(name: str) -> str:
             out = out[len(prefix):].strip()
             break
     parts = out.split()
-    while parts and parts[-1] in _INSTITUTION_TAIL_TOKENS:
-        parts.pop()
+    changed = True
+    while parts and changed:
+        changed = False
+        while parts and parts[-1] in _INSTITUTION_TAIL_TOKENS:
+            parts.pop()
+            changed = True
     return " ".join(parts)
+
+
+def _plausible_person_name(name: str) -> bool:
+    parts = name.split()
+    if not (2 <= len(parts) <= 4):
+        return False
+    lows = {p.lower().strip(".,:-") for p in parts}
+    if lows & _ROLE_GARBAGE_TOKENS:
+        return False
+    if any(token in name for token in ("Road", "Street", "Box ", "Overview", "LOGIN")):
+        return False
+    return True
 
 
 def _explicit_role_candidates(text: str) -> list[dict[str, Any]]:
@@ -268,7 +285,7 @@ def _explicit_role_candidates(text: str) -> list[dict[str, Any]]:
     for role, pattern in _EXPLICIT_ROLE_NAME_PATTERNS:
         for m in pattern.finditer(text):
             name = _clean_name(m.group(1))
-            if 2 <= len(name.split()) <= 4 and name.lower() not in seen:
+            if _plausible_person_name(name) and name.lower() not in seen:
                 seen.add(name.lower())
                 out.append({
                     "full_name": name,
@@ -286,7 +303,7 @@ def _explicit_role_candidates(text: str) -> list[dict[str, Any]]:
         name = _clean_name(m.group(1))
         if any(x.lower() in name.lower() for x in ("editorial", "overview", "special issues")):
             continue
-        if 2 <= len(name.split()) <= 4 and name.lower() not in seen:
+        if _plausible_person_name(name) and name.lower() not in seen:
             seen.add(name.lower())
             out.append({
                 "full_name": name,
@@ -314,7 +331,7 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
             for nm in _NAME_AFFIL_RE.finditer(window):
                 name = _clean_name(nm.group(1))
                 affil = nm.group(2).strip(" .,-—–:;")
-                if len(name.split()) < 2 or len(name.split()) > 5:
+                if not _plausible_person_name(name):
                     continue
                 if name.lower() in seen_names:
                     continue
@@ -328,7 +345,7 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
     for nm in _NAME_AFFIL_RE.finditer(text):
         name = _clean_name(nm.group(1))
         affil = nm.group(2).strip(" .,-—–:;")
-        if len(name.split()) < 2 or len(name.split()) > 5:
+        if not _plausible_person_name(name):
             continue
         if name.lower() in seen_names:
             continue
