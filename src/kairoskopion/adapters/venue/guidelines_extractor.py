@@ -85,7 +85,7 @@ _AI_POLICY_RE = re.compile(
     re.IGNORECASE,
 )
 _EXPLICIT_LANGUAGE_RE = re.compile(
-    r"(?:journal(?:'s)?|publication(?:'s)?)\s+language\s+(?:is|:)\s*([A-Za-z]+)",
+    r"(?:the\s+)?(?:journal(?:['’]s)?|publication(?:['’]s)?)\s+language\s+(?:is|:)\s*([A-Za-z]+)",
     re.IGNORECASE,
 )
 _LANGUAGE_HINTS_RE = re.compile(
