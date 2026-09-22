@@ -7,9 +7,12 @@ the env var is unset.
 
 Supported env vars (all optional):
 
+  - KAIROSKOPION_OPENALEX_API_KEY
+    Free OpenAlex API key. Appended as `api_key=...`; useful on shared
+    runtimes where the anonymous credit budget may be exhausted.
+
   - KAIROSKOPION_OPENALEX_MAILTO
-    Polite-pool email for OpenAlex. Appended as `?mailto=...` on
-    every OpenAlex request. ~10× rate-limit headroom.
+    Optional contact parameter retained for compatibility/politeness.
 
   - KAIROSKOPION_CROSSREF_MAILTO
     Same trick for Crossref polite pool.
@@ -45,8 +48,13 @@ def _get(name: str) -> str | None:
     return v.strip() if v and v.strip() else None
 
 
+def openalex_api_key() -> str | None:
+    """Return the configured free OpenAlex API key, or None."""
+    return _get("KAIROSKOPION_OPENALEX_API_KEY")
+
+
 def openalex_mailto() -> str | None:
-    """Return the configured OpenAlex polite-pool mailto, or None."""
+    """Return the configured OpenAlex contact mailto, or None."""
     return _get("KAIROSKOPION_OPENALEX_MAILTO")
 
 
@@ -83,17 +91,20 @@ def append_qs(url: str, params: dict[str, str]) -> str:
 
 
 def openalex_polite_url(url: str) -> str:
-    """Add mailto polite-pool param if configured.
+    """Add configured OpenAlex auth/contact query parameters.
 
-    Idempotent: if the URL already carries `mailto=` it is returned
-    unchanged.
+    OpenAlex still permits casual anonymous use, but shared runtime IPs can
+    exhaust the anonymous credit budget. A free API key makes this contour
+    explicit and attributable. Idempotent for existing params.
     """
+    params: dict[str, str] = {}
+    key = openalex_api_key()
     mt = openalex_mailto()
-    if not mt:
-        return url
-    if "mailto=" in url:
-        return url
-    return append_qs(url, {"mailto": mt})
+    if key and "api_key=" not in url:
+        params["api_key"] = key
+    if mt and "mailto=" not in url:
+        params["mailto"] = mt
+    return append_qs(url, params)
 
 
 def crossref_polite_url(url: str) -> str:
@@ -108,6 +119,7 @@ def crossref_polite_url(url: str) -> str:
 def config_summary() -> dict[str, Any]:
     """Boolean presence summary — never log actual values."""
     return {
+        "openalex_api_key_configured": openalex_api_key() is not None,
         "openalex_mailto_configured": openalex_mailto() is not None,
         "crossref_mailto_configured": crossref_mailto() is not None,
         "semantic_scholar_key_configured": semantic_scholar_api_key() is not None,
