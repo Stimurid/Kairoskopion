@@ -24,6 +24,7 @@ from .adapter import pressure_pack_from_diagnostics
 from .artikl_projection import bind_artikl_projection
 from .target_world import build_target_world_snapshot
 from .round_trip import compare_round_trip
+from .reconcile import reconcile_target_pressure_pack, derive_transition_class
 from .transition import propose_transition
 
 __all__ = [
@@ -44,5 +45,7 @@ __all__ = [
     "bind_artikl_projection",
     "build_target_world_snapshot",
     "compare_round_trip",
+    "reconcile_target_pressure_pack",
+    "derive_transition_class",
     "propose_transition",
 ]
