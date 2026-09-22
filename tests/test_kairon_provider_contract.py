@@ -612,6 +612,6 @@ def test_generic_landing_page_is_not_promoted_to_fulltext_locator():
     }]
     manifest = manifest_from_openalex_works(target_id="v1", works=works)
     art = manifest.artifacts[0]
-    assert art.acquisition_state == "metadata_only"
+    assert art.acquisition_state == "landing_locator"
     assert not any(n.startswith("fulltext_locator:") for n in art.notes)
-    assert any(n.startswith("landing_page_locator:") for n in art.notes)
+    assert any(n.startswith("landing_locator:") for n in art.notes)
