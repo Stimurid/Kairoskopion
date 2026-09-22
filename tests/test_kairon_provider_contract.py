@@ -426,3 +426,91 @@ def test_fulltext_heading_detector_rejects_pdf_headers_and_footnotes():
     """
     model = model_article_text(text, source_ref="fixture:pdf")
     assert model["headings"] == ["1 Introduction", "2 LLMs and Minds", "8 Conclusion"]
+
+
+def test_transition_engine_matches_observed_p06_profiles():
+    from kairoskopion.kairon_provider import propose_transition
+    from kairoskopion.kairon_provider.models import TargetPressureItem, TargetPressurePack
+
+    pnt = TargetPressurePack(
+        target_id="philosophy_technology",
+        snapshot_id="P06-TW-PNT-20260922-v1",
+        items=[
+            TargetPressureItem("PNT-LANG", "language_audience", "English target branch", severity="major", transformation_depth_hint="branch"),
+            TargetPressureItem("PNT-FRAME", "problem_framing", "Target-facing reframe", severity="moderate", transformation_depth_hint="reframe"),
+            TargetPressureItem("PNT-AI", "llm_disclosure", "Formal disclosure", severity="minor", transformation_depth_hint="local"),
+        ],
+    )
+    d = propose_transition(
+        call_id="P06-KAIRON-CALL-001",
+        pressure_pack=pnt,
+        protected_core=["governed bootstrapping", "generation/validation/adoption authority"],
+        allowed_change_classes=[
+            "PACKAGING", "LOCAL_EXPOSITION", "STRUCTURAL_RECONFIGURATION",
+            "DISCIPLINARY_TRANSLATION", "ARTICLE_VARIANT_BRANCH",
+        ],
+    )
+    assert d.primary_transition == "BRANCH"
+    assert d.required_operations == ["BRANCH", "REFRAME", "LOCAL_ADAPT"]
+    assert d.author_decision_required is False
+    assert d.adoption_status == "PROPOSAL_ONLY"
+
+
+def test_transition_engine_holds_on_major_target_evidence_debt():
+    from kairoskopion.kairon_provider import propose_transition
+    from kairoskopion.kairon_provider.models import TargetPressureItem, TargetPressurePack
+
+    pack = TargetPressurePack(
+        target_id="techne",
+        snapshot_id="P06-TW-TECHNE-20260922-v1",
+        items=[
+            TargetPressureItem("TECH-LANG", "language_audience", "English branch", severity="major", transformation_depth_hint="branch"),
+            TargetPressureItem("TECH-FRAME", "philosophy_of_technology_frame", "Reframe", severity="moderate", transformation_depth_hint="reframe"),
+            TargetPressureItem("TECH-CORPUS", "corpus_confidence", "Need validated fulltext corpus", severity="major", transformation_depth_hint="evidence_needed"),
+        ],
+    )
+    d = propose_transition(call_id="c-tech", pressure_pack=pack)
+    assert d.primary_transition == "HOLD"
+    assert d.blocking_evidence_debt == ["TECH-CORPUS"]
+    assert "BRANCH" in d.required_operations
+
+
+def test_transition_engine_escalates_deep_rearchitecture_for_identity_review():
+    from kairoskopion.kairon_provider import propose_transition
+    from kairoskopion.kairon_provider.models import TargetPressureItem, TargetPressurePack
+
+    pack = TargetPressurePack(
+        target_id="minds_machines",
+        snapshot_id="P06-TW-MM-20260922-v1",
+        items=[
+            TargetPressureItem("MM-LANG", "language_audience", "English branch", severity="major", transformation_depth_hint="branch"),
+            TargetPressureItem("MM-COG", "disciplinary_center", "Recenter on cognition/computation", severity="major", transformation_depth_hint="rearchitect_or_branch"),
+        ],
+    )
+    d = propose_transition(
+        call_id="c-mm",
+        pressure_pack=pack,
+        protected_core=["recursive infrastructure object"],
+        allowed_change_classes=["ARTICLE_VARIANT_BRANCH"],
+    )
+    assert d.primary_transition == "BRANCH"
+    assert "REARCHITECT" in d.required_operations
+    assert d.requires_identity_review is True
+    assert d.author_decision_required is True
+
+
+def test_transition_engine_returns_keep_when_pressure_set_is_empty():
+    from kairoskopion.kairon_provider import propose_transition
+    from kairoskopion.kairon_provider.models import TargetPressurePack
+
+    pack = TargetPressurePack(target_id="philosophy_technology", snapshot_id="snap", items=[])
+    d = propose_transition(call_id="closed", pressure_pack=pack)
+    assert d.primary_transition == "KEEP"
+    assert d.required_operations == ["KEEP"]
+    assert d.author_decision_required is False
+
+
+def test_provider_api_exposes_transition_proposal_route():
+    from kairoskopion.api.kairon_provider import router
+    paths = {route.path for route in router.routes}
+    assert "/kairon/provider/transition-proposal" in paths
