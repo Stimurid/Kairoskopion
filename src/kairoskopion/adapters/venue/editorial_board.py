@@ -268,6 +268,82 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
     return candidates
 
 
+
+
+def _clean_html_text(fragment: str) -> str:
+    return _WHITESPACE_RE.sub(" ", html.unescape(_TAG_RE.sub(" ", fragment))).strip(" ,;:-")
+
+
+def extract_candidate_members_html(raw_html: str) -> list[dict[str, Any]]:
+    """Extract editors from structured HTML before flattening.
+
+    Handles two common patterns that are lost by plain-text flattening:
+    1) <li>Name, Affiliation, Country</li> advisory-board rows;
+    2) role heading + <b>Name</b><br>Affiliation blocks.
+    It is conservative: malformed/very long names are ignored.
+    """
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    # Advisory/list rows: first comma separates person from affiliation.
+    for m in re.finditer(r"<li[^>]*>(.*?)(?=<li|</ul>)", raw_html, re.I | re.S):
+        txt = _clean_html_text(m.group(1))
+        if "," not in txt:
+            continue
+        name, rest = [x.strip() for x in txt.split(",", 1)]
+        if not (2 <= len(name.split()) <= 5) or len(name) > 100:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "full_name": name,
+            "affiliation_hint": rest[:180],
+            "role_hint": "board_member",
+        })
+
+    # Role blocks with bold person names. Limit to the editorial-team body
+    # when such a marker exists, which avoids navigation/menu bold tags.
+    body = raw_html
+    marker = re.search(r"EDITORIAL\s+TEAM", body, re.I)
+    if marker:
+        body = body[marker.start():]
+    role = "board_member"
+    role_map = [
+        (re.compile(r"Editors?-in-Chief", re.I), "editor_in_chief"),
+        (re.compile(r"Special Issues? Editor", re.I), "special_issue_editor"),
+        (re.compile(r"Managing Editor", re.I), "managing_editor"),
+        (re.compile(r"Book Review Editor", re.I), "book_review_editor"),
+        (re.compile(r"Editorial Assistants?", re.I), "editorial_assistant"),
+        (re.compile(r"Editorial Advisory Board", re.I), "board_member"),
+    ]
+    tokens = re.finditer(r"<(?:b|strong)[^>]*>(.*?)</(?:b|strong)>", body, re.I | re.S)
+    for tm in tokens:
+        label = _clean_html_text(tm.group(1))
+        if not label:
+            continue
+        matched_role = next((r for p, r in role_map if p.fullmatch(label)), None)
+        if matched_role:
+            role = matched_role
+            continue
+        if not (2 <= len(label.split()) <= 5) or len(label) > 100:
+            continue
+        if any(x in label.lower() for x in ("editorial team", "submission", "journal", "copyright")):
+            continue
+        after = body[tm.end():tm.end() + 500]
+        aff = _clean_html_text(after.split("<br", 2)[1] if "<br" in after else after)[:180]
+        key = label.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "full_name": label,
+            "affiliation_hint": aff or None,
+            "role_hint": role,
+        })
+    return out
+
 # -----------------------------------------------------------------------
 # Identity resolution
 # -----------------------------------------------------------------------
@@ -433,6 +509,7 @@ def build_editorial_board_cloud(
             return cloud
         board_page_html = raw
 
+    structured_candidates = extract_candidate_members_html(board_page_html)
     text = strip_html(board_page_html)
     if len(text) < 200:
         cloud.unknowns.append(
@@ -450,7 +527,7 @@ def build_editorial_board_cloud(
     # roles, degrees, cities and countries appear adjacent to names.
     candidates = _extract_structured_board_candidates(board_page_html)
     if not candidates:
-        candidates = extract_candidate_members(text)
+        candidates = structured_candidates or extract_candidate_members(text)
         cloud.warnings.append("editor extraction used generic text fallback")
     if not candidates:
         cloud.unknowns.append(
