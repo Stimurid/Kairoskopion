@@ -133,6 +133,42 @@ class TargetWorldSnapshot(_DictModel):
     created_at: str = field(default_factory=_now)
 
 
+
+@dataclass
+class TargetPageSnapshot(_DictModel):
+    role: str
+    url: str
+    access_status: str = "unknown"
+    content_hash: str | None = None
+    evidence_status: str = "unknown"
+    extracted: dict[str, Any] = field(default_factory=dict)
+    unknowns: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    retrieved_at: str = field(default_factory=_now)
+
+
+@dataclass
+class TargetPageBundle(_DictModel):
+    homepage_url: str
+    pages: list[TargetPageSnapshot] = field(default_factory=list)
+    discovered_urls: dict[str, list[str]] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
+    created_at: str = field(default_factory=_now)
+
+
+@dataclass
+class ProviderRunRecord(_DictModel):
+    run_id: str
+    call_id: str | None = None
+    status: str = "pending"
+    stage_status: dict[str, str] = field(default_factory=dict)
+    target_snapshot_id: str | None = None
+    evidence_refs: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
+    created_at: str = field(default_factory=_now)
+    updated_at: str = field(default_factory=_now)
+
+
 @dataclass
 class KaironProviderRequest(_DictModel):
     call_id: str
