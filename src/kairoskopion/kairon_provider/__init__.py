@@ -15,9 +15,12 @@ from .models import (
     RoundTripComparison,
     TargetPressureItem,
     TargetPressurePack,
+    TargetModelBundle,
     TargetWorldSnapshot,
 )
 from .adapter import pressure_pack_from_diagnostics
+from .target_world import build_target_world_snapshot
+from .round_trip import compare_round_trip
 
 __all__ = [
     "ArtiklStatePointer",
@@ -29,6 +32,9 @@ __all__ = [
     "RoundTripComparison",
     "TargetPressureItem",
     "TargetPressurePack",
+    "TargetModelBundle",
     "TargetWorldSnapshot",
     "pressure_pack_from_diagnostics",
+    "build_target_world_snapshot",
+    "compare_round_trip",
 ]
