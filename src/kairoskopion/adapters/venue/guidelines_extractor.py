@@ -84,6 +84,10 @@ _AI_POLICY_RE = re.compile(
     r"AI\s+(?:assistance|tools|disclosure|policy))",
     re.IGNORECASE,
 )
+_EXPLICIT_LANGUAGE_RE = re.compile(
+    r"(?:journal(?:'s)?|publication(?:'s)?)\s+language\s+(?:is|:)\s*([A-Za-z]+)",
+    re.IGNORECASE,
+)
 _LANGUAGE_HINTS_RE = re.compile(
     r"manuscripts?\s+(?:must|should)\s+be\s+(?:submitted\s+|written\s+)?in\s+([A-Za-z]+)",
     re.IGNORECASE,
@@ -222,7 +226,7 @@ def extract_formal_submission_profile(
         result["unknowns"].append("article_types: UNKNOWN_NOT_FOUND")
 
     # Language
-    lang_match = _LANGUAGE_HINTS_RE.search(text)
+    lang_match = _EXPLICIT_LANGUAGE_RE.search(text) or _LANGUAGE_HINTS_RE.search(text)
     lang_value = lang_match.group(1).lower() if lang_match else None
     if lang_value and lang_value not in _NON_LANGUAGE_TOKENS:
         result["fields_present"]["language"] = {
