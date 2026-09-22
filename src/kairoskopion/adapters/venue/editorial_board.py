@@ -343,7 +343,7 @@ def extract_candidate_members_html(raw_html: str) -> list[dict[str, Any]]:
 
             # Named staff in bold tags; multiple names can live in one <ul>.
             bolds = list(re.finditer(
-                r"<(?:b|strong)[^>]*>(.*?)</(?:b|strong)>",
+                r"<(?:b|strong)(?:\s[^>]*)?>(.*?)</(?:b|strong)>",
                 section, re.I | re.S,
             ))
             for j, bm in enumerate(bolds):
