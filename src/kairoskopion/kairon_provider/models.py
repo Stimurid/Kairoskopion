@@ -102,6 +102,23 @@ class TargetPressurePack(_DictModel):
 
 
 @dataclass
+class TargetModelBundle(_DictModel):
+    """Corpus-derived publication-world models.
+
+    These are provider observations, not canonical Artikl semantics.
+    """
+    genre_patterns: list[dict[str, Any]] = field(default_factory=list)
+    argument_patterns: list[dict[str, Any]] = field(default_factory=list)
+    method_patterns: list[dict[str, Any]] = field(default_factory=list)
+    citation_patterns: dict[str, Any] = field(default_factory=dict)
+    register_patterns: list[dict[str, Any]] = field(default_factory=list)
+    novelty_patterns: list[dict[str, Any]] = field(default_factory=list)
+    evidence_refs: list[str] = field(default_factory=list)
+    confidence: str = "low"
+    limitations: list[str] = field(default_factory=list)
+
+
+@dataclass
 class TargetWorldSnapshot(_DictModel):
     snapshot_id: str
     target_id: str
@@ -109,6 +126,7 @@ class TargetWorldSnapshot(_DictModel):
     venue_profile_ref: str | None = None
     editor_profiles: list[EditorScientificProfile] = field(default_factory=list)
     corpus_manifest: CorpusArtifactManifest | None = None
+    target_models: TargetModelBundle | None = None
     model_refs: dict[str, str] = field(default_factory=dict)
     evidence_refs: list[str] = field(default_factory=list)
     freshness: dict[str, Any] = field(default_factory=dict)
