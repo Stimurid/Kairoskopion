@@ -11,6 +11,8 @@ import hashlib
 import mimetypes
 import urllib.parse
 import urllib.request
+import ipaddress
+import socket
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +20,27 @@ DEFAULT_UA = (
     "Kairoskopion/0.2 "
     "(https://github.com/Stimurid/Kairoskopion; mailto:kairoskopion@proton.me)"
 )
+
+
+def _public_http_target(url: str) -> tuple[bool, str | None]:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return False, "unsupported_scheme"
+    host = (parsed.hostname or "").strip().lower()
+    if not host or host in {"localhost", "localhost.localdomain"}:
+        return False, "local_or_missing_host"
+    try:
+        infos = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80))
+    except OSError:
+        return False, "dns_resolution_failed"
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            continue
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+            return False, f"non_public_address:{ip}"
+    return True, None
 
 
 def _safe_ext(content_type: str | None, url: str) -> str:
@@ -59,7 +82,11 @@ def acquire_explicit_fulltext(
     fixture_content_type: str | None = None,
 ) -> dict[str, Any]:
     parsed = urllib.parse.urlparse(url)
-    if parsed.scheme not in ("http", "https"):
+    if fixture_bytes is None:
+        allowed, reason = _public_http_target(url)
+        if not allowed:
+            return {"status": "blocked", "url": url, "error": reason}
+    elif parsed.scheme not in ("http", "https"):
         return {"status": "blocked", "url": url, "error": "unsupported_scheme"}
 
     content_type = fixture_content_type
