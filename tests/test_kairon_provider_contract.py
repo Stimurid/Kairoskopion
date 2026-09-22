@@ -366,3 +366,45 @@ def test_structured_pdc_editorial_team_parser():
     names = [r["full_name"] for r in rows]
     assert names == ["Levi Checketts", "Stacey O. Irwin"]
     assert all(r["role_hint"] == "Editors-in-Chief" for r in rows)
+
+
+def test_techne_guidelines_fixture_keeps_abstract_and_manuscript_limits_separate():
+    from kairoskopion.adapters.venue.guidelines_extractor import extract_formal_submission_profile
+
+    html = """
+    <html><body>
+    <h1>General Requirements</h1>
+    <p>The first page should contain the title of the paper, an abstract
+    (up to 150 words), and 4-5 keywords or phrases.</p>
+    <p>Total length should not exceed 8,500 words.</p>
+    <p>All references should follow the Chicago author/date citation style.</p>
+    </body></html>
+    """
+    result = extract_formal_submission_profile(guidelines_html=html)
+    assert result["fields_present"]["abstract_word_limit"]["max"] == 150
+    assert result["fields_present"]["word_limit"]["max"] == 8500
+    assert result["fields_present"]["reference_style"]["value"] == "chicago"
+
+
+def test_techne_editorial_fixture_preserves_names_and_roles():
+    from kairoskopion.adapters.venue.editorial_board import extract_candidate_members_html
+
+    html = """
+    <p><b>EDITORIAL TEAM</b></p>
+    <b><p>Editors-in-Chief</p></b>
+    <ul><b>Levi Checketts</b><br>Hong Kong Baptist University<br>
+    <br><b>Stacey O. Irwin</b><br>Millersville University</ul>
+    <b><p>Special Issues Editor</p></b>
+    <ul><b>Marco Tamborini</b><br>Pegaso University</ul>
+    <b><p>Editorial Advisory Board</p></b>
+    <ul>
+      <li>Vincent Blok, Erasmus University Rotterdam, The Netherlands
+      <li>Philip Brey, University of Twente, The Netherlands
+    </ul>
+    """
+    rows = extract_candidate_members_html(html)
+    by_name = {x["full_name"]: x for x in rows}
+    assert by_name["Levi Checketts"]["role_hint"] == "editor_in_chief"
+    assert by_name["Stacey O. Irwin"]["role_hint"] == "editor_in_chief"
+    assert by_name["Marco Tamborini"]["role_hint"] == "special_issue_editor"
+    assert by_name["Vincent Blok"]["affiliation_hint"].startswith("Erasmus University")
