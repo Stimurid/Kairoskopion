@@ -257,6 +257,17 @@ def _clean_name(name: str) -> str:
         if out.startswith(prefix):
             out = out[len(prefix):].strip()
             break
+    # Flattened HTML often glues a role heading to the first following name
+    # (e.g. "Associate Editors John Doe"). Strip only known role prefixes;
+    # do not generally delete title-like words from person names.
+    out = re.sub(
+        r"^(?:Editor-in-Chief|Editors?-in-Chief|Associate Editors?|"
+        r"Editorial Advisory Board|Advisory Board|Editorial Board|"
+        r"Managing Editor|Special Issues? Editor|Book Review Editor)\s+",
+        "",
+        out,
+        flags=re.IGNORECASE,
+    ).strip()
     parts = out.split()
     changed = True
     while parts and changed:
