@@ -171,6 +171,31 @@ class ProviderRunRecord(_DictModel):
 
 
 @dataclass
+class VenueCandidateDisposition(_DictModel):
+    candidate_key: str
+    canonical_name: str
+    disposition: str
+    issn: str | None = None
+    sources: list[str] = field(default_factory=list)
+    matched_terms: list[str] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
+    evidence_gaps: list[str] = field(default_factory=list)
+    merged_candidate_count: int = 1
+    raw_candidate_refs: list[str] = field(default_factory=list)
+
+
+@dataclass
+class VenueCandidateScreeningBatch(_DictModel):
+    raw_count: int
+    unique_count: int
+    dispositions: list[VenueCandidateDisposition] = field(default_factory=list)
+    duplicate_groups: list[dict[str, Any]] = field(default_factory=list)
+    semantic_terms: list[str] = field(default_factory=list)
+    unknowns: list[str] = field(default_factory=list)
+    created_at: str = field(default_factory=_now)
+
+
+@dataclass
 class KaironTransitionDecision(_DictModel):
     """Proposal-level Kairon transition decision.
 
