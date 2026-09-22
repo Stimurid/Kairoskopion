@@ -11,6 +11,7 @@ from .models import (
     CorpusArtifactManifest,
     EditorScientificProfile,
     KaironProviderRequest,
+    KaironTransitionDecision,
     KaironProviderResponse,
     RoundTripComparison,
     TargetPressureItem,
@@ -21,6 +22,7 @@ from .models import (
 from .adapter import pressure_pack_from_diagnostics
 from .target_world import build_target_world_snapshot
 from .round_trip import compare_round_trip
+from .transition import propose_transition
 
 __all__ = [
     "ArtiklStatePointer",
@@ -28,6 +30,7 @@ __all__ = [
     "CorpusArtifactManifest",
     "EditorScientificProfile",
     "KaironProviderRequest",
+    "KaironTransitionDecision",
     "KaironProviderResponse",
     "RoundTripComparison",
     "TargetPressureItem",
@@ -37,4 +40,5 @@ __all__ = [
     "pressure_pack_from_diagnostics",
     "build_target_world_snapshot",
     "compare_round_trip",
+    "propose_transition",
 ]
