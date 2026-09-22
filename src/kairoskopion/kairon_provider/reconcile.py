@@ -33,7 +33,7 @@ def _stem(token: str) -> str:
 def _terms(text: str) -> set[str]:
     return {
         _stem(x)
-        for x in re.findall(r"[A-Za-z][A-Za-z\\-]{2,}", text or "")
+        for x in re.findall(r"[A-Za-z][A-Za-z-]{2,}", text or "")
         if x.lower() not in _STOP
     }
 
@@ -65,7 +65,7 @@ def _reference_count_from_projection(article: ArticleModel) -> int | None:
     if article.reference_count is not None and article.reference_count > 0:
         return int(article.reference_count)
     text = article.citation_ecology_current or ""
-    m = re.search(r"(\\d+)\\s+(?:bibliography\\s+items|references?|sources?)", text, re.I)
+    m = re.search(r"(\d+)\s+(?:bibliography\s+items|references?|sources?)", text, re.I)
     return int(m.group(1)) if m else None
 
 
