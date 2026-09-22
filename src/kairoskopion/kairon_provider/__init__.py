@@ -6,6 +6,7 @@ the older internal entities are gradually retyped.
 """
 
 from .models import (
+    ArtiklArticleProjection,
     ArtiklStatePointer,
     CorpusArtifact,
     CorpusArtifactManifest,
@@ -20,11 +21,13 @@ from .models import (
     TargetWorldSnapshot,
 )
 from .adapter import pressure_pack_from_diagnostics
+from .artikl_projection import bind_artikl_projection
 from .target_world import build_target_world_snapshot
 from .round_trip import compare_round_trip
 from .transition import propose_transition
 
 __all__ = [
+    "ArtiklArticleProjection",
     "ArtiklStatePointer",
     "CorpusArtifact",
     "CorpusArtifactManifest",
@@ -38,6 +41,7 @@ __all__ = [
     "TargetModelBundle",
     "TargetWorldSnapshot",
     "pressure_pack_from_diagnostics",
+    "bind_artikl_projection",
     "build_target_world_snapshot",
     "compare_round_trip",
     "propose_transition",
