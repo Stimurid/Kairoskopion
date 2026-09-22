@@ -657,3 +657,71 @@ def test_artikl_projection_overrides_shallow_standalone_semantics():
     assert article.extraction_status == "derived_from_artikl"
     assert "drive:manuscript" in article.source_refs
     assert all("genre not detected" not in u for u in article.unknowns)
+
+
+def test_reconciliation_suppresses_false_topic_and_genre_pressure():
+    from kairoskopion.schema import ArticleModel, VenueModel
+    from kairoskopion.kairon_provider import (
+        TargetPressureItem,
+        TargetPressurePack,
+        reconcile_target_pressure_pack,
+        derive_transition_class,
+    )
+
+    article = ArticleModel(
+        title_current="Governed Bootstrapping of Thinking Infrastructure",
+        abstract_current="A conceptual synthesis in philosophy of technology about recursive improvement of thinking tools and AI.",
+        problem_statement="How can thinking infrastructure recursively improve under governance?",
+        object_of_inquiry="thinking infrastructure",
+        core_claims=["Re-entry distinguishes bootstrapping from ordinary improvement."],
+        genre_current="conceptual_article",
+        disciplinary_register_current="philosophy of technology; philosophy of AI",
+        citation_ecology_current="20 references verified",
+        word_count=4500,
+        has_ai_disclosure=False,
+    )
+    venue = VenueModel(
+        canonical_name="Example Philosophy & Technology",
+        scope_summary="philosophy and technology; conceptual foundations and consequences of technologies",
+        article_types_supported=["original article"],
+        author_guidelines_refs=["https://example.org/guidelines"],
+        source_refs=["https://example.org/scope"],
+    )
+    base = TargetPressurePack(
+        target_id="v1",
+        snapshot_id="s1",
+        items=[
+            TargetPressureItem(
+                pressure_id="mm-topic", dimension="topic",
+                observation="legacy weak topic", severity="major",
+                transformation_depth_hint="structural_or_deeper",
+            ),
+            TargetPressureItem(
+                pressure_id="mm-genre", dimension="genre",
+                observation="legacy weak genre", severity="major",
+                transformation_depth_hint="identity_or_reseed_review",
+            ),
+            TargetPressureItem(
+                pressure_id="fit-cite", dimension="citation_ecology",
+                observation="not assessed", severity="unknown",
+                transformation_depth_hint="evidence_needed",
+            ),
+        ],
+    )
+    pack = reconcile_target_pressure_pack(
+        article=article,
+        venue=venue,
+        base_pack=base,
+        target_models={"genre_patterns": [{"label": "conceptual_article", "share": 0.3}]},
+        formal_profile={"fields_present": {
+            "reference_style": {"value": "apa"},
+            "ai_policy_mentioned": {"value": True},
+        }},
+    )
+    assert not any(x.dimension == "topic" for x in pack.items)
+    assert not any(x.dimension == "genre" for x in pack.items)
+    assert any(x.pressure_id == "target:citation_ecology:profile" for x in pack.items)
+    assert any(x.pressure_id == "target:formal:reference_style" for x in pack.items)
+    assert any(x.pressure_id == "target:formal:ai_disclosure" for x in pack.items)
+    assert len(pack.conflicts) >= 2
+    assert derive_transition_class(pack) == "LOCAL_ADAPT"
