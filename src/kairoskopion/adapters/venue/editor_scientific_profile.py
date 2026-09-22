@@ -19,6 +19,11 @@ OPENALEX_WORKS = "https://api.openalex.org/works"
 
 def _http_json(url: str, timeout: int = 15) -> dict[str, Any] | None:
     try:
+        from ...config.env import openalex_polite_url
+        url = openalex_polite_url(url)
+    except Exception:
+        pass
+    try:
         req = urllib.request.Request(url, headers={"User-Agent": DEFAULT_UA})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8"))
