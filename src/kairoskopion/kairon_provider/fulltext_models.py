@@ -34,35 +34,95 @@ _MOVE_MARKERS = {
 }
 
 
-def _is_heading(text: str) -> bool:
-    """Conservative heading detector for extracted scholarly PDFs.
+def _heading_score(title: str) -> float:
+    """Score title-likeness of a numbered PDF line.
 
-    PDF text extraction frequently promotes page headers, page numbers and
-    numbered footnotes into standalone lines. Keep explicit markdown/all-caps
-    headings and numbered section headings, but reject common page/header and
-    prose-footnote shapes.
+    Real section headings tend to be short and title-like; PDF footnotes tend
+    to be sentence-like continuations. This is intentionally transparent and
+    conservative rather than an opaque classifier.
     """
-    if _PAGE_HEADER_RE.match(text):
-        return False
-    if _MARKDOWN_HEADING_RE.match(text) or _ALLCAPS_HEADING_RE.match(text):
-        return True
-    m = _NUMBERED_HEADING_RE.match(text)
-    if not m:
-        return False
-    number, title = m.groups()
-    try:
-        first = int(number.split(".", 1)[0])
-    except ValueError:
-        return False
-    if first > 30:
-        return False
+    words = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ’'\-]*", title)
+    if not words:
+        return -10.0
+    low = title.lower()
+    if any(x in low for x in (
+        "university of", "department of", "institute for", "corresponding author",
+        "page ", "http://", "https://",
+    )):
+        return -8.0
     if title.rstrip().endswith((".", ";")):
-        return False
-    if len(title.split()) > 18:
-        return False
-    if re.search(r"\bPage\s+\d+\s+of\s+\d+\b", title, re.I):
-        return False
-    return True
+        return -5.0
+    if len(words) > 18:
+        return -4.0
+    if len(words) < 2:
+        return -3.0
+    capped = sum(1 for w in words if w[:1].isupper() or w.isupper())
+    ratio = capped / len(words)
+    score = ratio * 5.0
+    if 2 <= len(words) <= 12:
+        score += 1.0
+    if title.endswith("?"):
+        score += 0.5
+    # Known scholarly section labels are strong anchors.
+    probe = title.lower()
+    if any(term in probe for terms in _SECTION_KIND.values() for term in terms):
+        score += 4.0
+    return score
+
+
+def _extract_headings(lines: list[str]) -> list[str]:
+    """Select structural headings while suppressing PDF footnote/header noise."""
+    explicit = [x for x in lines if _MARKDOWN_HEADING_RE.match(x)]
+    if explicit:
+        return explicit[:80]
+
+    allcaps = [x for x in lines if _ALLCAPS_HEADING_RE.match(x) and not _PAGE_HEADER_RE.match(x)]
+
+    numbered: list[tuple[int, str, str, float, int]] = []
+    for pos, line in enumerate(lines):
+        if _PAGE_HEADER_RE.match(line):
+            continue
+        m = _NUMBERED_HEADING_RE.match(line)
+        if not m:
+            continue
+        number, title = m.groups()
+        try:
+            major = int(number.split(".", 1)[0])
+        except ValueError:
+            continue
+        if major > 30:
+            continue
+        score = _heading_score(title)
+        if score < 1.5:
+            continue
+        numbered.append((major, number, line, score, pos))
+
+    # Pick the strongest top-level candidate for each major section number.
+    # Footnotes commonly repeat section-like numbers; the best title-shape is
+    # markedly more stable than "first numeric line wins".
+    top: dict[int, tuple[int, str, str, float, int]] = {}
+    for item in numbered:
+        major, number, line, score, pos = item
+        if "." in number:
+            continue
+        prev = top.get(major)
+        if prev is None or score > prev[3]:
+            top[major] = item
+
+    selected = list(top.values())
+    selected.sort(key=lambda x: x[4])
+    selected_lines = [x[2] for x in selected]
+
+    # Keep high-confidence decimal subsections whose parent major survived.
+    parent_majors = set(top)
+    subs = [
+        x for x in numbered
+        if "." in x[1] and x[0] in parent_majors and x[3] >= 2.0
+    ]
+    merged = [(x, lines.index(x)) for x in selected_lines]
+    merged.extend((x[2], x[4]) for x in subs)
+    merged.extend((x, lines.index(x)) for x in allcaps)
+    return [x for x, _ in sorted(dict(merged).items(), key=lambda kv: kv[1])][:80]
 
 
 def _classify_heading(text: str) -> str:
@@ -75,7 +135,7 @@ def _classify_heading(text: str) -> str:
 
 def model_article_text(text: str, *, source_ref: str | None = None) -> dict[str, Any]:
     lines = [x.strip() for x in text.splitlines() if x.strip()]
-    headings = [line for line in lines if _is_heading(line)][:80]
+    headings = _extract_headings(lines)
     section_sequence = [
         {"heading": h, "kind": _classify_heading(h)}
         for h in headings
