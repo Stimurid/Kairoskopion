@@ -77,6 +77,13 @@ CATEGORY_PATTERNS: dict[str, list[re.Pattern]] = {
         re.compile(r"about[-_ ]?(?:the[-_ ]?)?journal", re.IGNORECASE),
         re.compile(r"\bjournal[-_ ]?info\b", re.IGNORECASE),
     ],
+    "cfp_special_issue": [
+        re.compile(r"call[-_ ]?for[-_ ]?papers?", re.IGNORECASE),
+        re.compile(r"special[-_ ]?issue", re.IGNORECASE),
+        re.compile(r"thematic[-_ ]?(?:issue|collection)", re.IGNORECASE),
+        re.compile(r"topical[-_ ]?collection", re.IGNORECASE),
+        re.compile(r"research[-_ ]?topic", re.IGNORECASE),
+    ],
     "policy_oa_apc": [
         re.compile(r"open[-_ ]?access", re.IGNORECASE),
         re.compile(r"article[-_ ]?processing[-_ ]?charge", re.IGNORECASE),
