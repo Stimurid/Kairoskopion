@@ -171,6 +171,32 @@ class ProviderRunRecord(_DictModel):
 
 
 @dataclass
+class KaironTransitionDecision(_DictModel):
+    """Proposal-level Kairon transition decision.
+
+    This object may classify transformation depth, but it cannot adopt a
+    semantic change. Adoption remains with ARTIKL.KAIRON / author governance.
+    """
+    decision_id: str
+    call_id: str
+    target_id: str
+    snapshot_id: str
+    primary_transition: str
+    required_operations: list[str] = field(default_factory=list)
+    alternative_transitions: list[str] = field(default_factory=list)
+    pressure_ids: list[str] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
+    evidence_refs: list[str] = field(default_factory=list)
+    blocking_evidence_debt: list[str] = field(default_factory=list)
+    requires_identity_review: bool = False
+    author_decision_required: bool = False
+    adoption_status: str = "PROPOSAL_ONLY"
+    authority_boundary: str = "ARTIKL.KAIRON/author"
+    unknowns: list[str] = field(default_factory=list)
+    created_at: str = field(default_factory=_now)
+
+
+@dataclass
 class KaironProviderRequest(_DictModel):
     call_id: str
     artikl_state: ArtiklStatePointer
