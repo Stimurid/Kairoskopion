@@ -514,3 +514,69 @@ def test_provider_api_exposes_transition_proposal_route():
     from kairoskopion.api.kairon_provider import router
     paths = {route.path for route in router.routes}
     assert "/kairon/provider/transition-proposal" in paths
+
+
+def test_techne_shaped_guidelines_do_not_confuse_abstract_and_total_word_limit():
+    from kairoskopion.adapters.venue.guidelines_extractor import extract_formal_submission_profile
+
+    html = """
+    <html><body>
+    <p>The first page should contain an abstract (up to 150 words).</p>
+    <p>Your manuscript should be double-spaced. Total length should not exceed 8,500 words.</p>
+    <p>All references should follow the Chicago author/date citation style.</p>
+    </body></html>
+    """
+    result = extract_formal_submission_profile(guidelines_html=html)
+    assert result["fields_present"]["abstract_word_limit"]["max"] == 150
+    assert result["fields_present"]["word_limit"]["max"] == 8500
+
+
+def test_techne_shaped_editorial_page_extracts_clean_core_editor_names():
+    from kairoskopion.adapters.venue.editorial_board import extract_candidate_members
+
+    text = (
+        "EDITORIAL TEAM Editors-in-Chief Levi Checketts Academy of Chinese, History, "
+        "Religion and Philosophy Centre for Applied Ethics Hong Kong Baptist University "
+        "[email protected] Stacey O. Irwin College of Arts, Humanities and Social Sciences "
+        "Millersville University [email protected] Special Issues Editor Marco Tamborini "
+        "Department of Literary, Linguistic, and Philosophical Studies Pegaso University "
+        "[email protected] Managing Editor Michael Poznic Institute for Technology Assessment "
+        "and Systems Analysis Karlsruhe Institute of Technology"
+    )
+    candidates = extract_candidate_members(text)
+    names = {c["full_name"] for c in candidates}
+    assert "Levi Checketts" in names
+    assert "Stacey O. Irwin" in names
+    assert "Marco Tamborini" in names
+    assert "Michael Poznic" in names
+
+
+def test_target_world_uses_crossref_fallback_when_openalex_empty(monkeypatch):
+    import kairoskopion.kairon_provider.target_world as tw
+
+    monkeypatch.setattr(tw, "fetch_works_for_venue", lambda *a, **k: [])
+    monkeypatch.setattr(
+        tw,
+        "fetch_crossref_works_for_issn",
+        lambda *a, **k: [{
+            "id": "https://doi.org/10.1/x",
+            "title": "Conceptual Technology",
+            "publication_year": 2026,
+            "doi": "https://doi.org/10.1/x",
+            "_reconstructed_abstract": "We propose a conceptual framework for technology.",
+            "referenced_works_count": 20,
+            "authorships": [{"author": {"display_name": "A. Author"}}],
+            "primary_location": {"landing_page_url": "https://doi.org/10.1/x"},
+            "open_access": {},
+            "_provider": "crossref",
+        }],
+    )
+    snap = tw.build_target_world_snapshot(
+        target_id="v1",
+        openalex_source_id="S1",
+        issn="1234-5678",
+        max_editors=0,
+    )
+    assert len(snap.corpus_manifest.artifacts) == 1
+    assert snap.freshness["corpus_provider"] == "crossref_fallback"
+    assert any("Crossref fallback" in x for x in snap.freshness["unknowns"])
