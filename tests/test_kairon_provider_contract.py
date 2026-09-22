@@ -589,6 +589,9 @@ def test_explicit_journal_language_statement_beats_word_format_false_positive():
     <html><body>
     <h2>Language</h2><p>The journal's language is English.</p>
     <p>Manuscripts should be submitted in Word.</p>
+    <p>Authors should prepare a complete manuscript with title, abstract, keywords,
+    main text, references, declarations, and any supplementary information required
+    by the journal. The submission page contains additional editorial instructions.</p>
     </body></html>
     """
     result = extract_formal_submission_profile(guidelines_html=html)
