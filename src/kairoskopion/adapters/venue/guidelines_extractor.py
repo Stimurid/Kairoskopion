@@ -45,12 +45,12 @@ _WS_RE = re.compile(r"\s+")
 _TOTAL_LENGTH_RE = re.compile(
     r"(?:total\s+(?:length|word\s+count)|manuscript\s+(?:length|word\s+count))"
     r"[^0-9]{0,50}(?:not\s+exceed|maximum|max\.?|up\s+to)?[^0-9]{0,20}"
-    r"(\d{3,6})\s*words?",
+    r"([\d,]{3,7})\s*words?",
     re.IGNORECASE,
 )
 _WORD_LIMIT_RE = re.compile(
     r"(?:word\s+(?:limit|count|length)|maximum|max\.?|up\s+to)"
-    r"[^0-9]{0,30}(\d{3,6})(?:\s*[-–—to]\s*(\d{3,6}))?\s*words?",
+    r"[^0-9]{0,30}([\d,]{3,7})(?:\s*[-–—to]\s*([\d,]{3,7}))?\s*words?",
     re.IGNORECASE,
 )
 _ABSTRACT_LIMIT_RE = re.compile(
