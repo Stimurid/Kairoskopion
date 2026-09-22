@@ -9,9 +9,12 @@ from typing import Any
 from ..adapters.source_intake import SourceRole, register_local_source
 from .models import CorpusArtifactManifest
 
-_HEADING_RE = re.compile(
-    r"^(?:#{1,6}\s+.+|\d+(?:\.\d+)*[.)]?\s+.{3,100}|[A-Z][A-Z0-9 ,:&/\-]{5,100})$"
+_MARKDOWN_HEADING_RE = re.compile(r"^#{1,6}\\s+.+$")
+_NUMBERED_HEADING_RE = re.compile(
+    r"^(\\d+(?:\\.\\d+)*)(?:[.)])?\\s+(.{3,140})$"
 )
+_ALLCAPS_HEADING_RE = re.compile(r"^[A-Z][A-Z0-9 ,:&/\\-]{5,100}$")
+_PAGE_HEADER_RE = re.compile(r"^\\d+\\s+Page\\s+\\d+\\s+of\\s+\\d+$", re.I)
 _SECTION_KIND = {
     "introduction": ("introduction", "background"),
     "literature": ("literature review", "related work", "theoretical background"),
@@ -31,6 +34,37 @@ _MOVE_MARKERS = {
 }
 
 
+def _is_heading(text: str) -> bool:
+    """Conservative heading detector for extracted scholarly PDFs.
+
+    PDF text extraction frequently promotes page headers, page numbers and
+    numbered footnotes into standalone lines. Keep explicit markdown/all-caps
+    headings and numbered section headings, but reject common page/header and
+    prose-footnote shapes.
+    """
+    if _PAGE_HEADER_RE.match(text):
+        return False
+    if _MARKDOWN_HEADING_RE.match(text) or _ALLCAPS_HEADING_RE.match(text):
+        return True
+    m = _NUMBERED_HEADING_RE.match(text)
+    if not m:
+        return False
+    number, title = m.groups()
+    try:
+        first = int(number.split(".", 1)[0])
+    except ValueError:
+        return False
+    if first > 30:
+        return False
+    if title.rstrip().endswith((".", ";")):
+        return False
+    if len(title.split()) > 18:
+        return False
+    if re.search(r"\\bPage\\s+\\d+\\s+of\\s+\\d+\\b", title, re.I):
+        return False
+    return True
+
+
 def _classify_heading(text: str) -> str:
     low = text.lower().strip("# 0123456789.)")
     for kind, terms in _SECTION_KIND.items():
@@ -41,7 +75,7 @@ def _classify_heading(text: str) -> str:
 
 def model_article_text(text: str, *, source_ref: str | None = None) -> dict[str, Any]:
     lines = [x.strip() for x in text.splitlines() if x.strip()]
-    headings = [line for line in lines if _HEADING_RE.match(line)][:80]
+    headings = [line for line in lines if _is_heading(line)][:80]
     section_sequence = [
         {"heading": h, "kind": _classify_heading(h)}
         for h in headings
