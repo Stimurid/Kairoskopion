@@ -73,3 +73,113 @@ def test_provider_response_can_carry_partial_snapshot_without_erasing_errors():
     data = response.to_dict()
     assert data["target_snapshot"]["snapshot_id"] == "snap-1"
     assert data["errors"] == ["editor_profile_timeout"]
+
+
+def test_target_world_builds_editor_corpus_and_models_from_fixtures():
+    from kairoskopion.kairon_provider.target_world import build_target_world_snapshot
+
+    works = [
+        {
+            "id": "https://openalex.org/W1",
+            "title": "A conceptual framework for responsible AI",
+            "publication_year": 2025,
+            "doi": "https://doi.org/10.1/example",
+            "_reconstructed_abstract": "We propose a conceptual framework and critique existing models.",
+            "referenced_works_count": 42,
+            "authorships": [{"author": {"display_name": "A. Author"}}],
+            "open_access": {"oa_url": "https://example.org/paper.pdf"},
+        },
+        {
+            "id": "https://openalex.org/W2",
+            "title": "Case study of algorithmic governance",
+            "publication_year": 2024,
+            "_reconstructed_abstract": "This empirical case study uses interviews and comparison.",
+            "referenced_works_count": 31,
+            "authorships": [{"author": {"display_name": "B. Author"}}],
+        },
+    ]
+    editor_members = [
+        {"full_name": "Jane Editor", "role": "editor_in_chief", "affiliation": "Example University"}
+    ]
+    editor_fixtures = {
+        "Jane Editor": {
+            "author": {
+                "id": "https://openalex.org/A1",
+                "display_name": "Jane Editor",
+                "works_count": 50,
+                "cited_by_count": 1000,
+                "last_known_institution": {"display_name": "Example University"},
+                "x_concepts": [
+                    {"display_name": "Philosophy of Technology"},
+                    {"display_name": "Artificial Intelligence"},
+                ],
+            },
+            "works": [
+                {
+                    "id": "https://openalex.org/EW1",
+                    "title": "Technology and responsibility",
+                    "publication_year": 2023,
+                    "doi": "https://doi.org/10.1/editor",
+                    "cited_by_count": 12,
+                    "type": "article",
+                }
+            ],
+        }
+    }
+
+    snap = build_target_world_snapshot(
+        target_id="venue-1",
+        openalex_source_id="S1",
+        fixture_works=works,
+        editor_members=editor_members,
+        editor_fixtures=editor_fixtures,
+        provider_commit="test",
+    )
+    assert snap.corpus_manifest is not None
+    assert len(snap.corpus_manifest.artifacts) == 2
+    assert snap.corpus_manifest.artifacts[0].acquisition_state == "fulltext_locator"
+    assert snap.target_models is not None
+    assert snap.target_models.genre_patterns
+    assert snap.editor_profiles[0].name == "Jane Editor"
+    assert snap.editor_profiles[0].key_works[0]["title"] == "Technology and responsibility"
+
+
+def test_round_trip_resolves_pressure_on_same_snapshot():
+    from kairoskopion.kairon_provider import compare_round_trip
+
+    prior_state = ArtiklStatePointer(state_id="s1", state_type="MANUSCRIPT")
+    current_state = ArtiklStatePointer(state_id="s2", state_type="TARGET_VARIANT")
+    prior = pressure_pack_from_diagnostics(
+        target_id="venue-1",
+        snapshot_id="snap-1",
+        fit={"axes": [
+            {"axis": "genre", "value": "weak"},
+            {"axis": "method", "value": "weak"},
+        ]},
+    )
+    current = pressure_pack_from_diagnostics(
+        target_id="venue-1",
+        snapshot_id="snap-1",
+        fit={"axes": [
+            {"axis": "genre", "value": "strong"},
+            {"axis": "method", "value": "weak"},
+        ]},
+    )
+    diff = compare_round_trip(
+        call_id="c1",
+        prior_state=prior_state,
+        current_state=current_state,
+        prior_pack=prior,
+        current_pack=current,
+    )
+    assert "fit:genre:0" in diff.resolved_pressure_ids
+    assert "fit:method:1" in diff.persistent_pressure_ids
+    assert "same frozen target snapshot" in diff.notes[0]
+
+
+def test_provider_api_router_imports():
+    from kairoskopion.api.kairon_provider import router
+    paths = {route.path for route in router.routes}
+    assert "/kairon/provider/pressure-pack" in paths
+    assert "/kairon/provider/target-world" in paths
+    assert "/kairon/provider/re-evaluate" in paths
