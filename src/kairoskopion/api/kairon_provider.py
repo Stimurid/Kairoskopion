@@ -27,6 +27,7 @@ from ..kairon_provider.round_trip import compare_round_trip
 from ..kairon_provider.storage import ProviderRunStore, TargetWorldStore
 from ..kairon_provider.target_pages import build_target_page_bundle
 from ..kairon_provider.target_world import build_target_world_snapshot
+from ..kairon_provider.transition import propose_transition
 
 router = APIRouter(
     prefix="/kairon/provider",
@@ -68,6 +69,13 @@ class TargetPagesRequest(BaseModel):
 class FulltextAcquireRequest(BaseModel):
     max_files: int = 10
     max_bytes_per_file: int = 25 * 1024 * 1024
+
+
+class TransitionProposalRequest(BaseModel):
+    call_id: str
+    pressure_pack: dict[str, Any]
+    protected_core: list[str] = Field(default_factory=list)
+    allowed_change_classes: list[str] = Field(default_factory=list)
 
 
 class RoundTripRequest(BaseModel):
@@ -269,6 +277,17 @@ def update_run_stage(run_id: str, req: RunStageUpdateRequest):
         data["status"] = "partial"
     _run_store.put(data)
     return data
+
+
+@router.post("/transition-proposal")
+def transition_proposal(req: TransitionProposalRequest):
+    pack = _pack(req.pressure_pack)
+    return propose_transition(
+        call_id=req.call_id,
+        pressure_pack=pack,
+        protected_core=req.protected_core,
+        allowed_change_classes=req.allowed_change_classes,
+    ).to_dict()
 
 
 @router.post("/re-evaluate")
