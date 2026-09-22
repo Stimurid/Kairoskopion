@@ -67,6 +67,30 @@ _NAME_AFFIL_RE = re.compile(
     r"([^,\)\n\r<]{4,120})"
 )
 
+_COUNTRY_PREFIXES = (
+    "USA ", "UK ", "China ", "Sweden ", "Austria ", "Australia ",
+    "The Netherlands ", "Netherlands ", "Germany ", "Italy ",
+)
+
+_EXPLICIT_ROLE_NAME_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
+    ("editor_in_chief", re.compile(
+        r"Editors?-in-Chief\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
+        re.IGNORECASE,
+    )),
+    ("special_issues_editor", re.compile(
+        r"Special\s+Issues?\s+Editor\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
+        re.IGNORECASE,
+    )),
+    ("managing_editor", re.compile(
+        r"Managing\s+Editor\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
+        re.IGNORECASE,
+    )),
+    ("book_review_editor", re.compile(
+        r"Book\s+Review\s+Editor\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
+        re.IGNORECASE,
+    )),
+)
+
 _ROLE_PATTERNS = {
     "editor_in_chief": re.compile(
         r"editor[\s\-]*in[\s\-]*chief|main\s+editor|chief\s+editor",
@@ -221,6 +245,49 @@ def _extract_structured_board_candidates(raw_html: str) -> list[dict[str, Any]]:
     return candidates
 
 
+def _clean_name(name: str) -> str:
+    out = name.strip(" .,-—–:;")
+    for prefix in _COUNTRY_PREFIXES:
+        if out.startswith(prefix):
+            out = out[len(prefix):].strip()
+            break
+    return out
+
+
+def _explicit_role_candidates(text: str) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for role, pattern in _EXPLICIT_ROLE_NAME_PATTERNS:
+        for m in pattern.finditer(text):
+            name = _clean_name(m.group(1))
+            if 2 <= len(name.split()) <= 4 and name.lower() not in seen:
+                seen.add(name.lower())
+                out.append({
+                    "full_name": name,
+                    "affiliation_hint": None,
+                    "role_hint": role,
+                })
+    # Multi-editor headings often list another editor after the first contact
+    # block. Capture a proper-name sequence immediately after an email marker,
+    # but only before the next explicit role heading.
+    for m in re.finditer(
+        r"(?:\[email\s*protected\]|[\w.+-]+@[\w.-]+\.\w+)\s+"
+        r"([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
+        text,
+    ):
+        name = _clean_name(m.group(1))
+        if any(x.lower() in name.lower() for x in ("editorial", "overview", "special issues")):
+            continue
+        if 2 <= len(name.split()) <= 4 and name.lower() not in seen:
+            seen.add(name.lower())
+            out.append({
+                "full_name": name,
+                "affiliation_hint": None,
+                "role_hint": "editor_in_chief",
+            })
+    return out
+
+
 def extract_candidate_members(text: str) -> list[dict[str, Any]]:
     """Heuristic extraction of (name, affiliation) pairs from board page text.
 
@@ -228,8 +295,8 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
     `role_hint`. Best-effort; many board pages will not match cleanly
     and will yield 0 candidates — that's honest UNKNOWN territory.
     """
-    candidates: list[dict[str, Any]] = []
-    seen_names: set[str] = set()
+    candidates: list[dict[str, Any]] = _explicit_role_candidates(text)
+    seen_names: set[str] = {c["full_name"].lower() for c in candidates}
     # Find role-tagged windows (best signal)
     for role, pat in _ROLE_PATTERNS.items():
         for m in pat.finditer(text):
@@ -237,7 +304,7 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
             window_end = min(len(text), m.end() + 250)
             window = text[window_start:window_end]
             for nm in _NAME_AFFIL_RE.finditer(window):
-                name = nm.group(1).strip(" .,-—–:;")
+                name = _clean_name(nm.group(1))
                 affil = nm.group(2).strip(" .,-—–:;")
                 if len(name.split()) < 2 or len(name.split()) > 5:
                     continue
@@ -251,7 +318,7 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
                 })
     # Plus general matches outside any role window
     for nm in _NAME_AFFIL_RE.finditer(text):
-        name = nm.group(1).strip(" .,-—–:;")
+        name = _clean_name(nm.group(1))
         affil = nm.group(2).strip(" .,-—–:;")
         if len(name.split()) < 2 or len(name.split()) > 5:
             continue
