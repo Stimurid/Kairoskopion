@@ -192,7 +192,7 @@ def _norm_person_name(value: str) -> list[str]:
     return [
         t.lower()
         for t in re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ'’-]+", value or "")
-        if len(t) > 1
+        if len(t) >= 1
     ]
 
 
