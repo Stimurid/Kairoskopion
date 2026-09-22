@@ -54,7 +54,11 @@ def _heading_score(title: str) -> float:
         return -5.0
     if len(words) > 18:
         return -4.0
-    if len(words) < 2:
+    probe = title.lower()
+    known_section = any(
+        term in probe for terms in _SECTION_KIND.values() for term in terms
+    )
+    if len(words) < 2 and not known_section:
         return -3.0
     capped = sum(1 for w in words if w[:1].isupper() or w.isupper())
     ratio = capped / len(words)
@@ -64,8 +68,7 @@ def _heading_score(title: str) -> float:
     if title.endswith("?"):
         score += 0.5
     # Known scholarly section labels are strong anchors.
-    probe = title.lower()
-    if any(term in probe for terms in _SECTION_KIND.values() for term in terms):
+    if known_section:
         score += 4.0
     return score
 
