@@ -615,3 +615,45 @@ def test_generic_landing_page_is_not_promoted_to_fulltext_locator():
     assert art.acquisition_state == "landing_locator"
     assert not any(n.startswith("fulltext_locator:") for n in art.notes)
     assert any(n.startswith("landing_locator:") for n in art.notes)
+
+
+def test_artikl_projection_overrides_shallow_standalone_semantics():
+    from kairoskopion.schema import ArticleModel
+    from kairoskopion.kairon_provider import (
+        ArtiklArticleProjection,
+        ArtiklStatePointer,
+        bind_artikl_projection,
+    )
+
+    base = ArticleModel(
+        title_current="Shallow title",
+        genre_current="unknown",
+        protected_core=[],
+        unknowns=["genre not detected", "protected core not confirmed by user"],
+        word_count=5000,
+    )
+    projection = ArtiklArticleProjection(
+        artikl_state=ArtiklStatePointer(
+            state_id="P06",
+            state_type="MANUSCRIPT",
+            version="1.0",
+            source_refs=["drive:manuscript"],
+        ),
+        title="Governed Bootstrapping",
+        problem_statement="How can recursive infrastructure change itself under governance?",
+        core_claims=["Re-entry distinguishes bootstrapping from ordinary improvement."],
+        genre="conceptual_article",
+        novelty_mode="new_synthesis",
+        method_status="conceptual_method",
+        protected_core=["RE_ENTRY", "authority separation"],
+        language="en",
+        evidence_refs=["drive:acceptance"],
+    )
+    article = bind_artikl_projection(base, projection)
+    assert article.genre_current == "conceptual_article"
+    assert article.method_status == "conceptual_method"
+    assert article.protected_core == ["RE_ENTRY", "authority separation"]
+    assert article.word_count == 5000
+    assert article.extraction_status == "derived_from_artikl"
+    assert "drive:manuscript" in article.source_refs
+    assert all("genre not detected" not in u for u in article.unknowns)
