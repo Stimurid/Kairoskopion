@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from .auth import get_current_user
 from ..kairon_provider.adapter import pressure_pack_from_diagnostics
 from ..kairon_provider.fulltext import acquire_manifest_fulltexts
+from ..kairon_provider.fulltext_models import extract_fulltext_article_models
 from ..kairon_provider.models import (
     ArtiklStatePointer,
     CorpusArtifact,
@@ -197,11 +198,23 @@ def acquire_fulltext(snapshot_id: str, req: FulltextAcquireRequest):
         max_bytes_per_file=max(1024, min(req.max_bytes_per_file, 100 * 1024 * 1024)),
     )
     data["corpus_manifest"] = result["manifest"].to_dict()
+    model_result = extract_fulltext_article_models(result["manifest"])
+    target_models = dict(data.get("target_models") or {})
+    target_models["article_models"] = model_result["article_models"]
+    limitations = list(target_models.get("limitations") or [])
+    if model_result["failures"]:
+        limitations.append(
+            f"fulltext structural extraction failures: {len(model_result['failures'])}"
+        )
+    target_models["limitations"] = list(dict.fromkeys(limitations))
+    data["target_models"] = target_models
     _store.put(data)
     return {
         "attempted": result["attempted"],
         "acquired": result["acquired"],
         "validated": result["validated"],
+        "modeled": model_result["modeled"],
+        "model_failures": model_result["failures"],
         "errors": result["errors"],
         "snapshot_id": snapshot_id,
     }
