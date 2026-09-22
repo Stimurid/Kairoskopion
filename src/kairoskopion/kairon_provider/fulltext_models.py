@@ -9,12 +9,12 @@ from typing import Any
 from ..adapters.source_intake import SourceRole, register_local_source
 from .models import CorpusArtifactManifest
 
-_MARKDOWN_HEADING_RE = re.compile(r"^#{1,6}\\s+.+$")
+_MARKDOWN_HEADING_RE = re.compile(r"^#{1,6}\s+.+$")
 _NUMBERED_HEADING_RE = re.compile(
-    r"^(\\d+(?:\\.\\d+)*)(?:[.)])?\\s+(.{3,140})$"
+    r"^(\d+(?:\.\d+)*)(?:[.)])?\s+(.{3,140})$"
 )
-_ALLCAPS_HEADING_RE = re.compile(r"^[A-Z][A-Z0-9 ,:&/\\-]{5,100}$")
-_PAGE_HEADER_RE = re.compile(r"^\\d+\\s+Page\\s+\\d+\\s+of\\s+\\d+$", re.I)
+_ALLCAPS_HEADING_RE = re.compile(r"^[A-Z][A-Z0-9 ,:&/\-]{5,100}$")
+_PAGE_HEADER_RE = re.compile(r"^\d+\s+Page\s+\d+\s+of\s+\d+$", re.I)
 _SECTION_KIND = {
     "introduction": ("introduction", "background"),
     "literature": ("literature review", "related work", "theoretical background"),
@@ -60,7 +60,7 @@ def _is_heading(text: str) -> bool:
         return False
     if len(title.split()) > 18:
         return False
-    if re.search(r"\\bPage\\s+\\d+\\s+of\\s+\\d+\\b", title, re.I):
+    if re.search(r"\bPage\s+\d+\s+of\s+\d+\b", title, re.I):
         return False
     return True
 
