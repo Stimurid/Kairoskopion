@@ -54,6 +54,7 @@ class PressurePackRequest(BaseModel):
 class TargetWorldRequest(BaseModel):
     target_id: str
     openalex_source_id: str | None = None
+    issn: str | None = None
     venue_profile_ref: str | None = None
     board_page_url: str | None = None
     max_works: int = 30
@@ -150,6 +151,7 @@ def build_target_world(req: TargetWorldRequest):
     snapshot = build_target_world_snapshot(
         target_id=req.target_id,
         openalex_source_id=req.openalex_source_id,
+        issn=req.issn,
         venue_profile_ref=req.venue_profile_ref,
         board_page_url=req.board_page_url,
         max_works=max(1, min(req.max_works, 100)),
