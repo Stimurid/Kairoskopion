@@ -85,9 +85,12 @@ _AI_POLICY_RE = re.compile(
     re.IGNORECASE,
 )
 _LANGUAGE_HINTS_RE = re.compile(
-    r"manuscripts?\s+(?:must|should)\s+be\s+(?:submitted\s+)?in\s+([A-Za-z]+)",
+    r"manuscripts?\s+(?:must|should)\s+be\s+(?:submitted\s+|written\s+)?in\s+([A-Za-z]+)",
     re.IGNORECASE,
 )
+_NON_LANGUAGE_TOKENS = {
+    "word", "doc", "docx", "pdf", "latex", "tex", "format", "file",
+}
 _OPEN_ACCESS_RE = re.compile(
     r"(open\s+access|gold\s+open\s+access|hybrid\s+(?:OA|open\s+access)|"
     r"diamond\s+open\s+access)",
@@ -220,9 +223,10 @@ def extract_formal_submission_profile(
 
     # Language
     lang_match = _LANGUAGE_HINTS_RE.search(text)
-    if lang_match:
+    lang_value = lang_match.group(1).lower() if lang_match else None
+    if lang_value and lang_value not in _NON_LANGUAGE_TOKENS:
         result["fields_present"]["language"] = {
-            "value": lang_match.group(1).lower(),
+            "value": lang_value,
             "evidence": "external_claim_html",
         }
     else:
