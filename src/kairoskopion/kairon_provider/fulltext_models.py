@@ -125,7 +125,14 @@ def _extract_headings(lines: list[str]) -> list[str]:
     merged = [(x, lines.index(x)) for x in selected_lines]
     merged.extend((x[2], x[4]) for x in subs)
     merged.extend((x, lines.index(x)) for x in allcaps)
-    return [x for x, _ in sorted(dict(merged).items(), key=lambda kv: kv[1])][:80]
+    ordered = [x for x, _ in sorted(dict(merged).items(), key=lambda kv: kv[1])][:80]
+
+    # A recognized Conclusion is a strong end-of-article structural anchor.
+    # Numeric footnotes/references after it must not re-open the section graph.
+    for i, heading in enumerate(ordered):
+        if _classify_heading(heading) == "conclusion":
+            return ordered[: i + 1]
+    return ordered
 
 
 def _classify_heading(text: str) -> str:
