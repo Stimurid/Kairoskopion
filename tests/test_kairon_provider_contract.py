@@ -275,3 +275,31 @@ def test_provider_api_exposes_deep_run_routes():
     assert "/kairon/provider/target-world/{snapshot_id}/acquire-fulltext" in paths
     assert "/kairon/provider/runs" in paths
     assert "/kairon/provider/runs/{run_id}/stage" in paths
+
+
+def test_article_fulltext_structural_model_detects_sections_and_moves():
+    from kairoskopion.kairon_provider.fulltext_models import model_article_text
+
+    text = """
+    # Introduction
+    This paper argues that the existing framework has a problem and a gap.
+    # Literature Review
+    Prior work is compared with our approach.
+    # Methodology
+    We use interviews and data from two case studies.
+    # Results
+    The findings show a contrast between cases.
+    # Limitations
+    A limitation is the bounded sample.
+    # Conclusion
+    Therefore, we propose a revised conceptual framework.
+    """
+    model = model_article_text(text, source_ref="fixture:article")
+    kinds = {x["kind"] for x in model["section_sequence"]}
+    assert "methods" in kinds
+    assert "limitations" in kinds
+    assert "conclusion" in kinds
+    moves = {x["move"] for x in model["argument_moves"]}
+    assert "claim" in moves
+    assert "problem" in moves
+    assert model["word_count"] > 20
