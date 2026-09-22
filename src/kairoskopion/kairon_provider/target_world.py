@@ -13,6 +13,7 @@ from typing import Any
 
 from ..adapters.venue.editorial_board import build_editorial_board_cloud
 from ..adapters.venue.openalex_works import fetch_works_for_venue
+from ..adapters.venue.crossref_works import fetch_crossref_works_for_issn
 from .corpus import manifest_from_openalex_works
 from .editor_profiles import acquire_editor_scientific_profiles
 from .models import TargetWorldSnapshot
@@ -27,6 +28,7 @@ def build_target_world_snapshot(
     *,
     target_id: str,
     openalex_source_id: str | None = None,
+    issn: str | None = None,
     venue_profile_ref: str | None = None,
     board_page_url: str | None = None,
     board_page_html: str | None = None,
@@ -46,13 +48,24 @@ def build_target_world_snapshot(
     works: list[dict[str, Any]] = []
     unknowns: list[str] = []
     evidence_refs: list[str] = []
+    corpus_provider = "none"
 
     if fixture_works is not None:
         works = list(fixture_works)
+        corpus_provider = "fixture"
     elif openalex_source_id:
         works = fetch_works_for_venue(openalex_source_id, max_works=max_works)
+        corpus_provider = "openalex" if works else "openalex_unavailable"
+        if not works and issn:
+            works = fetch_crossref_works_for_issn(issn, max_works=max_works)
+            corpus_provider = "crossref_fallback" if works else "crossref_fallback_empty"
+            if works:
+                unknowns.append("OpenAlex Works unavailable; corpus acquired from Crossref fallback")
+    elif issn:
+        works = fetch_crossref_works_for_issn(issn, max_works=max_works)
+        corpus_provider = "crossref"
     else:
-        unknowns.append("no OpenAlex source id or corpus fixture supplied")
+        unknowns.append("no OpenAlex source id, ISSN, or corpus fixture supplied")
 
     manifest = manifest_from_openalex_works(
         target_id=target_id,
@@ -99,6 +112,7 @@ def build_target_world_snapshot(
             "snapshot_created_at": _now(),
             "corpus_selection_strategy": selection_strategy,
             "corpus_size": len(manifest.artifacts),
+            "corpus_provider": corpus_provider,
             "editor_profile_count": len(editor_profiles),
             "unknowns": unknowns + list(manifest.unknowns),
         },
