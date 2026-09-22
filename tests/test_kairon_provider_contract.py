@@ -580,3 +580,16 @@ def test_target_world_uses_crossref_fallback_when_openalex_empty(monkeypatch):
     assert len(snap.corpus_manifest.artifacts) == 1
     assert snap.freshness["corpus_provider"] == "crossref_fallback"
     assert any("Crossref fallback" in x for x in snap.freshness["unknowns"])
+
+
+def test_explicit_journal_language_statement_beats_word_format_false_positive():
+    from kairoskopion.adapters.venue.guidelines_extractor import extract_formal_submission_profile
+
+    html = """
+    <html><body>
+    <h2>Language</h2><p>The journal's language is English.</p>
+    <p>Manuscripts should be submitted in Word.</p>
+    </body></html>
+    """
+    result = extract_formal_submission_profile(guidelines_html=html)
+    assert result["fields_present"]["language"]["value"] == "english"
