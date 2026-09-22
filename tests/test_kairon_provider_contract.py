@@ -596,3 +596,22 @@ def test_explicit_journal_language_statement_beats_word_format_false_positive():
     """
     result = extract_formal_submission_profile(guidelines_html=html)
     assert result["fields_present"]["language"]["value"] == "english"
+
+
+def test_generic_landing_page_is_not_promoted_to_fulltext_locator():
+    from kairoskopion.kairon_provider.corpus import manifest_from_openalex_works
+
+    works = [{
+        "id": "https://doi.org/10.1/x",
+        "title": "Metadata only paper",
+        "publication_year": 2026,
+        "doi": "https://doi.org/10.1/x",
+        "primary_location": {"landing_page_url": "https://doi.org/10.1/x", "pdf_url": None},
+        "open_access": {},
+        "authorships": [],
+    }]
+    manifest = manifest_from_openalex_works(target_id="v1", works=works)
+    art = manifest.artifacts[0]
+    assert art.acquisition_state == "metadata_only"
+    assert not any(n.startswith("fulltext_locator:") for n in art.notes)
+    assert any(n.startswith("landing_page_locator:") for n in art.notes)
