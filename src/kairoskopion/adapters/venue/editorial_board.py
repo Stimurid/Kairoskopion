@@ -182,31 +182,80 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
 # Identity resolution
 # -----------------------------------------------------------------------
 
+_AFFIL_STOP = {
+    "university", "college", "institute", "school", "department", "faculty",
+    "centre", "center", "research", "professor", "emeritus", "the", "of",
+}
+
+
+def _norm_person_name(value: str) -> list[str]:
+    return [
+        t.lower()
+        for t in re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ'’-]+", value or "")
+        if len(t) > 1
+    ]
+
+
+def _name_identity_ok(query_name: str, candidate_name: str) -> bool:
+    """Conservative person-name gate.
+
+    Require matching surname plus compatible given-name/initial evidence.
+    Search rank alone is never accepted as identity.
+    """
+    q = _norm_person_name(query_name)
+    c = _norm_person_name(candidate_name)
+    if not q or not c or q[-1] != c[-1]:
+        return False
+    q_first, c_first = q[0], c[0]
+    if q_first == c_first:
+        return True
+    # Allow an initial on either side, but only with exact surname.
+    if len(q_first) == 1 and c_first.startswith(q_first):
+        return True
+    if len(c_first) == 1 and q_first.startswith(c_first):
+        return True
+    return False
+
+
+def _affiliation_identity_ok(hint: str | None, candidate_inst: str | None) -> bool:
+    if not hint:
+        return True
+    if not candidate_inst:
+        return False
+    def tokens(value: str) -> set[str]:
+        return {
+            t.lower()
+            for t in re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ]{3,}", value or "")
+            if t.lower() not in _AFFIL_STOP
+        }
+    h, c = tokens(hint), tokens(candidate_inst)
+    return bool(h and c and (h & c))
+
+
 def openalex_author_lookup(
     name: str, affiliation_hint: str | None = None, timeout: int = 12,
 ) -> dict | None:
-    """Try OpenAlex Authors search for the most-likely match."""
+    """Resolve an OpenAlex Author conservatively.
+
+    A search result is accepted only when person-name identity is compatible
+    and, when an affiliation hint is supplied, the current institution shares
+    a discriminating token. A top-ranked search hit is not identity evidence.
+    """
     q = urllib.parse.quote(name.strip())
-    url = f"{OPENALEX_AUTHORS}?search={q}&per_page=5"
+    url = f"{OPENALEX_AUTHORS}?search={q}&per_page=10"
     resp = _http_json(url, timeout=timeout)
     if not resp:
         return None
     results = resp.get("results", []) or []
-    if not results:
-        return None
-    # If affiliation hint present, prefer the candidate whose
-    # last_known_institution display_name shares a token with the hint.
-    if affiliation_hint:
-        hint_tokens = {
-            t.lower()
-            for t in re.findall(r"[A-Za-z]{4,}", affiliation_hint)
-        }
-        for r in results:
-            inst = (r.get("last_known_institution") or {}).get("display_name", "")
-            inst_tokens = {t.lower() for t in re.findall(r"[A-Za-z]{4,}", inst)}
-            if hint_tokens & inst_tokens:
-                return r
-    return results[0]
+    for r in results:
+        display = str(r.get("display_name") or "")
+        if not _name_identity_ok(name, display):
+            continue
+        inst = (r.get("last_known_institution") or {}).get("display_name")
+        if not _affiliation_identity_ok(affiliation_hint, inst):
+            continue
+        return r
+    return None
 
 
 def orcid_record(orcid_id: str, timeout: int = 10) -> dict | None:
