@@ -23,6 +23,34 @@ class _DictModel:
 
 
 @dataclass
+class ArtiklArticleProjection(_DictModel):
+    """Canonical semantic projection supplied by Artikl/WhiteCrow.
+
+    This object outranks Kairoskopion's standalone article extraction when
+    semantic_authority=ARTIKL. It is intentionally explicit about provenance.
+    """
+    artikl_state: "ArtiklStatePointer"
+    title: str | None = None
+    abstract: str | None = None
+    problem_statement: str | None = None
+    research_question: str | None = None
+    object_of_inquiry: str | None = None
+    core_claims: list[str] = field(default_factory=list)
+    genre: str = "unknown"
+    disciplinary_register: str | None = None
+    novelty_mode: str = "unknown"
+    method_status: str = "unknown"
+    method_description: str | None = None
+    theoretical_shoulders: list[str] = field(default_factory=list)
+    citation_ecology: str | None = None
+    protected_core: list[str] = field(default_factory=list)
+    mutable_zones: list[str] = field(default_factory=list)
+    language: str | None = None
+    evidence_refs: list[str] = field(default_factory=list)
+    semantic_authority: str = "ARTIKL"
+
+
+@dataclass
 class ArtiklStatePointer(_DictModel):
     state_id: str
     state_type: str
