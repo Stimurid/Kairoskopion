@@ -131,6 +131,96 @@ def extract_orcid_ids(text: str) -> list[str]:
     return sorted(set(_ORCID_RE.findall(text)))
 
 
+
+_CREDENTIAL_SUFFIX_RE = re.compile(
+    r"\s+(?:PhD|DPhil|MD|MPhil|MSc|MA|MBA|LLM|JD|DDS|DSc)(?:\s*,?\s*(?:PhD|DPhil|MD|MPhil|MSc|MA|MBA|LLM|JD|DDS|DSc))*\s*$",
+    re.IGNORECASE,
+)
+
+
+def _clean_editor_name(value: str) -> str:
+    value = strip_html(value or "")
+    value = _CREDENTIAL_SUFFIX_RE.sub("", value).strip(" ,;:-")
+    return value
+
+
+def _extract_structured_board_candidates(raw_html: str) -> list[dict[str, Any]]:
+    """Publisher-aware extraction before the generic visible-text heuristic.
+
+    Springer journal pages expose stable data-test attributes for role, name
+    and affiliation. PDC/Techné exposes role headings followed by <ul> blocks.
+    Structured extraction prevents role/country/credential text from being
+    misclassified as person names.
+    """
+    candidates: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+
+    # Springer Nature Link editorial-board cards.
+    springer_re = re.compile(
+        r'<h2[^>]*data-test=["\']editorDisplayRole["\'][^>]*>(.*?)</h2>'
+        r'.*?<h3[^>]*data-test=["\']editorListing["\'][^>]*>(.*?)</h3>'
+        r'\s*<div[^>]*class=["\'][^"\']*u-text-default\s+u-line-height-tight[^"\']*["\'][^>]*>(.*?)</div>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for role_html, name_html, affil_html in springer_re.findall(raw_html):
+        role = strip_html(role_html).strip()
+        name = _clean_editor_name(name_html)
+        affil = strip_html(affil_html).strip()
+        if len(name.split()) < 2 or len(name.split()) > 6:
+            continue
+        key = (name.lower(), role.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append({
+            "full_name": name,
+            "affiliation_hint": affil or None,
+            "role_hint": role or "editor",
+            "extraction_mode": "springer_structured",
+        })
+
+    if candidates:
+        return candidates
+
+    # PDC/Techné leadership blocks: role heading + <ul> containing one or
+    # more bold names followed by affiliation/address lines.
+    role_block_re = re.compile(
+        r'<b>\s*<p>\s*([^<]*?(?:Editor|Editors)[^<]*?)\s*</b>\s*</p>\s*<ul>(.*?)</ul>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for role_html, block in role_block_re.findall(raw_html):
+        role = strip_html(role_html).strip()
+        name_matches = list(re.finditer(r'<b>\s*([^<]{3,100}?)\s*</b>\s*<br\s*/?>', block, re.IGNORECASE))
+        for i, nm in enumerate(name_matches):
+            name = _clean_editor_name(nm.group(1))
+            if len(name.split()) < 2 or len(name.split()) > 6:
+                continue
+            start = nm.end()
+            end = name_matches[i + 1].start() if i + 1 < len(name_matches) else len(block)
+            tail = block[start:end]
+            # First non-empty line before contact/address noise is usually
+            # department/institution. Keep a bounded combined hint.
+            tail = re.sub(r'<a\b.*?</a>', ' ', tail, flags=re.IGNORECASE | re.DOTALL)
+            pieces = [
+                strip_html(x).strip()
+                for x in re.split(r'<br\s*/?>', tail, flags=re.IGNORECASE)
+            ]
+            pieces = [p for p in pieces if p and "@" not in p][:3]
+            affil = ", ".join(pieces) if pieces else None
+            key = (name.lower(), role.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append({
+                "full_name": name,
+                "affiliation_hint": affil,
+                "role_hint": role or "editor",
+                "extraction_mode": "pdc_structured",
+            })
+
+    return candidates
+
+
 def extract_candidate_members(text: str) -> list[dict[str, Any]]:
     """Heuristic extraction of (name, affiliation) pairs from board page text.
 
@@ -355,8 +445,13 @@ def build_editorial_board_cloud(
     # Pull ORCID ids first (very high signal)
     orcid_ids = extract_orcid_ids(text)
 
-    # Then candidate (name, affiliation) tuples
-    candidates = extract_candidate_members(text)
+    # Prefer publisher-structured extraction. Generic text heuristics are a
+    # fallback only; they are too permissive for modern board pages where
+    # roles, degrees, cities and countries appear adjacent to names.
+    candidates = _extract_structured_board_candidates(board_page_html)
+    if not candidates:
+        candidates = extract_candidate_members(text)
+        cloud.warnings.append("editor extraction used generic text fallback")
     if not candidates:
         cloud.unknowns.append(
             "no editor name/affiliation pairs matched the heuristic patterns"
