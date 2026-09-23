@@ -57,11 +57,15 @@ class AcademicWorldNode(_BatchDictModel):
     languages: list[str] = field(default_factory=list)
     institutional_regions: list[str] = field(default_factory=list)
     citation_ecology_refs: list[str] = field(default_factory=list)
+    canonical_questions: list[str] = field(default_factory=list)
+    legitimate_objects: list[str] = field(default_factory=list)
     evidence_refs: list[str] = field(default_factory=list)
     source_status: str = "unknown"
     review_status: str = "unreviewed"
     confidence: str = "low"
     freshness: dict[str, Any] = field(default_factory=dict)
+    provenance: dict[str, Any] = field(default_factory=dict)
+    last_checked_at: str | None = None
 
     def __post_init__(self) -> None:
         if not self.node_id.strip():
@@ -100,6 +104,25 @@ class LocalFirstAuditReceipt(_BatchDictModel):
                 "external discovery requires prior discipline, venue and "
                 "TargetWorld local checks"
             )
+
+
+@dataclass
+class BatchQualificationSpec(_BatchDictModel):
+    """Execution policy for a resumable article × target qualification batch."""
+
+    batch_id: str
+    concurrency_limit: int = 4
+    source_budget: dict[str, Any] = field(default_factory=dict)
+    freshness_policy: dict[str, Any] = field(default_factory=dict)
+    failure_policy: dict[str, Any] = field(default_factory=dict)
+    author_decision_policy: str = "stop_on_identity_change"
+    acceptance_policy: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.batch_id.strip():
+            raise ValueError("batch spec batch_id must be non-empty")
+        if self.concurrency_limit < 1:
+            raise ValueError("concurrency_limit must be >= 1")
 
 
 @dataclass
@@ -166,6 +189,7 @@ class BatchQualificationPlan(_BatchDictModel):
     target_ids: list[str]
     cells: list[BatchCell]
     snapshot_reuse: dict[str, list[str]] = field(default_factory=dict)
+    spec: BatchQualificationSpec | None = None
     status: str = "planned"
 
     def cells_for_article(self, article_id: str) -> list[BatchCell]:
@@ -206,6 +230,7 @@ def build_batch_qualification_plan(
     batch_id: str,
     articles: list[BatchArticleInput],
     targets: list[BatchTargetInput],
+    spec: BatchQualificationSpec | None = None,
 ) -> BatchQualificationPlan:
     """Build the deterministic article x target qualification matrix.
 
@@ -216,6 +241,8 @@ def build_batch_qualification_plan(
 
     if not batch_id.strip():
         raise ValueError("batch_id must be non-empty")
+    if spec is not None and spec.batch_id != batch_id:
+        raise ValueError("batch spec batch_id must match plan batch_id")
     if not articles:
         raise ValueError("batch requires at least one article")
     if not targets:
@@ -255,4 +282,5 @@ def build_batch_qualification_plan(
         target_ids=[t.target_id for t in targets],
         cells=cells,
         snapshot_reuse=snapshot_reuse,
+        spec=spec,
     )

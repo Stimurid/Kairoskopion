@@ -26,9 +26,16 @@ from .batch import (
     BatchArticleInput,
     BatchCell,
     BatchQualificationPlan,
+    BatchQualificationSpec,
     BatchTargetInput,
     LocalFirstAuditReceipt,
     build_batch_qualification_plan,
+)
+from .batch_runtime import (
+    AcademicWorldStore,
+    BatchRunStore,
+    authorize_external_discovery,
+    probe_local_first,
 )
 from .adapter import pressure_pack_from_diagnostics
 from .artikl_projection import bind_artikl_projection
@@ -42,6 +49,11 @@ __all__ = [
     "BatchArticleInput",
     "BatchCell",
     "BatchQualificationPlan",
+    "BatchQualificationSpec",
+    "AcademicWorldStore",
+    "BatchRunStore",
+    "authorize_external_discovery",
+    "probe_local_first",
     "BatchTargetInput",
     "LocalFirstAuditReceipt",
     "build_batch_qualification_plan",
