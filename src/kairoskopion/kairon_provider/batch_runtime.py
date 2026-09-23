@@ -213,8 +213,12 @@ def probe_local_first(
     """
 
     root = Path(data_root)
-    hits: list[str] = []
-    notes: list[str] = []
+    layer_hits: dict[str, list[str]] = {
+        "discipline_registry": [],
+        "venue_registry": [],
+        "target_world_store": [],
+        "venue_memory": [],
+    }
 
     # 1. Disciplinary landscape: repository seed/live registry.
     discipline_registry = load_default_registry()
@@ -222,10 +226,9 @@ def probe_local_first(
         matches = discipline_registry.candidates_keyword(
             discipline_query, region="auto", limit=12
         )
-        hits.extend(f"discipline:{m.discipline_id}" for m in matches)
-        notes.append(f"discipline_matches={len(matches)}")
-    else:
-        notes.append(f"discipline_cards_available={len(discipline_registry)}")
+        layer_hits["discipline_registry"] = [
+            f"discipline:{m.discipline_id}" for m in matches
+        ]
 
     # 2. Durable runtime venue registry.
     hub = RegistryHub(data_dir=root / "registry")
@@ -236,25 +239,36 @@ def probe_local_first(
                 venue_matches.append(rec)
     elif venue_query:
         venue_matches = hub.venues().search(venue_query, limit=20)
-    hits.extend(f"venue:{r.venue_id}" for r in venue_matches)
-    notes.append(f"venue_registry_matches={len(venue_matches)}")
+    layer_hits["venue_registry"] = [f"venue:{r.venue_id}" for r in venue_matches]
 
     # 3. Frozen TargetWorld snapshots.
     tw_store = TargetWorldStore(root)
-    target_snapshots = []
     for snapshot_id in tw_store.list_ids():
         data = tw_store.get(snapshot_id)
         if data and str(data.get("target_id")) == target_id:
-            target_snapshots.append(snapshot_id)
-            hits.append(f"targetworld:{snapshot_id}")
-    notes.append(f"target_world_matches={len(target_snapshots)}")
+            layer_hits["target_world_store"].append(f"targetworld:{snapshot_id}")
 
     # 4. Cross-session VenueMemory.
     vm = VenueMemoryRegistry(root)
     memory = vm.lookup(issn=issn, name=venue_query) if (issn or venue_query) else None
     if memory is not None:
-        hits.append(f"venue_memory:{memory.venue_memory_id}")
-    notes.append(f"venue_memory_matches={1 if memory else 0}")
+        layer_hits["venue_memory"].append(
+            f"venue_memory:{memory.venue_memory_id}"
+        )
+
+    hits = []
+    for values in layer_hits.values():
+        hits.extend(values)
+    target_level_hit = any(
+        layer_hits[key]
+        for key in ("venue_registry", "target_world_store", "venue_memory")
+    )
+    if target_level_hit:
+        status = "target_local_hit"
+    elif layer_hits["discipline_registry"]:
+        status = "context_only_hit"
+    else:
+        status = "local_miss"
 
     return LocalFirstAuditReceipt(
         target_id=target_id,
@@ -263,8 +277,9 @@ def probe_local_first(
         checked_target_world_store=True,
         checked_venue_memory=True,
         local_hits=list(dict.fromkeys(hits)),
+        layer_hits=layer_hits,
         external_discovery_used=False,
-        status="local_hit" if hits else "local_miss",
+        status=status,
     )
 
 

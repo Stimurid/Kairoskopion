@@ -86,6 +86,7 @@ class LocalFirstAuditReceipt(_BatchDictModel):
     checked_target_world_store: bool = False
     checked_venue_memory: bool = False
     local_hits: list[str] = field(default_factory=list)
+    layer_hits: dict[str, list[str]] = field(default_factory=dict)
     stale_local_refs: list[str] = field(default_factory=list)
     external_discovery_used: bool = False
     external_task_refs: list[str] = field(default_factory=list)

@@ -34,3 +34,8 @@ Full repository run in the available /tmp/kairo-batch-venv:
 - 16 subtests PASS
 
 Control run on the unchanged parent bff69fa reproduces all five failures in the same environment. Three are FastAPI route-introspection/environment failures in test_blocker_regression; two are the already-known rubric-loader baseline. Therefore branch-specific regressions observed in this run: 0.
+
+
+## Pilot-001 repair
+
+The first real local-first probe exposed a semantic bug: a discipline-only registry hit was being reported as a generic local hit even when no venue, VenueMemory or TargetWorld existed. The receipt now separates layer_hits and reports target_local_hit, context_only_hit, or local_miss. This prevents disciplinary context from suppressing required target acquisition.

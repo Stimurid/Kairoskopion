@@ -95,7 +95,22 @@ def test_probe_local_first_reuses_frozen_target_world(tmp_path):
     assert receipt.checked_target_world_store is True
     assert "targetworld:targetworld:venue-a:frozen" in receipt.local_hits
     assert receipt.external_discovery_used is False
-    assert receipt.status == "local_hit"
+    assert receipt.status == "target_local_hit"
+
+
+
+
+def test_probe_local_first_distinguishes_context_from_target_hit(tmp_path):
+    receipt = probe_local_first(
+        target_id="missing-target",
+        data_root=tmp_path,
+        discipline_query="philosophy of technology",
+        venue_query="Definitely Missing Venue",
+    )
+    assert receipt.layer_hits["discipline_registry"]
+    assert receipt.layer_hits["venue_registry"] == []
+    assert receipt.layer_hits["target_world_store"] == []
+    assert receipt.status == "context_only_hit"
 
 
 def test_external_discovery_authorization_requires_completed_local_probe(tmp_path):
