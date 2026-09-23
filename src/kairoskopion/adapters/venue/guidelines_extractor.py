@@ -103,7 +103,7 @@ _AI_COPYEDIT_EXEMPT_RE = re.compile(
 )
 
 _AI_POLICY_RE = re.compile(
-    r"(generative\s+AI|ChatGPT|large\s+language\s+model(?:s)?|"
+    r"(generative\s+AI|ChatGPT|\bLLMs?\b|large\s+language\s+model(?:s)?|"
     r"AI\s+(?:assistance|tools|disclosure|policy))",
     re.IGNORECASE,
 )
