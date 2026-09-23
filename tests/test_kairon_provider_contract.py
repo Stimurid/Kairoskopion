@@ -906,3 +906,29 @@ def test_provider_api_exposes_reconcile_pressure_route():
     from kairoskopion.api.kairon_provider import router
     paths = {route.path for route in router.routes}
     assert "/kairon/provider/reconcile-pressure" in paths
+
+
+def test_target_world_snapshot_carries_refresh_lineage_and_rules():
+    from kairoskopion.kairon_provider.models import TargetWorldSnapshot
+    snap = TargetWorldSnapshot(
+        snapshot_id="s2",
+        target_id="v1",
+        parent_snapshot_id="s1",
+        refresh_reason="official guidelines refreshed",
+        canonical_target_rules={"abstract_words": {"min": 150, "max": 250}},
+    )
+    data = snap.to_dict()
+    assert data["parent_snapshot_id"] == "s1"
+    assert data["canonical_target_rules"]["abstract_words"]["max"] == 250
+
+
+def test_provider_run_separates_scholarly_and_operational_debt():
+    from kairoskopion.kairon_provider.models import ProviderRunRecord
+    run = ProviderRunRecord(
+        run_id="r1",
+        scholarly_debt=["citation ecology review"],
+        open_debt=["author disclosure"],
+    )
+    data = run.to_dict()
+    assert data["scholarly_debt"] == ["citation ecology review"]
+    assert data["open_debt"] == ["author disclosure"]
