@@ -7,7 +7,7 @@ from copy import deepcopy
 from typing import Any
 
 from ..schema import ArticleModel, VenueModel
-from .models import TargetPressureItem, TargetPressurePack
+from .models import ManuscriptSurfaceProfile, TargetPressureItem, TargetPressurePack
 
 
 _STOP = {
@@ -86,6 +86,7 @@ def reconcile_target_pressure_pack(
     base_pack: TargetPressurePack,
     target_models: dict[str, Any] | None = None,
     formal_profile: dict[str, Any] | None = None,
+    manuscript_surface: ManuscriptSurfaceProfile | dict[str, Any] | None = None,
 ) -> TargetPressurePack:
     """Reconcile legacy diagnostics with stronger target-world evidence.
 
@@ -171,18 +172,23 @@ def reconcile_target_pressure_pack(
             source_kind="target_world_reconciliation",
         ))
 
+    surface = (
+        manuscript_surface.to_dict()
+        if hasattr(manuscript_surface, "to_dict")
+        else dict(manuscript_surface or {})
+    )
     fields = _formal_fields(formal_profile)
 
     word_limit = fields.get("word_limit")
     if isinstance(word_limit, dict):
         max_words = word_limit.get("max")
-        if max_words and article.word_count:
-            items = _drop_dimensions(items, {"formal_compliance"})
-            if article.word_count > int(max_words):
+        current_words = surface.get("word_count") or article.word_count
+        if max_words and current_words:
+            if int(current_words) > int(max_words):
                 items.append(TargetPressureItem(
                     pressure_id="target:formal:word_limit",
                     dimension="formal_compliance",
-                    observation=f"Manuscript {article.word_count} words exceeds target maximum {max_words}.",
+                    observation=f"Manuscript {current_words} words exceeds target maximum {max_words}.",
                     evidence_refs=list(venue.author_guidelines_refs or venue.source_refs or []),
                     evidence_status="fact_from_source",
                     severity="major",
@@ -191,9 +197,9 @@ def reconcile_target_pressure_pack(
                 ))
 
     abstract_limit = fields.get("abstract_word_limit")
-    if isinstance(abstract_limit, dict) and article.abstract_current:
+    if isinstance(abstract_limit, dict) and (article.abstract_current or surface.get("abstract_word_count")):
         max_abs = abstract_limit.get("max")
-        abs_words = len(article.abstract_current.split())
+        abs_words = int(surface.get("abstract_word_count") or len((article.abstract_current or "").split()))
         if max_abs and abs_words > int(max_abs):
             items.append(TargetPressureItem(
                 pressure_id="target:formal:abstract_limit",
@@ -208,29 +214,91 @@ def reconcile_target_pressure_pack(
 
     ref_style = fields.get("reference_style")
     if isinstance(ref_style, dict) and ref_style.get("value"):
-        style = str(ref_style["value"])
-        items.append(TargetPressureItem(
-            pressure_id="target:formal:reference_style",
-            dimension="formal_compliance",
-            observation=f"Target requires {style} reference style; formatting conversion must be verified.",
-            evidence_refs=list(venue.author_guidelines_refs or venue.source_refs or []),
-            evidence_status="fact_from_source",
-            severity="minor",
-            transformation_depth_hint="local",
-            source_kind="formal_rule",
-        ))
+        style = str(ref_style["value"]).strip().lower()
+        current_style = str(surface.get("reference_style") or "").strip().lower()
+        if current_style != style:
+            items.append(TargetPressureItem(
+                pressure_id="target:formal:reference_style",
+                dimension="formal_compliance",
+                observation=f"Target requires {style} reference style; current artifact is {current_style or 'unknown'}.",
+                evidence_refs=list(venue.author_guidelines_refs or venue.source_refs or []),
+                evidence_status="fact_from_source",
+                severity="minor",
+                transformation_depth_hint="local",
+                source_kind="formal_rule",
+            ))
+
+    keyword_rule = fields.get("keyword_count")
+    if isinstance(keyword_rule, dict) and surface.get("keyword_count") is not None:
+        current_keywords = int(surface["keyword_count"])
+        min_kw = keyword_rule.get("min")
+        max_kw = keyword_rule.get("max")
+        if ((min_kw is not None and current_keywords < int(min_kw))
+                or (max_kw is not None and current_keywords > int(max_kw))):
+            items.append(TargetPressureItem(
+                pressure_id="target:formal:keyword_count",
+                dimension="formal_compliance",
+                observation=(
+                    f"Target requires {min_kw or 0}–{max_kw or '∞'} keywords; "
+                    f"current artifact has {current_keywords}."
+                ),
+                evidence_refs=list(venue.author_guidelines_refs or venue.source_refs or []),
+                evidence_status="fact_from_source",
+                severity="minor",
+                transformation_depth_hint="local",
+                source_kind="formal_rule",
+            ))
+
+    formats = fields.get("submission_file_formats")
+    if isinstance(formats, dict) and formats.get("values") and surface.get("file_format"):
+        allowed_formats = {str(x).lower() for x in formats.get("values") or []}
+        current_format = str(surface["file_format"]).lower()
+        if current_format not in allowed_formats:
+            items.append(TargetPressureItem(
+                pressure_id="target:formal:file_format",
+                dimension="formal_compliance",
+                observation=(
+                    f"Target accepts {sorted(allowed_formats)} submission formats; "
+                    f"current working artifact is {current_format} and needs packaging/export."
+                ),
+                evidence_refs=list(venue.author_guidelines_refs or venue.source_refs or []),
+                evidence_status="fact_from_source",
+                severity="minor",
+                transformation_depth_hint="packaging",
+                source_kind="formal_rule",
+            ))
 
     ai_policy = fields.get("ai_policy_mentioned")
-    if isinstance(ai_policy, dict) and ai_policy.get("value") and not article.has_ai_disclosure:
+    if isinstance(ai_policy, dict):
+        declaration_required = bool(
+            ai_policy.get("llm_use_declaration_required", ai_policy.get("value"))
+        )
+        has_disclosure = surface.get("has_ai_disclosure")
+        if has_disclosure is None:
+            has_disclosure = article.has_ai_disclosure
+        if declaration_required and not has_disclosure:
+            items.append(TargetPressureItem(
+                pressure_id="target:formal:ai_disclosure",
+                dimension="formal_compliance",
+                observation="Target requires disclosure of substantive LLM use; manuscript/submission disclosure state must be completed.",
+                evidence_refs=list(venue.author_guidelines_refs or venue.source_refs or []),
+                evidence_status="fact_from_source",
+                severity="minor",
+                transformation_depth_hint="local",
+                source_kind="formal_rule",
+            ))
+
+    formal_unknowns = list((formal_profile or {}).get("unknowns") or [])
+    if any(str(u).startswith("word_limit:") for u in formal_unknowns):
         items.append(TargetPressureItem(
-            pressure_id="target:formal:ai_disclosure",
-            dimension="formal_compliance",
-            observation="Target explicitly mentions AI-use disclosure; manuscript/submission disclosure state must be completed.",
+            pressure_id="target:formal:word_limit:unknown",
+            dimension="formal_evidence",
+            observation="Authoritative target word limit was not found; final length compliance cannot yet be verified.",
             evidence_refs=list(venue.author_guidelines_refs or venue.source_refs or []),
-            evidence_status="fact_from_source",
-            severity="minor",
-            transformation_depth_hint="local",
-            source_kind="formal_rule",
+            evidence_status="evidence_need",
+            severity="unknown",
+            transformation_depth_hint="evidence_needed",
+            source_kind="formal_rule_unknown",
         ))
 
     dimensions = {x.dimension for x in items}
