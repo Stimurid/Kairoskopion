@@ -24,6 +24,8 @@ from ..kairon_provider.models import (
     TargetPressurePack,
 )
 from ..kairon_provider.round_trip import compare_round_trip
+from ..kairon_provider.reconcile import reconcile_target_pressure_pack
+from ..schema import ArticleModel, VenueModel
 from ..kairon_provider.storage import ProviderRunStore, TargetWorldStore
 from ..kairon_provider.target_pages import build_target_page_bundle
 from ..kairon_provider.target_world import build_target_world_snapshot
@@ -70,6 +72,15 @@ class TargetPagesRequest(BaseModel):
 class FulltextAcquireRequest(BaseModel):
     max_files: int = 10
     max_bytes_per_file: int = 25 * 1024 * 1024
+
+
+class ReconcilePressureRequest(BaseModel):
+    article: dict[str, Any]
+    venue: dict[str, Any]
+    pressure_pack: dict[str, Any]
+    target_models: dict[str, Any] | None = None
+    formal_profile: dict[str, Any] | None = None
+    manuscript_surface: dict[str, Any] | None = None
 
 
 class TransitionProposalRequest(BaseModel):
@@ -279,6 +290,21 @@ def update_run_stage(run_id: str, req: RunStageUpdateRequest):
         data["status"] = "partial"
     _run_store.put(data)
     return data
+
+
+@router.post("/reconcile-pressure")
+def reconcile_pressure(req: ReconcilePressureRequest):
+    article = ArticleModel.from_dict(req.article)
+    venue = VenueModel.from_dict(req.venue)
+    pack = _pack(req.pressure_pack)
+    return reconcile_target_pressure_pack(
+        article=article,
+        venue=venue,
+        base_pack=pack,
+        target_models=req.target_models,
+        formal_profile=req.formal_profile,
+        manuscript_surface=req.manuscript_surface,
+    ).to_dict()
 
 
 @router.post("/transition-proposal")
