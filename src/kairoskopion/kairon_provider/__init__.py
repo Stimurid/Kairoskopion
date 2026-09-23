@@ -30,6 +30,17 @@ from .batch import (
     LocalFirstAuditReceipt,
     build_batch_qualification_plan,
 )
+from .batch_runtime import (
+    BATCH_STAGE_ORDER,
+    BatchCellRuntimeState,
+    BatchRunState,
+    BatchRunStore,
+    BatchWorkItem,
+    advance_cell_stage,
+    advance_work_item,
+    build_resume_work_items,
+    initialize_batch_run,
+)
 from .adapter import pressure_pack_from_diagnostics
 from .artikl_projection import bind_artikl_projection
 from .target_world import build_target_world_snapshot
@@ -45,6 +56,15 @@ __all__ = [
     "BatchTargetInput",
     "LocalFirstAuditReceipt",
     "build_batch_qualification_plan",
+    "BATCH_STAGE_ORDER",
+    "BatchCellRuntimeState",
+    "BatchRunState",
+    "BatchRunStore",
+    "BatchWorkItem",
+    "advance_cell_stage",
+    "advance_work_item",
+    "build_resume_work_items",
+    "initialize_batch_run",
     "ArtiklArticleProjection",
     "ArtiklStatePointer",
     "CorpusArtifact",
