@@ -51,6 +51,24 @@ class ArtiklArticleProjection(_DictModel):
 
 
 @dataclass
+class ManuscriptSurfaceProfile(_DictModel):
+    """Observed artifact-level state used for formal target reconciliation.
+
+    This is deliberately separate from Artikl semantic authority. It describes
+    the current realization/packaging of a manuscript variant.
+    """
+    word_count: int | None = None
+    abstract_word_count: int | None = None
+    keyword_count: int | None = None
+    reference_style: str | None = None
+    file_format: str | None = None
+    has_ai_disclosure: bool | None = None
+    language: str | None = None
+    heading_depth: int | None = None
+    evidence_refs: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ArtiklStatePointer(_DictModel):
     state_id: str
     state_type: str
