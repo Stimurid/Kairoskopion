@@ -146,6 +146,22 @@ def test_batch_store_resumes_pending_cells(tmp_path):
     assert completed.cells[0].pressure_pack_id == "pack:1"
 
 
+
+
+def test_batch_store_claim_and_recover_inflight(tmp_path):
+    plan = _plan(tmp_path)
+    store = BatchRunStore(tmp_path)
+    store.put(plan)
+    claimed = store.claim_cells(plan.batch_id)
+    assert len(claimed) == 1
+    assert store.get(plan.batch_id).cells[0].status == "in_progress"
+    assert store.pending_cells(plan.batch_id) == []
+    assert store.recover_inflight(plan.batch_id) == 1
+    pending = store.pending_cells(plan.batch_id)
+    assert len(pending) == 1
+    assert pending[0].status == "retry"
+
+
 def test_batch_spec_id_must_match_plan():
     article = BatchArticleInput(
         article_id="A1",

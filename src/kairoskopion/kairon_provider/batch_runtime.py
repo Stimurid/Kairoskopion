@@ -198,6 +198,42 @@ class BatchRunStore:
         return out
 
 
+    def claim_cells(self, batch_id: str, limit: int | None = None) -> list[BatchCell]:
+        """Claim resumable cells for one qualification scheduler worker."""
+        plan = self.get(batch_id)
+        if plan is None:
+            raise KeyError(f"batch not found: {batch_id}")
+        cap = limit
+        if cap is None and plan.spec is not None:
+            cap = plan.spec.concurrency_limit
+        if cap is None:
+            cap = 1
+        candidates = [
+            c for c in plan.cells if c.status in ("pending", "planned", "retry")
+        ][: max(0, cap)]
+        for cell in candidates:
+            cell.status = "in_progress"
+        if candidates:
+            plan.status = "running"
+            self.put(plan)
+        return candidates
+
+    def recover_inflight(self, batch_id: str) -> int:
+        """Make cells abandoned by an interrupted worker resumable."""
+        plan = self.get(batch_id)
+        if plan is None:
+            raise KeyError(f"batch not found: {batch_id}")
+        recovered = 0
+        for cell in plan.cells:
+            if cell.status == "in_progress":
+                cell.status = "retry"
+                recovered += 1
+        if recovered:
+            plan.status = "running"
+            self.put(plan)
+        return recovered
+
+
 def probe_local_first(
     *,
     target_id: str,

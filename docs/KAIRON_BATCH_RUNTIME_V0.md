@@ -39,3 +39,8 @@ Control run on the unchanged parent bff69fa reproduces all five failures in the 
 ## Pilot-001 repair
 
 The first real local-first probe exposed a semantic bug: a discipline-only registry hit was being reported as a generic local hit even when no venue, VenueMemory or TargetWorld existed. The receipt now separates layer_hits and reports target_local_hit, context_only_hit, or local_miss. This prevents disciplinary context from suppressing required target acquisition.
+
+
+## Scheduler resume hardening
+
+BatchRunStore now exposes claim_cells() bounded by BatchQualificationSpec.concurrency_limit and recover_inflight(), which converts abandoned in_progress cells to retry after worker interruption. This closes the minimal single-writer B10 resume contract; distributed leases remain a later production concern.
