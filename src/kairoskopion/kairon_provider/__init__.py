@@ -21,6 +21,15 @@ from .models import (
     TargetModelBundle,
     TargetWorldSnapshot,
 )
+from .batch import (
+    AcademicWorldNode,
+    BatchArticleInput,
+    BatchCell,
+    BatchQualificationPlan,
+    BatchTargetInput,
+    LocalFirstAuditReceipt,
+    build_batch_qualification_plan,
+)
 from .adapter import pressure_pack_from_diagnostics
 from .artikl_projection import bind_artikl_projection
 from .target_world import build_target_world_snapshot
@@ -29,6 +38,13 @@ from .reconcile import reconcile_target_pressure_pack, derive_transition_class
 from .transition import propose_transition
 
 __all__ = [
+    "AcademicWorldNode",
+    "BatchArticleInput",
+    "BatchCell",
+    "BatchQualificationPlan",
+    "BatchTargetInput",
+    "LocalFirstAuditReceipt",
+    "build_batch_qualification_plan",
     "ArtiklArticleProjection",
     "ArtiklStatePointer",
     "CorpusArtifact",
