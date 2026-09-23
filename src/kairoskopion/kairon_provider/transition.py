@@ -113,7 +113,8 @@ def propose_transition(
     if blocking_debt:
         primary = "HOLD"
     else:
-        primary = next((x for x in _PRIMARY_PRIORITY if x in ops), "REFRAME")
+        actionable = [x for x in _PRIMARY_PRIORITY if x != "HOLD" and x in ops]
+        primary = actionable[0] if actionable else ("HOLD" if "HOLD" in ops else "REFRAME")
 
     deep_ops = set(ops) & _DEEP_IDENTITY_REVIEW
     requires_identity_review = bool(deep_ops)
