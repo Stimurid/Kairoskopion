@@ -786,3 +786,123 @@ def test_springer_shaped_guidelines_extract_keyword_format_and_llm_rules():
     assert ai["llm_use_declaration_required"] is True
     assert ai["ai_assisted_copyediting_declaration_exempt"] is True
     assert p["fields_present"]["reference_style"]["value"] == "apa"
+
+
+def test_formal_reconciliation_observes_current_variant_surface():
+    from kairoskopion.schema import ArticleModel, VenueModel
+    from kairoskopion.kairon_provider import (
+        ManuscriptSurfaceProfile,
+        TargetPressurePack,
+        reconcile_target_pressure_pack,
+    )
+
+    article = ArticleModel(
+        title_current="Governed Bootstrapping",
+        abstract_current="fallback abstract",
+        word_count=4095,
+        has_ai_disclosure=False,
+    )
+    venue = VenueModel(
+        canonical_name="Philosophy & Technology",
+        author_guidelines_refs=["https://link.springer.com/journal/13347/submission-guidelines?IFA="],
+    )
+    formal = {
+        "fields_present": {
+            "abstract_word_limit": {"max": 250},
+            "reference_style": {"value": "apa"},
+            "keyword_count": {"min": 4, "max": 6},
+            "submission_file_formats": {"values": ["docx", "doc", "latex"]},
+            "ai_policy_mentioned": {
+                "value": True,
+                "llm_use_declaration_required": True,
+                "ai_assisted_copyediting_declaration_exempt": True,
+            },
+        },
+        "unknowns": ["word_limit: UNKNOWN_NOT_FOUND"],
+    }
+    surface = ManuscriptSurfaceProfile(
+        word_count=4095,
+        abstract_word_count=226,
+        keyword_count=6,
+        reference_style="apa",
+        file_format="google_doc",
+        has_ai_disclosure=True,
+        language="English",
+        evidence_refs=["drive:pt-variant"],
+    )
+    pack = reconcile_target_pressure_pack(
+        article=article,
+        venue=venue,
+        base_pack=TargetPressurePack(target_id="pt", snapshot_id="snap", items=[]),
+        formal_profile=formal,
+        manuscript_surface=surface,
+    )
+    ids = {x.pressure_id for x in pack.items}
+    assert "target:formal:reference_style" not in ids
+    assert "target:formal:ai_disclosure" not in ids
+    assert "target:formal:abstract_limit" not in ids
+    assert "target:formal:keyword_count" not in ids
+    assert "target:formal:file_format" in ids
+    assert "target:formal:word_limit:unknown" in ids
+
+
+def test_formal_reconciliation_closes_packaging_after_docx_export():
+    from kairoskopion.schema import ArticleModel, VenueModel
+    from kairoskopion.kairon_provider import (
+        ManuscriptSurfaceProfile,
+        TargetPressurePack,
+        reconcile_target_pressure_pack,
+    )
+
+    formal = {
+        "fields_present": {
+            "reference_style": {"value": "apa"},
+            "keyword_count": {"min": 4, "max": 6},
+            "submission_file_formats": {"values": ["docx", "doc", "latex"]},
+            "ai_policy_mentioned": {"value": True, "llm_use_declaration_required": True},
+        },
+        "unknowns": [],
+    }
+    pack = reconcile_target_pressure_pack(
+        article=ArticleModel(has_ai_disclosure=True),
+        venue=VenueModel(author_guidelines_refs=["target:guidelines"]),
+        base_pack=TargetPressurePack(target_id="pt", snapshot_id="snap", items=[]),
+        formal_profile=formal,
+        manuscript_surface=ManuscriptSurfaceProfile(
+            keyword_count=6, reference_style="apa", file_format="docx",
+            has_ai_disclosure=True,
+        ),
+    )
+    assert pack.items == []
+
+
+def test_nonblocking_evidence_debt_does_not_suppress_local_transition():
+    from kairoskopion.kairon_provider import propose_transition
+    from kairoskopion.kairon_provider.models import TargetPressureItem, TargetPressurePack
+
+    pack = TargetPressurePack(
+        target_id="pt",
+        snapshot_id="snap",
+        items=[
+            TargetPressureItem(
+                pressure_id="format", dimension="formal_compliance",
+                observation="Export to docx", severity="minor",
+                transformation_depth_hint="packaging",
+            ),
+            TargetPressureItem(
+                pressure_id="word-unknown", dimension="formal_evidence",
+                observation="Word limit not found", severity="unknown",
+                transformation_depth_hint="evidence_needed",
+            ),
+        ],
+    )
+    d = propose_transition(call_id="c", pressure_pack=pack)
+    assert d.primary_transition == "LOCAL_ADAPT"
+    assert "HOLD" in d.required_operations
+    assert d.blocking_evidence_debt == []
+
+
+def test_provider_api_exposes_reconcile_pressure_route():
+    from kairoskopion.api.kairon_provider import router
+    paths = {route.path for route in router.routes}
+    assert "/kairon/provider/reconcile-pressure" in paths
