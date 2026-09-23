@@ -60,6 +60,12 @@ _ORCID_RE = re.compile(r"\b(\d{4}-\d{4}-\d{4}-\d{3}[0-9X])\b")
 #   "Prof. Jane Doe, University of X"
 #   "Jane Doe — Editor-in-Chief, University of X"
 #   "Dr. Jane Doe (Department of Y, University of X, Country)"
+_PAREN_NAME_AFFIL_RE = re.compile(
+    r"(?:(?:Prof\.|Professor|Dr\.|Dr|Mr\.|Ms\.|Mrs\.)\s+)?"
+    r"([A-Z][a-zà-ÿA-Z'\.\-]+(?:\s+[A-Z][a-zà-ÿA-Z'\.\-]+){1,3})"
+    r"\s*\(\s*([^\)\n\r<]{3,120})\s*\)"
+)
+
 _NAME_AFFIL_RE = re.compile(
     r"(?:(?:Prof\.|Professor|Dr\.|Dr|Mr\.|Ms\.|Mrs\.)\s+)?"
     r"([A-Z][a-zà-ÿA-Z'\.\-]+(?:\s+[A-Z][a-zà-ÿA-Z'\.\-]+){1,3})"
@@ -333,6 +339,23 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
     """
     candidates: list[dict[str, Any]] = _explicit_role_candidates(text)
     seen_names: set[str] = {c["full_name"].lower() for c in candidates}
+
+    # Strong generic signal independent of role headings:
+    # "John Doe (Harvard University)". This is intentionally processed
+    # before the broader comma/dash heuristic so role-window changes do not
+    # regress simple board pages.
+    for nm in _PAREN_NAME_AFFIL_RE.finditer(text):
+        name = _clean_name(nm.group(1))
+        affil = nm.group(2).strip(" .,-—–:;")
+        if not _plausible_person_name(name) or name.lower() in seen_names:
+            continue
+        seen_names.add(name.lower())
+        candidates.append({
+            "full_name": name,
+            "affiliation_hint": affil,
+            "role_hint": "board_member",
+        })
+
     # Find role-tagged windows (best signal)
     for role, pat in _ROLE_PATTERNS.items():
         for m in pat.finditer(text):
