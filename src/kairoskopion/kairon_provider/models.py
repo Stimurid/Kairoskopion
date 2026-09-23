@@ -169,12 +169,15 @@ class TargetModelBundle(_DictModel):
 class TargetWorldSnapshot(_DictModel):
     snapshot_id: str
     target_id: str
+    parent_snapshot_id: str | None = None
+    refresh_reason: str | None = None
     provider_commit: str | None = None
     venue_profile_ref: str | None = None
     editor_profiles: list[EditorScientificProfile] = field(default_factory=list)
     corpus_manifest: CorpusArtifactManifest | None = None
     target_models: TargetModelBundle | None = None
     model_refs: dict[str, str] = field(default_factory=dict)
+    canonical_target_rules: dict[str, Any] = field(default_factory=dict)
     evidence_refs: list[str] = field(default_factory=list)
     freshness: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=_now)
@@ -212,6 +215,8 @@ class ProviderRunRecord(_DictModel):
     target_snapshot_id: str | None = None
     evidence_refs: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    scholarly_debt: list[str] = field(default_factory=list)
+    open_debt: list[str] = field(default_factory=list)
     created_at: str = field(default_factory=_now)
     updated_at: str = field(default_factory=_now)
 
