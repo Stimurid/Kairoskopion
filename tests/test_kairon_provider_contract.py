@@ -760,3 +760,29 @@ def test_language_translation_creates_target_variant_branch_not_identity_rewrite
     item = next(x for x in pack.items if x.pressure_id == "target:language:translation")
     assert item.transformation_depth_hint == "target_variant_branch"
     assert derive_transition_class(pack) == "BRANCH"
+
+
+def test_springer_shaped_guidelines_extract_keyword_format_and_llm_rules():
+    from kairoskopion.adapters.venue.guidelines_extractor import extract_formal_submission_profile
+
+    html = """
+    <html><body>
+    <p>Use of an LLM should be properly documented in the Methods section.</p>
+    <p>The use of an LLM for "AI assisted copy editing" purposes does not need to be declared.</p>
+    <p>Please provide an abstract of 150 to 250 words.</p>
+    <p>Please provide 4 to 6 keywords which can be used for indexing purposes.</p>
+    <p>Manuscripts should be submitted in Word. Save your file in docx format or doc format.</p>
+    <p>Manuscripts with mathematical content can also be submitted in LaTeX.</p>
+    <p>Authors are encouraged to follow official APA version 7 guidelines.</p>
+    </body></html>
+    """
+    p = extract_formal_submission_profile(guidelines_html=html)
+    assert p["fields_present"]["abstract_word_limit"]["max"] == 250
+    assert p["fields_present"]["keyword_count"] == {
+        "min": 4, "max": 6, "evidence": "external_claim_html"
+    }
+    assert p["fields_present"]["submission_file_formats"]["values"] == ["docx", "doc", "latex"]
+    ai = p["fields_present"]["ai_policy_mentioned"]
+    assert ai["llm_use_declaration_required"] is True
+    assert ai["ai_assisted_copyediting_declaration_exempt"] is True
+    assert p["fields_present"]["reference_style"]["value"] == "apa"
