@@ -9,7 +9,9 @@ pulls out:
   - reference_style ('apa' / 'chicago' / 'vancouver' / 'harvard' / 'numeric' / None)
   - open_access status (mentions of OA / hybrid / gold)
   - APC mentions (amount + currency where parseable)
-  - AI policy presence
+  - AI policy presence + explicit LLM declaration/copy-editing exception where stated
+  - keyword count constraints
+  - accepted manuscript file formats
 
 Strict rules:
   - Absent fact = UNKNOWN_NOT_FOUND, NOT a `False` / `None` guess.
@@ -79,6 +81,27 @@ _APC_RE = re.compile(
     r"([\$€£]|USD|EUR|GBP)?\s*(\d{2,5}(?:[,.]\d{3})?)",
     re.IGNORECASE,
 )
+_KEYWORD_COUNT_RE = re.compile(
+    r"(?:provide|include|supply)\s+(\d+)\s*(?:to|[-–—])\s*(\d+)\s+keywords?",
+    re.IGNORECASE,
+)
+_WORD_FORMAT_RE = re.compile(
+    r"manuscripts?\s+should\s+be\s+submitted\s+in\s+Word",
+    re.IGNORECASE,
+)
+_LATEX_FORMAT_RE = re.compile(
+    r"manuscripts?\s+with\s+mathematical\s+content\s+can\s+also\s+be\s+submitted\s+in\s+LaTeX",
+    re.IGNORECASE,
+)
+_LLM_DECLARATION_RE = re.compile(
+    r"use\s+of\s+an\s+LLM[^.]{0,120}?should\s+be\s+properly\s+documented",
+    re.IGNORECASE,
+)
+_AI_COPYEDIT_EXEMPT_RE = re.compile(
+    r"AI\s+assisted\s+copy\s+editing[^.]{0,180}?does\s+not\s+need\s+to\s+be\s+declared",
+    re.IGNORECASE,
+)
+
 _AI_POLICY_RE = re.compile(
     r"(generative\s+AI|ChatGPT|large\s+language\s+model(?:s)?|"
     r"AI\s+(?:assistance|tools|disclosure|policy))",
@@ -225,6 +248,31 @@ def extract_formal_submission_profile(
     else:
         result["unknowns"].append("article_types: UNKNOWN_NOT_FOUND")
 
+    # Keyword count
+    kw = _KEYWORD_COUNT_RE.search(text)
+    if kw:
+        result["fields_present"]["keyword_count"] = {
+            "min": int(kw.group(1)),
+            "max": int(kw.group(2)),
+            "evidence": "external_claim_html",
+        }
+    else:
+        result["unknowns"].append("keyword_count: UNKNOWN_NOT_FOUND")
+
+    # Submission file formats
+    formats: list[str] = []
+    if _WORD_FORMAT_RE.search(text):
+        formats.extend(["docx", "doc"])
+    if _LATEX_FORMAT_RE.search(text):
+        formats.append("latex")
+    if formats:
+        result["fields_present"]["submission_file_formats"] = {
+            "values": list(dict.fromkeys(formats)),
+            "evidence": "external_claim_html",
+        }
+    else:
+        result["unknowns"].append("submission_file_formats: UNKNOWN_NOT_FOUND")
+
     # Language
     lang_match = _EXPLICIT_LANGUAGE_RE.search(text) or _LANGUAGE_HINTS_RE.search(text)
     lang_value = lang_match.group(1).lower() if lang_match else None
@@ -265,10 +313,15 @@ def extract_formal_submission_profile(
 
     # AI policy
     if _AI_POLICY_RE.search(text):
-        result["fields_present"]["ai_policy_mentioned"] = {
+        ai = {
             "value": True,
             "evidence": "external_claim_html",
         }
+        if _LLM_DECLARATION_RE.search(text):
+            ai["llm_use_declaration_required"] = True
+        if _AI_COPYEDIT_EXEMPT_RE.search(text):
+            ai["ai_assisted_copyediting_declaration_exempt"] = True
+        result["fields_present"]["ai_policy_mentioned"] = ai
     else:
         result["unknowns"].append("ai_policy: UNKNOWN_NOT_FOUND")
 
