@@ -60,11 +60,47 @@ _ORCID_RE = re.compile(r"\b(\d{4}-\d{4}-\d{4}-\d{3}[0-9X])\b")
 #   "Prof. Jane Doe, University of X"
 #   "Jane Doe — Editor-in-Chief, University of X"
 #   "Dr. Jane Doe (Department of Y, University of X, Country)"
+_PAREN_NAME_AFFIL_RE = re.compile(
+    r"(?:(?:Prof\.|Professor|Dr\.|Dr|Mr\.|Ms\.|Mrs\.)\s+)?"
+    r"([A-Z][a-zà-ÿA-Z'\.\-]+(?:\s+[A-Z][a-zà-ÿA-Z'\.\-]+){1,3})"
+    r"\s*\(\s*([^\)\n\r<]{3,120})\s*\)"
+)
+
 _NAME_AFFIL_RE = re.compile(
     r"(?:(?:Prof\.|Professor|Dr\.|Dr|Mr\.|Ms\.|Mrs\.)\s+)?"
     r"([A-Z][a-zà-ÿA-Z'\.\-]+(?:\s+[A-Z][a-zà-ÿA-Z'\.\-]+){1,3})"
     r"\s*[,\-—–\(]\s*"
     r"([^,\)\n\r<]{4,120})"
+)
+
+_INSTITUTION_TAIL_TOKENS = {
+    "Academy", "College", "University", "Institute", "Institution",
+    "Department", "School", "Centre", "Center", "Faculty",
+    "of", "for", "and", "the",
+}
+_ROLE_GARBAGE_TOKENS = {
+    "editor", "editors", "editorial", "team", "managing", "special",
+    "issues", "chief", "overview", "login", "dashboard",
+}
+
+_COUNTRY_PREFIXES = (
+    "USA ", "UK ", "China ", "Sweden ", "Austria ", "Australia ",
+    "The Netherlands ", "Netherlands ", "Germany ", "Italy ",
+)
+
+_EXPLICIT_ROLE_NAME_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
+    ("editor_in_chief", re.compile(
+        r"(?i:Editors?-in-Chief)\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
+    )),
+    ("special_issues_editor", re.compile(
+        r"(?i:Special\s+Issues?\s+Editor)\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
+    )),
+    ("managing_editor", re.compile(
+        r"(?i:Managing\s+Editor)\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
+    )),
+    ("book_review_editor", re.compile(
+        r"(?i:Book\s+Review\s+Editor)\s+([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
+    )),
 )
 
 _ROLE_PATTERNS = {
@@ -131,6 +167,169 @@ def extract_orcid_ids(text: str) -> list[str]:
     return sorted(set(_ORCID_RE.findall(text)))
 
 
+
+_CREDENTIAL_SUFFIX_RE = re.compile(
+    r"\s+(?:PhD|DPhil|MD|MPhil|MSc|MA|MBA|LLM|JD|DDS|DSc)(?:\s*,?\s*(?:PhD|DPhil|MD|MPhil|MSc|MA|MBA|LLM|JD|DDS|DSc))*\s*$",
+    re.IGNORECASE,
+)
+
+
+def _clean_editor_name(value: str) -> str:
+    value = strip_html(value or "")
+    value = _CREDENTIAL_SUFFIX_RE.sub("", value).strip(" ,;:-")
+    return value
+
+
+def _extract_structured_board_candidates(raw_html: str) -> list[dict[str, Any]]:
+    """Publisher-aware extraction before the generic visible-text heuristic.
+
+    Springer journal pages expose stable data-test attributes for role, name
+    and affiliation. PDC/Techné exposes role headings followed by <ul> blocks.
+    Structured extraction prevents role/country/credential text from being
+    misclassified as person names.
+    """
+    candidates: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+
+    # Springer Nature Link editorial-board cards.
+    springer_re = re.compile(
+        r'<h2[^>]*data-test=["\']editorDisplayRole["\'][^>]*>(.*?)</h2>'
+        r'.*?<h3[^>]*data-test=["\']editorListing["\'][^>]*>(.*?)</h3>'
+        r'\s*<div[^>]*class=["\'][^"\']*u-text-default\s+u-line-height-tight[^"\']*["\'][^>]*>(.*?)</div>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for role_html, name_html, affil_html in springer_re.findall(raw_html):
+        role = strip_html(role_html).strip()
+        name = _clean_editor_name(name_html)
+        affil = strip_html(affil_html).strip()
+        if len(name.split()) < 2 or len(name.split()) > 6:
+            continue
+        key = (name.lower(), role.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append({
+            "full_name": name,
+            "affiliation_hint": affil or None,
+            "role_hint": role or "editor",
+            "extraction_mode": "springer_structured",
+        })
+
+    if candidates:
+        return candidates
+
+    # PDC/Techné leadership blocks: role heading + <ul> containing one or
+    # more bold names followed by affiliation/address lines.
+    role_block_re = re.compile(
+        r'<b>\s*<p>\s*([^<]*?(?:Editor|Editors)[^<]*?)\s*</b>\s*</p>\s*<ul>(.*?)</ul>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for role_html, block in role_block_re.findall(raw_html):
+        role = strip_html(role_html).strip()
+        name_matches = list(re.finditer(r'<b>\s*([^<]{3,100}?)\s*</b>\s*<br\s*/?>', block, re.IGNORECASE))
+        for i, nm in enumerate(name_matches):
+            name = _clean_editor_name(nm.group(1))
+            if len(name.split()) < 2 or len(name.split()) > 6:
+                continue
+            start = nm.end()
+            end = name_matches[i + 1].start() if i + 1 < len(name_matches) else len(block)
+            tail = block[start:end]
+            # First non-empty line before contact/address noise is usually
+            # department/institution. Keep a bounded combined hint.
+            tail = re.sub(r'<a\b.*?</a>', ' ', tail, flags=re.IGNORECASE | re.DOTALL)
+            pieces = [
+                strip_html(x).strip()
+                for x in re.split(r'<br\s*/?>', tail, flags=re.IGNORECASE)
+            ]
+            pieces = [p for p in pieces if p and "@" not in p][:3]
+            affil = ", ".join(pieces) if pieces else None
+            key = (name.lower(), role.lower())
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append({
+                "full_name": name,
+                "affiliation_hint": affil,
+                "role_hint": role or "editor",
+                "extraction_mode": "pdc_structured",
+            })
+
+    return candidates
+
+
+def _clean_name(name: str) -> str:
+    out = name.strip(" .,-—–:;")
+    for prefix in _COUNTRY_PREFIXES:
+        if out.startswith(prefix):
+            out = out[len(prefix):].strip()
+            break
+    # Flattened HTML often glues a role heading to the first following name
+    # (e.g. "Associate Editors John Doe"). Strip only known role prefixes;
+    # do not generally delete title-like words from person names.
+    out = re.sub(
+        r"^(?:Editor-in-Chief|Editors?-in-Chief|Associate Editors?|"
+        r"Editorial Advisory Board|Advisory Board|Editorial Board|"
+        r"Managing Editor|Special Issues? Editor|Book Review Editor)\s+",
+        "",
+        out,
+        flags=re.IGNORECASE,
+    ).strip()
+    parts = out.split()
+    changed = True
+    while parts and changed:
+        changed = False
+        while parts and parts[-1] in _INSTITUTION_TAIL_TOKENS:
+            parts.pop()
+            changed = True
+    return " ".join(parts)
+
+
+def _plausible_person_name(name: str) -> bool:
+    parts = name.split()
+    if not (2 <= len(parts) <= 4):
+        return False
+    lows = {p.lower().strip(".,:-") for p in parts}
+    if lows & _ROLE_GARBAGE_TOKENS:
+        return False
+    if any(token in name for token in ("Road", "Street", "Box ", "Overview", "LOGIN")):
+        return False
+    return True
+
+
+def _explicit_role_candidates(text: str) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for role, pattern in _EXPLICIT_ROLE_NAME_PATTERNS:
+        for m in pattern.finditer(text):
+            name = _clean_name(m.group(1))
+            if _plausible_person_name(name) and name.lower() not in seen:
+                seen.add(name.lower())
+                out.append({
+                    "full_name": name,
+                    "affiliation_hint": None,
+                    "role_hint": role,
+                })
+    # Multi-editor headings often list another editor after the first contact
+    # block. Capture a proper-name sequence immediately after an email marker,
+    # but only before the next explicit role heading.
+    for m in re.finditer(
+        r"(?:\[email\s*protected\]|[\w.+-]+@[\w.-]+\.\w+)\s+"
+        r"([A-Z][A-Za-zÀ-ÿ'\.\-]+(?:\s+[A-Z][A-Za-zÀ-ÿ'\.\-]+){1,3})",
+        text,
+    ):
+        name = _clean_name(m.group(1))
+        if any(x.lower() in name.lower() for x in ("editorial", "overview", "special issues")):
+            continue
+        if _plausible_person_name(name) and name.lower() not in seen:
+            seen.add(name.lower())
+            out.append({
+                "full_name": name,
+                "affiliation_hint": None,
+                "role_hint": "editor_in_chief",
+            })
+    return out
+
+
 def extract_candidate_members(text: str) -> list[dict[str, Any]]:
     """Heuristic extraction of (name, affiliation) pairs from board page text.
 
@@ -138,8 +337,25 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
     `role_hint`. Best-effort; many board pages will not match cleanly
     and will yield 0 candidates — that's honest UNKNOWN territory.
     """
-    candidates: list[dict[str, Any]] = []
-    seen_names: set[str] = set()
+    candidates: list[dict[str, Any]] = _explicit_role_candidates(text)
+    seen_names: set[str] = {c["full_name"].lower() for c in candidates}
+
+    # Strong generic signal independent of role headings:
+    # "John Doe (Harvard University)". This is intentionally processed
+    # before the broader comma/dash heuristic so role-window changes do not
+    # regress simple board pages.
+    for nm in _PAREN_NAME_AFFIL_RE.finditer(text):
+        name = _clean_name(nm.group(1))
+        affil = nm.group(2).strip(" .,-—–:;")
+        if not _plausible_person_name(name) or name.lower() in seen_names:
+            continue
+        seen_names.add(name.lower())
+        candidates.append({
+            "full_name": name,
+            "affiliation_hint": affil,
+            "role_hint": "board_member",
+        })
+
     # Find role-tagged windows (best signal)
     for role, pat in _ROLE_PATTERNS.items():
         for m in pat.finditer(text):
@@ -147,9 +363,9 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
             window_end = min(len(text), m.end() + 250)
             window = text[window_start:window_end]
             for nm in _NAME_AFFIL_RE.finditer(window):
-                name = nm.group(1).strip(" .,-—–:;")
+                name = _clean_name(nm.group(1))
                 affil = nm.group(2).strip(" .,-—–:;")
-                if len(name.split()) < 2 or len(name.split()) > 5:
+                if not _plausible_person_name(name):
                     continue
                 if name.lower() in seen_names:
                     continue
@@ -161,9 +377,9 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
                 })
     # Plus general matches outside any role window
     for nm in _NAME_AFFIL_RE.finditer(text):
-        name = nm.group(1).strip(" .,-—–:;")
+        name = _clean_name(nm.group(1))
         affil = nm.group(2).strip(" .,-—–:;")
-        if len(name.split()) < 2 or len(name.split()) > 5:
+        if not _plausible_person_name(name):
             continue
         if name.lower() in seen_names:
             continue
@@ -178,35 +394,217 @@ def extract_candidate_members(text: str) -> list[dict[str, Any]]:
     return candidates
 
 
+
+
+def _clean_html_text(fragment: str) -> str:
+    return _WHITESPACE_RE.sub(" ", html.unescape(_TAG_RE.sub(" ", fragment))).strip(" ,;:-")
+
+
+def extract_candidate_members_html(raw_html: str) -> list[dict[str, Any]]:
+    """Extract editor names/roles before HTML flattening.
+
+    Role headings define bounded sections. Names are read from bold tags or
+    list rows inside each section, so adjacent addresses/countries cannot be
+    glued onto the person's name by whitespace flattening.
+    """
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    body = raw_html
+    marker = re.search(r"EDITORIAL\s+TEAM", body, re.I)
+    if marker:
+        body = body[marker.start():]
+
+    role_specs = [
+        (r"Editors?-in-Chief", "editor_in_chief"),
+        (r"Special Issues? Editor", "special_issue_editor"),
+        (r"Managing Editor", "managing_editor"),
+        (r"Book Review Editor", "book_review_editor"),
+        (r"Editorial Assistants?", "editorial_assistant"),
+        (r"Editorial Advisory Board", "board_member"),
+    ]
+    role_re = re.compile(
+        "|".join(f"(?P<R{i}>{pat})" for i, (pat, _) in enumerate(role_specs)),
+        re.I,
+    )
+    role_matches = list(role_re.finditer(body))
+
+    def role_for(match: re.Match) -> str:
+        for i, (_, role_name) in enumerate(role_specs):
+            if match.groupdict().get(f"R{i}"):
+                return role_name
+        return "board_member"
+
+    def add(name: str, affiliation: str | None, role: str) -> None:
+        name = _clean_html_text(name)
+        if not (2 <= len(name.split()) <= 5) or len(name) > 100:
+            return
+        low = name.lower()
+        if any(x in low for x in (
+            "editorial team", "submission", "journal", "copyright",
+            "special issue", "managing editor", "book review editor",
+        )):
+            return
+        if low in seen:
+            return
+        seen.add(low)
+        out.append({
+            "full_name": name,
+            "affiliation_hint": _clean_html_text(affiliation or "")[:180] or None,
+            "role_hint": role,
+        })
+
+    if role_matches:
+        for i, rm in enumerate(role_matches):
+            role = role_for(rm)
+            section_end = role_matches[i + 1].start() if i + 1 < len(role_matches) else len(body)
+            section = body[rm.end():section_end]
+
+            # Advisory-board style rows.
+            for lm in re.finditer(r"<li[^>]*>(.*?)(?=<li|</ul>)", section, re.I | re.S):
+                txt = _clean_html_text(lm.group(1))
+                if "," in txt:
+                    name, rest = [x.strip() for x in txt.split(",", 1)]
+                    add(name, rest, role)
+
+            # Named staff in bold tags; multiple names can live in one <ul>.
+            bolds = list(re.finditer(
+                r"<(?:b|strong)(?:\s[^>]*)?>(.*?)</(?:b|strong)>",
+                section, re.I | re.S,
+            ))
+            for j, bm in enumerate(bolds):
+                name = _clean_html_text(bm.group(1))
+                tail_end = bolds[j + 1].start() if j + 1 < len(bolds) else len(section)
+                tail = section[bm.end():tail_end]
+                chunks = [
+                    _clean_html_text(x)
+                    for x in re.split(r"<br\s*/?>", tail, flags=re.I)
+                ]
+                chunks = [
+                    x for x in chunks
+                    if x and "email" not in x.lower() and "@" not in x
+                ]
+                affiliation = chunks[0] if chunks else None
+                add(name, affiliation, role)
+        return out
+
+    # Generic fallback for pages without recognizable role headings.
+    for m in re.finditer(r"<li[^>]*>(.*?)(?=<li|</ul>)", body, re.I | re.S):
+        txt = _clean_html_text(m.group(1))
+        if "," in txt:
+            name, rest = [x.strip() for x in txt.split(",", 1)]
+            add(name, rest, "board_member")
+    return out
+
+
 # -----------------------------------------------------------------------
 # Identity resolution
 # -----------------------------------------------------------------------
 
+_AFFIL_STOP = {
+    "university", "college", "institute", "school", "department", "faculty",
+    "centre", "center", "research", "professor", "emeritus", "the", "of",
+}
+
+
+def _norm_person_name(value: str) -> list[str]:
+    return [
+        t.lower()
+        for t in re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ'’-]+", value or "")
+        if len(t) >= 1
+    ]
+
+
+def _name_identity_ok(query_name: str, candidate_name: str) -> bool:
+    """Conservative person-name gate.
+
+    Require exact surname plus compatible given-name evidence. Initial forms
+    are accepted only when the remaining unmatched given-name tokens are also
+    initials. This prevents a query like "Dhiraj Murthy" from accepting
+    "D. N. Prabhakar Murthy" merely because the surname and first initial match.
+    Search rank alone is never accepted as identity.
+    """
+    q = _norm_person_name(query_name)
+    c = _norm_person_name(candidate_name)
+    if not q or not c or q[-1] != c[-1]:
+        return False
+
+    q_given, c_given = q[:-1], c[:-1]
+    if not q_given or not c_given:
+        return False
+    if q_given == c_given:
+        return True
+
+    q_first, c_first = q_given[0], c_given[0]
+    first_compatible = (
+        q_first == c_first
+        or (len(q_first) == 1 and c_first.startswith(q_first))
+        or (len(c_first) == 1 and q_first.startswith(c_first))
+    )
+    if not first_compatible:
+        return False
+
+    # Extra given-name evidence may be initials ("Matt J Zook" vs
+    # "M. J. Zook"), but an unmatched full name is a different person signal.
+    q_extra = q_given[1:]
+    c_extra = c_given[1:]
+    if any(len(t) > 1 for t in q_extra + c_extra):
+        # Full middle names are safe only when they occur on both sides
+        # at the same ordinal position.
+        common = min(len(q_extra), len(c_extra))
+        for i in range(common):
+            a, b = q_extra[i], c_extra[i]
+            if len(a) > 1 or len(b) > 1:
+                if not (
+                    a == b
+                    or (len(a) == 1 and b.startswith(a))
+                    or (len(b) == 1 and a.startswith(b))
+                ):
+                    return False
+        if any(len(t) > 1 for t in q_extra[common:] + c_extra[common:]):
+            return False
+    return True
+
+
+def _affiliation_identity_ok(hint: str | None, candidate_inst: str | None) -> bool:
+    if not hint:
+        return True
+    if not candidate_inst:
+        return False
+    def tokens(value: str) -> set[str]:
+        return {
+            t.lower()
+            for t in re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ]{3,}", value or "")
+            if t.lower() not in _AFFIL_STOP
+        }
+    h, c = tokens(hint), tokens(candidate_inst)
+    return bool(h and c and (h & c))
+
+
 def openalex_author_lookup(
     name: str, affiliation_hint: str | None = None, timeout: int = 12,
 ) -> dict | None:
-    """Try OpenAlex Authors search for the most-likely match."""
+    """Resolve an OpenAlex Author conservatively.
+
+    A search result is accepted only when person-name identity is compatible
+    and, when an affiliation hint is supplied, the current institution shares
+    a discriminating token. A top-ranked search hit is not identity evidence.
+    """
     q = urllib.parse.quote(name.strip())
-    url = f"{OPENALEX_AUTHORS}?search={q}&per_page=5"
+    url = f"{OPENALEX_AUTHORS}?search={q}&per_page=10"
     resp = _http_json(url, timeout=timeout)
     if not resp:
         return None
     results = resp.get("results", []) or []
-    if not results:
-        return None
-    # If affiliation hint present, prefer the candidate whose
-    # last_known_institution display_name shares a token with the hint.
-    if affiliation_hint:
-        hint_tokens = {
-            t.lower()
-            for t in re.findall(r"[A-Za-z]{4,}", affiliation_hint)
-        }
-        for r in results:
-            inst = (r.get("last_known_institution") or {}).get("display_name", "")
-            inst_tokens = {t.lower() for t in re.findall(r"[A-Za-z]{4,}", inst)}
-            if hint_tokens & inst_tokens:
-                return r
-    return results[0]
+    for r in results:
+        display = str(r.get("display_name") or "")
+        if not _name_identity_ok(name, display):
+            continue
+        inst = (r.get("last_known_institution") or {}).get("display_name")
+        if not _affiliation_identity_ok(affiliation_hint, inst):
+            continue
+        return r
+    return None
 
 
 def orcid_record(orcid_id: str, timeout: int = 10) -> dict | None:
@@ -264,6 +662,7 @@ def build_editorial_board_cloud(
             return cloud
         board_page_html = raw
 
+    structured_candidates = extract_candidate_members_html(board_page_html)
     text = strip_html(board_page_html)
     if len(text) < 200:
         cloud.unknowns.append(
@@ -276,8 +675,13 @@ def build_editorial_board_cloud(
     # Pull ORCID ids first (very high signal)
     orcid_ids = extract_orcid_ids(text)
 
-    # Then candidate (name, affiliation) tuples
-    candidates = extract_candidate_members(text)
+    # Prefer publisher-structured extraction. Generic text heuristics are a
+    # fallback only; they are too permissive for modern board pages where
+    # roles, degrees, cities and countries appear adjacent to names.
+    candidates = _extract_structured_board_candidates(board_page_html)
+    if not candidates:
+        candidates = structured_candidates or extract_candidate_members(text)
+        cloud.warnings.append("editor extraction used generic text fallback")
     if not candidates:
         cloud.unknowns.append(
             "no editor name/affiliation pairs matched the heuristic patterns"

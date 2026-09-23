@@ -9,7 +9,9 @@ pulls out:
   - reference_style ('apa' / 'chicago' / 'vancouver' / 'harvard' / 'numeric' / None)
   - open_access status (mentions of OA / hybrid / gold)
   - APC mentions (amount + currency where parseable)
-  - AI policy presence
+  - AI policy presence + explicit LLM declaration/copy-editing exception where stated
+  - keyword count constraints
+  - accepted manuscript file formats
 
 Strict rules:
   - Absent fact = UNKNOWN_NOT_FOUND, NOT a `False` / `None` guess.
@@ -42,9 +44,15 @@ _SCRIPT_RE = re.compile(r"<script.*?</script>", re.DOTALL | re.IGNORECASE)
 _STYLE_RE = re.compile(r"<style.*?</style>", re.DOTALL | re.IGNORECASE)
 _WS_RE = re.compile(r"\s+")
 
+_TOTAL_LENGTH_RE = re.compile(
+    r"(?:total\s+(?:length|word\s+count)|manuscript\s+(?:length|word\s+count))"
+    r"[^0-9]{0,50}(?:not\s+exceed|maximum|max\.?|up\s+to)?[^0-9]{0,20}"
+    r"([\d,]{3,7})\s*words?",
+    re.IGNORECASE,
+)
 _WORD_LIMIT_RE = re.compile(
     r"(?:word\s+(?:limit|count|length)|maximum|max\.?|up\s+to)"
-    r"[^0-9]{0,30}(\d{3,6})(?:\s*[-–—to]\s*(\d{3,6}))?\s*words?",
+    r"[^0-9]{0,30}([\d,]{3,7})(?:\s*[-–—to]\s*([\d,]{3,7}))?\s*words?",
     re.IGNORECASE,
 )
 _ABSTRACT_LIMIT_RE = re.compile(
@@ -73,15 +81,43 @@ _APC_RE = re.compile(
     r"([\$€£]|USD|EUR|GBP)?\s*(\d{2,5}(?:[,.]\d{3})?)",
     re.IGNORECASE,
 )
+_KEYWORD_COUNT_RE = re.compile(
+    r"(?:provide|include|supply)\s+(\d+)\s*(?:to|[-–—])\s*(\d+)\s+keywords?",
+    re.IGNORECASE,
+)
+_WORD_FORMAT_RE = re.compile(
+    r"manuscripts?\s+should\s+be\s+submitted\s+in\s+Word",
+    re.IGNORECASE,
+)
+_LATEX_FORMAT_RE = re.compile(
+    r"manuscripts?\s+with\s+mathematical\s+content\s+can\s+also\s+be\s+submitted\s+in\s+LaTeX",
+    re.IGNORECASE,
+)
+_LLM_DECLARATION_RE = re.compile(
+    r"use\s+of\s+an\s+LLM[^.]{0,120}?should\s+be\s+properly\s+documented",
+    re.IGNORECASE,
+)
+_AI_COPYEDIT_EXEMPT_RE = re.compile(
+    r"AI\s+assisted\s+copy\s+editing[^.]{0,180}?does\s+not\s+need\s+to\s+be\s+declared",
+    re.IGNORECASE,
+)
+
 _AI_POLICY_RE = re.compile(
-    r"(generative\s+AI|ChatGPT|large\s+language\s+model(?:s)?|"
+    r"(generative\s+AI|ChatGPT|\bLLMs?\b|large\s+language\s+model(?:s)?|"
     r"AI\s+(?:assistance|tools|disclosure|policy))",
     re.IGNORECASE,
 )
-_LANGUAGE_HINTS_RE = re.compile(
-    r"manuscripts?\s+(?:must|should)\s+be\s+(?:submitted\s+)?in\s+([A-Za-z]+)",
+_EXPLICIT_LANGUAGE_RE = re.compile(
+    r"(?:the\s+)?(?:journal(?:['’]s)?|publication(?:['’]s)?)\s+language\s+(?:is|:)\s*([A-Za-z]+)",
     re.IGNORECASE,
 )
+_LANGUAGE_HINTS_RE = re.compile(
+    r"manuscripts?\s+(?:must|should)\s+be\s+(?:submitted\s+|written\s+)?in\s+([A-Za-z]+)",
+    re.IGNORECASE,
+)
+_NON_LANGUAGE_TOKENS = {
+    "word", "doc", "docx", "pdf", "latex", "tex", "format", "file",
+}
 _OPEN_ACCESS_RE = re.compile(
     r"(open\s+access|gold\s+open\s+access|hybrid\s+(?:OA|open\s+access)|"
     r"diamond\s+open\s+access)",
@@ -160,11 +196,18 @@ def extract_formal_submission_profile(
 
     result["access_status"] = result.get("access_status", "opened") or "opened"
 
-    # Word limits
-    wl = _WORD_LIMIT_RE.search(text)
+    # Word limits. Prefer explicit manuscript/total-length statements.
+    # The generic regex is guarded against nearby "abstract" text so an
+    # "abstract up to 150 words" clause cannot become the manuscript limit.
+    total = _TOTAL_LENGTH_RE.search(text)
+    wl = total or _WORD_LIMIT_RE.search(text)
+    if wl and not total:
+        ctx = text[max(0, wl.start() - 100):wl.end() + 40].lower()
+        if "abstract" in ctx:
+            wl = None
     if wl:
-        lo = int(wl.group(1))
-        hi = int(wl.group(2)) if wl.group(2) else None
+        lo = int(wl.group(1).replace(",", ""))
+        hi = int(wl.group(2).replace(",", "")) if (not total and wl.lastindex and wl.lastindex >= 2 and wl.group(2)) else None
         result["fields_present"]["word_limit"] = {
             "min": lo if hi else None, "max": hi or lo,
             "evidence": "external_claim_html",
@@ -205,11 +248,37 @@ def extract_formal_submission_profile(
     else:
         result["unknowns"].append("article_types: UNKNOWN_NOT_FOUND")
 
+    # Keyword count
+    kw = _KEYWORD_COUNT_RE.search(text)
+    if kw:
+        result["fields_present"]["keyword_count"] = {
+            "min": int(kw.group(1)),
+            "max": int(kw.group(2)),
+            "evidence": "external_claim_html",
+        }
+    else:
+        result["unknowns"].append("keyword_count: UNKNOWN_NOT_FOUND")
+
+    # Submission file formats
+    formats: list[str] = []
+    if _WORD_FORMAT_RE.search(text):
+        formats.extend(["docx", "doc"])
+    if _LATEX_FORMAT_RE.search(text):
+        formats.append("latex")
+    if formats:
+        result["fields_present"]["submission_file_formats"] = {
+            "values": list(dict.fromkeys(formats)),
+            "evidence": "external_claim_html",
+        }
+    else:
+        result["unknowns"].append("submission_file_formats: UNKNOWN_NOT_FOUND")
+
     # Language
-    lang_match = _LANGUAGE_HINTS_RE.search(text)
-    if lang_match:
+    lang_match = _EXPLICIT_LANGUAGE_RE.search(text) or _LANGUAGE_HINTS_RE.search(text)
+    lang_value = lang_match.group(1).lower() if lang_match else None
+    if lang_value and lang_value not in _NON_LANGUAGE_TOKENS:
         result["fields_present"]["language"] = {
-            "value": lang_match.group(1).lower(),
+            "value": lang_value,
             "evidence": "external_claim_html",
         }
     else:
@@ -244,10 +313,15 @@ def extract_formal_submission_profile(
 
     # AI policy
     if _AI_POLICY_RE.search(text):
-        result["fields_present"]["ai_policy_mentioned"] = {
+        ai = {
             "value": True,
             "evidence": "external_claim_html",
         }
+        if _LLM_DECLARATION_RE.search(text):
+            ai["llm_use_declaration_required"] = True
+        if _AI_COPYEDIT_EXEMPT_RE.search(text):
+            ai["ai_assisted_copyediting_declaration_exempt"] = True
+        result["fields_present"]["ai_policy_mentioned"] = ai
     else:
         result["unknowns"].append("ai_policy: UNKNOWN_NOT_FOUND")
 

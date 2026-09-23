@@ -135,6 +135,10 @@ venue_memory_registry = VenueMemoryRegistry(_vm_data_dir)
 from .workbench import router as _workbench_router
 app.include_router(_workbench_router, prefix="/api")
 
+# Additive ARTIKL.KAIRON provider surface
+from .kairon_provider import router as _kairon_provider_router
+app.include_router(_kairon_provider_router)
+
 
 # ---------------------------------------------------------------------------
 # Health

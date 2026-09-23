@@ -4,7 +4,9 @@ This is the HTTP layer the corpus miner service calls. Services
 themselves must not import urllib/requests; per the architectural
 invariant in tests/test_pipeline_manuscript_venue_fit.py.
 
-Free, no auth. Rate-limit polite (200ms between page fetches).
+Casual anonymous use is supported by OpenAlex; a free API key is used when
+configured because shared runtime IPs may exhaust the anonymous credit budget.
+Rate-limit polite (200ms between page fetches).
 Reconstructs OpenAlex's `abstract_inverted_index` into plain text.
 """
 
@@ -42,9 +44,16 @@ def _http_json(url: str, timeout: int = 20, ua: str = DEFAULT_UA) -> dict | None
         req = urllib.request.Request(url, headers={"User-Agent": ua})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        hint = "anonymous_budget_or_auth" if e.code in (401, 403) else "http_error"
+        logger.warning(
+            "OpenAlex Works fetch failed: HTTP %s (%s) on %s",
+            e.code, hint, url.split("api_key=", 1)[0][:100],
+        )
+        return None
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
         logger.warning("OpenAlex Works fetch failed: %s on %s",
-                       type(e).__name__, url[:80])
+                       type(e).__name__, url.split("api_key=", 1)[0][:100])
         return None
 
 
