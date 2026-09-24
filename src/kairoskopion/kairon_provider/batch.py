@@ -140,6 +140,7 @@ class BatchArticleInput(_BatchDictModel):
     mutable_zones: list[str] = field(default_factory=list)
     allowed_change_classes: list[str] = field(default_factory=list)
     academic_world_path_hints: list[list[str]] = field(default_factory=list)
+    eligible_target_ids: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.article_id.strip():
@@ -263,6 +264,8 @@ def build_batch_qualification_plan(
 
     for article in articles:
         for target in targets:
+            if article.eligible_target_ids and target.target_id not in article.eligible_target_ids:
+                continue
             cid = _cell_id(
                 batch_id=batch_id,
                 article_id=article.article_id,
