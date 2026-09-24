@@ -117,3 +117,51 @@ def test_target_variant_branch_pressure_maps_to_branch_transition():
     assert decision.primary_transition == "BRANCH"
     assert "BRANCH" in decision.required_operations
     assert decision.author_decision_required is False
+
+def test_formal_bilingual_policy_overrides_english_corpus_title_inference():
+    article = ArticleModel(
+        language="ru", genre_current="conceptual_article",
+        method_status="conceptual", reference_count=25,
+    )
+    snap = _snapshot()
+    snap["canonical_target_rules"] = {
+        "accepted_languages": ["ru", "en"],
+        "language_evidence_refs": ["venue-pack:official-guidelines"],
+    }
+    target = BatchTargetInput(
+        target_id="t", snapshot_id="snap:1",
+        academic_world_path=["discipline:philosophy-of-technology"],
+    )
+    pack = derive_batch_target_pressure(
+        article_input=_article_input(), article=article, target=target,
+        snapshot=snap, current_year=2026,
+    )
+    ids = {x.pressure_id for x in pack.items}
+    assert "target:corpus:language:english_realization" not in ids
+    assert "target:formal:language:target_variant_required" not in ids
+
+
+def test_formal_language_rule_requires_variant_when_article_language_is_not_accepted():
+    article = ArticleModel(
+        language="ru", genre_current="conceptual_article",
+        method_status="conceptual", reference_count=25,
+    )
+    snap = _snapshot()
+    snap["canonical_target_rules"] = {
+        "accepted_languages": ["en"],
+        "language_evidence_refs": ["venue-pack:official-guidelines"],
+    }
+    target = BatchTargetInput(
+        target_id="t", snapshot_id="snap:1",
+        academic_world_path=["discipline:philosophy-of-technology"],
+    )
+    pack = derive_batch_target_pressure(
+        article_input=_article_input(), article=article, target=target,
+        snapshot=snap, current_year=2026,
+    )
+    pressure = next(
+        x for x in pack.items
+        if x.pressure_id == "target:formal:language:target_variant_required"
+    )
+    assert pressure.transformation_depth_hint == "target_variant_branch"
+    assert pressure.evidence_status == "formal_target_rule"
