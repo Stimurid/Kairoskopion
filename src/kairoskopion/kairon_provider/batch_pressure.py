@@ -110,6 +110,47 @@ def _corpus_is_english_dominant(snapshot: dict[str, Any]) -> bool | None:
     return asciiish / len(titles) >= 0.8
 
 
+def _normalize_language(value: str | None) -> str | None:
+    raw = (value or "").strip().lower()
+    if not raw:
+        return None
+    aliases = {
+        "russian": "ru", "русский": "ru", "ru-ru": "ru",
+        "english": "en", "английский": "en", "en-us": "en", "en-uk": "en",
+        "french": "fr", "французский": "fr",
+        "german": "de", "немецкий": "de",
+    }
+    if raw in aliases:
+        return aliases[raw]
+    if len(raw) == 2:
+        return raw
+    if "-" in raw and len(raw.split("-", 1)[0]) == 2:
+        return raw.split("-", 1)[0]
+    return raw
+
+
+def _accepted_languages(snapshot: dict[str, Any]) -> tuple[set[str], list[str]]:
+    """Return formal accepted-language rules when the frozen snapshot has them.
+
+    Formal venue policy outranks corpus-title script inference. Crossref/OpenAlex
+    often expose translated/romanized titles, so title language alone cannot
+    override an explicit bilingual/multilingual submission rule.
+    """
+    rules = dict(snapshot.get("canonical_target_rules") or {})
+    raw = (
+        rules.get("accepted_languages")
+        or rules.get("languages_accepted")
+        or rules.get("submission_languages")
+        or []
+    )
+    if isinstance(raw, str):
+        raw = [raw]
+    langs = {_normalize_language(str(x)) for x in raw if str(x).strip()}
+    langs.discard(None)
+    refs = [str(x) for x in (rules.get("language_evidence_refs") or []) if x]
+    return {str(x) for x in langs}, refs
+
+
 def derive_batch_target_pressure(
     *,
     article_input: BatchArticleInput,
@@ -284,24 +325,43 @@ def derive_batch_target_pressure(
         ))
         unknowns.append("target:corpus:citation")
 
-    english = _corpus_is_english_dominant(snapshot)
-    article_language = (article.language or "").lower()
-    if english and article_language.startswith("ru"):
-        items.append(TargetPressureItem(
-            pressure_id="target:corpus:language:english_realization",
-            dimension="language_register",
-            observation=(
-                "The frozen target corpus is English-dominant while the authoritative "
-                "current article state is Russian. An English sibling TARGET_VARIANT is "
-                "required for this batch trajectory; formal language policy remains a B8 check."
-            ),
-            evidence_refs=refs,
-            evidence_status="corpus_observation",
-            severity="major",
-            transformation_depth_hint="target_variant_branch",
-            uncertainty=["formal submission language policy not yet verified in B8"],
-            source_kind="target_corpus_profile",
-        ))
+    accepted_languages, language_rule_refs = _accepted_languages(snapshot)
+    article_language = _normalize_language(article.language)
+    if accepted_languages and article_language:
+        if article_language not in accepted_languages:
+            items.append(TargetPressureItem(
+                pressure_id="target:formal:language:target_variant_required",
+                dimension="language_register",
+                observation=(
+                    f"The authoritative current article language is {article_language!r}, "
+                    f"while the frozen formal target rule accepts {sorted(accepted_languages)}. "
+                    "A target-language sibling TARGET_VARIANT is required."
+                ),
+                evidence_refs=_unique([*refs, *language_rule_refs]),
+                evidence_status="formal_target_rule",
+                severity="major",
+                transformation_depth_hint="target_variant_branch",
+                source_kind="canonical_target_rules",
+            ))
+    else:
+        english = _corpus_is_english_dominant(snapshot)
+        if english and article_language == "ru":
+            items.append(TargetPressureItem(
+                pressure_id="target:corpus:language:english_realization",
+                dimension="language_register",
+                observation=(
+                    "The frozen target corpus is English-dominant while the authoritative "
+                    "current article state is Russian. An English sibling TARGET_VARIANT is "
+                    "provisionally required for this batch trajectory; formal language policy "
+                    "remains unverified and can override corpus-title inference."
+                ),
+                evidence_refs=refs,
+                evidence_status="corpus_observation",
+                severity="major",
+                transformation_depth_hint="target_variant_branch",
+                uncertainty=["formal submission language policy not yet verified in B8"],
+                source_kind="target_corpus_profile",
+            ))
 
     for limitation in target_models.get("limitations") or []:
         items.append(TargetPressureItem(
