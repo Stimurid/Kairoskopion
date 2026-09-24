@@ -12,7 +12,7 @@ from dataclasses import replace
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from .batch import (
     AcademicWorldNode,
@@ -42,45 +42,100 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 class AcademicWorldStore:
-    """Durable graph store under KAIROSKOPION_DATA_DIR.
+    """Durable graph store with immutable repository seeds plus live overrides.
 
-    Nodes are addressable by stable node_id. Updating a node replaces its
-    current materialization but preserves provenance supplied by the caller.
-    Frozen TargetWorld evidence remains in TargetWorldStore and is never
-    overwritten by this store.
+    Seed records are search-routing memory. Live records override them by
+    node_id. When a live node changes, the previous materialization is archived
+    so later passes can reconstruct how the local graph evolved.
     """
 
-    def __init__(self, root: str | Path):
-        self.root = Path(root) / "kairon_provider" / "academic_world"
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        seed_paths: Iterable[str | Path] = (),
+    ):
+        base = Path(root) / "kairon_provider" / "academic_world"
+        self.root = base / "live"
+        self.history_root = base / "history"
         self.root.mkdir(parents=True, exist_ok=True)
+        self.seed_paths = [Path(x) for x in seed_paths]
 
     def _path(self, node_id: str) -> Path:
         return self.root / f"{_digest(node_id)}.json"
 
+    def _seed_nodes(self) -> dict[str, AcademicWorldNode]:
+        out: dict[str, AcademicWorldNode] = {}
+        for path in self.seed_paths:
+            if not path.is_file():
+                continue
+            for line in path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    node = AcademicWorldNode(**json.loads(line))
+                except Exception:
+                    continue
+                out[node.node_id] = node
+        return out
+
     def put(self, node: AcademicWorldNode) -> AcademicWorldNode:
-        _atomic_json(self._path(node.node_id), node.to_dict())
+        path = self._path(node.node_id)
+        if path.is_file():
+            prior = json.loads(path.read_text(encoding="utf-8"))
+            current = node.to_dict()
+            if prior != current:
+                history_dir = self.history_root / _digest(node.node_id)
+                history_dir.mkdir(parents=True, exist_ok=True)
+                prior_digest = hashlib.sha256(
+                    json.dumps(prior, ensure_ascii=False, sort_keys=True).encode("utf-8")
+                ).hexdigest()
+                _atomic_json(history_dir / f"{prior_digest}.json", prior)
+        _atomic_json(path, node.to_dict())
         return node
 
     def get(self, node_id: str) -> AcademicWorldNode | None:
         path = self._path(node_id)
-        if not path.is_file():
-            return None
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        if raw.get("node_id") != node_id:
-            return None
-        return AcademicWorldNode(**raw)
+        if path.is_file():
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if raw.get("node_id") == node_id:
+                return AcademicWorldNode(**raw)
+        return self._seed_nodes().get(node_id)
 
     def list_nodes(self, node_type: str | None = None) -> list[AcademicWorldNode]:
-        out: list[AcademicWorldNode] = []
+        merged = self._seed_nodes()
         for path in sorted(self.root.glob("*.json")):
             try:
                 raw = json.loads(path.read_text(encoding="utf-8"))
                 node = AcademicWorldNode(**raw)
             except Exception:
                 continue
-            if node_type is None or node.node_type == node_type:
-                out.append(node)
+            merged[node.node_id] = node
+        out = list(merged.values())
+        if node_type is not None:
+            out = [node for node in out if node.node_type == node_type]
         return out
+
+    def search(self, query: str, limit: int = 20) -> list[AcademicWorldNode]:
+        q = (query or "").strip().lower()
+        if not q:
+            return self.list_nodes()[:limit]
+        scored: list[tuple[int, AcademicWorldNode]] = []
+        for node in self.list_nodes():
+            score = 0
+            if q in node.node_id.lower():
+                score += 4
+            for value in node.names.values():
+                if q in value.lower():
+                    score += 6
+            for value in node.languages + node.institutional_regions:
+                if q in value.lower():
+                    score += 2
+            if score:
+                scored.append((score, node))
+        scored.sort(key=lambda item: (-item[0], item[1].node_id))
+        return [node for _, node in scored[:limit]]
 
     def children_of(self, parent_id: str) -> list[AcademicWorldNode]:
         return [n for n in self.list_nodes() if parent_id in n.parent_ids]
@@ -238,6 +293,7 @@ def probe_local_first(
     *,
     target_id: str,
     data_root: str | Path,
+    academic_world_query: str | None = None,
     discipline_query: str | None = None,
     venue_query: str | None = None,
     issn: str | None = None,
@@ -250,11 +306,24 @@ def probe_local_first(
 
     root = Path(data_root)
     layer_hits: dict[str, list[str]] = {
+        "academic_world": [],
         "discipline_registry": [],
         "venue_registry": [],
         "target_world_store": [],
         "venue_memory": [],
     }
+
+    # 0. Academic-world graph: repository routing seeds + durable live overrides.
+    repo_root = Path(__file__).resolve().parents[3]
+    academic_seed_paths = sorted(
+        (repo_root / "data" / "academic_world" / "seeds").glob("*.jsonl")
+    )
+    academic_store = AcademicWorldStore(root, seed_paths=academic_seed_paths)
+    if academic_world_query:
+        layer_hits["academic_world"] = [
+            f"academic_world:{node.node_id}"
+            for node in academic_store.search(academic_world_query, limit=20)
+        ]
 
     # 1. Disciplinary landscape: repository seed/live registry.
     discipline_registry = load_default_registry()
@@ -301,13 +370,14 @@ def probe_local_first(
     )
     if target_level_hit:
         status = "target_local_hit"
-    elif layer_hits["discipline_registry"]:
+    elif layer_hits["academic_world"] or layer_hits["discipline_registry"]:
         status = "context_only_hit"
     else:
         status = "local_miss"
 
     return LocalFirstAuditReceipt(
         target_id=target_id,
+        checked_academic_world_store=True,
         checked_discipline_registry=True,
         checked_venue_registry=True,
         checked_target_world_store=True,
@@ -334,3 +404,28 @@ def authorize_external_discovery(
     )
     updated.validate()
     return updated
+
+
+def persist_target_world_refresh(
+    *,
+    store: TargetWorldStore,
+    parent_snapshot_id: str,
+    refreshed_snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist refresh as a descendant; a frozen snapshot is never overwritten."""
+    parent = store.get(parent_snapshot_id)
+    if parent is None:
+        raise KeyError(f"parent target snapshot not found: {parent_snapshot_id}")
+    child_id = str(refreshed_snapshot.get("snapshot_id") or "")
+    if not child_id:
+        raise ValueError("refreshed snapshot_id must be non-empty")
+    if child_id == parent_snapshot_id:
+        raise ValueError("refresh must create a new descendant snapshot_id")
+    if store.get(child_id) is not None:
+        raise ValueError("refreshed snapshot_id already exists")
+    data = dict(refreshed_snapshot)
+    lineage = dict(data.get("lineage") or {})
+    lineage["parent_snapshot_id"] = parent_snapshot_id
+    data["lineage"] = lineage
+    store.put(data)
+    return data

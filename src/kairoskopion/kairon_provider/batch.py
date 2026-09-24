@@ -81,6 +81,7 @@ class LocalFirstAuditReceipt(_BatchDictModel):
     """Proof that durable local knowledge was checked before network discovery."""
 
     target_id: str
+    checked_academic_world_store: bool = False
     checked_discipline_registry: bool = False
     checked_venue_registry: bool = False
     checked_target_world_store: bool = False
@@ -97,23 +98,28 @@ class LocalFirstAuditReceipt(_BatchDictModel):
         if not self.target_id.strip():
             raise ValueError("local-first receipt target_id must be non-empty")
         if self.external_discovery_used and not (
-            self.checked_discipline_registry
+            self.checked_academic_world_store
+            and self.checked_discipline_registry
             and self.checked_venue_registry
             and self.checked_target_world_store
         ):
             raise ValueError(
-                "external discovery requires prior discipline, venue and "
-                "TargetWorld local checks"
+                "external discovery requires prior academic-world, discipline, "
+                "venue and TargetWorld local checks"
             )
 
 
 @dataclass
 class BatchQualificationSpec(_BatchDictModel):
-    """Execution policy for a resumable article × target qualification batch."""
+    """Execution policy for a resumable article x target qualification batch."""
 
     batch_id: str
-    concurrency_limit: int = 4
+    academic_world_policy: dict[str, Any] = field(default_factory=dict)
+    discovery_policy: dict[str, Any] = field(default_factory=dict)
+    target_selection_policy: dict[str, Any] = field(default_factory=dict)
+    target_depth_policy: dict[str, Any] = field(default_factory=dict)
     source_budget: dict[str, Any] = field(default_factory=dict)
+    concurrency_limit: int = 4
     freshness_policy: dict[str, Any] = field(default_factory=dict)
     failure_policy: dict[str, Any] = field(default_factory=dict)
     author_decision_policy: str = "stop_on_identity_change"

@@ -44,3 +44,19 @@ The first real local-first probe exposed a semantic bug: a discipline-only regis
 ## Scheduler resume hardening
 
 BatchRunStore now exposes claim_cells() bounded by BatchQualificationSpec.concurrency_limit and recover_inflight(), which converts abandoned in_progress cells to retry after worker interruption. This closes the minimal single-writer B10 resume contract; distributed leases remain a later production concern.
+
+## Academic-world routing delta
+
+The local-first boundary now includes AcademicWorldStore itself. Repository routing seeds and durable live graph nodes are checked before external discovery can be authorized. `LocalFirstAuditReceipt.checked_academic_world_store` is mandatory for external discovery.
+
+Repository routing seeds are intentionally low-confidence scaffolds, not claims about academic cultures. The initial graph exposes Russian/post-Soviet, Anglophone, Francophone, Germanophone, East Asian, South Asian, Southeast Asian, African, MENA, Latin American/Iberophone and transregional routes; evidence-backed descendants carry concrete discipline/school/venue structure. Multi-parent nodes are supported.
+
+AcademicWorldStore now reads immutable seed JSONL plus live overrides. A changed live record archives its previous materialization under `academic_world/history` before replacement. Frozen TargetWorld refresh is separately guarded by `persist_target_world_refresh()`, which requires a new descendant snapshot ID and records `parent_snapshot_id`.
+
+New classifier family: `academic_world_resolution_v1`. It sits between `disciplinary_mapping_v2` and `venue_funnel_planning_v2`, selects only local AcademicWorld node IDs, preserves multiple trajectories, treats routing scaffolds as non-substantive, and emits acquisition debt when the local graph lacks evidence.
+
+Current delta qualification:
+- targeted batch/runtime/pressure/academic-world suite: 27 PASS;
+- full repository: 3360 PASS, 5 FAIL, 8 deselected, 16 subtests PASS;
+- the five failures are the same parent-baseline failures previously reproduced in this test environment (3 FastAPI route-introspection/environment, 2 rubric-loader);
+- observed branch-specific regressions: 0.

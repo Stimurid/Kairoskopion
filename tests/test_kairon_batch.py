@@ -26,6 +26,7 @@ def _article(article_id: str) -> BatchArticleInput:
 def _receipt(target_id: str, *, external: bool = False) -> LocalFirstAuditReceipt:
     return LocalFirstAuditReceipt(
         target_id=target_id,
+        checked_academic_world_store=True,
         checked_discipline_registry=True,
         checked_venue_registry=True,
         checked_target_world_store=True,
@@ -106,6 +107,7 @@ def test_external_discovery_without_prior_local_checks_is_rejected():
             snapshot_id="targetworld:missing:1",
             local_first_receipt=LocalFirstAuditReceipt(
                 target_id="missing",
+                checked_academic_world_store=True,
                 checked_discipline_registry=True,
                 checked_venue_registry=False,
                 checked_target_world_store=True,

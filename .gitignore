@@ -36,6 +36,10 @@ htmlcov/
 # Data: ignore contents by default, then un-ignore curated subtrees.
 # Using data/* (not data/) so negations can re-include subdirectories.
 data/*
+!data/academic_world/
+data/academic_world/*
+!data/academic_world/seeds/
+!data/academic_world/seeds/*.jsonl
 
 # Curated project data — tracked and reviewable.
 !data/disciplinary_landscape/

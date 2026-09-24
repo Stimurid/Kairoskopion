@@ -179,3 +179,73 @@ def test_batch_spec_id_must_match_plan():
         assert "batch spec batch_id" in str(exc)
     else:
         raise AssertionError("mismatched BatchQualificationSpec should fail")
+
+
+def test_academic_world_store_reads_seed_and_archives_live_revision(tmp_path):
+    seed = tmp_path / "seed.jsonl"
+    seed.write_text(
+        json.dumps({
+            "node_id": "ecology:anglophone",
+            "node_type": "REGION_ECOLOGY",
+            "names": {"en": "Anglophone publication ecology"},
+            "source_status": "routing_scaffold",
+        }) + "\n",
+        encoding="utf-8",
+    )
+    store = AcademicWorldStore(tmp_path / "runtime", seed_paths=[seed])
+    assert store.get("ecology:anglophone").source_status == "routing_scaffold"
+    assert store.search("Anglophone")[0].node_id == "ecology:anglophone"
+
+    store.put(AcademicWorldNode(
+        node_id="ecology:anglophone",
+        node_type="REGION_ECOLOGY",
+        names={"en": "Anglophone publication ecology"},
+        source_status="provisional",
+        evidence_refs=["source:first"],
+    ))
+    store.put(AcademicWorldNode(
+        node_id="ecology:anglophone",
+        node_type="REGION_ECOLOGY",
+        names={"en": "Anglophone publication ecology"},
+        source_status="provisional",
+        evidence_refs=["source:first", "source:second"],
+    ))
+    history = list((store.history_root).rglob("*.json"))
+    assert len(history) == 1
+    assert store.get("ecology:anglophone").evidence_refs[-1] == "source:second"
+
+
+def test_probe_local_first_checks_academic_world_seed(tmp_path):
+    receipt = probe_local_first(
+        target_id="missing-target",
+        data_root=tmp_path,
+        academic_world_query="Anglophone",
+    )
+    assert receipt.checked_academic_world_store is True
+    assert receipt.layer_hits["academic_world"]
+    assert any("ecology:anglophone" in x for x in receipt.layer_hits["academic_world"])
+
+
+def test_target_world_refresh_must_create_descendant(tmp_path):
+    from kairoskopion.kairon_provider.batch_runtime import persist_target_world_refresh
+
+    store = TargetWorldStore(tmp_path)
+    store.put({"snapshot_id": "targetworld:x:1", "target_id": "x"})
+    try:
+        persist_target_world_refresh(
+            store=store,
+            parent_snapshot_id="targetworld:x:1",
+            refreshed_snapshot={"snapshot_id": "targetworld:x:1", "target_id": "x"},
+        )
+    except ValueError as exc:
+        assert "new descendant" in str(exc)
+    else:
+        raise AssertionError("refresh should not overwrite a frozen snapshot")
+
+    child = persist_target_world_refresh(
+        store=store,
+        parent_snapshot_id="targetworld:x:1",
+        refreshed_snapshot={"snapshot_id": "targetworld:x:2", "target_id": "x"},
+    )
+    assert child["lineage"]["parent_snapshot_id"] == "targetworld:x:1"
+    assert store.get("targetworld:x:1")["snapshot_id"] == "targetworld:x:1"

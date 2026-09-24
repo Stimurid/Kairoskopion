@@ -35,6 +35,7 @@ from .batch_runtime import (
     AcademicWorldStore,
     BatchRunStore,
     authorize_external_discovery,
+    persist_target_world_refresh,
     probe_local_first,
 )
 from .adapter import pressure_pack_from_diagnostics
@@ -53,6 +54,7 @@ __all__ = [
     "AcademicWorldStore",
     "BatchRunStore",
     "authorize_external_discovery",
+    "persist_target_world_refresh",
     "probe_local_first",
     "BatchTargetInput",
     "LocalFirstAuditReceipt",

@@ -20,7 +20,7 @@ _HINT_MAP: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...] = (
     (("split",), ("SPLIT",)),
     (("abandon_target",), ("ABANDON_TARGET",)),
     (("rearchitect_or_branch",), ("BRANCH", "REARCHITECT")),
-    (("branch",), ("BRANCH",)),
+    (("branch", "target_variant_branch"), ("BRANCH",)),
     (("structural_or_deeper", "structural", "rearchitect"), ("REARCHITECT",)),
     (("local_or_structural",), ("REFRAME",)),
     (("reframe",), ("REFRAME",)),
