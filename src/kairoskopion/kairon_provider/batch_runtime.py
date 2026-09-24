@@ -235,7 +235,7 @@ class BatchRunStore:
             break
         if found is None:
             raise KeyError(f"cell not found: {cell_id}")
-        terminal = {"complete", "blocked_author", "failed", "abandoned"}
+        terminal = {"complete", "qualification_complete", "evidence_hold", "blocked_author", "failed", "abandoned"}
         if plan.cells and all(c.status in terminal for c in plan.cells):
             plan.status = "complete"
         elif any(c.status not in ("pending", "planned") for c in plan.cells):
@@ -297,6 +297,7 @@ def probe_local_first(
     discipline_query: str | None = None,
     venue_query: str | None = None,
     issn: str | None = None,
+    repository_root: str | Path | None = None,
 ) -> LocalFirstAuditReceipt:
     """Check durable local knowledge without creating network work.
 
@@ -305,16 +306,19 @@ def probe_local_first(
     """
 
     root = Path(data_root)
+    repo_root = Path(repository_root) if repository_root is not None else Path(__file__).resolve().parents[3]
     layer_hits: dict[str, list[str]] = {
         "academic_world": [],
         "discipline_registry": [],
         "venue_registry": [],
+        "repository_venue_registry": [],
+        "repository_venue_harvest": [],
+        "venue_evidence_pack": [],
         "target_world_store": [],
         "venue_memory": [],
     }
 
     # 0. Academic-world graph: repository routing seeds + durable live overrides.
-    repo_root = Path(__file__).resolve().parents[3]
     academic_seed_paths = sorted(
         (repo_root / "data" / "academic_world" / "seeds").glob("*.jsonl")
     )
@@ -346,6 +350,51 @@ def probe_local_first(
         venue_matches = hub.venues().search(venue_query, limit=20)
     layer_hits["venue_registry"] = [f"venue:{r.venue_id}" for r in venue_matches]
 
+    # 2b. Repository venue registry shipped with the current code/data state.
+    repo_hub = RegistryHub(data_dir=repo_root / "data" / "registry")
+    repo_venue_matches = []
+    if issn:
+        for rec in repo_hub.venues().list_all():
+            if rec.issn == issn or rec.eissn == issn:
+                repo_venue_matches.append(rec)
+    elif venue_query:
+        repo_venue_matches = repo_hub.venues().search(venue_query, limit=20)
+    layer_hits["repository_venue_registry"] = [
+        f"repo_venue:{r.venue_id}" for r in repo_venue_matches
+    ]
+
+    # 2c. Repository harvested provisional venue records.
+    q = (venue_query or "").strip().lower()
+    for path in sorted((repo_root / "data" / "seed_registry").glob("**/provisional_venue_records.jsonl")):
+        try:
+            rows = [
+                json.loads(line)
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+        except Exception:
+            continue
+        for row in rows:
+            name = str(row.get("canonical_name") or row.get("title") or row.get("name") or "")
+            row_issn = str(row.get("issn") or "")
+            if (issn and row_issn == issn) or (q and q in name.lower()):
+                rid = str(row.get("venue_id") or _digest(name)[:12])
+                layer_hits["repository_venue_harvest"].append(
+                    f"repo_harvest:{rid}"
+                )
+
+    # 2d. Evidence packs are durable local target knowledge too.
+    for path in sorted((repo_root / "data" / "venue_evidence_packs").glob("*.md")):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        low = text.lower()
+        if (issn and issn in text) or (q and q in low):
+            layer_hits["venue_evidence_pack"].append(
+                f"venue_evidence_pack:{path.name}"
+            )
+
     # 3. Frozen TargetWorld snapshots.
     tw_store = TargetWorldStore(root)
     for snapshot_id in tw_store.list_ids():
@@ -366,7 +415,14 @@ def probe_local_first(
         hits.extend(values)
     target_level_hit = any(
         layer_hits[key]
-        for key in ("venue_registry", "target_world_store", "venue_memory")
+        for key in (
+            "venue_registry",
+            "repository_venue_registry",
+            "repository_venue_harvest",
+            "venue_evidence_pack",
+            "target_world_store",
+            "venue_memory",
+        )
     )
     if target_level_hit:
         status = "target_local_hit"
