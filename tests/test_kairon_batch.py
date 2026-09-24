@@ -170,3 +170,39 @@ def test_batch_article_rejects_provider_owned_semantic_authority():
                 authority="KAIROSKOPION",
             ),
         )
+
+def test_batch_plan_supports_sparse_article_target_eligibility():
+    a1 = _article("A1")
+    a2 = _article("A2")
+    a1.eligible_target_ids = ["p-and-t"]
+    a2.eligible_target_ids = ["techne"]
+    plan = build_batch_qualification_plan(
+        batch_id="batch:sparse",
+        articles=[a1, a2],
+        targets=[
+            _target("p-and-t", "targetworld:pt:1"),
+            _target("techne", "targetworld:techne:1"),
+        ],
+    )
+    assert len(plan.cells) == 2
+    assert {(c.article_id, c.target_id) for c in plan.cells} == {
+        ("A1", "p-and-t"),
+        ("A2", "techne"),
+    }
+
+
+def test_sparse_eligibility_still_reuses_shared_target_when_allowed():
+    a1 = _article("A1")
+    a2 = _article("A2")
+    a1.eligible_target_ids = ["p-and-t"]
+    a2.eligible_target_ids = ["p-and-t", "techne"]
+    plan = build_batch_qualification_plan(
+        batch_id="batch:sparse-reuse",
+        articles=[a1, a2],
+        targets=[
+            _target("p-and-t", "targetworld:pt:shared"),
+            _target("techne", "targetworld:techne:1"),
+        ],
+    )
+    assert len(plan.snapshot_reuse["targetworld:pt:shared"]) == 2
+    assert len(plan.cells) == 3
