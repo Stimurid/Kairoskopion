@@ -249,3 +249,60 @@ def test_target_world_refresh_must_create_descendant(tmp_path):
     )
     assert child["lineage"]["parent_snapshot_id"] == "targetworld:x:1"
     assert store.get("targetworld:x:1")["snapshot_id"] == "targetworld:x:1"
+
+def test_probe_local_first_reuses_repository_venue_knowledge(tmp_path: Path):
+    repo = tmp_path / "repo"
+    data = tmp_path / "runtime"
+    (repo / "data" / "registry").mkdir(parents=True)
+    (repo / "data" / "registry" / "venues.jsonl").write_text(
+        '{"venue_id":"v1","canonical_name":"Known Journal","issn":"1234-5678","source_status":"provisional","review_status":"pending"}\n',
+        encoding="utf-8",
+    )
+    receipt = probe_local_first(
+        target_id="known",
+        data_root=data,
+        venue_query="Known Journal",
+        issn="1234-5678",
+        repository_root=repo,
+    )
+    assert receipt.status == "target_local_hit"
+    assert receipt.layer_hits["repository_venue_registry"] == ["repo_venue:v1"]
+
+
+def test_probe_local_first_reuses_repository_harvest_and_evidence_pack(tmp_path: Path):
+    repo = tmp_path / "repo"
+    data = tmp_path / "runtime"
+    harvest = repo / "data" / "seed_registry" / "education" / "p10"
+    harvest.mkdir(parents=True)
+    (harvest / "provisional_venue_records.jsonl").write_text(
+        '{"venue_id":"vh1","canonical_name":"Harvested Higher Education","issn":"1111-2222"}\n',
+        encoding="utf-8",
+    )
+    packs = repo / "data" / "venue_evidence_packs"
+    packs.mkdir(parents=True)
+    (packs / "local_journal.md").write_text(
+        "# Venue Evidence Pack: Local Journal\nISSN 3333-4444\n",
+        encoding="utf-8",
+    )
+
+    harvested = probe_local_first(
+        target_id="he",
+        data_root=data,
+        venue_query="Harvested Higher Education",
+        issn="1111-2222",
+        repository_root=repo,
+    )
+    assert harvested.status == "target_local_hit"
+    assert harvested.layer_hits["repository_venue_harvest"] == ["repo_harvest:vh1"]
+
+    packed = probe_local_first(
+        target_id="local",
+        data_root=data,
+        venue_query="Local Journal",
+        issn="3333-4444",
+        repository_root=repo,
+    )
+    assert packed.status == "target_local_hit"
+    assert packed.layer_hits["venue_evidence_pack"] == [
+        "venue_evidence_pack:local_journal.md"
+    ]
