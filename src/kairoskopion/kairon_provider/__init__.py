@@ -38,6 +38,12 @@ from .batch_runtime import (
     persist_target_world_refresh,
     probe_local_first,
 )
+from .batch_executor import (
+    BatchCellQualificationReceipt,
+    BatchQualificationReceiptStore,
+    qualify_batch_cell,
+    run_batch_qualification_slice,
+)
 from .adapter import pressure_pack_from_diagnostics
 from .artikl_projection import bind_artikl_projection
 from .target_world import build_target_world_snapshot
@@ -59,6 +65,10 @@ __all__ = [
     "BatchTargetInput",
     "LocalFirstAuditReceipt",
     "build_batch_qualification_plan",
+    "BatchCellQualificationReceipt",
+    "BatchQualificationReceiptStore",
+    "qualify_batch_cell",
+    "run_batch_qualification_slice",
     "ArtiklArticleProjection",
     "ArtiklStatePointer",
     "CorpusArtifact",
