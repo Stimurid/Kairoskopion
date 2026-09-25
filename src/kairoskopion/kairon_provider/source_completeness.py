@@ -1,5 +1,3 @@
-[Reading 73 lines from start (total: 73 lines, 0 remaining)]
-
 """D25 source-completeness projection consumed by Kairon qualification."""
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict
