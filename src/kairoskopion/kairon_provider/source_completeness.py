@@ -73,5 +73,3 @@ def source_completeness_debt(report: SourceCompletenessReport) -> list[str]:
     ):
         return []
     return ["article:reference_count"]
-
-[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]
