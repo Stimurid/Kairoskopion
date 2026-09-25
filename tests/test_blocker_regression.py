@@ -128,7 +128,7 @@ class TestGenreMethodRerun:
     def test_rerun_endpoint_exists(self):
         """POST /cases/{case_id}/article-model/rerun must exist."""
         from kairoskopion.api.app import app
-        routes = [r.path for r in app.routes]
+        routes = [getattr(r, "path", None) for r in app.routes]
         assert "/cases/{case_id}/article-model/rerun" in routes
 
     def test_rerun_method_exists(self):
@@ -220,7 +220,7 @@ class TestFinalizationEndpoint:
 
     def test_confirm_endpoint_exists(self):
         from kairoskopion.api.app import app
-        routes = [r.path for r in app.routes]
+        routes = [getattr(r, "path", None) for r in app.routes]
         assert "/cases/{case_id}/article-model/confirm" in routes
 
 
@@ -257,7 +257,7 @@ class TestAgentMapIntegrity:
 
     def test_agent_map_endpoint_exists(self):
         from kairoskopion.api.app import app
-        routes = [r.path for r in app.routes]
+        routes = [getattr(r, "path", None) for r in app.routes]
         assert "/agents/map" in routes
 
     def test_agent_map_derives_has_real_llm_from_execution_mode(self):

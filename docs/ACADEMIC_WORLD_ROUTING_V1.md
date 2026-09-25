@@ -43,5 +43,3 @@ graph adjacency links.
 The projection deliberately does not manufacture DISCIPLINE_FAMILY or
 SCHOOL_TRADITION_TRIBE nodes. Those levels enter only from evidence-backed
 local records, corpus analysis, or explicit source acquisition.
-
-[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]

@@ -398,5 +398,3 @@ def test_probe_projects_repository_discipline_into_academic_world(tmp_path: Path
     assert projected is not None
     assert projected.source_status == "llm_draft"
     assert projected.parent_ids == ["ecology:transregional"]
-
-[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]

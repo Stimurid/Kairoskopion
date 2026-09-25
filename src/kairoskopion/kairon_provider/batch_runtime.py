@@ -613,5 +613,3 @@ def persist_target_world_refresh(
     data["lineage"] = lineage
     store.put(data)
     return data
-
-[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]

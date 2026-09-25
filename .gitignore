@@ -49,6 +49,8 @@ data/disciplinary_landscape/registry/
 !data/venue_evidence_packs/**
 !data/seed_registry/
 !data/seed_registry/**
+!data/rubrics/
+!data/rubrics/**
 
 # Private/runtime data — always ignored.
 data/input/
