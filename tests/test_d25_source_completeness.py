@@ -60,5 +60,3 @@ def test_sc08_projection_does_not_mutate_semantic_fields():
     project_verified_reference_count(a,r,current_manuscript_revision="m1")
     assert a.core_claims == ["c1"]
     assert a.protected_core == ["p1"]
-
-[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]
