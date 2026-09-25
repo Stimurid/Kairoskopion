@@ -253,5 +253,3 @@ def run_batch_qualification_slice(
         receipts.append(receipt)
 
     return receipts
-
-[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]
