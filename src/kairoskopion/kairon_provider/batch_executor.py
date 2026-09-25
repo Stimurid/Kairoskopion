@@ -20,6 +20,7 @@ from .batch_pressure import derive_batch_target_pressure
 from .batch_runtime import BatchRunStore
 from .models import KaironTransitionDecision, TargetPressurePack
 from .storage import TargetWorldStore
+from .source_completeness import SourceCompletenessReport, project_verified_reference_count
 from .transition import propose_transition
 
 
@@ -189,6 +190,8 @@ def run_batch_qualification_slice(
     article_inputs: dict[str, BatchArticleInput],
     article_models: dict[str, ArticleModel],
     target_inputs: dict[str, BatchTargetInput],
+    source_completeness_reports: dict[str, SourceCompletenessReport] | None = None,
+    manuscript_revisions: dict[str, str] | None = None,
     limit: int | None = None,
     current_year: int | None = None,
 ) -> list[BatchCellQualificationReceipt]:
@@ -201,6 +204,14 @@ def run_batch_qualification_slice(
         try:
             article_input = article_inputs[cell.article_id]
             article = article_models[cell.article_id]
+            if source_completeness_reports and cell.article_id in source_completeness_reports:
+                if not manuscript_revisions or cell.article_id not in manuscript_revisions:
+                    raise ValueError("source completeness projection requires current manuscript revision")
+                article = project_verified_reference_count(
+                    article,
+                    source_completeness_reports[cell.article_id],
+                    current_manuscript_revision=manuscript_revisions[cell.article_id],
+                )
             target = target_inputs[cell.target_id]
             receipt = qualify_batch_cell(
                 cell=cell,

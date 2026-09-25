@@ -46,6 +46,11 @@ from .batch_executor import (
     qualify_batch_cell,
     run_batch_qualification_slice,
 )
+from .source_completeness import (
+    SourceCompletenessReport,
+    project_verified_reference_count,
+    source_completeness_debt,
+)
 from .adapter import pressure_pack_from_diagnostics
 from .artikl_projection import bind_artikl_projection
 from .target_world import build_target_world_snapshot
@@ -73,6 +78,9 @@ __all__ = [
     "BatchQualificationReceiptStore",
     "qualify_batch_cell",
     "run_batch_qualification_slice",
+    "SourceCompletenessReport",
+    "project_verified_reference_count",
+    "source_completeness_debt",
     "ArtiklArticleProjection",
     "ArtiklStatePointer",
     "CorpusArtifact",
