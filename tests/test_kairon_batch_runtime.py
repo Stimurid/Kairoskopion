@@ -12,8 +12,10 @@ from kairoskopion.kairon_provider.batch import (
 from kairoskopion.kairon_provider.batch_runtime import (
     AcademicWorldStore,
     BatchRunStore,
+    academic_world_node_from_discipline,
     authorize_external_discovery,
     probe_local_first,
+    sync_discipline_registry_to_academic_world,
 )
 from kairoskopion.kairon_provider.storage import TargetWorldStore
 
@@ -306,3 +308,95 @@ def test_probe_local_first_reuses_repository_harvest_and_evidence_pack(tmp_path:
     assert packed.layer_hits["venue_evidence_pack"] == [
         "venue_evidence_pack:local_journal.md"
     ]
+
+
+
+def test_discipline_projection_preserves_status_and_cross_region_links(tmp_path):
+    from kairoskopion.services.discipline_registry.loader import DisciplineRegistry
+    from kairoskopion.services.discipline_registry.model import (
+        DisciplineModel,
+        EvidenceRef,
+    )
+
+    ru = DisciplineModel(
+        discipline_id="ru-sample",
+        display_names={"ru": "Тестовая дисциплина", "en": "Sample discipline"},
+        region="ru",
+        source_status="llm_draft",
+        last_updated="2026-09-25",
+        canonical_questions=["Что считается легитимным вопросом?"],
+        legitimate_objects=["объект X"],
+        adjacent=["ru-neighbor"],
+        international_mapping=["intl-sample"],
+        evidence_refs=[EvidenceRef(source_type="other", source_id="local-source")],
+    )
+    registry = DisciplineRegistry([ru])
+    store = AcademicWorldStore(tmp_path)
+    nodes = sync_discipline_registry_to_academic_world(
+        store, discipline_registry=registry
+    )
+    assert len(nodes) == 1
+    node = store.get("discipline:ru-sample")
+    assert node is not None
+    assert node.parent_ids == ["ecology:ru-post-soviet"]
+    assert node.source_status == "llm_draft"
+    assert node.review_status == "unreviewed"
+    assert "discipline:intl-sample" in node.adjacent_ids
+    assert "discipline:ru-neighbor" in node.adjacent_ids
+    assert node.canonical_questions == ["Что считается легитимным вопросом?"]
+    assert node.provenance["projection_semantics"] == "status_preserving"
+
+
+def test_discipline_projection_does_not_invent_family_or_school():
+    from kairoskopion.services.discipline_registry.model import DisciplineModel
+
+    discipline = DisciplineModel(
+        discipline_id="intl-sample",
+        display_names={"en": "Sample discipline"},
+        region="international",
+        source_status="llm_draft",
+        last_updated="2026-09-25",
+    )
+    node = academic_world_node_from_discipline(discipline)
+    assert node.node_type == "DISCIPLINE"
+    assert node.parent_ids == ["ecology:transregional"]
+    assert all("family:" not in x and "school:" not in x for x in node.parent_ids)
+
+
+def test_probe_projects_repository_discipline_into_academic_world(tmp_path: Path):
+    repo = tmp_path / "repo"
+    runtime = tmp_path / "runtime"
+    seeds = repo / "data" / "disciplinary_landscape" / "seeds"
+    seeds.mkdir(parents=True)
+    (seeds / "international_seed.jsonl").write_text(
+        json.dumps(
+            {
+                "discipline_id": "intl-test-field",
+                "display_names": {"en": "Test Field"},
+                "region": "international",
+                "source_status": "llm_draft",
+                "last_updated": "2026-09-25",
+                "aliases": [],
+                "evidence_refs": [{"source_type": "other", "source_id": "fixture"}],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    receipt = probe_local_first(
+        target_id="missing-target",
+        data_root=runtime,
+        academic_world_query="Test Field",
+        discipline_query="Test Field",
+        repository_root=repo,
+    )
+    assert "academic_world:discipline:intl-test-field" in receipt.layer_hits[
+        "academic_world"
+    ]
+    graph = AcademicWorldStore(runtime)
+    projected = graph.get("discipline:intl-test-field")
+    assert projected is not None
+    assert projected.source_status == "llm_draft"
+    assert projected.parent_ids == ["ecology:transregional"]
+
+[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]

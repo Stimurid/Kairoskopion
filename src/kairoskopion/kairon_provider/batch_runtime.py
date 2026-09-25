@@ -23,7 +23,10 @@ from .batch import (
 )
 from .storage import TargetWorldStore
 from ..registry.services import RegistryHub
-from ..services.discipline_registry.loader import load_default_registry
+from ..services.discipline_registry.loader import (
+    load_default_registry,
+    load_registry_from_paths,
+)
 from ..services.venue_memory import VenueMemoryRegistry
 
 
@@ -156,6 +159,124 @@ class AcademicWorldStore:
                     )
             previous = node
         return errors
+
+
+REGION_ECOLOGY_PARENTS: dict[str, list[str]] = {
+    "ru": ["ecology:ru-post-soviet"],
+    "international": ["ecology:transregional"],
+    "en-us": ["ecology:anglophone"],
+    "en-uk": ["ecology:anglophone"],
+    "eu-fr": ["ecology:francophone"],
+    "eu-de": ["ecology:germanophone"],
+    "other": ["world:academic-publication-space"],
+}
+
+
+def _discipline_evidence_refs(discipline: Any) -> list[str]:
+    refs: list[str] = []
+    for ref in getattr(discipline, "evidence_refs", []) or []:
+        source_url = getattr(ref, "source_url", None)
+        source_type = getattr(ref, "source_type", None)
+        source_id = getattr(ref, "source_id", None)
+        if source_url:
+            refs.append(str(source_url))
+        elif source_type and source_id:
+            refs.append(f"{source_type}:{source_id}")
+        elif source_type:
+            refs.append(f"{source_type}:unspecified")
+    return list(dict.fromkeys(refs))
+
+
+def academic_world_node_from_discipline(discipline: Any) -> AcademicWorldNode:
+    """Project one existing DisciplineModel into the shared academic-world graph.
+
+    This is a projection, not a promotion. Source/review status remain visible,
+    and missing discipline-family/school nodes are not invented.
+    """
+
+    discipline_id = str(discipline.discipline_id)
+    region = str(getattr(discipline, "region", "other") or "other")
+    parents = list(REGION_ECOLOGY_PARENTS.get(region, ["world:academic-publication-space"]))
+    adjacent = [
+        f"discipline:{x}"
+        for x in [
+            *(getattr(discipline, "adjacent", []) or []),
+            *(getattr(discipline, "international_mapping", []) or []),
+        ]
+        if x and x != discipline_id
+    ]
+    source_status = str(getattr(discipline, "source_status", "unknown") or "unknown")
+    review_status = (
+        "curator_confirmed"
+        if source_status == "user_confirmed"
+        else "unreviewed"
+    )
+    confidence = {
+        "user_confirmed": "high",
+        "auto_enriched": "medium",
+        "needs_review": "low",
+        "llm_draft": "low",
+        "candidate": "low",
+    }.get(source_status, "low")
+
+    return AcademicWorldNode(
+        node_id=f"discipline:{discipline_id}",
+        node_type="DISCIPLINE",
+        names=dict(getattr(discipline, "display_names", {}) or {}),
+        parent_ids=parents,
+        adjacent_ids=list(dict.fromkeys(adjacent)),
+        institutional_regions=[] if region == "international" else [region],
+        canonical_questions=list(getattr(discipline, "canonical_questions", []) or []),
+        legitimate_objects=list(getattr(discipline, "legitimate_objects", []) or []),
+        evidence_refs=_discipline_evidence_refs(discipline),
+        source_status=source_status,
+        review_status=review_status,
+        confidence=confidence,
+        freshness={
+            "source_last_updated": getattr(discipline, "last_updated", None),
+            "source_last_enriched": getattr(discipline, "last_enriched", None),
+        },
+        provenance={
+            "kind": "discipline_registry_projection",
+            "discipline_id": discipline_id,
+            "region": region,
+            "schema_version": getattr(discipline, "schema_version", None),
+            "model_version": getattr(discipline, "model_version", None),
+            "projection_semantics": "status_preserving",
+        },
+        last_checked_at=(
+            getattr(discipline, "last_enriched", None)
+            or getattr(discipline, "last_updated", None)
+        ),
+    )
+
+
+def sync_discipline_registry_to_academic_world(
+    store: AcademicWorldStore,
+    *,
+    discipline_registry: Any | None = None,
+) -> list[AcademicWorldNode]:
+    """Materialize status-preserving discipline projections into the graph."""
+
+    registry = discipline_registry or load_default_registry()
+    nodes: list[AcademicWorldNode] = []
+    for discipline in registry.all():
+        node = academic_world_node_from_discipline(discipline)
+        store.put(node)
+        nodes.append(node)
+    return nodes
+
+
+def _load_repository_discipline_registry(repo_root: Path):
+    data_root = repo_root / "data" / "disciplinary_landscape"
+    seeds = sorted((data_root / "seeds").glob("*.jsonl"))
+    live = data_root / "registry" / "disciplinary_landscape.jsonl"
+    if seeds or live.is_file():
+        return load_registry_from_paths(
+            seeds,
+            live_registry_path=live if live.is_file() else None,
+        )
+    return load_default_registry()
 
 
 class BatchRunStore:
@@ -323,14 +444,21 @@ def probe_local_first(
         (repo_root / "data" / "academic_world" / "seeds").glob("*.jsonl")
     )
     academic_store = AcademicWorldStore(root, seed_paths=academic_seed_paths)
+
+    # 1. Disciplinary landscape: repository seed/live registry. Existing
+    # DisciplineModel cards are projected into the shared graph without
+    # promoting their source status or inventing missing family/school nodes.
+    discipline_registry = _load_repository_discipline_registry(repo_root)
+    sync_discipline_registry_to_academic_world(
+        academic_store,
+        discipline_registry=discipline_registry,
+    )
     if academic_world_query:
         layer_hits["academic_world"] = [
             f"academic_world:{node.node_id}"
             for node in academic_store.search(academic_world_query, limit=20)
         ]
 
-    # 1. Disciplinary landscape: repository seed/live registry.
-    discipline_registry = load_default_registry()
     if discipline_query:
         matches = discipline_registry.candidates_keyword(
             discipline_query, region="auto", limit=12
@@ -485,3 +613,5 @@ def persist_target_world_refresh(
     data["lineage"] = lineage
     store.put(data)
     return data
+
+[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]

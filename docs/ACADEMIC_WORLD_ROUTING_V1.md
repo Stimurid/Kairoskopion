@@ -29,3 +29,19 @@ Reusable knowledge is stored independently from article-specific pressure. A Tar
 ## Seed status
 
 The top-level ecology seed is `routing_scaffold` / low confidence. It only ensures that RF/post-Soviet, Anglophone, Francophone, Germanophone, East/South/Southeast Asian, African, MENA, Latin American/Iberophone and transregional routes can exist as first-class paths. Concrete norms require evidence-backed child nodes and source refs.
+## Discipline registry projection
+
+Existing DisciplineModel cards are now projected into AcademicWorldNode
+records before academic-world lookup. The projection is status-preserving:
+llm_draft remains llm_draft; it does not become accepted merely because it
+is present in the graph. Regional parents are explicit routing ecologies
+(ru -> ecology:ru-post-soviet, international -> ecology:transregional,
+en-us/en-uk -> ecology:anglophone, eu-fr -> ecology:francophone,
+eu-de -> ecology:germanophone). adjacent and international_mapping become
+graph adjacency links.
+
+The projection deliberately does not manufacture DISCIPLINE_FAMILY or
+SCHOOL_TRADITION_TRIBE nodes. Those levels enter only from evidence-backed
+local records, corpus analysis, or explicit source acquisition.
+
+[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]

@@ -34,9 +34,11 @@ from .batch import (
 from .batch_runtime import (
     AcademicWorldStore,
     BatchRunStore,
+    academic_world_node_from_discipline,
     authorize_external_discovery,
     persist_target_world_refresh,
     probe_local_first,
+    sync_discipline_registry_to_academic_world,
 )
 from .batch_executor import (
     BatchCellQualificationReceipt,
@@ -58,6 +60,8 @@ __all__ = [
     "BatchQualificationPlan",
     "BatchQualificationSpec",
     "AcademicWorldStore",
+    "academic_world_node_from_discipline",
+    "sync_discipline_registry_to_academic_world",
     "BatchRunStore",
     "authorize_external_discovery",
     "persist_target_world_refresh",
@@ -91,3 +95,5 @@ __all__ = [
     "derive_transition_class",
     "propose_transition",
 ]
+
+[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]
