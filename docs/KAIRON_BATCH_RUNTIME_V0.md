@@ -1,6 +1,6 @@
 # Kairon Batch Runtime v0 — durable world graph + local-first resume
 
-Status: qualification branch only. No production authority.
+Status: production-accepted on main and deployed. Runtime authority remains bounded by ARTIKL.KAIRON contracts.
 
 Builds on feature/kairon-batch-qualification-v0 and the canonical D19 owner-merge / batch protocol.
 
@@ -60,3 +60,12 @@ Current delta qualification:
 - full repository: 3360 PASS, 5 FAIL, 8 deselected, 16 subtests PASS;
 - the five failures are the same parent-baseline failures previously reproduced in this test environment (3 FastAPI route-introspection/environment, 2 rubric-loader);
 - observed branch-specific regressions: 0.
+
+## Production acceptance receipt (2026-09-25)
+
+- main/prod commit: `08f2f60426b7c048073a27adaf87339587f62841`
+- PR #4 normalized already-qualified TargetWorld refs and merged after green CI.
+- production rollback ref: `prod-pre-batch-20260925` at `3e94eb7fa72595c1c2bd6b35ce0ecba08b565aae`.
+- `kairoskopion-api.service` restarted cleanly; `/health` returned `status=ok`; working tree clean.
+- production virtualenv intentionally has no pytest; qualification evidence is the green GitHub CI on the exact deployed main head, not an ad-hoc mutation of prod dependencies.
+- authority boundary is unchanged: batch/Kairoskopion may acquire, cache, route, pressure-test, and propose; manuscript-state authority remains ARTIKL.KAIRON / Artikl owner-return.
