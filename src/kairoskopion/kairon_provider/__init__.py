@@ -46,6 +46,7 @@ from .batch_executor import (
     qualify_batch_cell,
     run_batch_qualification_slice,
 )
+from .bibliography_ledger import BibliographyEvidenceEntry, BibliographyLedger, verify_bibliography_ledger
 from .source_completeness import (
     SourceCompletenessReport,
     project_verified_reference_count,
@@ -78,6 +79,9 @@ __all__ = [
     "BatchQualificationReceiptStore",
     "qualify_batch_cell",
     "run_batch_qualification_slice",
+    "BibliographyEvidenceEntry",
+    "BibliographyLedger",
+    "verify_bibliography_ledger",
     "SourceCompletenessReport",
     "project_verified_reference_count",
     "source_completeness_debt",
