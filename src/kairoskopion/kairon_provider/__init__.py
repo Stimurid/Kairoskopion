@@ -47,6 +47,7 @@ from .batch_executor import (
     run_batch_qualification_slice,
 )
 from .bibliography_ledger import BibliographyEvidenceEntry, BibliographyLedger, verify_bibliography_ledger
+from .bibliography_resolver import BibliographyResolutionResult, resolve_manuscript_bibliography
 from .source_completeness import (
     SourceCompletenessReport,
     project_verified_reference_count,
@@ -79,6 +80,8 @@ __all__ = [
     "BatchQualificationReceiptStore",
     "qualify_batch_cell",
     "run_batch_qualification_slice",
+    "BibliographyResolutionResult",
+    "resolve_manuscript_bibliography",
     "BibliographyEvidenceEntry",
     "BibliographyLedger",
     "verify_bibliography_ledger",
