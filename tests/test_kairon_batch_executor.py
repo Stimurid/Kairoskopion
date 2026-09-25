@@ -213,5 +213,3 @@ def test_source_completeness_projection_runs_before_pressure_derivation(tmp_path
     )[0]
     assert "article:reference_count" not in result.evidence_debt
     assert article.reference_count == 20
-
-[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]
