@@ -1,5 +1,3 @@
-[Reading 105 lines from start (total: 105 lines, 0 remaining)]
-
 """Kairoskopion binding for the canonical ARTIKL.KAIRON provider contract.
 
 This package is deliberately additive. It does not replace the existing Case
