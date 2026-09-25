@@ -32,8 +32,8 @@ jobs:
       - name: Run CLI smoke test
         run: |
           kairoskopion status
-          kairoskopion run-fixture --storage-root /tmp/kairon_ci
-          kairoskopion inspect-storage --storage-root /tmp/kairon_ci
-          kairoskopion vault-index --storage-root /tmp/kairon_ci
-          kairoskopion export-bundle --storage-root /tmp/kairon_ci --output /tmp/kairon_ci_bundle.zip
+          kairoskopion --storage-root /tmp/kairon_ci run-fixture
+          kairoskopion --storage-root /tmp/kairon_ci inspect-storage
+          kairoskopion --storage-root /tmp/kairon_ci vault-index
+          kairoskopion --storage-root /tmp/kairon_ci export-bundle --output /tmp/kairon_ci_bundle.zip
           kairoskopion validate-bundle --bundle /tmp/kairon_ci_bundle.zip
