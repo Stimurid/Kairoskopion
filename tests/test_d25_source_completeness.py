@@ -1,5 +1,3 @@
-[Reading 60 lines from start (total: 60 lines, 0 remaining)]
-
 import pytest
 from kairoskopion.schema import ArticleModel
 from kairoskopion.kairon_provider import (
