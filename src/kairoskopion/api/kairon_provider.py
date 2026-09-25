@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from .auth import get_current_user
 from ..kairon_provider.adapter import pressure_pack_from_diagnostics
+from ..kairon_provider.bibliography_resolver import resolve_manuscript_bibliography
 from ..kairon_provider.fulltext import acquire_manifest_fulltexts
 from ..kairon_provider.fulltext_models import extract_fulltext_article_models
 from ..kairon_provider.models import (
@@ -43,6 +44,13 @@ _run_store = ProviderRunStore(_data_root)
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+class BibliographyVerifyRequest(BaseModel):
+    article_id: str
+    manuscript_revision: str
+    manuscript_text: str
+    live: bool = False
 
 
 class PressurePackRequest(BaseModel):
@@ -144,6 +152,16 @@ def _manifest(d: dict[str, Any]) -> CorpusArtifactManifest:
         unknowns=list(d.get("unknowns") or []),
         created_at=d.get("created_at") or _now(),
     )
+
+
+@router.post("/bibliography/verify")
+def verify_bibliography(req: BibliographyVerifyRequest):
+    result = resolve_manuscript_bibliography(
+        article_id=req.article_id, manuscript_revision=req.manuscript_revision,
+        manuscript_text=req.manuscript_text, mode="real" if req.live else "mock",
+        cache_dir=str(_data_root / "kairon_provider" / "bibliography_cache"),
+    )
+    return result.to_dict()
 
 
 @router.post("/pressure-pack")
