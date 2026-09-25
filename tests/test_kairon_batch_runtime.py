@@ -95,7 +95,7 @@ def test_probe_local_first_reuses_frozen_target_world(tmp_path):
     assert receipt.checked_discipline_registry is True
     assert receipt.checked_venue_registry is True
     assert receipt.checked_target_world_store is True
-    assert "targetworld:targetworld:venue-a:frozen" in receipt.local_hits
+    assert "targetworld:venue-a:frozen" in receipt.local_hits
     assert receipt.external_discovery_used is False
     assert receipt.status == "target_local_hit"
 
