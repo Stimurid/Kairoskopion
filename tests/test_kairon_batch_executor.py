@@ -1,3 +1,5 @@
+[Reading 213 lines from start (total: 213 lines, 0 remaining)]
+
 from pathlib import Path
 
 from kairoskopion.kairon_provider import (
@@ -7,6 +9,7 @@ from kairoskopion.kairon_provider import (
     BatchQualificationSpec,
     BatchTargetInput,
     LocalFirstAuditReceipt,
+    SourceCompletenessReport,
     build_batch_qualification_plan,
     run_batch_qualification_slice,
 )
@@ -186,3 +189,29 @@ def test_missing_snapshot_is_durable_failed_receipt(tmp_path: Path):
     assert "target snapshot not found" in result.errors[0]
     assert receipts.get(result.cell_id).status == "failed"
     assert batch_store.get("batch:missing").status == "complete"
+
+
+def test_source_completeness_projection_runs_before_pressure_derivation(tmp_path: Path):
+    article_input, article = _article("A1", language="en")
+    article.reference_count = None
+    target = _target("pt", "targetworld:pt:1")
+    plan = build_batch_qualification_plan(batch_id="batch:sc", articles=[article_input], targets=[target])
+    batch_store = BatchRunStore(tmp_path); batch_store.put(plan)
+    tw = TargetWorldStore(tmp_path); tw.put(_snapshot("pt", "targetworld:pt:1"))
+    report = SourceCompletenessReport(
+        report_id="verified", article_id="A1", manuscript_revision="m1",
+        bibliography_status="VERIFIED_COMPLETE", reference_count_status="VERIFIED",
+        reference_count=20,
+    )
+    result = run_batch_qualification_slice(
+        batch_id="batch:sc", batch_store=batch_store,
+        receipt_store=BatchQualificationReceiptStore(tmp_path),
+        target_world_store=tw, article_inputs={"A1": article_input},
+        article_models={"A1": article}, target_inputs={"pt": target},
+        source_completeness_reports={"A1": report},
+        manuscript_revisions={"A1": "m1"}, current_year=2026,
+    )[0]
+    assert "article:reference_count" not in result.evidence_debt
+    assert article.reference_count == 20
+
+[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]
