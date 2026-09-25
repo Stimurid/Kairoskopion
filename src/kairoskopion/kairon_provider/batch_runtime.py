@@ -528,7 +528,12 @@ def probe_local_first(
     for snapshot_id in tw_store.list_ids():
         data = tw_store.get(snapshot_id)
         if data and str(data.get("target_id")) == target_id:
-            layer_hits["target_world_store"].append(f"targetworld:{snapshot_id}")
+            target_ref = (
+                snapshot_id
+                if str(snapshot_id).startswith("targetworld:")
+                else f"targetworld:{snapshot_id}"
+            )
+            layer_hits["target_world_store"].append(target_ref)
 
     # 4. Cross-session VenueMemory.
     vm = VenueMemoryRegistry(root)
