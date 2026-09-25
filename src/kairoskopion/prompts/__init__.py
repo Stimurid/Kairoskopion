@@ -1,5 +1,6 @@
 """Prompt families for Kairoskopion agents (spec §69)."""
 
+from .academic_world_resolution import ACADEMIC_WORLD_RESOLUTION_FAMILY
 from .article_modeling import ARTICLE_MODELING_FAMILY
 from .citation_ecology_analysis import CITATION_ECOLOGY_FAMILY
 from .compliance_assessment import COMPLIANCE_ASSESSMENT_FAMILY
@@ -24,6 +25,7 @@ from .venue_funnel_planning import VENUE_FUNNEL_FAMILY
 from .venue_matrix_assessment import VENUE_MATRIX_FAMILY
 
 __all__ = [
+    "ACADEMIC_WORLD_RESOLUTION_FAMILY",
     "ARTICLE_FIELD_POSITION_FAMILY",
     "ARTICLE_MODELING_FAMILY",
     "CITATION_ECOLOGY_FAMILY",

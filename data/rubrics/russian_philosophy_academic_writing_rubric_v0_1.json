@@ -1,0 +1,253 @@
+{
+  "rubric_id": "hse_practical_philosophy_academic_writing_rubric_v0_1",
+  "schema_version": "0.1.0",
+  "source_status": "source_recovered_from_official_hse_materials",
+  "source_file": "HSE Practical Philosophy course-work rules 2023-2024 + School of Philosophy and Cultural Studies generative-AI policy 2024",
+  "source_urls": [
+    "https://www.hse.ru/data/2023/11/21/2106182632/Правила%20подготовки%20КР%202023-2024%20утв_new.pdf",
+    "https://www.hse.ru/data/2024/05/02/2135413169/Политика%20ШФиК%20использования%20ИИ.pdf",
+    "https://www.hse.ru/ba/phil/materials"
+  ],
+  "recovered_at": "2026-09-25",
+  "recovery_note": "The 2026-06 loader/tests commit documented this JSON but data/rubrics was ignored by git. This carrier reconstructs the documented eight-category rubric from the cited official HSE source materials and keeps its original non-venue semantics.",
+  "applicability": [
+    "russian_language_philosophical_papers"
+  ],
+  "not_a_venue_profile": true,
+  "not_journal_policy": true,
+  "categories": [
+    {
+      "category_id": "ai_use_policy",
+      "name": "Generative AI use and academic integrity",
+      "items": [
+        {
+          "key": "ai_use_must_be_disclosed",
+          "summary": "Describe any generative-AI use in the paper, including the model and purpose of use.",
+          "source_ref": "HSE AI policy §§1,6"
+        },
+        {
+          "key": "ai_is_supplement_not_substitute",
+          "summary": "Use generative AI as a supplement to independent thinking and learning, not as its replacement.",
+          "source_ref": "HSE AI policy §3"
+        },
+        {
+          "key": "undisclosed_generated_text_is_integrity_risk",
+          "summary": "Undisclosed AI-generated or AI-rephrased/translated material may constitute an academic-integrity violation.",
+          "source_ref": "HSE AI policy §§5-6"
+        },
+        {
+          "key": "generated_material_must_be_marked",
+          "summary": "Mark generated material and disclose AI-assisted paraphrase or translation when used.",
+          "source_ref": "HSE AI policy §6"
+        },
+        {
+          "key": "ai_share_limit_coursework",
+          "summary": "For assessed student work the policy sets a default ceiling of 20% AI-generated material unless otherwise agreed in writing.",
+          "source_ref": "HSE AI policy §7"
+        }
+      ]
+    },
+    {
+      "category_id": "research_purpose",
+      "name": "Research purpose and novelty",
+      "items": [
+        {
+          "key": "independent_research",
+          "summary": "The work should be an independent research text rather than compilation, retelling, or unsupported personal opinion.",
+          "source_ref": "Course-work rules §4.1"
+        },
+        {
+          "key": "novelty_is_explicit",
+          "summary": "State how the work differs from prior research: problem framing, neglected question, method, texts, interpretation, argument, critique, or cross-field linkage.",
+          "source_ref": "Course-work rules §4.2"
+        },
+        {
+          "key": "actuality_is_discussion_link",
+          "summary": "Ground relevance in current academic discussion rather than a generic declaration of importance.",
+          "source_ref": "Course-work rules §4.2"
+        },
+        {
+          "key": "result_tracks_purpose",
+          "summary": "The introduction, main body, and conclusion should make the connection between topic, purpose, tasks, and results inspectable.",
+          "source_ref": "Course-work rules §§4.1,4.3,4.6"
+        }
+      ]
+    },
+    {
+      "category_id": "literature_work",
+      "name": "Work with literature and discussion",
+      "items": [
+        {
+          "key": "build_key_literature_set",
+          "summary": "Build a bounded set of key literature through systematic search and citation chaining, then refine it during the project.",
+          "source_ref": "Course-work rules §3.12"
+        },
+        {
+          "key": "reconstruct_author_positions",
+          "summary": "For important sources record the problem addressed, the author's position, opponents, and exact locator when useful.",
+          "source_ref": "Course-work rules §3.12"
+        },
+        {
+          "key": "classical_and_current_literature",
+          "summary": "Demonstrate knowledge of both classical sources and current research relevant to novelty and actuality.",
+          "source_ref": "Course-work rules §4.2"
+        },
+        {
+          "key": "original_language_and_secondary_scholarship",
+          "summary": "For author/history-of-philosophy work, include original-language primary material where relevant plus classical and current secondary scholarship.",
+          "source_ref": "Course-work rules §4.4"
+        },
+        {
+          "key": "source_quality_over_name_dropping",
+          "summary": "Source use should support the argument; references or philosophical terminology alone do not establish a philosophical contribution.",
+          "source_ref": "Course-work rules §4.3"
+        }
+      ]
+    },
+    {
+      "category_id": "structure",
+      "name": "Structure and section function",
+      "items": [
+        {
+          "key": "standard_research_structure",
+          "summary": "Use a coherent introduction, main body, conclusion, bibliography, and appendices when needed.",
+          "source_ref": "Course-work rules §4.1"
+        },
+        {
+          "key": "sections_serve_problem",
+          "summary": "Every chapter and paragraph should have a task connected to the central problem and research purpose.",
+          "source_ref": "Course-work rules §§3.14-3.17"
+        },
+        {
+          "key": "two_or_three_logical_chapters",
+          "summary": "The main body should normally contain two or three logically complete chapters, with each chapter providing a basis for the next.",
+          "source_ref": "Course-work rules §4.5"
+        },
+        {
+          "key": "chapter_closes_with_conclusion",
+          "summary": "Each chapter solves one stated task and ends with a concise conclusion.",
+          "source_ref": "Course-work rules §4.5"
+        },
+        {
+          "key": "conclusion_returns_argument",
+          "summary": "The conclusion should return to the problem and purpose and summarize the arguments that show how the purpose was achieved.",
+          "source_ref": "Course-work rules §4.6"
+        }
+      ]
+    },
+    {
+      "category_id": "goal_tasks_thesis",
+      "name": "Problem, goal, tasks, thesis, and method",
+      "items": [
+        {
+          "key": "problem_before_goal",
+          "summary": "Formulate a concrete research problem before fixing the work's goal.",
+          "source_ref": "Course-work rules §3.13"
+        },
+        {
+          "key": "goal_as_defensible_thesis",
+          "summary": "Formulate the goal as justification or criticism of a position or thesis, rather than as 'learn', 'describe', or 'show importance'.",
+          "source_ref": "Course-work rules §3.13"
+        },
+        {
+          "key": "tasks_decompose_problem",
+          "summary": "Decompose the research problem and goal into a small set of concrete research tasks.",
+          "source_ref": "Course-work rules §3.14"
+        },
+        {
+          "key": "intro_names_problem_goal_tasks_method",
+          "summary": "The introduction should state the problem, novelty/actuality, professional discussion, goal/thesis, tasks, method, and rationale of structure.",
+          "source_ref": "Course-work rules §4.2"
+        },
+        {
+          "key": "conclusions_answer_tasks",
+          "summary": "Conclusions should correspond to the stated tasks and the research goal.",
+          "source_ref": "Course-work rules §§4.6,6.3"
+        }
+      ]
+    },
+    {
+      "category_id": "philosophical_problem",
+      "name": "Philosophical problem and disciplinary relation",
+      "items": [
+        {
+          "key": "philosophical_problem_required",
+          "summary": "Even interdisciplinary topics should articulate a genuinely philosophical problem and use philosophical texts, methodology, or concepts appropriately.",
+          "source_ref": "Course-work rules §§3.1,4.3"
+        },
+        {
+          "key": "problem_is_nontrivial_and_bounded",
+          "summary": "The research question should be nontrivial and narrow enough to answer within the available scope.",
+          "source_ref": "Course-work rules §3.2"
+        },
+        {
+          "key": "disciplinary_relation_is_argued",
+          "summary": "Argue the connection to philosophical problematic with examples or conceptual relations; declarations alone are insufficient.",
+          "source_ref": "Course-work rules §4.3"
+        },
+        {
+          "key": "research_not_referat",
+          "summary": "Summary of existing positions is useful but cannot replace philosophical investigation.",
+          "source_ref": "Course-work rules §4.1"
+        }
+      ]
+    },
+    {
+      "category_id": "argument_and_style",
+      "name": "Argumentation and academic style",
+      "items": [
+        {
+          "key": "quotes_are_not_arguments",
+          "summary": "A quotation requires an explanation of why it is present and how it functions in the argument.",
+          "source_ref": "Course-work rules §4.1"
+        },
+        {
+          "key": "compare_and_criticize_positions",
+          "summary": "When presenting other authors, identify limitations and problems and compare positions critically.",
+          "source_ref": "Course-work rules §4.1"
+        },
+        {
+          "key": "claims_require_justification",
+          "summary": "Agreement or disagreement with a thesis must be justified rather than merely asserted.",
+          "source_ref": "Course-work rules §4.1"
+        },
+        {
+          "key": "clear_concrete_rigorous_style",
+          "summary": "Use clear, concrete, academically rigorous prose and professional terminology without unnecessary obscurity.",
+          "source_ref": "Course-work rules §4.9"
+        },
+        {
+          "key": "reader_load_control",
+          "summary": "Prefer meaningful paragraphs, split very long multi-part sentences where clarity suffers, and avoid bureaucratic clichés and gratuitous abstraction.",
+          "source_ref": "Course-work rules §4.9"
+        }
+      ]
+    },
+    {
+      "category_id": "references",
+      "name": "References and citation discipline",
+      "items": [
+        {
+          "key": "full_locator_during_drafting",
+          "summary": "Record full bibliographic references and page locators while drafting quotations or paraphrases.",
+          "source_ref": "Course-work rules §3.17"
+        },
+        {
+          "key": "bibliography_matches_used_sources",
+          "summary": "The bibliography should contain the sources actually used in the work.",
+          "source_ref": "Course-work rules §4.7"
+        },
+        {
+          "key": "primary_secondary_current_balance",
+          "summary": "Use appropriate primary sources, recognized secondary scholarship, and recent research in Russian and other relevant languages.",
+          "source_ref": "Course-work rules §4.7"
+        },
+        {
+          "key": "citation_format_and_bibliography_are_assessed",
+          "summary": "Correct citation practice and bibliography are explicit evaluation criteria alongside academic style and writing quality.",
+          "source_ref": "Course-work rules §6.3"
+        }
+      ]
+    }
+  ]
+}
