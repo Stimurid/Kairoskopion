@@ -1,5 +1,3 @@
-[Reading 213 lines from start (total: 213 lines, 0 remaining)]
-
 from pathlib import Path
 
 from kairoskopion.kairon_provider import (
