@@ -1,5 +1,3 @@
-[Reading 253 lines from start (total: 253 lines, 0 remaining)]
-
 """Executable qualification slice for ARTIKL.KAIRON batch cells.
 
 This module closes the gap between a durable BatchQualificationPlan and an
