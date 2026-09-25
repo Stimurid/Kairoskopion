@@ -1,3 +1,5 @@
+[Reading 105 lines from start (total: 105 lines, 0 remaining)]
+
 """Kairoskopion binding for the canonical ARTIKL.KAIRON provider contract.
 
 This package is deliberately additive. It does not replace the existing Case
@@ -46,6 +48,11 @@ from .batch_executor import (
     qualify_batch_cell,
     run_batch_qualification_slice,
 )
+from .source_completeness import (
+    SourceCompletenessReport,
+    project_verified_reference_count,
+    source_completeness_debt,
+)
 from .adapter import pressure_pack_from_diagnostics
 from .artikl_projection import bind_artikl_projection
 from .target_world import build_target_world_snapshot
@@ -73,6 +80,9 @@ __all__ = [
     "BatchQualificationReceiptStore",
     "qualify_batch_cell",
     "run_batch_qualification_slice",
+    "SourceCompletenessReport",
+    "project_verified_reference_count",
+    "source_completeness_debt",
     "ArtiklArticleProjection",
     "ArtiklStatePointer",
     "CorpusArtifact",
@@ -95,3 +105,5 @@ __all__ = [
     "derive_transition_class",
     "propose_transition",
 ]
+
+[executed on device: moderbober-prod-01 (57f0d6c1-4162-4265-9d35-45397ed5f4e7)]
