@@ -28,6 +28,7 @@ from ..kairon_provider.round_trip import compare_round_trip
 from ..kairon_provider.reconcile import reconcile_target_pressure_pack
 from ..schema import ArticleModel, VenueModel
 from ..kairon_provider.storage import ProviderRunStore, TargetWorldStore
+from ..kairon_provider.target_world_catalog import TargetWorldCatalog
 from ..kairon_provider.target_pages import build_target_page_bundle
 from ..kairon_provider.target_world import build_target_world_snapshot
 from ..kairon_provider.transition import propose_transition
@@ -40,6 +41,7 @@ router = APIRouter(
 _data_root = Path(os.environ.get("KAIROSKOPION_DATA_DIR") or ".kairoskopion")
 _store = TargetWorldStore(_data_root)
 _run_store = ProviderRunStore(_data_root)
+_catalog = TargetWorldCatalog(_data_root)
 
 
 def _now() -> str:
@@ -71,6 +73,17 @@ class TargetWorldRequest(BaseModel):
     max_editors: int = 10
     selection_strategy: str = "recent_articles"
     provider_commit: str | None = None
+
+
+class TargetWorldCatalogImportRequest(BaseModel):
+    package: dict[str, Any]
+
+
+class TargetWorldCatalogPublishRequest(BaseModel):
+    status: str = "PROVIDER_OBSERVED"
+    origin: str = "KAIROSKOPION"
+    source_ref: str | None = None
+    display_name: str | None = None
 
 
 class TargetPagesRequest(BaseModel):
@@ -190,7 +203,54 @@ def build_target_world(req: TargetWorldRequest):
     )
     data = snapshot.to_dict()
     _store.put(data)
+    _catalog.ingest(
+        data,
+        origin="KAIROSKOPION",
+        status="PROVIDER_OBSERVED",
+        source_ref=f"targetworld-store:{data['snapshot_id']}",
+    )
     return data
+
+
+@router.get("/target-world-catalog")
+def list_target_world_catalog(target_id: str | None = None):
+    return {"entries": _catalog.list_entries(target_id)}
+
+
+@router.get("/target-world-catalog/best/{target_id}")
+def best_target_world_catalog(target_id: str):
+    entry = _catalog.best_for_target(target_id)
+    if entry is None:
+        raise HTTPException(404, "target world not found in shared catalog")
+    return entry
+
+
+@router.get("/target-world-catalog/package/{package_id}")
+def get_target_world_package(package_id: str):
+    data = _catalog.get_package(package_id)
+    if data is None:
+        raise HTTPException(404, "target world exchange package not found")
+    return data
+
+
+@router.post("/target-world-catalog/import")
+def import_target_world_package(req: TargetWorldCatalogImportRequest):
+    try:
+        return _catalog.import_package(req.package)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
+@router.post("/target-world/{snapshot_id}/publish-catalog")
+def publish_target_world_catalog(snapshot_id: str, req: TargetWorldCatalogPublishRequest):
+    data = _store.get(snapshot_id)
+    if data is None:
+        raise HTTPException(404, "target world snapshot not found")
+    return _catalog.ingest(
+        data, origin=req.origin, status=req.status,
+        source_ref=req.source_ref or f"targetworld-store:{snapshot_id}",
+        display_name=req.display_name,
+    )
 
 
 @router.get("/target-world/{snapshot_id}")
@@ -218,6 +278,10 @@ def snapshot_target_pages(snapshot_id: str, req: TargetPagesRequest):
     refs.extend(p.get("url") for p in b.get("pages", []) if p.get("url"))
     data["evidence_refs"] = list(dict.fromkeys(refs))
     _store.put(data)
+    _catalog.ingest(
+        data, origin="KAIROSKOPION", status="PROVIDER_OBSERVED",
+        source_ref=f"targetworld-store:{snapshot_id}",
+    )
     return b
 
 
@@ -248,6 +312,10 @@ def acquire_fulltext(snapshot_id: str, req: FulltextAcquireRequest):
     target_models["limitations"] = list(dict.fromkeys(limitations))
     data["target_models"] = target_models
     _store.put(data)
+    _catalog.ingest(
+        data, origin="KAIROSKOPION", status="PROVIDER_OBSERVED",
+        source_ref=f"targetworld-store:{snapshot_id}",
+    )
     return {
         "attempted": result["attempted"],
         "acquired": result["acquired"],
