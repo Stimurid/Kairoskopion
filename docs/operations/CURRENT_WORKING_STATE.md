@@ -2,136 +2,171 @@
 
 **Last updated:** 2026-10-06T04:41+03:00
 **Branch:** `main`
-**Runtime-code merge:** `c1f00e984c3f86105250c294f13644b508310945` — publication package finalization gate
-**Last directly verified production HEAD:** `91a35cc5434d2a34e7027abfbe8abcab759c43fc` on 2026-09-30
+**Current main HEAD:** `78b8a4bd9ad71f9a9814a146a8ae029e7433a73b` (docs-state only)
+**Production runtime code HEAD:** `c1f00e984c3f86105250c294f13644b508310945`
 **Production domain:** `kairoskop.mindkampf.ru`
 
 ---
 
-## Deployment status
+## Deployment status: LIVE
 
-**`DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR`**
+**`PROD_LIVE / FINALIZATION_GATE_VERIFIED`**
 
-The publication-front TRM-062 runtime repair is merged and fully green in Git,
-but production deployment cannot be executed from the currently authorized
-contours.
+The prior `DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR` state is superseded.
 
-Owner environment policy still applies:
+An already-existing repo-scoped self-hosted GitHub Actions runner on
+`moderbober-prod-01` was recovered and reused as a one-shot non-SSH actuator.
+No SSH/SCP/SFTP/port-22 access was enabled or attempted.
 
-- SSH / SCP / SFTP / port-22 probes are prohibited.
-- SSH retry limit is zero.
-- Production may only be changed through an already-authorized non-SSH contour.
-- The repository currently has test CI only; no deploy workflow/webhook/pull-agent
-  is configured in this repository.
-- No authorized remote-terminal / VM actuator is connected in the current
-  ChatGPT scene.
+### Deployment evidence
 
-Do **not** represent the new finalization endpoint as live until a production
-HEAD readback and endpoint smoke prove it.
+- Previous directly verified production HEAD:
+  `91a35cc5434d2a34e7027abfbe8abcab759c43fc`
+- Deployed runtime code HEAD:
+  `c1f00e984c3f86105250c294f13644b508310945`
+- One-shot non-SSH deploy run: `37401804487`
+- Runner: `moderbober-prod-01-tinkuy`
+- Deploy receipt artifact: `11384979277`
+- Service restart: PASS
+- `/health`: recovered after normal restart window
+- Live OpenAPI exposes:
+  - `POST /kairon/provider/submission-packages/finalize`
+  - `GET /kairon/provider/submission-packages/{manifest_id}`
 
-## Publication-front repair merged on 2026-10-06
+Treat the self-hosted runner as a proven emergency/one-shot actuator, **not**
+as a generally governed deployment service unless separately established.
 
-### TRM-062 — reproducible submission-package finalization
+## TRM-062 finalization slice
 
-**Which article:** P06 positive control; P07 next reuse case.
+### Canonical runtime code
 
-**Which stage:** target-specific package closure →
-`READY_FOR_HUMAN_SUBMISSION`.
+PR #11 merged as:
 
-**What was blocked:** the existing `SubmissionPack` could report
-`ready_for_manual_submission` as a pre-artifact readiness skeleton without
-binding the exact exported artifact revision/hash, frozen/current TargetWorld
-identity, current policy evidence, semantic/privacy/render QA receipts, live
-submission route, or author-only factual gates.
+`c1f00e984c3f86105250c294f13644b508310945`
 
-**What now exists in canonical code:**
+The runtime provides a deterministic fail-closed finalization manifest with:
 
-- fail-closed submission finalization manifest;
-- deterministic digest and idempotent durable manifest store;
-- exact upstream `submission_pack_id` lineage bound into the digest;
-- exact manuscript/artifact revision or SHA binding;
-- current TargetWorld catalog promotion binding while frozen package bytes stay
-  immutable;
-- only `PROD_ACCEPTED` / `PROD_OBSERVED` TargetWorld status can finalize;
-- `QUALIFIED_DEV`, `PROVIDER_OBSERVED`, `STAGING`, `PROVISIONAL` fail closed;
-- default required QA:
+- upstream `submission_pack_id` lineage;
+- exact manuscript/artifact revision or SHA;
+- frozen TargetWorld package identity/digest;
+- current TargetWorld catalog promotion;
+- only `PROD_ACCEPTED` / `PROD_OBSERVED` finalizable;
+- current policy refs;
+- required `SEMANTIC_QA`, `PRIVACY_SCRUB`, `VISUAL_RENDER`;
+- live submission route gate;
+- author-field gate;
+- durable/idempotent manifest storage;
+- physical final submission remains human-only.
+
+Legacy `ready_for_manual_submission` remains a pre-artifact skeleton and now
+explicitly requires the finalization gate.
+
+## Real production proof — P06
+
+Production TargetWorld:
+
+- snapshot:
+  `targetworld:philosophy_technology_prod_acceptance:719491146388`
+- package:
+  `targetworld:philosophy_technology_prod_acceptance:719491146388@8263d0aad06d70bf`
+- catalog status: `PROD_ACCEPTED`
+- digest:
+  `8263d0aad06d70bfb647ecee0aeb82150dd0cac28f64483506f0fc32e0a928ad`
+
+Production submission manifest:
+
+- run: `37402017234`
+- receipt artifact: `11384874860`
+- manifest: `submissionpkg:P06:7c1a3afdffe8b26d`
+- digest:
+  `7c1a3afdffe8b26d42289d90306ba6bd2f3278c82c3ca8d682fa1b4ac9f4bdf7`
+- repeat write: idempotent
+- durable GET readback: matched
+
+P06 result is intentionally `BLOCKED` only on real external/human gates:
+
+- `author_fields_not_confirmed:OPEN`
+- `submission_route_not_live:BLOCKED`
+- `live_route_evidence:editorial_manager_development_site`
+
+No technical/package/TargetWorld/QA blocker remains for the P06 P&T package.
+
+## Cross-head production proof — P07
+
+The same live gate was exercised independently on P07.
+
+- production run: `37402407964`
+- runner: `moderbober-prod-01-tinkuy`
+- receipt artifact: `11385159894`
+- manifest: `submissionpkg:P07:3c883749e261be7c`
+- digest:
+  `3c883749e261be7c989216a9a83ea35870bf2a23e5fb23108f362b4fa33537bd`
+- TargetWorld catalog status: `PROD_ACCEPTED`
+
+P07 preflight correctly returns the actual remaining package boundary:
+
+- missing:
+  - `manuscript_docx`
+  - `title_page`
+  - `cover_letter`
+  - `submission_checklist`
+- QA not yet passed:
   - `SEMANTIC_QA`
   - `PRIVACY_SCRUB`
   - `VISUAL_RENDER`
-- live route gate;
-- author-field gate;
-- authenticated provider finalize/readback endpoints;
-- legacy `ready_for_manual_submission` remains backward compatible but now
-  carries:
-  - `is_final_submission_package=false`
-  - `requires_finalization_gate=true`
-  - pointer to `/kairon/provider/submission-packages/finalize`
-- physical final submission remains human-only.
+- `author_fields_not_confirmed:OPEN`
+- `submission_route_not_live:BLOCKED`
+- `live_route_evidence:editorial_manager_development_site`
 
-### Git evidence
-
-- PR #11: `fix(kairon): fail-closed publication package finalization`
-- Exact pre-merge branch head:
-  `585348ccfdbbffd2c1bd2a55973c90f12a93abff`
-- Merge commit:
-  `c1f00e984c3f86105250c294f13644b508310945`
-- Branch CI: Python 3.11 / 3.12 / 3.13 — full pytest + CLI smoke PASS.
-- Post-merge main CI run `37397699250`: Python 3.11 / 3.12 / 3.13 —
-  full pytest + CLI smoke PASS.
-
-## Current production boundary
-
-The last directly verified production census on 2026-09-30 found
-`/opt/kairoskopion/app` aligned to
-`91a35cc5434d2a34e7027abfbe8abcab759c43fc`, with uvicorn on port 8088 and
-the public vhost active.
-
-The current ChatGPT web fetch surface cannot access the basic-auth-protected
-`/health` or `/openapi.json`, so no newer production HEAD or route presence
-has been proven in this scene.
-
-Therefore the authoritative current distinction is:
-
-- **Git / canonical code:** MAIN_MERGED + MAIN_CI_PASS.
-- **Production runtime:** last verified older HEAD; new package-finalization
-  endpoint **not proven live**.
-- **Deploy blocker:** no authorized non-SSH actuator.
+Therefore the finalization slice is proven reusable across article heads.
 
 ## What is NOT blocked anymore
 
-Do not reopen these as the first publication-front blocker:
+Do not reopen these as first publication-front blockers:
 
-1. Kairon batch qualification exists in main.
-2. Durable per-cell receipts exist.
-3. Batch interruption/recovery primitives exist:
-   `claim_cells()` + `recover_inflight()`.
-4. Shared immutable TargetWorld exchange catalog exists in main.
-5. TRM-062 code-side acceptance is complete.
+1. Kairon batch qualification.
+2. Durable per-cell receipts.
+3. Batch interruption/recovery primitives.
+4. Shared immutable TargetWorld exchange catalog.
+5. Submission-package finalization gate.
+6. Non-SSH one-shot production actuation for this host.
 
-A fully autonomous cross-run scheduler remains a separate open concern, but is
-not the first blocker for P06/P07 package closure.
+## Current publication-front blocker
 
-## Next mechanical action
+The next concrete reusable seam is **upstream package materialization**, not
+finalization:
 
-When an authorized non-SSH actuator is available:
+`target sibling → manuscript DOCX + title page + cover letter + submission
+checklist → semantic/privacy/render receipts → finalization gate`.
 
-1. Deploy current `main` containing runtime-code merge
-   `c1f00e984c3f86105250c294f13644b508310945`.
-2. Read back production git HEAD.
-3. Verify local/public health.
-4. Verify OpenAPI contains:
-   - `POST /kairon/provider/submission-packages/finalize`
-   - `GET /kairon/provider/submission-packages/{manifest_id}`
-5. Exercise a blocked smoke: incomplete QA must return `BLOCKED`.
-6. Exercise a P06-equivalent complete manifest and GET readback.
-7. Verify repeat finalization is idempotent.
-8. Record a central HEAD SYNC `RUNTIME_CHANGE`.
-9. Reuse the same production gate for P07.
+P06 proves this path manually.
+P07 proves the missing boundary mechanically.
 
-## Do not do
+TRM-062 as a whole therefore remains open for:
 
-- do not attempt SSH;
-- do not build a new scheduler before this runtime deploy/readback is closed;
-- do not claim production from Git merge alone;
-- do not auto-submit to a journal;
-- do not let `ready_for_manual_submission` bypass the finalization gate.
+- reusable target-sibling/package factory behavior;
+- ACTIVE → NEXT target delta reuse;
+- artifact-generation/resume/logging that avoids repeated manual rescue.
+
+## Next authorized move
+
+Use P07 as the reproducibility case:
+
+1. inventory its existing target sibling and package carriers;
+2. reuse the P06 proven materialization procedure;
+3. identify exactly which steps are deterministic/reusable;
+4. implement only the smallest package-factory seam needed to create/version:
+   manuscript DOCX, title page, cover letter and submission checklist;
+5. keep author-owned facts as explicit gates;
+6. require semantic/privacy/full-render receipts;
+7. rerun the already-live finalization gate;
+8. then test the same factory on one more article head or NEXT target.
+
+## Operational invariants
+
+- no SSH;
+- no automatic journal submission;
+- final `Submit/Send/Confirm` remains Timur-only;
+- do not rebuild the finalization gate;
+- do not make P07 wait for a global scheduler;
+- do not call a pre-artifact readiness skeleton a final package.
