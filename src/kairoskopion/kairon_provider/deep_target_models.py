@@ -101,6 +101,37 @@ def _attempt_diag(outcome: Any) -> dict[str, Any]:
     return data
 
 
+_VOLATILE_SEMANTIC_KEYS = {
+    "created_at", "updated_at", "last_checked_at", "observed_at",
+    "latency_ms", "input_tokens", "output_tokens", "attempt_count",
+}
+
+
+def _stable_attempt_diag(outcome: Any) -> dict[str, Any]:
+    """Persist provenance without run-timing/token-count noise."""
+    diag = _attempt_diag(outcome)
+    keep = (
+        "provider_status", "parse_status", "parse_failure_category",
+        "schema_error_category", "content_hash_prefix", "model",
+        "fallback_reason",
+    )
+    return {k: diag.get(k) for k in keep if diag.get(k) not in (None, "")}
+
+
+def _stable_semantic(value: Any) -> Any:
+    """Remove runtime-only fields before content addressing."""
+    if isinstance(value, dict):
+        return {
+            key: _stable_semantic(item)
+            for key, item in value.items()
+            if key not in _VOLATILE_SEMANTIC_KEYS
+            and key not in {"attempt_diagnostics", "llm_attempt"}
+        }
+    if isinstance(value, list):
+        return [_stable_semantic(item) for item in value]
+    return value
+
+
 def _pattern_id(
     content_hash: str, source_ref: str, semantic_output: dict[str, Any]
 ) -> str:
@@ -222,7 +253,7 @@ def build_published_article_patterns(
             failures.append({
                 "source_ref": artifact.source_ref,
                 "status": "semantic_parse_failed",
-                "attempt": _attempt_diag(outcome),
+                "attempt": _stable_attempt_diag(outcome),
             })
             continue
         validation = _validate_pattern(parsed)
@@ -231,7 +262,7 @@ def build_published_article_patterns(
                 "source_ref": artifact.source_ref,
                 "status": "semantic_schema_failed",
                 "errors": validation,
-                "attempt": _attempt_diag(outcome),
+                "attempt": _stable_attempt_diag(outcome),
             })
             continue
 
@@ -266,8 +297,11 @@ def build_published_article_patterns(
             warnings=list(parsed.get("warnings") or []),
             confidence=parsed.get("confidence") or "low",
         ).to_dict()
+        # Keep the semantic card durable and content-addressable. Runtime
+        # timing/token diagnostics belong to execution receipts, not the card.
+        pattern.pop("created_at", None)
         pattern["structural_observation"] = structural
-        pattern["llm_attempt"] = _attempt_diag(outcome)
+        pattern["llm_attempt"] = _stable_attempt_diag(outcome)
         patterns.append(pattern)
 
     corpus_id = _corpus_id(target_id, patterns)
@@ -336,6 +370,7 @@ def aggregate_deep_target_model(
         ),
         evidence_refs=sorted(pattern_ids),
     ).to_dict()
+    corpus.pop("created_at", None)
     corpus["selection_strategy"] = selection_strategy
     corpus["bias_notes"] = list(bias_notes or [])
     corpus["fulltext_semantic_pattern_count"] = len(patterns)
@@ -367,7 +402,7 @@ def aggregate_deep_target_model(
             model_role="genre_move_aggregator",
         )
         genre_parsed = _parsed_dict(outcome)
-        genre_diag = _attempt_diag(outcome)
+        genre_diag = _stable_attempt_diag(outcome)
 
         citation_provider = configured_provider(
             "target_citation_ecologist"
@@ -387,7 +422,7 @@ def aggregate_deep_target_model(
             model_role="target_citation_ecologist",
         )
         citation_parsed = _parsed_dict(c_outcome)
-        citation_diag = _attempt_diag(c_outcome)
+        citation_diag = _stable_attempt_diag(c_outcome)
 
     archetypes = list((genre_parsed or {}).get("archetypes") or [])
     archetype_errors = _validate_archetypes(archetypes, pattern_ids)
@@ -411,6 +446,7 @@ def aggregate_deep_target_model(
         unknowns=list((genre_parsed or {}).get("unknowns") or []),
         warnings=list((genre_parsed or {}).get("warnings") or []),
     ).to_dict()
+    genre_profile.pop("created_at", None)
     genre_profile["rare_moves"] = list(
         (genre_parsed or {}).get("rare_moves") or []
     )
@@ -448,6 +484,7 @@ def aggregate_deep_target_model(
             or sorted(pattern_ids)
         ),
     ).to_dict()
+    citation_profile.pop("created_at", None)
     citation_profile.update({
         "observed_cited_authors": list(
             (citation_parsed or {}).get("dominant_cited_authors") or []
@@ -470,6 +507,19 @@ def aggregate_deep_target_model(
         ),
     })
 
+    meaningful_editors = [
+        profile for profile in (editor_profiles or [])
+        if str(profile.get("name") or "").strip()
+        and list(profile.get("source_refs") or [])
+        and str(profile.get("evidence_status") or "unknown") != "unknown"
+        and any((
+            profile.get("disciplines"),
+            profile.get("research_topics"),
+            profile.get("theoretical_traditions"),
+            profile.get("key_works"),
+        ))
+    ]
+
     requirements = {
         "min_fulltext_semantic_patterns": {
             "required": int(min_fulltexts),
@@ -488,8 +538,13 @@ def aggregate_deep_target_model(
         },
         "citation_ecology_profile": {"pass": citation_parsed is not None},
         "editor_scholarly_ecology": {
-            "actual": len(editor_profiles or []),
-            "pass": len(editor_profiles or []) > 0,
+            "actual": len(meaningful_editors),
+            "total_editor_profiles": len(editor_profiles or []),
+            "pass": len(meaningful_editors) > 0,
+            "minimum_contract": (
+                "name + source_refs + non-unknown evidence_status + "
+                "discipline/topic/tradition/key_work signal"
+            ),
         },
     }
     blockers = [
@@ -511,7 +566,7 @@ def aggregate_deep_target_model(
         "countermodels": list(
             (genre_parsed or {}).get("countermodels") or []
         ),
-        "editor_scholarly_ecology": list(editor_profiles or []),
+        "editor_scholarly_ecology": list(meaningful_editors),
         "pattern_failures": list(pattern_result.get("failures") or []),
         "prompt_versions": {
             "published_article_pattern": (
@@ -532,11 +587,7 @@ def aggregate_deep_target_model(
             "target_citation_ecology": citation_diag,
         },
     }
-    digest_payload = {
-        key: value for key, value in payload.items()
-        if key != "attempt_diagnostics"
-    }
-    digest = _digest(digest_payload)
+    digest = _digest(_stable_semantic(payload))
     payload["deep_target_model_id"] = f"deep-target:{target_id}:{digest[:16]}"
     payload["content_digest"] = digest
     payload["deep_model_gate"] = {
@@ -694,13 +745,13 @@ def simulate_article_against_deep_model(
             f"{ARTICLE_TARGET_MODEL_SIMULATION_FAMILY['version']}"
         ),
     }
-    digest = _digest({
+    digest = _digest(_stable_semantic({
         "schema_version": payload["schema_version"],
         "article_id": payload["article_id"],
         "deep_target_model_id": payload["deep_target_model_id"],
         "result": payload["result"],
         "prompt_version": payload["prompt_version"],
-    })
+    }))
     payload["simulation_id"] = f"targetsim:{digest[:16]}"
     payload["content_digest"] = digest
     payload["status"] = "READY"
