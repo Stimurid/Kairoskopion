@@ -392,14 +392,13 @@ def aggregate_deep_target_model(
     archetypes = list((genre_parsed or {}).get("archetypes") or [])
     archetype_errors = _validate_archetypes(archetypes, pattern_ids)
 
+    genre_id_key = {
+        "corpus_id": corpus_id,
+        "prompt": GENRE_MOVE_AGGREGATION_FAMILY["version"],
+        "output": genre_parsed or {},
+    }
     genre_profile = GenreMoveProfile(
-        genre_move_profile_id=(
-            f"gmove_{_digest({
-                'corpus_id': corpus_id,
-                'prompt': GENRE_MOVE_AGGREGATION_FAMILY['version'],
-                'output': genre_parsed or {},
-            })[:16]}"
-        ),
+        genre_move_profile_id=f"gmove_{_digest(genre_id_key)[:16]}",
         observed_moves=dict((genre_parsed or {}).get("observed_moves") or {}),
         dominant_moves=list((genre_parsed or {}).get("dominant_moves") or []),
         conspicuously_absent_moves=list(
@@ -419,13 +418,14 @@ def aggregate_deep_target_model(
         (genre_parsed or {}).get("article_comparison_dimensions") or []
     )
 
+    citation_id_key = {
+        "corpus_id": corpus_id,
+        "prompt": TARGET_CITATION_ECOLOGY_FAMILY["version"],
+        "output": citation_parsed or {},
+    }
     citation_profile = CitationExpectationProfile(
         citation_expectation_profile_id=(
-            f"cexp_{_digest({
-                'corpus_id': corpus_id,
-                'prompt': TARGET_CITATION_ECOLOGY_FAMILY['version'],
-                'output': citation_parsed or {},
-            })[:16]}"
+            f"cexp_{_digest(citation_id_key)[:16]}"
         ),
         typical_reference_count=(
             (citation_parsed or {}).get("reference_count_observation")
