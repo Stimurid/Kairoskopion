@@ -226,7 +226,15 @@ def assess_submission_package(
         "target_id": snapshot.get("target_id"),
         "snapshot_id": snapshot.get("snapshot_id"),
     }
+    source_submission_pack_id = str(
+        submission_pack.get("submission_pack_id") or ""
+    ).strip()
+    if not source_submission_pack_id:
+        blockers.append("submission_pack_id_missing")
+        blockers = _uniq(blockers)
+
     skeleton_summary = {
+        "submission_pack_id": source_submission_pack_id or None,
         "ready_status": submission_pack.get("ready_status"),
         "status": submission_pack.get("status"),
         "blocking_issues": _uniq(submission_pack.get("blocking_issues") or []),
@@ -258,7 +266,7 @@ def assess_submission_package(
         "manifest_id": manifest_id,
         "content_digest": digest,
         "status": READY_FOR_HUMAN_SUBMISSION if not blockers else BLOCKED,
-        "source_submission_pack_id": submission_pack.get("submission_pack_id"),
+        "source_submission_pack_id": source_submission_pack_id or None,
         "assessed_at": _now(),
     }
 
