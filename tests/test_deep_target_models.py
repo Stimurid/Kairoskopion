@@ -129,6 +129,18 @@ def _genre_response(patterns, invalid_member=False):
     }
 
 
+def _meaningful_editor():
+    return {
+        "name": "Editor Example",
+        "source_refs": ["https://openalex.org/A123"],
+        "evidence_status": "metadata_api_openalex",
+        "research_topics": ["philosophy of technology"],
+        "disciplines": ["Philosophy"],
+        "theoretical_traditions": [],
+        "key_works": [{"title": "Work"}],
+    }
+
+
 def _citation_response(patterns):
     return {
         "dominant_cited_authors": [],
@@ -230,7 +242,7 @@ def test_nine_semantic_fulltexts_do_not_close_hs016_target_gate():
         },
         selection_strategy="recent_articles",
         bias_notes=[],
-        editor_profiles=[{"name": "Editor"}],
+        editor_profiles=[_meaningful_editor()],
         provider=QueueProvider([
             _genre_response(patterns),
             _citation_response(patterns),
@@ -252,7 +264,7 @@ def test_ten_fulltexts_with_two_real_archetypes_can_close_target_gate():
         },
         selection_strategy="recent_articles",
         bias_notes=["recent sample"],
-        editor_profiles=[{"name": "Editor"}],
+        editor_profiles=[_meaningful_editor()],
         provider=QueueProvider([
             _genre_response(patterns),
             _citation_response(patterns),
@@ -275,7 +287,7 @@ def test_unknown_archetype_member_fails_closed():
         },
         selection_strategy="recent_articles",
         bias_notes=[],
-        editor_profiles=[{"name": "Editor"}],
+        editor_profiles=[_meaningful_editor()],
         provider=QueueProvider([
             _genre_response(patterns, invalid_member=True),
             _citation_response(patterns),
@@ -286,6 +298,64 @@ def test_unknown_archetype_member_fails_closed():
     assert any(
         "unknown_members" in item for item in model["deep_model_gate"]["blockers"]
     )
+
+
+def test_editor_name_without_provenance_does_not_close_gate():
+    patterns = _semantic_patterns(10)
+    model = aggregate_deep_target_model(
+        target_id="venue-1",
+        pattern_result={
+            "published_corpus_id": "deepcorpus:test",
+            "patterns": patterns,
+            "failures": [],
+        },
+        selection_strategy="recent_articles",
+        bias_notes=[],
+        editor_profiles=[{"name": "Editor"}],
+        provider=QueueProvider([
+            _genre_response(patterns),
+            _citation_response(patterns),
+        ]),
+        min_fulltexts=10,
+    )
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    editor_gate = model["deep_model_gate"]["requirements"][
+        "editor_scholarly_ecology"
+    ]
+    assert editor_gate["actual"] == 0
+    assert editor_gate["total_editor_profiles"] == 1
+
+
+def test_same_semantic_aggregation_has_same_deep_model_id():
+    patterns = _semantic_patterns(10)
+    args = dict(
+        target_id="venue-1",
+        pattern_result={
+            "published_corpus_id": "deepcorpus:test",
+            "patterns": patterns,
+            "failures": [],
+        },
+        selection_strategy="recent_articles",
+        bias_notes=["recent sample"],
+        editor_profiles=[_meaningful_editor()],
+        min_fulltexts=10,
+    )
+    first = aggregate_deep_target_model(
+        **args,
+        provider=QueueProvider([
+            _genre_response(patterns),
+            _citation_response(patterns),
+        ]),
+    )
+    second = aggregate_deep_target_model(
+        **args,
+        provider=QueueProvider([
+            _genre_response(patterns),
+            _citation_response(patterns),
+        ]),
+    )
+    assert first["deep_target_model_id"] == second["deep_target_model_id"]
+    assert first["content_digest"] == second["content_digest"]
 
 
 def test_article_simulation_refuses_blocked_deep_model():
