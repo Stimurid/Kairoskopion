@@ -311,6 +311,21 @@ def finalize_submission_package(req: SubmissionPackageFinalizeRequest):
     target_world_package = _catalog.get_package(req.target_world_package_id)
     if target_world_package is None:
         raise HTTPException(404, "target world exchange package not found")
+    catalog_entry = next(
+        (
+            entry for entry in _catalog.list_entries()
+            if entry.get("package_id") == req.target_world_package_id
+        ),
+        None,
+    )
+    if catalog_entry is None:
+        raise HTTPException(409, "target world package has no catalog entry")
+    # Exchange package bytes stay frozen. Current promotion status lives in
+    # the catalog index and is bound ephemerally for finalization.
+    target_world_package = {
+        **target_world_package,
+        "catalog_status": catalog_entry.get("status"),
+    }
     try:
         manifest = assess_submission_package(
             article_id=req.article_id,
