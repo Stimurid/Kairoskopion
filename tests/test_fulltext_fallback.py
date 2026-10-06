@@ -101,7 +101,8 @@ def test_direct_403_emits_durable_idempotent_fallback_request(tmp_path, monkeypa
     request = stored[0]
     assert request["article_identity"]["doi"] == "10.1234/example.403"
     assert request["prior_attempts"][0]["http_status"] == 403
-    assert request["requested_source_class"] == "INDAGO"
+    assert request["consumer"] == "INDAGO"
+    assert request["requested_source_class"] is None
     assert manifest.artifacts[0].acquisition_state == "fallback_requested"
 
 
@@ -214,6 +215,10 @@ def test_found_artifact_requires_validation_extraction_and_registration(tmp_path
             "provider_attempt_id": "attempt-artifact",
             "result_state": "FOUND_ARTIFACT",
             "artifact_ref": "artifact:1",
+            "resolved_article_identity": {
+                "doi": "10.1234/example.403",
+                "title": "Blocked publisher article",
+            },
             "content_hash": "a" * 64,
             "media_type": "application/pdf",
             "byte_size": 1024,
@@ -226,9 +231,63 @@ def test_found_artifact_requires_validation_extraction_and_registration(tmp_path
     evidence = FulltextEvidenceReturn(**stored)
     apply_evidence_return(artifact, evidence)
     assert artifact.acquisition_state == "fallback_artifact_returned"
-    assert artifact.content_hash == "a" * 64
-    # Provider evidence is not silently converted to a local filesystem path.
+    # Provider evidence is not silently converted to local validation state.
+    assert artifact.content_hash is None
     assert artifact.local_ref is None
+
+
+def test_found_artifact_doi_mismatch_fails_closed(tmp_path):
+    artifact = _artifact()
+    store = FulltextFallbackStore(tmp_path)
+    from kairoskopion.kairon_provider.fulltext_fallback import build_fallback_request
+
+    request = build_fallback_request(
+        target_snapshot_id="tw:techne:1",
+        target_corpus_id="techne",
+        artifact=artifact,
+        direct_error={
+            "url": "https://publisher.example/article.pdf",
+            "error_code": "http_403",
+            "http_status": 403,
+            "error": "HTTPError: HTTP Error 403",
+        },
+    )
+    store.put_request(request)
+    with pytest.raises(ValueError, match="DOI does not match"):
+        store.put_return(
+            request.request_id,
+            {
+                "provider_class": "AUTHORIZED_ARCHIVE",
+                "provider_attempt_id": "attempt-wrong-identity",
+                "result_state": "FOUND_ARTIFACT",
+                "resolved_article_identity": {"doi": "10.9999/wrong"},
+                "artifact_ref": "artifact:wrong",
+                "content_hash": "b" * 64,
+                "validation_state": "validated",
+                "extraction_state": "extracted",
+                "source_registration_ref": "litops:source:wrong",
+            },
+        )
+
+
+def test_late_fallback_return_cannot_downgrade_validated_local_artifact(tmp_path):
+    artifact = _artifact()
+    artifact.acquisition_state = "validated_artifact"
+    artifact.local_ref = str(tmp_path / "already-local.pdf")
+    artifact.content_hash = "local-hash"
+    evidence = FulltextEvidenceReturn(
+        request_id="fulltextreq:test",
+        provider_class="INDAGO_BROWSER",
+        provider_attempt_id="late-attempt",
+        result_state="HOST_POLICY_BLOCKED",
+        failure_reason="late negative provider event",
+        return_id="fulltextret:late",
+    )
+    apply_evidence_return(artifact, evidence)
+    assert artifact.acquisition_state == "validated_artifact"
+    assert artifact.local_ref.endswith("already-local.pdf")
+    assert artifact.content_hash == "local-hash"
+    assert any("HOST_POLICY_BLOCKED" in note for note in artifact.notes)
 
 
 def test_human_action_can_resume_same_request_with_later_return(tmp_path):
