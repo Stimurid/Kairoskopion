@@ -160,6 +160,15 @@ class TargetModelBundle(_DictModel):
     register_patterns: list[dict[str, Any]] = field(default_factory=list)
     novelty_patterns: list[dict[str, Any]] = field(default_factory=list)
     article_models: list[dict[str, Any]] = field(default_factory=list)
+    # TRM-071 restored deep publication-world semantics. Additive defaults keep
+    # all historical TargetWorld exchange packages backward-compatible.
+    published_article_patterns: list[dict[str, Any]] = field(default_factory=list)
+    genre_move_profile: dict[str, Any] = field(default_factory=dict)
+    citation_expectation_profile: dict[str, Any] = field(default_factory=dict)
+    corpus_archetypes: list[dict[str, Any]] = field(default_factory=list)
+    countermodels: list[dict[str, Any]] = field(default_factory=list)
+    deep_target_model: dict[str, Any] = field(default_factory=dict)
+    article_simulations: list[dict[str, Any]] = field(default_factory=list)
     evidence_refs: list[str] = field(default_factory=list)
     confidence: str = "low"
     limitations: list[str] = field(default_factory=list)

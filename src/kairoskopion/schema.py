@@ -70,6 +70,7 @@ from .ids import (
     editorial_board_profile_id,
     field_position_id,
     published_article_corpus_id,
+    published_article_pattern_id,
     source_evidence_packet_id,
     protected_core_policy_id,
     evidence_policy_id,
@@ -1015,6 +1016,45 @@ class PublishedArticleCorpus(_DictMixin):
     unknowns: list[str] = _list()
     confidence: str | None = _field()
     evidence_refs: list[str] = _list()
+    created_at: str = dc.field(default_factory=_now)
+
+
+@dc.dataclass
+class PublishedArticlePattern(_DictMixin):
+    """One fulltext-grounded observation of an actually published article.
+
+    Restored from the Journal-Yuga / Kairoskopion pre-regression contract
+    (TRM-071).  This is corpus evidence, not a claim about hidden editorial
+    intention.  Strong venue-level conclusions require aggregation across a
+    sufficiently deep corpus.
+    """
+
+    published_article_pattern_id: str = dc.field(
+        default_factory=published_article_pattern_id
+    )
+    published_corpus_id: str | None = _field()
+    article_source_id: str | None = _field()
+    title: str | None = _field()
+    abstract_pattern: str | None = _field()
+    section_structure: list[str] = _list()
+    intro_moves: list[str] = _list()
+    method_moves: list[str] = _list()
+    argument_moves: list[str] = _list()
+    conclusion_moves: list[str] = _list()
+    method_presence: str | None = _field()
+    theory_presence: list[str] = _list()
+    empirical_presence: str | None = _field()
+    citation_features: dict[str, Any] = _dict()
+    novelty_moves: list[str] = _list()
+    evidence_anchors: list[dict[str, Any]] = _list()
+    source_snapshot_id: str | None = _field()
+    content_hash: str | None = _field()
+    evidence_status: str = "corpus_observation"
+    semantic_status: str = "not_built"
+    prompt_family_version: str | None = _field()
+    unknowns: list[str] = _list()
+    warnings: list[str] = _list()
+    confidence: str | None = _field()
     created_at: str = dc.field(default_factory=_now)
 
 
