@@ -16,6 +16,11 @@ from ..kairon_provider.adapter import pressure_pack_from_diagnostics
 from ..kairon_provider.bibliography_resolver import resolve_manuscript_bibliography
 from ..kairon_provider.fulltext import acquire_manifest_fulltexts
 from ..kairon_provider.fulltext_models import extract_fulltext_article_models
+from ..kairon_provider.fulltext_fallback import (
+    FulltextEvidenceReturn,
+    FulltextFallbackStore,
+    apply_evidence_return,
+)
 from ..kairon_provider.models import (
     ArtiklStatePointer,
     CorpusArtifact,
@@ -47,6 +52,7 @@ _store = TargetWorldStore(_data_root)
 _run_store = ProviderRunStore(_data_root)
 _catalog = TargetWorldCatalog(_data_root)
 _submission_package_store = SubmissionPackageStore(_data_root)
+_fulltext_fallback_store = FulltextFallbackStore(_data_root)
 
 
 def _now() -> str:
@@ -114,6 +120,28 @@ class SubmissionPackageFinalizeRequest(BaseModel):
 class FulltextAcquireRequest(BaseModel):
     max_files: int = 10
     max_bytes_per_file: int = 25 * 1024 * 1024
+
+
+class FulltextEvidenceReturnRequest(BaseModel):
+    provider_class: str
+    provider_attempt_id: str
+    result_state: str
+    provider_instance: str | None = None
+    resolved_article_identity: dict[str, Any] = Field(default_factory=dict)
+    exact_source_satisfied: bool | None = None
+    reorientation_history: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(default_factory=list)
+    failure_reason: str | None = None
+    location_ref: str | None = None
+    human_action: dict[str, Any] | None = None
+    artifact_ref: str | None = None
+    content_hash: str | None = None
+    media_type: str | None = None
+    byte_size: int | None = None
+    acquisition_path: str | None = None
+    validation_state: str | None = None
+    extraction_state: str | None = None
+    source_registration_ref: str | None = None
 
 
 class ReconcilePressureRequest(BaseModel):
@@ -369,6 +397,9 @@ def acquire_fulltext(snapshot_id: str, req: FulltextAcquireRequest):
         output_dir=_data_root / "kairon_provider" / "artifacts",
         max_files=max(0, min(req.max_files, 50)),
         max_bytes_per_file=max(1024, min(req.max_bytes_per_file, 100 * 1024 * 1024)),
+        fallback_store=_fulltext_fallback_store,
+        target_snapshot_id=snapshot_id,
+        fallback_provenance_refs=["TRM-070"],
     )
     data["corpus_manifest"] = result["manifest"].to_dict()
     model_result = extract_fulltext_article_models(result["manifest"])
@@ -393,7 +424,81 @@ def acquire_fulltext(snapshot_id: str, req: FulltextAcquireRequest):
         "modeled": model_result["modeled"],
         "model_failures": model_result["failures"],
         "errors": result["errors"],
+        "fallback_requests": [
+            item.get("request_id") for item in result["fallback_requests"]
+        ],
         "snapshot_id": snapshot_id,
+    }
+
+
+@router.get("/fulltext-fallback/requests")
+def list_fulltext_fallback_requests(target_snapshot_id: str | None = None):
+    return {
+        "requests": _fulltext_fallback_store.list_requests(
+            target_snapshot_id=target_snapshot_id,
+        )
+    }
+
+
+@router.get("/fulltext-fallback/requests/{request_id}")
+def get_fulltext_fallback_request(request_id: str):
+    request = _fulltext_fallback_store.get_request(request_id)
+    if request is None:
+        raise HTTPException(404, "fulltext fallback request not found")
+    return {
+        "request": request.to_dict(),
+        "returns": _fulltext_fallback_store.list_returns(request_id),
+    }
+
+
+@router.post("/fulltext-fallback/requests/{request_id}/return")
+def receive_fulltext_fallback_return(
+    request_id: str,
+    req: FulltextEvidenceReturnRequest,
+):
+    request = _fulltext_fallback_store.get_request(request_id)
+    if request is None:
+        raise HTTPException(404, "fulltext fallback request not found")
+
+    data = _store.get(request.target_snapshot_id)
+    if data is None:
+        raise HTTPException(409, "request target snapshot no longer exists")
+    raw_manifest = data.get("corpus_manifest")
+    if not isinstance(raw_manifest, dict):
+        raise HTTPException(409, "target world has no corpus manifest")
+    manifest = _manifest(raw_manifest)
+    artifact = next(
+        (a for a in manifest.artifacts if a.source_ref == request.source_ref),
+        None,
+    )
+    if artifact is None:
+        raise HTTPException(409, "request source artifact not found in target corpus")
+
+    try:
+        stored = _fulltext_fallback_store.put_return(
+            request_id,
+            req.model_dump(exclude_none=True),
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+    evidence = FulltextEvidenceReturn(**stored)
+    apply_evidence_return(artifact, evidence)
+    data["corpus_manifest"] = manifest.to_dict()
+    _store.put(data)
+    _catalog.ingest(
+        data,
+        origin="KAIROSKOPION",
+        status="PROVIDER_OBSERVED",
+        source_ref=f"fulltext-fallback:{evidence.return_id}",
+    )
+    return {
+        "request_id": request_id,
+        "return": stored,
+        "snapshot_id": request.target_snapshot_id,
+        "source_ref": request.source_ref,
+        "artifact_state": artifact.acquisition_state,
+        "readable_local_ref": artifact.local_ref,
     }
 
 
