@@ -32,6 +32,10 @@ from ..kairon_provider.target_world_catalog import TargetWorldCatalog
 from ..kairon_provider.target_pages import build_target_page_bundle
 from ..kairon_provider.target_world import build_target_world_snapshot
 from ..kairon_provider.transition import propose_transition
+from ..kairon_provider.submission_gate import (
+    SubmissionPackageStore,
+    assess_submission_package,
+)
 
 router = APIRouter(
     prefix="/kairon/provider",
@@ -42,6 +46,7 @@ _data_root = Path(os.environ.get("KAIROSKOPION_DATA_DIR") or ".kairoskopion")
 _store = TargetWorldStore(_data_root)
 _run_store = ProviderRunStore(_data_root)
 _catalog = TargetWorldCatalog(_data_root)
+_submission_package_store = SubmissionPackageStore(_data_root)
 
 
 def _now() -> str:
@@ -88,6 +93,22 @@ class TargetWorldCatalogPublishRequest(BaseModel):
 
 class TargetPagesRequest(BaseModel):
     homepage_url: str
+
+
+class SubmissionPackageFinalizeRequest(BaseModel):
+    article_id: str
+    manuscript_revision: str
+    venue_id: str
+    submission_pack: dict[str, Any]
+    target_world_package_id: str
+    artifacts: list[dict[str, Any]] = Field(default_factory=list)
+    qa_receipts: list[dict[str, Any]] = Field(default_factory=list)
+    route_status: str
+    author_fields_status: str
+    policy_snapshot_refs: list[str] = Field(default_factory=list)
+    required_artifact_kinds: list[str] | None = None
+    required_qa_types: list[str] | None = None
+    external_blockers: list[str] = Field(default_factory=list)
 
 
 class FulltextAcquireRequest(BaseModel):
@@ -283,6 +304,40 @@ def snapshot_target_pages(snapshot_id: str, req: TargetPagesRequest):
         source_ref=f"targetworld-store:{snapshot_id}",
     )
     return b
+
+
+@router.post("/submission-packages/finalize")
+def finalize_submission_package(req: SubmissionPackageFinalizeRequest):
+    target_world_package = _catalog.get_package(req.target_world_package_id)
+    if target_world_package is None:
+        raise HTTPException(404, "target world exchange package not found")
+    try:
+        manifest = assess_submission_package(
+            article_id=req.article_id,
+            manuscript_revision=req.manuscript_revision,
+            venue_id=req.venue_id,
+            submission_pack=req.submission_pack,
+            target_world_package=target_world_package,
+            artifacts=req.artifacts,
+            qa_receipts=req.qa_receipts,
+            route_status=req.route_status,
+            author_fields_status=req.author_fields_status,
+            policy_snapshot_refs=req.policy_snapshot_refs,
+            required_artifact_kinds=req.required_artifact_kinds,
+            required_qa_types=req.required_qa_types,
+            external_blockers=req.external_blockers,
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return _submission_package_store.put(manifest)
+
+
+@router.get("/submission-packages/{manifest_id}")
+def get_submission_package_manifest(manifest_id: str):
+    manifest = _submission_package_store.get(manifest_id)
+    if manifest is None:
+        raise HTTPException(404, "submission package manifest not found")
+    return manifest
 
 
 @router.post("/target-world/{snapshot_id}/acquire-fulltext")
