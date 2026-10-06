@@ -177,13 +177,23 @@ def test_skeleton_debt_is_not_erased_by_artifact_qa():
     assert "skeleton:unknown:live route not verified by skeleton" in manifest["blockers"]
 
 
-def test_provisional_target_world_cannot_finalize():
-    manifest = _assess(target_world_package=_target_world("PROVISIONAL"))
-    assert manifest["status"] == BLOCKED
-    assert (
-        "target_world_status_not_finalizable:PROVISIONAL"
-        in manifest["blockers"]
-    )
+def test_nonproduction_target_world_cannot_finalize():
+    for status in ("QUALIFIED_DEV", "PROVIDER_OBSERVED", "STAGING", "PROVISIONAL"):
+        manifest = _assess(target_world_package=_target_world(status))
+        assert manifest["status"] == BLOCKED
+        assert (
+            f"target_world_status_not_finalizable:{status}"
+            in manifest["blockers"]
+        )
+
+
+def test_current_catalog_promotion_can_finalize_frozen_older_package():
+    package = _target_world("PROVIDER_OBSERVED")
+    package["catalog_status"] = "PROD_ACCEPTED"
+    manifest = _assess(target_world_package=package)
+    assert manifest["status"] == READY_FOR_HUMAN_SUBMISSION
+    assert manifest["target_world"]["status"] == "PROD_ACCEPTED"
+    assert manifest["target_world"]["package_status"] == "PROVIDER_OBSERVED"
 
 
 def test_missing_policy_snapshot_blocks():
