@@ -7,6 +7,11 @@ from typing import Any
 
 from ..adapters.venue.fulltext_fetch import acquire_explicit_fulltext
 from .models import CorpusArtifactManifest
+from .fulltext_fallback import (
+    FulltextFallbackStore,
+    build_fallback_request,
+    is_fallback_eligible_direct_error,
+)
 
 
 def _locator(notes: list[str]) -> str | None:
@@ -23,10 +28,14 @@ def acquire_manifest_fulltexts(
     max_files: int = 10,
     max_bytes_per_file: int = 25 * 1024 * 1024,
     fixtures: dict[str, tuple[bytes, str | None]] | None = None,
+    fallback_store: FulltextFallbackStore | None = None,
+    target_snapshot_id: str | None = None,
+    fallback_provenance_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     fixtures = fixtures or {}
     attempted = acquired = validated = 0
     errors: list[dict[str, Any]] = []
+    fallback_requests: list[dict[str, Any]] = []
 
     for artifact in manifest.artifacts:
         if attempted >= max_files:
@@ -56,7 +65,33 @@ def acquire_manifest_fulltexts(
                 validated += 1
         else:
             artifact.notes.append(f"fulltext_acquisition_failed:{result.get('error')}")
-            errors.append({"source_ref": artifact.source_ref, **result})
+            error = {
+                "source_ref": artifact.source_ref,
+                "doi": artifact.doi,
+                **result,
+            }
+            errors.append(error)
+            if (
+                fallback_store is not None
+                and target_snapshot_id
+                and is_fallback_eligible_direct_error(error)
+            ):
+                request = build_fallback_request(
+                    target_snapshot_id=target_snapshot_id,
+                    target_corpus_id=manifest.target_id,
+                    artifact=artifact,
+                    direct_error=error,
+                    provenance_refs=fallback_provenance_refs,
+                )
+                stored = fallback_store.put_request(request)
+                artifact.acquisition_state = "fallback_requested"
+                artifact.notes.append(
+                    f"fulltext_fallback_request:{stored['request_id']}"
+                )
+                artifact.notes.append(
+                    f"fulltext_fallback_trigger:{error.get('error_code')}"
+                )
+                fallback_requests.append(stored)
 
     return {
         "manifest": manifest,
@@ -64,5 +99,6 @@ def acquire_manifest_fulltexts(
         "acquired": acquired,
         "validated": validated,
         "errors": errors,
+        "fallback_requests": fallback_requests,
         "complete": attempted > 0 and acquired == attempted,
     }
