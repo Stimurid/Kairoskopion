@@ -179,6 +179,21 @@ def build_submission_pack(
     # --- Readiness ---
     readiness = _assess_readiness(compliance, risk, fit, missing, blocking)
 
+    # This legacy builder is intentionally a pre-artifact readiness skeleton.
+    # It cannot establish exact exported-artifact lineage, visual-render/privacy
+    # receipts, frozen TargetWorld promotion, live route, or author-only facts.
+    metadata["is_final_submission_package"] = False
+    metadata["requires_finalization_gate"] = True
+    metadata["finalization_gate"] = (
+        "/kairon/provider/submission-packages/finalize"
+    )
+    metadata["automation_level"] = "manual_only"
+    if readiness == SubmissionReadiness.READY_FOR_MANUAL_SUBMISSION.value:
+        warnings.append(
+            "Pre-artifact readiness only — run the submission package "
+            "finalization gate before READY_FOR_HUMAN_SUBMISSION."
+        )
+
     return SubmissionPack(
         article_model_id=article.article_model_id,
         manuscript_id=None,

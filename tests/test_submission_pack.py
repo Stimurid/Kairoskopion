@@ -425,3 +425,26 @@ class TestBuildSubmissionPack:
         risk = _minimal_risk(overall_risk_label="moderate")
         pack = build_submission_pack(art, ven, sc, risk=risk)
         assert pack.metadata.get("risk_label") == "moderate"
+
+    def test_ready_skeleton_requires_finalization_gate(self):
+        art = _minimal_article()
+        ven = _minimal_venue()
+        sc = _minimal_scenario()
+        fit = _minimal_fit(overall_label="strong_candidate")
+        comp = _minimal_compliance()
+        pack = build_submission_pack(
+            art, ven, sc, fit=fit, compliance=comp,
+        )
+        assert (
+            pack.ready_status
+            == SubmissionReadiness.READY_FOR_MANUAL_SUBMISSION.value
+        )
+        assert pack.metadata["is_final_submission_package"] is False
+        assert pack.metadata["requires_finalization_gate"] is True
+        assert pack.metadata["finalization_gate"].endswith(
+            "/submission-packages/finalize"
+        )
+        assert any(
+            "Pre-artifact readiness only" in warning
+            for warning in pack.warnings
+        )
