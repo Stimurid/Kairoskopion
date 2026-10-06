@@ -125,6 +125,9 @@ def editorial_board_profile_id() -> str:
 def published_article_corpus_id() -> str:
     return generate_id("pac")
 
+def published_article_pattern_id() -> str:
+    return generate_id("papat")
+
 def citation_expectation_profile_id() -> str:
     return generate_id("cexp")
 
