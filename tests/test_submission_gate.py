@@ -196,6 +196,23 @@ def test_current_catalog_promotion_can_finalize_frozen_older_package():
     assert manifest["target_world"]["package_status"] == "PROVIDER_OBSERVED"
 
 
+
+def test_upstream_submission_pack_identity_is_digest_bound():
+    first = _assess()
+    second_skeleton = _skeleton()
+    second_skeleton["submission_pack_id"] = "sp_p06_pt_other"
+    second = _assess(submission_pack=second_skeleton)
+    assert first["manifest_id"] != second["manifest_id"]
+
+
+def test_missing_submission_pack_id_blocks_finalization():
+    skeleton = _skeleton()
+    skeleton["submission_pack_id"] = None
+    manifest = _assess(submission_pack=skeleton)
+    assert manifest["status"] == BLOCKED
+    assert "submission_pack_id_missing" in manifest["blockers"]
+
+
 def test_missing_policy_snapshot_blocks():
     manifest = _assess(policy_snapshot_refs=[])
     assert manifest["status"] == BLOCKED
