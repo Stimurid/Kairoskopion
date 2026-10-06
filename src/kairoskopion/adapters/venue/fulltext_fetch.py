@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import mimetypes
+import urllib.error
 import urllib.parse
 import urllib.request
 import ipaddress
@@ -85,9 +86,19 @@ def acquire_explicit_fulltext(
     if fixture_bytes is None:
         allowed, reason = _public_http_target(url)
         if not allowed:
-            return {"status": "blocked", "url": url, "error": reason}
+            return {
+                "status": "blocked",
+                "url": url,
+                "error_code": str(reason or "blocked"),
+                "error": reason,
+            }
     elif parsed.scheme not in ("http", "https"):
-        return {"status": "blocked", "url": url, "error": "unsupported_scheme"}
+        return {
+            "status": "blocked",
+            "url": url,
+            "error_code": "unsupported_scheme",
+            "error": "unsupported_scheme",
+        }
 
     content_type = fixture_content_type
     data = fixture_bytes
@@ -98,15 +109,57 @@ def acquire_explicit_fulltext(
                 content_type = response.headers.get("Content-Type")
                 declared = response.headers.get("Content-Length")
                 if declared and int(declared) > max_bytes:
-                    return {"status": "blocked", "url": url, "error": "declared_size_over_limit"}
+                    return {
+                        "status": "blocked",
+                        "url": url,
+                        "error_code": "declared_size_over_limit",
+                        "error": "declared_size_over_limit",
+                    }
                 data = response.read(max_bytes + 1)
+        except urllib.error.HTTPError as exc:
+            return {
+                "status": "failed",
+                "url": url,
+                "error_code": f"http_{exc.code}",
+                "http_status": int(exc.code),
+                "error": f"HTTPError: HTTP Error {exc.code}",
+            }
+        except urllib.error.URLError as exc:
+            return {
+                "status": "failed",
+                "url": url,
+                "error_code": "network_error",
+                "error": f"URLError: {exc.reason}",
+            }
+        except TimeoutError as exc:
+            return {
+                "status": "failed",
+                "url": url,
+                "error_code": "timeout",
+                "error": f"TimeoutError: {exc}",
+            }
         except Exception as exc:
-            return {"status": "failed", "url": url, "error": f"{type(exc).__name__}: {exc}"}
+            return {
+                "status": "failed",
+                "url": url,
+                "error_code": "transport_error",
+                "error": f"{type(exc).__name__}: {exc}",
+            }
 
     if data is None:
-        return {"status": "failed", "url": url, "error": "no_data"}
+        return {
+            "status": "failed",
+            "url": url,
+            "error_code": "no_data",
+            "error": "no_data",
+        }
     if len(data) > max_bytes:
-        return {"status": "blocked", "url": url, "error": "download_size_over_limit"}
+        return {
+            "status": "blocked",
+            "url": url,
+            "error_code": "download_size_over_limit",
+            "error": "download_size_over_limit",
+        }
 
     digest = hashlib.sha256(data).hexdigest()
     root = Path(output_dir)
