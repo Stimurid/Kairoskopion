@@ -101,12 +101,15 @@ def _attempt_diag(outcome: Any) -> dict[str, Any]:
     return data
 
 
-def _pattern_id(content_hash: str, source_ref: str) -> str:
+def _pattern_id(
+    content_hash: str, source_ref: str, semantic_output: dict[str, Any]
+) -> str:
     key = {
         "content_hash": content_hash,
         "source_ref": source_ref,
         "prompt_family": PUBLISHED_ARTICLE_PATTERN_FAMILY["family_id"],
         "prompt_version": PUBLISHED_ARTICLE_PATTERN_FAMILY["version"],
+        "semantic_output": semantic_output,
     }
     return f"papat_{_digest(key)[:16]}"
 
@@ -209,6 +212,7 @@ def build_published_article_patterns(
                 "article_text": text,
             },
             strict_schema=False,
+            temperature=0.0,
             max_tokens=2600,
             agent_role="published_article_pattern_miner",
             model_role="published_article_pattern_miner",
@@ -234,7 +238,7 @@ def build_published_article_patterns(
         content_hash = snapshot.content_hash or artifact.content_hash or _digest(text)
         pattern = PublishedArticlePattern(
             published_article_pattern_id=_pattern_id(
-                content_hash, artifact.source_ref
+                content_hash, artifact.source_ref, parsed
             ),
             article_source_id=artifact.source_ref,
             title=artifact.title,
@@ -357,6 +361,7 @@ def aggregate_deep_target_model(
                 "patterns_json": _safe_json(patterns),
             },
             strict_schema=False,
+            temperature=0.0,
             max_tokens=3200,
             agent_role="genre_move_aggregator",
             model_role="genre_move_aggregator",
@@ -376,6 +381,7 @@ def aggregate_deep_target_model(
                 "patterns_json": _safe_json(patterns),
             },
             strict_schema=False,
+            temperature=0.0,
             max_tokens=2600,
             agent_role="target_citation_ecologist",
             model_role="target_citation_ecologist",
@@ -387,6 +393,13 @@ def aggregate_deep_target_model(
     archetype_errors = _validate_archetypes(archetypes, pattern_ids)
 
     genre_profile = GenreMoveProfile(
+        genre_move_profile_id=(
+            f"gmove_{_digest({
+                'corpus_id': corpus_id,
+                'prompt': GENRE_MOVE_AGGREGATION_FAMILY['version'],
+                'output': genre_parsed or {},
+            })[:16]}"
+        ),
         observed_moves=dict((genre_parsed or {}).get("observed_moves") or {}),
         dominant_moves=list((genre_parsed or {}).get("dominant_moves") or []),
         conspicuously_absent_moves=list(
@@ -407,6 +420,13 @@ def aggregate_deep_target_model(
     )
 
     citation_profile = CitationExpectationProfile(
+        citation_expectation_profile_id=(
+            f"cexp_{_digest({
+                'corpus_id': corpus_id,
+                'prompt': TARGET_CITATION_ECOLOGY_FAMILY['version'],
+                'output': citation_parsed or {},
+            })[:16]}"
+        ),
         typical_reference_count=(
             (citation_parsed or {}).get("reference_count_observation")
         ),
@@ -512,7 +532,11 @@ def aggregate_deep_target_model(
             "target_citation_ecology": citation_diag,
         },
     }
-    digest = _digest(payload)
+    digest_payload = {
+        key: value for key, value in payload.items()
+        if key != "attempt_diagnostics"
+    }
+    digest = _digest(digest_payload)
     payload["deep_target_model_id"] = f"deep-target:{target_id}:{digest[:16]}"
     payload["content_digest"] = digest
     payload["deep_model_gate"] = {
@@ -605,6 +629,7 @@ def simulate_article_against_deep_model(
             "deep_target_model_json": _safe_json(comparison_model),
         },
         strict_schema=False,
+        temperature=0.0,
         max_tokens=2600,
         agent_role="article_target_model_simulator",
         model_role="article_target_model_simulator",
@@ -614,6 +639,40 @@ def simulate_article_against_deep_model(
         return {
             "status": "BLOCKED",
             "blockers": ["article_model_simulation_parse_failed"],
+            "deep_target_model_id": deep_target_model.get(
+                "deep_target_model_id"
+            ),
+            "attempt": _attempt_diag(outcome),
+        }
+
+    valid_archetypes = {
+        str(item.get("archetype_id") or "")
+        for item in (deep_target_model.get("archetypes") or [])
+    } - {""}
+    valid_patterns = {
+        str(item.get("published_article_pattern_id") or "")
+        for item in (
+            deep_target_model.get("published_article_patterns") or []
+        )
+    } - {""}
+    used_archetypes = {
+        str(item.get("archetype_id") or "")
+        for item in (parsed.get("closest_archetypes") or [])
+    } - {""}
+    used_patterns = {
+        str(item) for item in (parsed.get("evidence_pattern_ids") or [])
+    } - {""}
+    evidence_errors = []
+    if used_archetypes - valid_archetypes:
+        evidence_errors.append("simulation_unknown_archetype_id")
+    if not used_patterns:
+        evidence_errors.append("simulation_missing_evidence_pattern_ids")
+    if used_patterns - valid_patterns:
+        evidence_errors.append("simulation_unknown_evidence_pattern_id")
+    if evidence_errors:
+        return {
+            "status": "BLOCKED",
+            "blockers": sorted(set(evidence_errors)),
             "deep_target_model_id": deep_target_model.get(
                 "deep_target_model_id"
             ),
@@ -635,7 +694,13 @@ def simulate_article_against_deep_model(
             f"{ARTICLE_TARGET_MODEL_SIMULATION_FAMILY['version']}"
         ),
     }
-    digest = _digest(payload)
+    digest = _digest({
+        "schema_version": payload["schema_version"],
+        "article_id": payload["article_id"],
+        "deep_target_model_id": payload["deep_target_model_id"],
+        "result": payload["result"],
+        "prompt_version": payload["prompt_version"],
+    })
     payload["simulation_id"] = f"targetsim:{digest[:16]}"
     payload["content_digest"] = digest
     payload["status"] = "READY"
