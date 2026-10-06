@@ -45,11 +45,22 @@ def summarize_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
         "confidence": models.get("confidence"),
         "freshness": snapshot.get("freshness") or {},
         "model_capabilities": [
-            k for k in ("genre_patterns","argument_patterns","method_patterns",
-                        "citation_patterns","register_patterns","novelty_patterns",
-                        "article_models")
+            k for k in (
+                "genre_patterns", "argument_patterns", "method_patterns",
+                "citation_patterns", "register_patterns", "novelty_patterns",
+                "article_models", "published_article_patterns",
+                "genre_move_profile", "citation_expectation_profile",
+                "corpus_archetypes", "countermodels", "deep_target_model",
+                "article_simulations",
+            )
             if models.get(k)
         ],
+        "deep_target_model_status": (
+            ((models.get("deep_target_model") or {}).get("deep_model_gate") or {}).get("status")
+        ),
+        "deep_fulltext_pattern_count": len(
+            models.get("published_article_patterns") or []
+        ),
     }
 
 class TargetWorldCatalog:
