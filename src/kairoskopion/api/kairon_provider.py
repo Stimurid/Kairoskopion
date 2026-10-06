@@ -32,6 +32,10 @@ from ..kairon_provider.target_world_catalog import TargetWorldCatalog
 from ..kairon_provider.target_pages import build_target_page_bundle
 from ..kairon_provider.target_world import build_target_world_snapshot
 from ..kairon_provider.transition import propose_transition
+from ..kairon_provider.deep_target_models import (
+    build_deep_target_model,
+    simulate_article_against_deep_model,
+)
 from ..kairon_provider.submission_gate import (
     SubmissionPackageStore,
     assess_submission_package,
@@ -114,6 +118,15 @@ class SubmissionPackageFinalizeRequest(BaseModel):
 class FulltextAcquireRequest(BaseModel):
     max_files: int = 10
     max_bytes_per_file: int = 25 * 1024 * 1024
+
+
+class DeepTargetModelRequest(BaseModel):
+    max_articles: int = 20
+    min_fulltexts: int = 10
+
+
+class ArticleTargetSimulationRequest(BaseModel):
+    article: dict[str, Any]
 
 
 class ReconcilePressureRequest(BaseModel):
@@ -395,6 +408,91 @@ def acquire_fulltext(snapshot_id: str, req: FulltextAcquireRequest):
         "errors": result["errors"],
         "snapshot_id": snapshot_id,
     }
+
+
+@router.post("/target-world/{snapshot_id}/deep-model")
+def build_deep_target_model_api(
+    snapshot_id: str,
+    req: DeepTargetModelRequest,
+):
+    data = _store.get(snapshot_id)
+    if data is None:
+        raise HTTPException(404, "target world snapshot not found")
+    raw_manifest = data.get("corpus_manifest")
+    if not isinstance(raw_manifest, dict):
+        raise HTTPException(409, "target world has no corpus manifest")
+    manifest = _manifest(raw_manifest)
+    result = build_deep_target_model(
+        target_id=str(data.get("target_id") or manifest.target_id),
+        manifest=manifest,
+        editor_profiles=list(data.get("editor_profiles") or []),
+        selection_strategy=manifest.selection_strategy,
+        bias_notes=list(manifest.bias_notes or []),
+        max_articles=max(1, min(req.max_articles, 50)),
+        min_fulltexts=max(1, min(req.min_fulltexts, 50)),
+    )
+    models = dict(data.get("target_models") or {})
+    models["published_article_patterns"] = list(
+        result.get("published_article_patterns") or []
+    )
+    models["genre_move_profile"] = dict(
+        result.get("genre_move_profile") or {}
+    )
+    models["citation_expectation_profile"] = dict(
+        result.get("citation_expectation_profile") or {}
+    )
+    models["corpus_archetypes"] = list(result.get("archetypes") or [])
+    models["countermodels"] = list(result.get("countermodels") or [])
+    models["deep_target_model"] = result
+    data["target_models"] = models
+    _store.put(data)
+    entry = _catalog.ingest(
+        data,
+        origin="KAIROSKOPION",
+        status="PROVIDER_OBSERVED",
+        source_ref=f"targetworld-store:{snapshot_id}:deep-model",
+    )
+    return {
+        "snapshot_id": snapshot_id,
+        "exchange_package_id": entry.get("package_id"),
+        "deep_target_model": result,
+    }
+
+
+@router.post("/target-world/{snapshot_id}/simulate-article")
+def simulate_article_target_model(
+    snapshot_id: str,
+    req: ArticleTargetSimulationRequest,
+):
+    data = _store.get(snapshot_id)
+    if data is None:
+        raise HTTPException(404, "target world snapshot not found")
+    models = dict(data.get("target_models") or {})
+    deep_model = models.get("deep_target_model")
+    if not isinstance(deep_model, dict) or not deep_model:
+        raise HTTPException(409, "deep target model not built")
+    result = simulate_article_against_deep_model(
+        article=req.article,
+        deep_target_model=deep_model,
+    )
+    if result.get("status") == "READY":
+        existing = list(models.get("article_simulations") or [])
+        sim_id = result.get("simulation_id")
+        existing = [
+            item for item in existing
+            if item.get("simulation_id") != sim_id
+        ]
+        existing.append(result)
+        models["article_simulations"] = existing
+        data["target_models"] = models
+        _store.put(data)
+        _catalog.ingest(
+            data,
+            origin="KAIROSKOPION",
+            status="PROVIDER_OBSERVED",
+            source_ref=f"targetworld-store:{snapshot_id}:article-simulation",
+        )
+    return result
 
 
 @router.post("/runs")
