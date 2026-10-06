@@ -20,7 +20,7 @@ BLOCKED = "BLOCKED"
 
 _ALLOWED_ROUTE = {"LIVE", "BLOCKED", "UNKNOWN"}
 _ALLOWED_AUTHOR_FIELDS = {"CONFIRMED", "OPEN", "NOT_REQUIRED"}
-_UNACCEPTABLE_TARGET_STATUSES = {"PROVISIONAL", "HISTORICAL"}
+_FINALIZABLE_TARGET_STATUSES = {"PROD_ACCEPTED", "PROD_OBSERVED"}
 
 
 def _now() -> str:
@@ -125,7 +125,10 @@ def assess_submission_package(
 
     package_id = str(target_world_package.get("package_id") or "").strip()
     content_digest = str(target_world_package.get("content_digest") or "").strip()
-    target_status = str(target_world_package.get("status") or "").strip()
+    package_status = str(target_world_package.get("status") or "").strip()
+    target_status = str(
+        target_world_package.get("catalog_status") or package_status
+    ).strip()
     snapshot = target_world_package.get("snapshot")
     if not package_id or not content_digest or not isinstance(snapshot, dict):
         raise ValueError(
@@ -165,7 +168,7 @@ def assess_submission_package(
     for item in submission_pack.get("unknowns") or []:
         blockers.append(f"skeleton:unknown:{item}")
 
-    if target_status in _UNACCEPTABLE_TARGET_STATUSES or not target_status:
+    if target_status not in _FINALIZABLE_TARGET_STATUSES:
         blockers.append(
             f"target_world_status_not_finalizable:{target_status or 'UNKNOWN'}"
         )
@@ -219,6 +222,7 @@ def assess_submission_package(
         "package_id": package_id,
         "content_digest": content_digest,
         "status": target_status,
+        "package_status": package_status,
         "target_id": snapshot.get("target_id"),
         "snapshot_id": snapshot.get("snapshot_id"),
     }
