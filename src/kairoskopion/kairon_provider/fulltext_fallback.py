@@ -43,8 +43,6 @@ ACQUISITION_GOALS = {
 FALLBACK_ELIGIBLE_ERROR_CODES = {
     "http_401",
     "http_403",
-    "http_407",
-    "http_429",
 }
 
 
@@ -76,7 +74,8 @@ class FulltextAcquisitionRequest:
     target_corpus_id: str
     source_ref: str
     article_identity: dict[str, Any] = field(default_factory=dict)
-    requested_source_class: str = "INDAGO"
+    consumer: str = "INDAGO"
+    requested_source_class: str | None = None
     source_priority: list[str] = field(default_factory=list)
     acquisition_goal: str = "ACQUIRE_IF_RUNTIME_AUTHORIZED"
     known_locations: list[str] = field(default_factory=list)
@@ -152,7 +151,7 @@ def build_fallback_request(
     target_corpus_id: str,
     artifact: CorpusArtifact,
     direct_error: dict[str, Any],
-    requested_source_class: str = "INDAGO",
+    requested_source_class: str | None = None,
     acquisition_goal: str = "ACQUIRE_IF_RUNTIME_AUTHORIZED",
     provenance_refs: list[str] | None = None,
 ) -> FulltextAcquisitionRequest:
@@ -173,6 +172,7 @@ def build_fallback_request(
         "target_corpus_id": target_corpus_id,
         "source_ref": artifact.source_ref,
         "article_identity": identity,
+        "consumer": "INDAGO",
         "requested_source_class": requested_source_class,
         "acquisition_goal": acquisition_goal,
     }
@@ -183,6 +183,7 @@ def build_fallback_request(
         target_corpus_id=target_corpus_id,
         source_ref=artifact.source_ref,
         article_identity=identity,
+        consumer="INDAGO",
         requested_source_class=requested_source_class,
         acquisition_goal=acquisition_goal,
         known_locations=_known_locations(artifact),
@@ -208,6 +209,7 @@ def normalize_evidence_return(
     if not attempt_id:
         raise ValueError("provider_attempt_id is required")
 
+    resolved_identity = payload.get("resolved_article_identity") or {}
     location_ref = payload.get("location_ref")
     human_action = payload.get("human_action")
     artifact_ref = payload.get("artifact_ref")
@@ -222,6 +224,17 @@ def normalize_evidence_return(
     if state == "HUMAN_ACTION_REQUIRED" and not isinstance(human_action, dict):
         raise ValueError("HUMAN_ACTION_REQUIRED requires human_action")
     if state == "FOUND_ARTIFACT":
+        if not isinstance(resolved_identity, dict) or not resolved_identity:
+            raise ValueError("FOUND_ARTIFACT requires resolved_article_identity")
+        request_doi = str(request.article_identity.get("doi") or "").strip().lower()
+        resolved_doi = str(resolved_identity.get("doi") or "").strip().lower()
+        for prefix in ("https://doi.org/", "http://doi.org/", "doi:"):
+            if request_doi.startswith(prefix):
+                request_doi = request_doi[len(prefix):]
+            if resolved_doi.startswith(prefix):
+                resolved_doi = resolved_doi[len(prefix):]
+        if request_doi and request_doi != resolved_doi:
+            raise ValueError("FOUND_ARTIFACT DOI does not match request identity")
         missing = [
             name for name, value in (
                 ("artifact_ref", artifact_ref),
@@ -251,7 +264,7 @@ def normalize_evidence_return(
         "provider_instance": payload.get("provider_instance"),
         "provider_attempt_id": attempt_id,
         "result_state": state,
-        "resolved_article_identity": payload.get("resolved_article_identity") or {},
+        "resolved_article_identity": resolved_identity,
         "exact_source_satisfied": payload.get("exact_source_satisfied"),
         "reorientation_history": payload.get("reorientation_history") or [],
         "evidence_refs": payload.get("evidence_refs") or [],
@@ -277,7 +290,7 @@ def apply_evidence_return(
     artifact: CorpusArtifact,
     evidence: FulltextEvidenceReturn,
 ) -> CorpusArtifact:
-    """Apply only machine-visible acquisition state; never fabricate readability."""
+    """Apply best-known acquisition state; never fabricate local readability."""
     state_map = {
         "FOUND_ARTIFACT": "fallback_artifact_returned",
         "FOUND_LOCATION": "fallback_location_found",
@@ -289,9 +302,27 @@ def apply_evidence_return(
         "TRANSPORT_DEFECT": "fallback_transport_defect",
         "IDENTITY_CONFLICT": "fallback_identity_conflict",
     }
-    artifact.acquisition_state = state_map[evidence.result_state]
-    if evidence.result_state == "FOUND_ARTIFACT" and evidence.content_hash:
-        artifact.content_hash = evidence.content_hash
+    state_rank = {
+        "metadata_only": 0,
+        "fulltext_locator": 0,
+        "fallback_requested": 1,
+        "fallback_not_found": 2,
+        "fallback_provider_blocked": 2,
+        "fallback_host_policy_blocked": 2,
+        "fallback_transient_failure": 2,
+        "fallback_transport_defect": 2,
+        "fallback_identity_conflict": 2,
+        "fallback_human_action_required": 3,
+        "fallback_location_found": 4,
+        "fallback_artifact_returned": 5,
+        "acquired_unvalidated": 6,
+        "validated_artifact": 7,
+    }
+    candidate_state = state_map[evidence.result_state]
+    if state_rank.get(candidate_state, 0) >= state_rank.get(
+        artifact.acquisition_state, 0
+    ):
+        artifact.acquisition_state = candidate_state
 
     notes = list(artifact.notes or [])
     additions = [
@@ -312,9 +343,9 @@ def apply_evidence_return(
     if evidence.failure_reason:
         additions.append(f"fulltext_fallback_failure:{evidence.failure_reason}")
     artifact.notes = list(dict.fromkeys(notes + additions))
-    # local_ref is intentionally untouched. A remote/provider return is not a
-    # locally readable artifact until a separate artifact transport/ingest step
-    # makes bytes available and validates them inside Kairoskopion.
+    # local_ref and local content_hash are intentionally untouched. Provider
+    # evidence is not a locally validated artifact until a separate transport/
+    # ingest step makes bytes available and validates them in Kairoskopion.
     return artifact
 
 
