@@ -273,6 +273,8 @@ def test_provider_api_exposes_deep_run_routes():
     paths = {route.path for route in router.routes}
     assert "/kairon/provider/target-world/{snapshot_id}/pages" in paths
     assert "/kairon/provider/target-world/{snapshot_id}/acquire-fulltext" in paths
+    assert "/kairon/provider/target-world/{snapshot_id}/deep-model" in paths
+    assert "/kairon/provider/target-world/{snapshot_id}/simulate-article" in paths
     assert "/kairon/provider/runs" in paths
     assert "/kairon/provider/runs/{run_id}/stage" in paths
 
