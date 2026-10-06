@@ -1,6 +1,6 @@
 # Kairoskopion Production Deploy Runbook
 
-**Last updated:** 2026-06-24
+**Last updated:** 2026-10-06
 **Status:** LIVE (staging/operator preview)
 
 ---
@@ -30,14 +30,53 @@
 | Local (on VM) | `curl http://127.0.0.1:8088/health` |
 | External | `curl https://kairoskop.mindkampf.ru/health` (requires basic auth) |
 
-**Note:** `/health` does not expose the git commit hash. To verify the deployed commit, check on the VM:
-
-```bash
-ssh deploy@81.26.176.248
-cd /opt/kairoskopion/app && git log --oneline -1
-```
+**Note:** `/health` does not expose the git commit hash. Because SSH is prohibited,
+commit readback must be produced by an authorized non-SSH actuator and persisted
+as a receipt. The 2026-10-06 production deployment used the repo-scoped
+self-hosted runner `moderbober-prod-01-tinkuy`.
 
 ## Deploy Procedure
+
+### Current allowed contour — non-SSH only
+
+SSH is disabled by owner environment policy. SSH retry limit is **zero**.
+Do not attempt SSH, SCP, SFTP, port-22 probes, or SSH-based rollback.
+
+A proven non-SSH execution body was recovered on 2026-10-06:
+
+- runner: `moderbober-prod-01-tinkuy`
+- host: `moderbober-prod-01`
+- use class: repo-scoped emergency / one-shot actuator
+- verified deploy run: `37401804487`
+- deploy receipt artifact: `11384979277`
+- verified runtime code HEAD after deploy:
+  `c1f00e984c3f86105250c294f13644b508310945`
+- service restart: PASS
+- health recovery: PASS
+- live OpenAPI route readback: PASS
+
+This proves the runner can execute the host-side deployment procedure without
+enabling SSH. It does **not** establish a generally governed deployment service.
+Do not assume it is available to unrelated repositories or hosts.
+
+For each use, the execution receipt must contain at least:
+
+1. requested git SHA;
+2. host/runner identity;
+3. before SHA;
+4. fetch/checkout or pull result;
+5. dependency/install result if needed;
+6. service restart result;
+7. after SHA;
+8. local health result;
+9. relevant endpoint/OpenAPI smoke.
+
+If no authorized non-SSH actuator is available, push main and return
+`DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR` with the exact runtime-code commit.
+
+### Historical SSH procedure — FOR REFERENCE ONLY, DO NOT EXECUTE
+
+The former procedure was:
 
 ```bash
 ssh deploy@81.26.176.248
@@ -51,29 +90,18 @@ sudo systemctl restart kairoskopion-api
 curl http://127.0.0.1:8088/health
 ```
 
-### SSH Access Status
+It remains documentation of host layout only. It is not an authorized
+execution path.
 
-**SSH is disabled by owner environment policy (2026-07-10).**
-SSH retry limit: **zero**. Do not attempt SSH, SCP, SFTP, or port-22 probes.
-
-Use non-SSH deployment contour only. If none available, push main and
-return `DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR` with the exact merge commit.
-
-See `docs/operations/ENVIRONMENT_INVARIANTS.md` for the full policy.
+See `docs/operations/ENVIRONMENT_INVARIANTS.md` for the binding policy.
 
 ## Rollback
 
-```bash
-ssh deploy@81.26.176.248
-cd /opt/kairoskopion/app
-sudo systemctl stop kairoskopion-api
-git checkout <known-good-commit>
-source .venv/bin/activate
-pip install -e '.[api]'
-cd ui && npm ci && npx vite build && cd ..
-sudo systemctl start kairoskopion-api
-curl http://127.0.0.1:8088/health
-```
+Rollback must use an authorized non-SSH actuator and the same receipt discipline
+as deployment. The old SSH rollback recipe is not authorized.
+
+A rollback receipt must identify the failed/current SHA, selected known-good SHA,
+service restart result, post-rollback SHA, and health/readback evidence.
 
 ## Environment Variables
 
