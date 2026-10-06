@@ -475,9 +475,14 @@ def receive_fulltext_fallback_return(
         raise HTTPException(409, "request source artifact not found in target corpus")
 
     try:
+        payload = (
+            req.model_dump(exclude_none=True)
+            if hasattr(req, "model_dump")
+            else req.dict(exclude_none=True)
+        )
         stored = _fulltext_fallback_store.put_return(
             request_id,
-            req.model_dump(exclude_none=True),
+            payload,
         )
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from exc
