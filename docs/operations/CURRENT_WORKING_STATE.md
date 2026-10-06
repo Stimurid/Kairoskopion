@@ -1,120 +1,137 @@
 # Current Working State
 
-**Last updated:** 2026-07-10T16:30+03:00
+**Last updated:** 2026-10-06T04:41+03:00
 **Branch:** `main`
-**Latest main commit:** `6c21124` (merge: discipline output truncation fix)
-**Currently deployed commit:** `1fc7c0a` (prior session's BLOCKER A-D fixes)
+**Runtime-code merge:** `c1f00e984c3f86105250c294f13644b508310945` — publication package finalization gate
+**Last directly verified production HEAD:** `91a35cc5434d2a34e7027abfbe8abcab759c43fc` on 2026-09-30
+**Production domain:** `kairoskop.mindkampf.ru`
 
 ---
 
-## Deployment status: BLOCKED
+## Deployment status
 
 **`DEPLOYMENT_BLOCKED_NO_NON_SSH_CONTOUR`**
 
-Code is on `origin/main` (commit `6c21124`) but cannot be deployed.
-SSH is disabled by owner environment policy. No CI/CD, GitHub Actions,
-webhook, or other non-SSH deployment path is configured.
+The publication-front TRM-062 runtime repair is merged and fully green in Git,
+but production deployment cannot be executed from the currently authorized
+contours.
 
-**To unblock:** either re-enable SSH or set up an alternative deployment
-contour (GitHub Actions, webhook on git push, etc.).
+Owner environment policy still applies:
 
-**To deploy manually (when SSH is re-enabled):**
-```bash
-ssh deploy@81.26.176.248
-cd /opt/kairoskopion/app
-git fetch origin && git pull origin main
-source .venv/bin/activate
-pip install -e '.[api]'
-cd ui && npm ci && npx vite build && cd ..
-sudo systemctl restart kairoskopion-api
-curl http://127.0.0.1:8088/health
-```
+- SSH / SCP / SFTP / port-22 probes are prohibited.
+- SSH retry limit is zero.
+- Production may only be changed through an already-authorized non-SSH contour.
+- The repository currently has test CI only; no deploy workflow/webhook/pull-agent
+  is configured in this repository.
+- No authorized remote-terminal / VM actuator is connected in the current
+  ChatGPT scene.
 
-## What was done this session
+Do **not** represent the new finalization endpoint as live until a production
+HEAD readback and endpoint smoke prove it.
 
-### BLOCKER E — Discipline matcher output truncation
+## Publication-front repair merged on 2026-10-06
 
-**Root cause:** V3 prompt (10 candidates, 7-10 sentence Russian rationales)
-consistently exceeds 4096 output tokens. Production LLM session log shows
-`output_tokens=4096` (hard ceiling) with `parse_status=text_only`. The JSON
-response is truncated mid-object. `repair_and_parse` cannot fix it. Agent
-falls back to keyword-only deterministic results (2-4 candidates, no LLM
-scoring).
+### TRM-062 — reproducible submission-package finalization
 
-**Fix (commits 75a549b, 2f928b0):**
-- `discipline_matcher.py`: `max_tokens` raised from 4096 to 8192
-- Added explicit `finish_reason == "length"` truncation detection
-- Truncation classified as `output_truncated` (distinct from `invalid_json`)
-- Attempt metadata (model, tokens, finish_reason) persisted on fallback
-- 16 regression tests in `tests/test_discipline_truncation.py`
+**Which article:** P06 positive control; P07 next reuse case.
 
-**Evidence from production session log
-(`/opt/kairoskopion/logs/llm_sessions/20260710_145922_api.jsonl`):**
-```
-agent_role: discipline_matcher
-output_tokens: 4096
-parse_status: text_only
-model: claude-sonnet-4-5-20250929
-latency_ms: 51770.6
-```
+**Which stage:** target-specific package closure →
+`READY_FOR_HUMAN_SUBMISSION`.
 
-### Environment documentation (commit 189d0c5)
+**What was blocked:** the existing `SubmissionPack` could report
+`ready_for_manual_submission` as a pre-artifact readiness skeleton without
+binding the exact exported artifact revision/hash, frozen/current TargetWorld
+identity, current policy evidence, semantic/privacy/render QA receipts, live
+submission route, or author-only factual gates.
 
-- `ENVIRONMENT_INVARIANTS.md`: SSH disabled, zero retry, deploy rules
-- `SESSION_HANDOFF.md`: durable session state record
-- `CLAUDE.md`: updated deploy section
-- Deploy runbook: SSH section updated to disabled status
+**What now exists in canonical code:**
 
-### Prior session: BLOCKERs A-D (deployed as commit 1fc7c0a)
+- fail-closed submission finalization manifest;
+- deterministic digest and idempotent durable manifest store;
+- exact upstream `submission_pack_id` lineage bound into the digest;
+- exact manuscript/artifact revision or SHA binding;
+- current TargetWorld catalog promotion binding while frozen package bytes stay
+  immutable;
+- only `PROD_ACCEPTED` / `PROD_OBSERVED` TargetWorld status can finalize;
+- `QUALIFIED_DEV`, `PROVIDER_OBSERVED`, `STAGING`, `PROVISIONAL` fail closed;
+- default required QA:
+  - `SEMANTIC_QA`
+  - `PRIVACY_SCRUB`
+  - `VISUAL_RENDER`
+- live route gate;
+- author-field gate;
+- authenticated provider finalize/readback endpoints;
+- legacy `ready_for_manual_submission` remains backward compatible but now
+  carries:
+  - `is_final_submission_package=false`
+  - `requires_finalization_gate=true`
+  - pointer to `/kairon/provider/submission-packages/finalize`
+- physical final submission remains human-only.
 
-- A: Discipline LLM wiring (registry-first shortcircuit removed)
-- B: Genre/method rerun endpoint + UI
-- C: Finalization endpoint
-- D: Agent map integrity tests
+### Git evidence
 
-## What is NOT done (pending deployment)
+- PR #11: `fix(kairon): fail-closed publication package finalization`
+- Exact pre-merge branch head:
+  `585348ccfdbbffd2c1bd2a55973c90f12a93abff`
+- Merge commit:
+  `c1f00e984c3f86105250c294f13644b508310945`
+- Branch CI: Python 3.11 / 3.12 / 3.13 — full pytest + CLI smoke PASS.
+- Post-merge main CI run `37397699250`: Python 3.11 / 3.12 / 3.13 —
+  full pytest + CLI smoke PASS.
 
-1. **Production deployment of BLOCKER E fix** — code is on origin/main
-   but not deployed. Blocked on SSH access.
+## Current production boundary
 
-2. **Production acceptance (12-step protocol):**
-   - Step 1 PASS: deployed commit verified (1fc7c0a)
-   - Step 2 PARTIAL: case created, text submitted, article model built via LLM
-   - Step 3 PASS: ArticleModel used LLM (claude-sonnet-4-5, parsed_ok, no fallback)
-   - Step 4 FAIL: discipline LLM truncated (4096 ceiling), keyword fallback only
-   - Steps 5-12: blocked on deployment of BLOCKER E fix
+The last directly verified production census on 2026-09-30 found
+`/opt/kairoskopion/app` aligned to
+`91a35cc5434d2a34e7027abfbe8abcab759c43fc`, with uvicorn on port 8088 and
+the public vhost active.
 
-3. **Genre/method resolution** — `genre=unknown`, `method=unknown` on test case.
-   Rerun endpoint exists but needs production test after discipline fix.
+The current ChatGPT web fetch surface cannot access the basic-auth-protected
+`/health` or `/openapi.json`, so no newer production HEAD or route presence
+has been proven in this scene.
 
-4. **Finalization persistence** — not yet tested on production.
+Therefore the authoritative current distinction is:
 
-## Gate results
+- **Git / canonical code:** MAIN_MERGED + MAIN_CI_PASS.
+- **Production runtime:** last verified older HEAD; new package-finalization
+  endpoint **not proven live**.
+- **Deploy blocker:** no authorized non-SSH actuator.
 
-| Gate | Result |
-|------|--------|
-| pytest | 3299 passed, 8 deselected |
-| Focused discipline tests | 16 passed |
-| Focused blocker regression | 29 passed |
-| TypeScript | clean (noEmit) |
-| Vite build | clean |
-| SSH attempts | 0 |
+## What is NOT blocked anymore
 
-## Commits in this session
+Do not reopen these as the first publication-front blocker:
 
-| Commit | Description |
-|--------|-------------|
-| `75a549b` | fix: increase discipline matcher max_tokens 4096→8192 |
-| `2f928b0` | fix: detect output truncation in discipline matcher |
-| `189d0c5` | docs: environment invariants, SSH disabled, session handoff |
-| `6c21124` | merge: discipline output truncation fix and environment invariants |
+1. Kairon batch qualification exists in main.
+2. Durable per-cell receipts exist.
+3. Batch interruption/recovery primitives exist:
+   `claim_cells()` + `recover_inflight()`.
+4. Shared immutable TargetWorld exchange catalog exists in main.
+5. TRM-062 code-side acceptance is complete.
 
-## Next steps (for next session)
+A fully autonomous cross-run scheduler remains a separate open concern, but is
+not the first blocker for P06/P07 package closure.
 
-1. Deploy commit `6c21124` to production (requires SSH or alternative contour)
-2. Create fresh disposable production case
-3. Verify discipline LLM returns 10 candidates with full rationales
-4. Test genre/method rerun on fresh case and existing UNKNOWN case
-5. Test finalization persistence (click, refresh, navigate, verify)
-6. Write `PROD_SEMANTIC_ANALYSIS_FINALIZATION_ACCEPTANCE.md`
-7. Return final RESULT
+## Next mechanical action
+
+When an authorized non-SSH actuator is available:
+
+1. Deploy current `main` containing runtime-code merge
+   `c1f00e984c3f86105250c294f13644b508310945`.
+2. Read back production git HEAD.
+3. Verify local/public health.
+4. Verify OpenAPI contains:
+   - `POST /kairon/provider/submission-packages/finalize`
+   - `GET /kairon/provider/submission-packages/{manifest_id}`
+5. Exercise a blocked smoke: incomplete QA must return `BLOCKED`.
+6. Exercise a P06-equivalent complete manifest and GET readback.
+7. Verify repeat finalization is idempotent.
+8. Record a central HEAD SYNC `RUNTIME_CHANGE`.
+9. Reuse the same production gate for P07.
+
+## Do not do
+
+- do not attempt SSH;
+- do not build a new scheduler before this runtime deploy/readback is closed;
+- do not claim production from Git merge alone;
+- do not auto-submit to a journal;
+- do not let `ready_for_manual_submission` bypass the finalization gate.
