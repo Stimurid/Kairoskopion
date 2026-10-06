@@ -2,8 +2,8 @@
 
 **Last updated:** 2026-10-06T04:41+03:00
 **Branch:** `main`
-**Current main HEAD:** `78b8a4bd9ad71f9a9814a146a8ae029e7433a73b` (docs-state only)
 **Production runtime code HEAD:** `c1f00e984c3f86105250c294f13644b508310945`
+**Git-main currentness rule:** read the live branch ref from Git; do not embed a self-referential current-main SHA in this file because updating the file advances main.
 **Production domain:** `kairoskop.mindkampf.ru`
 
 ---
