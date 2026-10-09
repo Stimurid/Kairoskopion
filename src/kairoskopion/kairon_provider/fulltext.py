@@ -40,6 +40,19 @@ def acquire_manifest_fulltexts(
     for artifact in manifest.artifacts:
         if attempted >= max_files:
             break
+
+        # Reuse already-proven local full text. A validated artifact with a
+        # durable local file and content hash is terminal for this acquisition
+        # pass; reacquiring it wastes the bounded budget and can overwrite
+        # evidence used by a frozen/descendant TargetWorld lineage.
+        if (
+            artifact.acquisition_state == "validated_artifact"
+            and artifact.local_ref
+            and artifact.content_hash
+            and Path(artifact.local_ref).is_file()
+        ):
+            continue
+
         url = _locator(artifact.notes)
         if not url:
             continue

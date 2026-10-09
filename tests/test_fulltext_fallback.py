@@ -52,6 +52,56 @@ def test_fallback_eligibility_is_access_block_specific():
     )
 
 
+def test_validated_local_artifact_is_reused_without_network_or_budget(tmp_path, monkeypatch):
+    local = tmp_path / "already-validated.pdf"
+    local.write_bytes(b"%PDF-1.4\nvalidated\n")
+    reused = CorpusArtifact(
+        source_ref="W-LOCAL",
+        title="Already validated",
+        doi="10.1234/already.validated",
+        acquisition_state="validated_artifact",
+        local_ref=str(local),
+        content_hash="a" * 64,
+        notes=["fulltext_locator:https://publisher.example/already.pdf"],
+    )
+    pending = _artifact()
+    manifest = CorpusArtifactManifest(
+        target_id="philosophy_technology",
+        selection_strategy="recent_articles",
+        artifacts=[reused, pending],
+    )
+
+    calls = []
+
+    def acquire(url, **kwargs):
+        calls.append(url)
+        return {
+            "status": "validated",
+            "url": url,
+            "path": str(tmp_path / "new.pdf"),
+            "sha256": "b" * 64,
+            "size_bytes": 1024,
+            "validation": {"reason": "pdf_shape_ok"},
+        }
+
+    monkeypatch.setattr(
+        "kairoskopion.kairon_provider.fulltext.acquire_explicit_fulltext",
+        acquire,
+    )
+    result = acquire_manifest_fulltexts(
+        manifest,
+        output_dir=tmp_path / "artifacts",
+        max_files=1,
+    )
+
+    assert calls == ["https://publisher.example/article.pdf"]
+    assert result["attempted"] == 1
+    assert result["validated"] == 1
+    assert reused.local_ref == str(local)
+    assert reused.content_hash == "a" * 64
+    assert reused.acquisition_state == "validated_artifact"
+
+
 def test_direct_success_does_not_emit_fallback_request(tmp_path):
     manifest = _manifest()
     url = "https://publisher.example/article.pdf"
