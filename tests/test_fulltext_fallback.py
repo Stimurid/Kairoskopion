@@ -5,6 +5,9 @@ from pathlib import Path
 import pytest
 
 from kairoskopion.kairon_provider.fulltext import acquire_manifest_fulltexts
+from kairoskopion.kairon_provider.fulltext_models import (
+    extract_fulltext_article_models,
+)
 from kairoskopion.kairon_provider.fulltext_fallback import (
     FulltextFallbackStore,
     FulltextEvidenceReturn,
@@ -37,8 +40,16 @@ def _manifest() -> CorpusArtifactManifest:
 def test_fallback_eligibility_is_access_block_specific():
     assert is_fallback_eligible_direct_error({"error_code": "http_403"})
     assert is_fallback_eligible_direct_error({"error_code": "http_401"})
+    assert is_fallback_eligible_direct_error(
+        {"error_code": "html_interstitial_or_challenge"}
+    )
+    assert is_fallback_eligible_direct_error(
+        {"error_code": "html_too_small_for_fulltext"}
+    )
     assert not is_fallback_eligible_direct_error({"error_code": "network_error"})
-    assert not is_fallback_eligible_direct_error({"error_code": "download_size_over_limit"})
+    assert not is_fallback_eligible_direct_error(
+        {"error_code": "download_size_over_limit"}
+    )
 
 
 def test_direct_success_does_not_emit_fallback_request(tmp_path):
@@ -56,6 +67,42 @@ def test_direct_success_does_not_emit_fallback_request(tmp_path):
     assert result["fallback_requests"] == []
     assert store.list_requests() == []
     assert manifest.artifacts[0].acquisition_state == "validated_artifact"
+
+
+def test_http_200_challenge_emits_fallback_and_is_not_modeled(tmp_path):
+    manifest = _manifest()
+    url = "https://publisher.example/article.pdf"
+    store = FulltextFallbackStore(tmp_path)
+    challenge = (
+        b"<!doctype html><html><head><title>Just a moment...</title></head>"
+        b"<body>Please verify you are human."
+        + (b"x" * 6000)
+        + b"</body></html>"
+    )
+    result = acquire_manifest_fulltexts(
+        manifest,
+        output_dir=tmp_path / "artifacts",
+        fixtures={url: (challenge, "text/html; charset=utf-8")},
+        fallback_store=store,
+        target_snapshot_id="tw:techne:challenge",
+        fallback_provenance_refs=["TRM-070", "HS-016"],
+    )
+
+    assert result["acquired"] == 1
+    assert result["validated"] == 0
+    assert result["complete"] is False
+    assert len(result["fallback_requests"]) == 1
+    assert (
+        result["errors"][0]["error_code"]
+        == "html_interstitial_or_challenge"
+    )
+    artifact = manifest.artifacts[0]
+    assert artifact.acquisition_state == "fallback_requested"
+    assert artifact.local_ref is not None
+
+    modeled = extract_fulltext_article_models(manifest)
+    assert modeled["modeled"] == 0
+    assert modeled["failures"][0]["status"] == "unvalidated_artifact"
 
 
 def test_direct_403_emits_durable_idempotent_fallback_request(tmp_path, monkeypatch):
