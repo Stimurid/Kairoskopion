@@ -49,47 +49,69 @@ jobs:
               "10.1007/s13347-025-00962-w",
               "10.1007/s13347-026-01108-2",
           ]
+
+          def inspect(url, root, source_id):
+              result = acquire_explicit_fulltext(url, output_dir=root)
+              row = {
+                  "url": url,
+                  "fetch_status": result.get("status"),
+                  "content_type": result.get("content_type"),
+                  "transport_sha256": result.get("sha256"),
+                  "size_bytes": result.get("size_bytes"),
+                  "error": result.get("error"),
+              }
+              path = result.get("path")
+              if path:
+                  snapshot, text = register_local_source(
+                      Path(path),
+                      role=SourceRole.PUBLISHED_ARTICLE,
+                      source_id=source_id,
+                  )
+                  chars = len(text or "")
+                  row.update({
+                      "extraction_status": snapshot.extraction_status,
+                      "content_hash": snapshot.content_hash,
+                      "text_chars": chars,
+                      "substantive_body": (
+                          snapshot.extraction_status == "extracted"
+                          and chars >= 5000
+                          and chars <= 80000
+                      ),
+                      "extraction_errors": snapshot.extraction_errors or [],
+                  })
+              return row
+
           rows = []
           with tempfile.TemporaryDirectory() as td:
               root = Path(td)
               for doi in dois:
-                  url = f"https://link.springer.com/article/{doi}"
-                  result = acquire_explicit_fulltext(url, output_dir=root)
-                  row = {
+                  landing = inspect(
+                      f"https://link.springer.com/article/{doi}",
+                      root,
+                      f"doi:{doi}:landing",
+                  )
+                  pdf = inspect(
+                      f"https://link.springer.com/content/pdf/{doi}.pdf",
+                      root,
+                      f"doi:{doi}:pdf",
+                  )
+                  candidates = [r for r in (pdf, landing) if r.get("substantive_body")]
+                  chosen = max(candidates, key=lambda x: x.get("text_chars") or 0) if candidates else None
+                  rows.append({
                       "doi": doi,
-                      "url": url,
-                      "fetch_status": result.get("status"),
-                      "content_type": result.get("content_type"),
-                      "sha256": result.get("sha256"),
-                      "size_bytes": result.get("size_bytes"),
-                      "error": result.get("error"),
-                  }
-                  path = result.get("path")
-                  if path:
-                      snapshot, text = register_local_source(
-                          Path(path),
-                          role=SourceRole.PUBLISHED_ARTICLE,
-                          source_id=f"doi:{doi}",
-                      )
-                      row.update({
-                          "extraction_status": snapshot.extraction_status,
-                          "content_hash": snapshot.content_hash,
-                          "text_chars": len(text or ""),
-                          "deep_complete_pass_eligible": (
-                              snapshot.extraction_status == "extracted"
-                              and bool(text)
-                              and len(text) <= 80000
-                          ),
-                          "extraction_errors": snapshot.extraction_errors or [],
-                      })
-                  rows.append(row)
+                      "landing": landing,
+                      "pdf": pdf,
+                      "selected": chosen,
+                  })
 
+          selected = [r["selected"] for r in rows if r.get("selected")]
+          hashes = [r.get("content_hash") for r in selected if r.get("content_hash")]
           summary = {
-              "schema_version": "trm071-pnt-corpus-preflight-v1",
+              "schema_version": "trm071-pnt-corpus-preflight-v2",
               "requested": len(rows),
-              "fetch_validated": sum(r.get("fetch_status") == "validated" for r in rows),
-              "extracted": sum(r.get("extraction_status") == "extracted" for r in rows),
-              "deep_complete_pass_eligible": sum(bool(r.get("deep_complete_pass_eligible")) for r in rows),
+              "substantive_bodies": len(selected),
+              "unique_content_hashes": len(set(hashes)),
+              "duplicate_hashes": len(hashes) - len(set(hashes)),
               "rows": rows,
           }
           out = Path("/tmp/trm071-pnt-preflight")
@@ -100,16 +122,19 @@ jobs:
           )
           print(json.dumps({
               k: summary[k]
-              for k in ("requested", "fetch_validated", "extracted", "deep_complete_pass_eligible")
+              for k in ("requested", "substantive_bodies", "unique_content_hashes", "duplicate_hashes")
           }))
-          if summary["deep_complete_pass_eligible"] < 8:
-              raise SystemExit("fewer than seed-profile minimum 8 bodies are complete-pass eligible")
+          if summary["substantive_bodies"] < 8:
+              raise SystemExit("fewer than seed-profile minimum 8 substantive bodies")
+          if summary["unique_content_hashes"] < 8:
+              raise SystemExit("fewer than seed-profile minimum 8 unique bodies")
           PY
 
       - name: Upload metadata-only receipt
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: trm071-pnt-corpus-preflight
           path: /tmp/trm071-pnt-preflight/receipt.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
