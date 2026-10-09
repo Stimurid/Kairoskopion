@@ -1,0 +1,126 @@
+name: TRM071 one-shot production deploy
+
+on:
+  push:
+    branches:
+      - ops/trm071-prod-deploy-20261009
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
+    steps:
+      - name: Guard actuator and deploy exact main
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="0f36134dd61e6736f8ae8777b61853fcebf4752d"
+          APP="/opt/kairoskopion/app"
+          test "${RUNNER_NAME:-}" = "moderbober-prod-01-tinkuy"
+          test -d "$APP/.git"
+          cd "$APP"
+
+          git fetch origin main
+          REMOTE="$(git rev-parse origin/main)"
+          test "$REMOTE" = "$TARGET"
+
+          BEFORE="$(git rev-parse HEAD)"
+          test -z "$(git status --porcelain)"
+          git merge-base --is-ancestor "$BEFORE" "$TARGET"
+
+          ROLLBACK="rollback/trm071-${GITHUB_RUN_ID}"
+          git branch "$ROLLBACK" "$BEFORE"
+
+          git switch main
+          git merge --ff-only origin/main
+          AFTER="$(git rev-parse HEAD)"
+          test "$AFTER" = "$TARGET"
+
+          {
+            echo "TARGET=$TARGET"
+            echo "BEFORE=$BEFORE"
+            echo "AFTER=$AFTER"
+            echo "ROLLBACK=$ROLLBACK"
+          } >> "$GITHUB_ENV"
+
+      - name: Install backend and run TRM071 regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /opt/kairoskopion/app
+          source .venv/bin/activate
+          python -m pip install -e '.[api]'
+          python -m pytest -q             tests/test_deep_target_models.py             tests/test_kairon_provider_contract.py
+
+      - name: Restart service and verify runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /opt/kairoskopion/app
+          sudo systemctl restart kairoskopion-api
+
+          HEALTH=""
+          for i in $(seq 1 30); do
+            if HEALTH="$(curl -fsS http://127.0.0.1:8088/health 2>/dev/null)"; then
+              break
+            fi
+            sleep 1
+          done
+          test -n "$HEALTH"
+
+          source .venv/bin/activate
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          with urllib.request.urlopen("http://127.0.0.1:8088/openapi.json", timeout=10) as r:
+              spec = json.load(r)
+          paths = set(spec.get("paths", {}))
+          required = {
+              "/kairon/provider/target-world/{snapshot_id}/deep-model",
+              "/kairon/provider/target-world/{snapshot_id}/simulate-article",
+              "/kairon/provider/submission-packages/finalize",
+          }
+          missing = sorted(required - paths)
+          if missing:
+              raise SystemExit(f"missing live routes: {missing}")
+          print("OPENAPI_ROUTE_SMOKE=PASS")
+          PY
+
+          LIVE_HEAD="$(git rev-parse HEAD)"
+          test "$LIVE_HEAD" = "$TARGET"
+          echo "LIVE_HEAD=$LIVE_HEAD" >> "$GITHUB_ENV"
+          printf '%s' "$HEALTH" > "$RUNNER_TEMP/kairoskopion-health.json"
+
+      - name: Write deployment receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/trm071-deploy-receipt"
+          cat > "$RUNNER_TEMP/trm071-deploy-receipt/receipt.txt" <<EOF
+          requested_sha=$TARGET
+          runner=${RUNNER_NAME}
+          before_sha=$BEFORE
+          after_sha=$AFTER
+          live_head=$LIVE_HEAD
+          rollback_ref=$ROLLBACK
+          targeted_tests=PASS
+          service_restart=PASS
+          health=PASS
+          openapi_deep_model=PASS
+          openapi_simulate_article=PASS
+          openapi_finalization=PASS
+          run_id=${GITHUB_RUN_ID}
+          EOF
+          cp "$RUNNER_TEMP/kairoskopion-health.json"             "$RUNNER_TEMP/trm071-deploy-receipt/health.json"
+
+      - name: Upload deployment receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: trm071-production-deploy-receipt
+          path: ${{ runner.temp }}/trm071-deploy-receipt
+          if-no-files-found: error
+          retention-days: 30
