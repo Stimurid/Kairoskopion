@@ -237,9 +237,9 @@ def test_unvalidated_local_bytes_never_enter_semantic_model(tmp_path):
 
 
 def test_short_extracted_body_is_not_counted_as_fulltext(tmp_path):
-    article = tmp_path / "challenge.html"
+    article = tmp_path / "short-validated.txt"
     article.write_text(
-        "<html><body>" + ("verify browser " * 20) + "</body></html>",
+        "short but transport-validated body " * 20,
         encoding="utf-8",
     )
     manifest = CorpusArtifactManifest(
@@ -247,9 +247,9 @@ def test_short_extracted_body_is_not_counted_as_fulltext(tmp_path):
         selection_strategy="fixture",
         artifacts=[
             CorpusArtifact(
-                source_ref="src:challenge",
+                source_ref="src:short-validated",
                 local_ref=str(article),
-                acquisition_state="acquired_unvalidated",
+                acquisition_state="validated_artifact",
             )
         ],
     )
