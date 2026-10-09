@@ -43,6 +43,8 @@ ACQUISITION_GOALS = {
 FALLBACK_ELIGIBLE_ERROR_CODES = {
     "http_401",
     "http_403",
+    "html_interstitial_or_challenge",
+    "html_too_small_for_fulltext",
 }
 
 
