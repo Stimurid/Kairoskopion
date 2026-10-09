@@ -1,0 +1,301 @@
+name: TRM070 TRM071 one-shot production deploy
+
+on:
+  push:
+    branches:
+      - ops/trm070-trm071-prod-deploy-20261009
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 35
+    steps:
+      - name: Guard actuator and fast-forward exact main
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="1534e3ec7911c8093197ab7cc40a64c06a7dbb85"
+          APP="/opt/kairoskopion/app"
+          test "${RUNNER_NAME:-}" = "moderbober-prod-01-tinkuy"
+          test -d "$APP/.git"
+          cd "$APP"
+
+          git fetch origin main
+          REMOTE="$(git rev-parse origin/main)"
+          test "$REMOTE" = "$TARGET"
+
+          BEFORE="$(git rev-parse HEAD)"
+          test -z "$(git status --porcelain)"
+          git merge-base --is-ancestor "$BEFORE" "$TARGET"
+
+          ROLLBACK="rollback/trm070-trm071-${GITHUB_RUN_ID}"
+          if ! git show-ref --verify --quiet "refs/heads/$ROLLBACK"; then
+            git branch "$ROLLBACK" "$BEFORE"
+          fi
+
+          git switch main
+          git merge --ff-only origin/main
+          AFTER="$(git rev-parse HEAD)"
+          test "$AFTER" = "$TARGET"
+
+          {
+            echo "TARGET=$TARGET"
+            echo "BEFORE=$BEFORE"
+            echo "AFTER=$AFTER"
+            echo "ROLLBACK=$ROLLBACK"
+          } >> "$GITHUB_ENV"
+
+      - name: Install and run publication-front regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /opt/kairoskopion/app
+          source .venv/bin/activate
+          python -m pip install -e '.[api]'
+          python -m pytest -q             tests/test_deep_target_models.py             tests/test_fulltext_fetch.py             tests/test_fulltext_fallback.py             tests/test_submission_gate.py             tests/test_kairon_provider_contract.py
+
+      - name: Restart and smoke live routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /opt/kairoskopion/app
+          sudo systemctl restart kairoskopion-api
+
+          HEALTH=""
+          for i in $(seq 1 30); do
+            if HEALTH="$(curl -fsS http://127.0.0.1:8088/health 2>/dev/null)"; then
+              break
+            fi
+            sleep 1
+          done
+          test -n "$HEALTH"
+
+          source .venv/bin/activate
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          with urllib.request.urlopen(
+              "http://127.0.0.1:8088/openapi.json", timeout=10
+          ) as response:
+              spec = json.load(response)
+
+          paths = set(spec.get("paths", {}))
+          required = {
+              "/kairon/provider/target-world/{snapshot_id}/deep-model",
+              "/kairon/provider/target-world/{snapshot_id}/simulate-article",
+              "/kairon/provider/target-world/{snapshot_id}/acquire-fulltext",
+              "/kairon/provider/fulltext-fallback/requests",
+              "/kairon/provider/fulltext-fallback/requests/{request_id}",
+              "/kairon/provider/fulltext-fallback/requests/{request_id}/return",
+              "/kairon/provider/submission-packages/finalize",
+          }
+          missing = sorted(required - paths)
+          if missing:
+              raise SystemExit(f"missing live routes: {missing}")
+          print("OPENAPI_PUBLICATION_SPINE_SMOKE=PASS")
+          PY
+
+          LIVE_HEAD="$(git rev-parse HEAD)"
+          test "$LIVE_HEAD" = "$TARGET"
+          echo "LIVE_HEAD=$LIVE_HEAD" >> "$GITHUB_ENV"
+
+          mkdir -p "$RUNNER_TEMP/trm070-trm071-deploy-receipt"
+          printf '%s' "$HEALTH" >             "$RUNNER_TEMP/trm070-trm071-deploy-receipt/health.json"
+
+      - name: Inventory historical PnT validated corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /opt/kairoskopion/app
+          source .venv/bin/activate
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          from dotenv import dotenv_values
+          from kairoskopion.adapters.source_intake import (
+              SourceRole,
+              register_local_source,
+          )
+          from kairoskopion.kairon_provider.storage import TargetWorldStore
+
+          app = Path("/opt/kairoskopion/app")
+          cfg = dotenv_values("/opt/kairoskopion/secrets/kairoskopion.env")
+          root = Path(cfg.get("KAIROSKOPION_DATA_DIR") or ".kairoskopion")
+          if not root.is_absolute():
+              root = app / root
+
+          snapshot_id = "targetworld:philosophy_technology:4a125cd4f313"
+          store = TargetWorldStore(root)
+          data = store.get(snapshot_id)
+          receipt = {
+              "schema_version": "trm071-pnt-prod-inventory-v1",
+              "snapshot_id": snapshot_id,
+              "snapshot_exists": bool(data),
+              "artifacts": [],
+          }
+
+          if data:
+              manifest = data.get("corpus_manifest") or {}
+              rows = []
+              substantive_hashes = set()
+              validated_count = 0
+              for raw in manifest.get("artifacts") or []:
+                  state = str(raw.get("acquisition_state") or "")
+                  local_ref = raw.get("local_ref")
+                  path = Path(local_ref) if local_ref else None
+                  if path and not path.is_absolute():
+                      path = app / path
+                  exists = bool(path and path.is_file())
+                  row = {
+                      "source_ref": raw.get("source_ref"),
+                      "doi": raw.get("doi"),
+                      "acquisition_state": state,
+                      "local_exists": exists,
+                      "declared_content_hash": raw.get("content_hash"),
+                  }
+                  if state == "validated_artifact":
+                      validated_count += 1
+                  if exists:
+                      try:
+                          data_bytes = path.read_bytes()
+                          sha256 = hashlib.sha256(data_bytes).hexdigest()
+                          row["byte_size"] = len(data_bytes)
+                          row["sha256"] = sha256
+                          snapshot, text = register_local_source(
+                              path,
+                              role=SourceRole.PUBLISHED_ARTICLE,
+                              source_id=str(raw.get("source_ref") or sha256),
+                          )
+                          chars = len(text or "")
+                          row["extraction_status"] = snapshot.extraction_status
+                          row["text_chars"] = chars
+                          substantive = (
+                              state == "validated_artifact"
+                              and snapshot.extraction_status == "extracted"
+                              and 5000 <= chars <= 80000
+                          )
+                          row["substantive_validated_body"] = substantive
+                          if substantive:
+                              substantive_hashes.add(sha256)
+                      except Exception as exc:
+                          row["inventory_error"] = type(exc).__name__
+                  rows.append(row)
+
+              editors = list(data.get("editor_profiles") or [])
+              evidence_editors = 0
+              for editor in editors:
+                  if not isinstance(editor, dict):
+                      continue
+                  refs = (
+                      editor.get("evidence_refs")
+                      or editor.get("source_refs")
+                      or editor.get("sources")
+                      or []
+                  )
+                  scholarly = any(
+                      editor.get(key)
+                      for key in (
+                          "research_topics",
+                          "topics",
+                          "traditions",
+                          "key_works",
+                          "publications",
+                          "scholarly_profile",
+                      )
+                  )
+                  if refs and scholarly:
+                      evidence_editors += 1
+
+              receipt.update({
+                  "corpus_artifact_count": len(rows),
+                  "validated_artifact_count": validated_count,
+                  "substantive_unique_body_count": len(substantive_hashes),
+                  "editor_profile_count": len(editors),
+                  "editor_profiles_with_scholarly_evidence": evidence_editors,
+                  "artifacts": rows,
+              })
+
+          out = Path(
+              "/tmp/trm070-trm071-deploy-receipt/"
+              "pnt-historical-inventory.json"
+          )
+          out.parent.mkdir(parents=True, exist_ok=True)
+          out.write_text(
+              json.dumps(receipt, ensure_ascii=False, indent=2),
+              encoding="utf-8",
+          )
+          print(json.dumps({
+              "snapshot_exists": receipt.get("snapshot_exists"),
+              "validated_artifact_count": receipt.get(
+                  "validated_artifact_count", 0
+              ),
+              "substantive_unique_body_count": receipt.get(
+                  "substantive_unique_body_count", 0
+              ),
+              "editor_profiles_with_scholarly_evidence": receipt.get(
+                  "editor_profiles_with_scholarly_evidence", 0
+              ),
+          }))
+          PY
+
+      - name: Write deployment receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/trm070-trm071-deploy-receipt"
+          cat > "$RUNNER_TEMP/trm070-trm071-deploy-receipt/receipt.txt" <<EOF
+          requested_sha=$TARGET
+          runner=${RUNNER_NAME}
+          before_sha=$BEFORE
+          after_sha=$AFTER
+          live_head=$LIVE_HEAD
+          rollback_ref=$ROLLBACK
+          targeted_tests=PASS
+          service_restart=PASS
+          health=PASS
+          deep_model_route=PASS
+          simulate_article_route=PASS
+          acquire_fulltext_route=PASS
+          fulltext_fallback_routes=PASS
+          finalization_route=PASS
+          run_id=${GITHUB_RUN_ID}
+          EOF
+
+      - name: Roll back local production checkout on failure
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${BEFORE:-}" ]; then
+            echo "No production mutation occurred before failure."
+            exit 0
+          fi
+          cd /opt/kairoskopion/app
+          git switch main
+          git reset --hard "$BEFORE"
+          source .venv/bin/activate
+          python -m pip install -e '.[api]'
+          sudo systemctl restart kairoskopion-api
+          curl -fsS http://127.0.0.1:8088/health >/dev/null
+          mkdir -p "$RUNNER_TEMP/trm070-trm071-deploy-receipt"
+          cat > "$RUNNER_TEMP/trm070-trm071-deploy-receipt/rollback.txt" <<EOF
+          rollback=PASS
+          restored_sha=$BEFORE
+          failed_target=${TARGET:-unknown}
+          run_id=${GITHUB_RUN_ID}
+          EOF
+
+      - name: Upload deployment receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trm070-trm071-production-deploy-receipt
+          path: ${{ runner.temp }}/trm070-trm071-deploy-receipt
+          if-no-files-found: warn
+          retention-days: 30
