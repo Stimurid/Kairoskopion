@@ -21,6 +21,20 @@ DEFAULT_UA = (
     "(https://github.com/Stimurid/Kairoskopion; mailto:kairoskopion@proton.me)"
 )
 
+# This adapter is explicitly for article full text, not arbitrary HTML pages.
+# Publisher bot/interstitial pages are commonly small, syntactically valid
+# HTML and must never be promoted to validated full-text artifacts.
+MIN_HTML_FULLTEXT_BYTES = 5_000
+_HTML_INTERSTITIAL_MARKERS = (
+    b"just a moment",
+    b"enable javascript and cookies",
+    b"verify you are human",
+    b"checking your browser",
+    b"captcha",
+    b"cf-chl-",
+    b"access denied",
+)
+
 
 def _public_http_target(url: str) -> tuple[bool, str | None]:
     parsed = urllib.parse.urlparse(url)
@@ -65,10 +79,21 @@ def validate_download(path: Path, content_type: str | None = None) -> dict[str, 
             "valid": data.startswith(b"%PDF"),
             "reason": "pdf_magic_ok" if data.startswith(b"%PDF") else "pdf_magic_missing",
         }
-    if path.suffix.lower() in (".html", ".htm") or "text/html" in ct:
-        prefix = data[:2048].lower()
-        ok = b"<html" in prefix or b"<!doctype html" in prefix
-        return {"valid": ok, "reason": "html_shape_ok" if ok else "html_shape_uncertain"}
+    if (
+        path.suffix.lower() in (".html", ".htm")
+        or "text/html" in ct
+        or "application/xhtml+xml" in ct
+    ):
+        probe = data[:16_384].lower()
+        if any(marker in probe for marker in _HTML_INTERSTITIAL_MARKERS):
+            return {"valid": False, "reason": "html_interstitial_or_challenge"}
+        if len(data) < MIN_HTML_FULLTEXT_BYTES:
+            return {"valid": False, "reason": "html_too_small_for_fulltext"}
+        ok = b"<html" in probe or b"<!doctype html" in probe
+        return {
+            "valid": ok,
+            "reason": "html_shape_ok" if ok else "html_shape_uncertain",
+        }
     return {"valid": True, "reason": "nonempty_transport_artifact"}
 
 

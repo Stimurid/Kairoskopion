@@ -43,6 +43,7 @@ from .fulltext_models import model_article_text
 from .models import CorpusArtifactManifest
 
 DEFAULT_MAX_ARTICLE_CHARS = 80_000
+DEFAULT_MIN_ARTICLE_CHARS = 5_000
 DEFAULT_MIN_DEEP_FULLTEXTS = 10
 
 
@@ -75,6 +76,15 @@ def max_article_chars() -> int:
     except ValueError:
         value = DEFAULT_MAX_ARTICLE_CHARS
     return max(10_000, value)
+
+
+def min_article_chars() -> int:
+    raw = os.environ.get("KAIROSKOPION_DEEP_MODEL_MIN_ARTICLE_CHARS", "")
+    try:
+        value = int(raw) if raw else DEFAULT_MIN_ARTICLE_CHARS
+    except ValueError:
+        value = DEFAULT_MIN_ARTICLE_CHARS
+    return max(1_000, value)
 
 
 def _parsed_dict(outcome: Any) -> dict[str, Any] | None:
@@ -176,6 +186,7 @@ def build_published_article_patterns(
     provider: Any | None = None,
     max_articles: int = 20,
     max_chars: int | None = None,
+    min_chars: int | None = None,
 ) -> dict[str, Any]:
     """Read complete acquired bodies and create semantic article cards.
 
@@ -184,10 +195,12 @@ def build_published_article_patterns(
     """
     provider = provider or configured_provider("published_article_pattern_miner")
     limit = max_chars if max_chars is not None else max_article_chars()
+    floor = min_chars if min_chars is not None else min_article_chars()
     patterns: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
     attempted = 0
     complete_seen = 0
+    seen_content_hashes: set[str] = set()
 
     if provider is None:
         return {
@@ -220,12 +233,43 @@ def build_published_article_patterns(
                 "detail": "; ".join(snapshot.extraction_errors or []),
             })
             continue
+
+        text_chars = len(text)
+        if text_chars < floor:
+            failures.append({
+                "source_ref": artifact.source_ref,
+                "status": "body_too_short_for_fulltext",
+                "chars": text_chars,
+                "min_chars": floor,
+                "detail": (
+                    "Extracted text is too short to count as a genuinely "
+                    "read full-text article."
+                ),
+            })
+            continue
+
+        content_hash = (
+            snapshot.content_hash or artifact.content_hash or _digest(text)
+        )
+        if content_hash in seen_content_hashes:
+            failures.append({
+                "source_ref": artifact.source_ref,
+                "status": "duplicate_fulltext_content",
+                "content_hash": content_hash,
+                "detail": (
+                    "The same extracted body is already represented in this "
+                    "corpus and cannot count twice toward HS-016."
+                ),
+            })
+            continue
+        seen_content_hashes.add(content_hash)
         complete_seen += 1
-        if len(text) > limit:
+
+        if text_chars > limit:
             failures.append({
                 "source_ref": artifact.source_ref,
                 "status": "input_too_large_requires_chunking",
-                "chars": len(text),
+                "chars": text_chars,
                 "max_chars": limit,
                 "detail": "Complete text was not sent; article does not count.",
             })
@@ -266,7 +310,6 @@ def build_published_article_patterns(
             })
             continue
 
-        content_hash = snapshot.content_hash or artifact.content_hash or _digest(text)
         pattern = PublishedArticlePattern(
             published_article_pattern_id=_pattern_id(
                 content_hash, artifact.source_ref, parsed
@@ -301,6 +344,7 @@ def build_published_article_patterns(
         # timing/token diagnostics belong to execution receipts, not the card.
         pattern.pop("created_at", None)
         pattern["structural_observation"] = structural
+        pattern["source_text_chars"] = text_chars
         pattern["llm_attempt"] = _stable_attempt_diag(outcome)
         patterns.append(pattern)
 
@@ -315,7 +359,9 @@ def build_published_article_patterns(
         "attempted": attempted,
         "modeled": len(patterns),
         "complete_fulltexts_seen": complete_seen,
+        "min_article_chars": floor,
         "max_article_chars": limit,
+        "unique_content_hashes_seen": len(seen_content_hashes),
     }
 
 
@@ -348,6 +394,15 @@ def aggregate_deep_target_model(
     """Aggregate fulltext-grounded cards into restored Journal-Yuga profiles."""
     patterns = list(pattern_result.get("patterns") or [])
     corpus_id = str(pattern_result.get("published_corpus_id") or "")
+    pattern_hashes = [
+        str(p.get("content_hash") or "").strip() for p in patterns
+    ]
+    nonempty_pattern_hashes = [h for h in pattern_hashes if h]
+    unique_pattern_hashes = set(nonempty_pattern_hashes)
+    missing_pattern_hashes = len(pattern_hashes) - len(nonempty_pattern_hashes)
+    duplicate_pattern_hashes = (
+        len(nonempty_pattern_hashes) - len(unique_pattern_hashes)
+    )
     pattern_ids = {
         str(p.get("published_article_pattern_id") or "") for p in patterns
     } - {""}
@@ -530,6 +585,17 @@ def aggregate_deep_target_model(
             "pass": bool(patterns) and all(
                 p.get("semantic_status") == "llm_grounded_fulltext"
                 for p in patterns
+            ),
+        },
+        "unique_fulltext_content_hashes": {
+            "required": int(min_fulltexts),
+            "actual": len(unique_pattern_hashes),
+            "missing_hashes": missing_pattern_hashes,
+            "duplicate_hashes": duplicate_pattern_hashes,
+            "pass": (
+                len(unique_pattern_hashes) >= int(min_fulltexts)
+                and missing_pattern_hashes == 0
+                and duplicate_pattern_hashes == 0
             ),
         },
         "archetypes_2_to_6": {
