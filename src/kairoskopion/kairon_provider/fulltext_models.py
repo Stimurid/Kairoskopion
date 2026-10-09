@@ -178,6 +178,16 @@ def extract_fulltext_article_models(manifest: CorpusArtifactManifest) -> dict[st
     for artifact in manifest.artifacts:
         if not artifact.local_ref:
             continue
+        if artifact.acquisition_state != "validated_artifact":
+            failures.append({
+                "source_ref": artifact.source_ref,
+                "status": "unvalidated_artifact",
+                "detail": (
+                    "Local bytes exist but transport/content validation did "
+                    "not establish a readable full-text article."
+                ),
+            })
+            continue
         path = Path(artifact.local_ref)
         snapshot, text = register_local_source(
             path,

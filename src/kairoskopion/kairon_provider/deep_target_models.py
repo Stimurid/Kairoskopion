@@ -220,6 +220,17 @@ def build_published_article_patterns(
         if not artifact.local_ref:
             continue
         attempted += 1
+        if artifact.acquisition_state != "validated_artifact":
+            failures.append({
+                "source_ref": artifact.source_ref,
+                "status": "unvalidated_artifact",
+                "acquisition_state": artifact.acquisition_state,
+                "detail": (
+                    "Local bytes exist but are not a validated full-text "
+                    "artifact and cannot enter HS-016 semantic modeling."
+                ),
+            })
+            continue
         snapshot, text = register_local_source(
             Path(artifact.local_ref),
             role=SourceRole.PUBLISHED_ARTICLE,

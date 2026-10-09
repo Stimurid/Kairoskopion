@@ -209,10 +209,10 @@ def test_complete_text_can_become_fulltext_grounded_pattern(tmp_path):
     )
 
 
-def test_short_extracted_body_is_not_counted_as_fulltext(tmp_path):
-    article = tmp_path / "challenge.html"
+def test_unvalidated_local_bytes_never_enter_semantic_model(tmp_path):
+    article = tmp_path / "challenge-large.html"
     article.write_text(
-        "<html><body>" + ("verify browser " * 20) + "</body></html>",
+        "<html><body>" + ("challenge payload " * 500) + "</body></html>",
         encoding="utf-8",
     )
     manifest = CorpusArtifactManifest(
@@ -220,9 +220,36 @@ def test_short_extracted_body_is_not_counted_as_fulltext(tmp_path):
         selection_strategy="fixture",
         artifacts=[
             CorpusArtifact(
-                source_ref="src:challenge",
+                source_ref="src:unvalidated",
                 local_ref=str(article),
-                acquisition_state="acquired_unvalidated",
+                acquisition_state="fallback_requested",
+            )
+        ],
+    )
+    result = build_published_article_patterns(
+        target_id="venue-1",
+        manifest=manifest,
+        provider=QueueProvider([_pattern_response()]),
+    )
+    assert result["modeled"] == 0
+    assert result["failures"][0]["status"] == "unvalidated_artifact"
+    assert result["complete_fulltexts_seen"] == 0
+
+
+def test_short_extracted_body_is_not_counted_as_fulltext(tmp_path):
+    article = tmp_path / "short-validated.txt"
+    article.write_text(
+        "short but transport-validated body " * 20,
+        encoding="utf-8",
+    )
+    manifest = CorpusArtifactManifest(
+        target_id="venue-1",
+        selection_strategy="fixture",
+        artifacts=[
+            CorpusArtifact(
+                source_ref="src:short-validated",
+                local_ref=str(article),
+                acquisition_state="validated_artifact",
             )
         ],
     )
