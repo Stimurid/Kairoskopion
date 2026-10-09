@@ -1,0 +1,115 @@
+name: TRM071 PnT corpus preflight
+
+on:
+  push:
+    branches:
+      - ops/trm071-pnt-corpus-preflight-20261009
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[api]"
+
+      - name: Probe ten accepted PnT fulltext locators
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import tempfile
+          from pathlib import Path
+
+          from kairoskopion.adapters.venue.fulltext_fetch import acquire_explicit_fulltext
+          from kairoskopion.adapters.source_intake import SourceRole, register_local_source
+
+          dois = [
+              "10.1007/s13347-026-01071-y",
+              "10.1007/s13347-026-01046-z",
+              "10.1007/s13347-026-01085-6",
+              "10.1007/s13347-026-01134-0",
+              "10.1007/s13347-026-01105-5",
+              "10.1007/s13347-025-00949-7",
+              "10.1007/s13347-025-00889-2",
+              "10.1007/s13347-025-00843-2",
+              "10.1007/s13347-025-00962-w",
+              "10.1007/s13347-026-01108-2",
+          ]
+          rows = []
+          with tempfile.TemporaryDirectory() as td:
+              root = Path(td)
+              for doi in dois:
+                  url = f"https://link.springer.com/article/{doi}"
+                  result = acquire_explicit_fulltext(url, output_dir=root)
+                  row = {
+                      "doi": doi,
+                      "url": url,
+                      "fetch_status": result.get("status"),
+                      "content_type": result.get("content_type"),
+                      "sha256": result.get("sha256"),
+                      "size_bytes": result.get("size_bytes"),
+                      "error": result.get("error"),
+                  }
+                  path = result.get("path")
+                  if path:
+                      snapshot, text = register_local_source(
+                          Path(path),
+                          role=SourceRole.PUBLISHED_ARTICLE,
+                          source_id=f"doi:{doi}",
+                      )
+                      row.update({
+                          "extraction_status": snapshot.extraction_status,
+                          "content_hash": snapshot.content_hash,
+                          "text_chars": len(text or ""),
+                          "deep_complete_pass_eligible": (
+                              snapshot.extraction_status == "extracted"
+                              and bool(text)
+                              and len(text) <= 80000
+                          ),
+                          "extraction_errors": snapshot.extraction_errors or [],
+                      })
+                  rows.append(row)
+
+          summary = {
+              "schema_version": "trm071-pnt-corpus-preflight-v1",
+              "requested": len(rows),
+              "fetch_validated": sum(r.get("fetch_status") == "validated" for r in rows),
+              "extracted": sum(r.get("extraction_status") == "extracted" for r in rows),
+              "deep_complete_pass_eligible": sum(bool(r.get("deep_complete_pass_eligible")) for r in rows),
+              "rows": rows,
+          }
+          out = Path("/tmp/trm071-pnt-preflight")
+          out.mkdir(parents=True, exist_ok=True)
+          (out / "receipt.json").write_text(
+              json.dumps(summary, ensure_ascii=False, indent=2),
+              encoding="utf-8",
+          )
+          print(json.dumps({
+              k: summary[k]
+              for k in ("requested", "fetch_validated", "extracted", "deep_complete_pass_eligible")
+          }))
+          if summary["deep_complete_pass_eligible"] < 8:
+              raise SystemExit("fewer than seed-profile minimum 8 bodies are complete-pass eligible")
+          PY
+
+      - name: Upload metadata-only receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: trm071-pnt-corpus-preflight
+          path: /tmp/trm071-pnt-preflight/receipt.json
+          if-no-files-found: error
+          retention-days: 30
