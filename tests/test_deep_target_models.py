@@ -74,6 +74,7 @@ def _semantic_patterns(n):
             "published_corpus_id": "deepcorpus:test",
             "article_source_id": f"src:{i}",
             "semantic_status": "llm_grounded_fulltext",
+            "content_hash": f"content-hash-{i}",
             "argument_moves": ["problem", "claim"],
             "theory_presence": ["technology studies"],
             "citation_features": {},
@@ -175,9 +176,11 @@ def test_published_article_pattern_schema_restored():
 def test_complete_text_can_become_fulltext_grounded_pattern(tmp_path):
     article = tmp_path / "article.txt"
     article.write_text(
-        "Introduction\nThis paper argues a problem.\n"
-        "Argument\nWe distinguish two positions.\n"
-        "Conclusion\nTherefore the distinction matters.\n",
+        (
+            "Introduction\nThis paper argues a problem and locates a gap.\n"
+            "Argument\nWe distinguish two positions and answer objections.\n"
+            "Conclusion\nTherefore the distinction matters for technology.\n"
+        ) * 40,
         encoding="utf-8",
     )
     manifest = CorpusArtifactManifest(
@@ -203,6 +206,75 @@ def test_complete_text_can_become_fulltext_grounded_pattern(tmp_path):
     assert result["patterns"][0]["semantic_status"] == "llm_grounded_fulltext"
     assert result["patterns"][0]["published_corpus_id"].startswith(
         "deepcorpus:venue-1:"
+    )
+
+
+def test_short_extracted_body_is_not_counted_as_fulltext(tmp_path):
+    article = tmp_path / "challenge.html"
+    article.write_text(
+        "<html><body>" + ("verify browser " * 20) + "</body></html>",
+        encoding="utf-8",
+    )
+    manifest = CorpusArtifactManifest(
+        target_id="venue-1",
+        selection_strategy="fixture",
+        artifacts=[
+            CorpusArtifact(
+                source_ref="src:challenge",
+                local_ref=str(article),
+                acquisition_state="acquired_unvalidated",
+            )
+        ],
+    )
+    result = build_published_article_patterns(
+        target_id="venue-1",
+        manifest=manifest,
+        provider=QueueProvider([]),
+    )
+    assert result["modeled"] == 0
+    assert result["complete_fulltexts_seen"] == 0
+    assert result["failures"][0]["status"] == "body_too_short_for_fulltext"
+
+
+def test_duplicate_extracted_body_counts_once(tmp_path):
+    text = (
+        "Introduction\nA substantive conceptual article develops an argument.\n"
+        "Argument\nIt reconstructs a problem, distinguishes positions, and "
+        "answers objections with explicit scholarly reasoning.\n"
+        "Conclusion\nThe contribution is bounded and restated.\n"
+    ) * 35
+    first = tmp_path / "first.txt"
+    second = tmp_path / "second.txt"
+    first.write_text(text, encoding="utf-8")
+    second.write_text(text, encoding="utf-8")
+    manifest = CorpusArtifactManifest(
+        target_id="venue-1",
+        selection_strategy="fixture",
+        artifacts=[
+            CorpusArtifact(
+                source_ref="src:first",
+                local_ref=str(first),
+                acquisition_state="validated_artifact",
+            ),
+            CorpusArtifact(
+                source_ref="src:second",
+                local_ref=str(second),
+                acquisition_state="validated_artifact",
+            ),
+        ],
+    )
+    result = build_published_article_patterns(
+        target_id="venue-1",
+        manifest=manifest,
+        provider=QueueProvider([_pattern_response()]),
+        max_chars=20_000,
+    )
+    assert result["modeled"] == 1
+    assert result["complete_fulltexts_seen"] == 1
+    assert result["unique_content_hashes_seen"] == 1
+    assert any(
+        item["status"] == "duplicate_fulltext_content"
+        for item in result["failures"]
     )
 
 
@@ -274,6 +346,37 @@ def test_ten_fulltexts_with_two_real_archetypes_can_close_target_gate():
     assert model["deep_model_gate"]["status"] == "READY"
     assert len(model["archetypes"]) == 2
     assert model["published_article_corpus"]["corpus_size"] == 10
+
+
+def test_duplicate_pattern_hashes_fail_deep_target_gate():
+    patterns = _semantic_patterns(10)
+    patterns[-1]["content_hash"] = patterns[0]["content_hash"]
+    model = aggregate_deep_target_model(
+        target_id="venue-1",
+        pattern_result={
+            "published_corpus_id": "deepcorpus:test",
+            "patterns": patterns,
+            "failures": [],
+        },
+        selection_strategy="recent_articles",
+        bias_notes=[],
+        editor_profiles=[_meaningful_editor()],
+        provider=QueueProvider([
+            _genre_response(patterns),
+            _citation_response(patterns),
+        ]),
+        min_fulltexts=10,
+    )
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert (
+        "unique_fulltext_content_hashes"
+        in model["deep_model_gate"]["blockers"]
+    )
+    unique_gate = model["deep_model_gate"]["requirements"][
+        "unique_fulltext_content_hashes"
+    ]
+    assert unique_gate["actual"] == 9
+    assert unique_gate["duplicate_hashes"] == 1
 
 
 def test_unknown_archetype_member_fails_closed():
