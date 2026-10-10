@@ -28,6 +28,12 @@ from ..agents.prompt_families.genre_move_aggregation import (
 from ..agents.prompt_families.published_article_pattern import (
     PUBLISHED_ARTICLE_PATTERN_FAMILY,
 )
+from ..agents.prompt_families.published_article_pattern_chunk import (
+    PUBLISHED_ARTICLE_PATTERN_CHUNK_FAMILY,
+)
+from ..agents.prompt_families.published_article_pattern_reduce import (
+    PUBLISHED_ARTICLE_PATTERN_REDUCE_FAMILY,
+)
 from ..agents.prompt_families.target_citation_ecology import (
     TARGET_CITATION_ECOLOGY_FAMILY,
 )
@@ -143,13 +149,18 @@ def _stable_semantic(value: Any) -> Any:
 
 
 def _pattern_id(
-    content_hash: str, source_ref: str, semantic_output: dict[str, Any]
+    content_hash: str,
+    source_ref: str,
+    semantic_output: dict[str, Any],
+    *,
+    prompt_family_id: str | None = None,
+    prompt_version: str | None = None,
 ) -> str:
     key = {
         "content_hash": content_hash,
         "source_ref": source_ref,
-        "prompt_family": PUBLISHED_ARTICLE_PATTERN_FAMILY["family_id"],
-        "prompt_version": PUBLISHED_ARTICLE_PATTERN_FAMILY["version"],
+        "prompt_family": prompt_family_id or PUBLISHED_ARTICLE_PATTERN_FAMILY["family_id"],
+        "prompt_version": prompt_version or PUBLISHED_ARTICLE_PATTERN_FAMILY["version"],
         "semantic_output": semantic_output,
     }
     return f"papat_{_digest(key)[:16]}"
@@ -179,6 +190,229 @@ def _validate_pattern(parsed: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _validate_chunk_pattern(parsed: dict[str, Any]) -> list[str]:
+    required = (
+        "section_structure_observations", "intro_moves", "method_moves",
+        "argument_moves", "conclusion_moves", "theory_presence",
+        "empirical_presence_observations", "citation_features",
+        "novelty_moves", "evidence_anchors", "unknowns", "warnings",
+        "confidence",
+    )
+    errors = [f"missing:{key}" for key in required if key not in parsed]
+    if not isinstance(parsed.get("evidence_anchors"), list):
+        errors.append("invalid:evidence_anchors")
+    return errors
+
+
+def _split_complete_text(text: str, max_chunk_chars: int) -> list[dict[str, Any]]:
+    """Split a complete article without dropping or overlapping any characters."""
+    if max_chunk_chars < 1:
+        raise ValueError("max_chunk_chars must be positive")
+    if len(text) <= max_chunk_chars:
+        return [{"text": text, "char_start": 0, "char_end": len(text)}]
+
+    expected_parts = (len(text) + max_chunk_chars - 1) // max_chunk_chars
+    target = (len(text) + expected_parts - 1) // expected_parts
+    chunks: list[dict[str, Any]] = []
+    start = 0
+    while start < len(text):
+        remaining = len(text) - start
+        if remaining <= max_chunk_chars:
+            end = len(text)
+        else:
+            ideal = min(start + target, start + max_chunk_chars)
+            lower = min(ideal, start + max(1, target // 2))
+            cut = text.rfind("\n\n", lower, ideal + 1)
+            if cut < lower:
+                cut = text.rfind("\n", lower, ideal + 1)
+            end = cut if cut > start else ideal
+        chunks.append({"text": text[start:end], "char_start": start, "char_end": end})
+        start = end
+
+    if "".join(item["text"] for item in chunks) != text:
+        raise RuntimeError("chunk coverage invariant failed")
+    if any(len(item["text"]) > max_chunk_chars for item in chunks):
+        raise RuntimeError("chunk size invariant failed")
+    return chunks
+
+
+def _run_complete_article_semantics(
+    *,
+    provider: Any,
+    target_id: str,
+    source_ref: str,
+    title: str,
+    text: str,
+    structural: dict[str, Any],
+    max_chars: int,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Run one-pass semantics or complete-body chunk map/reduce."""
+    if len(text) <= max_chars:
+        outcome = try_llm_call_with_outcome(
+            provider,
+            PUBLISHED_ARTICLE_PATTERN_FAMILY,
+            {
+                "target_id": target_id,
+                "source_ref": source_ref,
+                "title": title,
+                "structural_json": _safe_json(structural),
+                "article_text": text,
+            },
+            strict_schema=False,
+            temperature=0.0,
+            max_tokens=2600,
+            agent_role="published_article_pattern_miner",
+            model_role="published_article_pattern_miner",
+        )
+        parsed = _parsed_dict(outcome)
+        if parsed is None:
+            return None, {
+                "status": "semantic_parse_failed",
+                "attempt": _stable_attempt_diag(outcome),
+            }
+        validation = _validate_pattern(parsed)
+        if validation:
+            return None, {
+                "status": "semantic_schema_failed",
+                "errors": validation,
+                "attempt": _stable_attempt_diag(outcome),
+            }
+        return {
+            "parsed": parsed,
+            "semantic_status": "llm_grounded_fulltext",
+            "prompt_family_id": PUBLISHED_ARTICLE_PATTERN_FAMILY["family_id"],
+            "prompt_version": PUBLISHED_ARTICLE_PATTERN_FAMILY["version"],
+            "llm_attempt": _stable_attempt_diag(outcome),
+            "chunking": None,
+        }, None
+
+    chunks = _split_complete_text(text, max_chars)
+    chunk_results: list[dict[str, Any]] = []
+    chunk_attempts: list[dict[str, Any]] = []
+    for index, chunk in enumerate(chunks, start=1):
+        outcome = try_llm_call_with_outcome(
+            provider,
+            PUBLISHED_ARTICLE_PATTERN_CHUNK_FAMILY,
+            {
+                "target_id": target_id,
+                "source_ref": source_ref,
+                "title": title,
+                "chunk_index": index,
+                "chunk_total": len(chunks),
+                "char_start": chunk["char_start"],
+                "char_end": chunk["char_end"],
+                "structural_json": _safe_json(structural),
+                "chunk_text": chunk["text"],
+            },
+            strict_schema=False,
+            temperature=0.0,
+            max_tokens=2200,
+            agent_role="published_article_pattern_chunk_miner",
+            model_role="published_article_pattern_miner",
+        )
+        parsed = _parsed_dict(outcome)
+        attempt = _stable_attempt_diag(outcome)
+        chunk_attempts.append(attempt)
+        if parsed is None:
+            return None, {
+                "status": "chunk_semantic_parse_failed",
+                "chunk_index": index,
+                "chunk_total": len(chunks),
+                "char_start": chunk["char_start"],
+                "char_end": chunk["char_end"],
+                "attempt": attempt,
+            }
+        validation = _validate_chunk_pattern(parsed)
+        if validation:
+            return None, {
+                "status": "chunk_semantic_schema_failed",
+                "chunk_index": index,
+                "chunk_total": len(chunks),
+                "errors": validation,
+                "attempt": attempt,
+            }
+        local = dict(parsed)
+        local["_chunk_index"] = index
+        local["_chunk_total"] = len(chunks)
+        local["_char_start"] = chunk["char_start"]
+        local["_char_end"] = chunk["char_end"]
+        chunk_results.append(local)
+
+    complete_coverage = (
+        chunks[0]["char_start"] == 0
+        and chunks[-1]["char_end"] == len(text)
+        and all(
+            chunks[i]["char_end"] == chunks[i + 1]["char_start"]
+            for i in range(len(chunks) - 1)
+        )
+        and "".join(item["text"] for item in chunks) == text
+    )
+    if not complete_coverage:
+        return None, {
+            "status": "chunk_coverage_invariant_failed",
+            "chunk_total": len(chunks),
+        }
+
+    reducer = try_llm_call_with_outcome(
+        provider,
+        PUBLISHED_ARTICLE_PATTERN_REDUCE_FAMILY,
+        {
+            "target_id": target_id,
+            "source_ref": source_ref,
+            "title": title,
+            "chunk_total": len(chunks),
+            "complete_coverage": True,
+            "article_chars": len(text),
+            "structural_json": _safe_json(structural),
+            "chunk_results_json": _safe_json(chunk_results),
+        },
+        strict_schema=False,
+        temperature=0.0,
+        max_tokens=3000,
+        agent_role="published_article_pattern_reducer",
+        model_role="published_article_pattern_miner",
+    )
+    parsed = _parsed_dict(reducer)
+    if parsed is None:
+        return None, {
+            "status": "chunk_reduce_parse_failed",
+            "chunk_total": len(chunks),
+            "attempt": _stable_attempt_diag(reducer),
+        }
+    validation = _validate_pattern(parsed)
+    if validation:
+        return None, {
+            "status": "chunk_reduce_schema_failed",
+            "chunk_total": len(chunks),
+            "errors": validation,
+            "attempt": _stable_attempt_diag(reducer),
+        }
+    return {
+        "parsed": parsed,
+        "semantic_status": "llm_grounded_fulltext_chunked",
+        "prompt_family_id": PUBLISHED_ARTICLE_PATTERN_REDUCE_FAMILY["family_id"],
+        "prompt_version": PUBLISHED_ARTICLE_PATTERN_REDUCE_FAMILY["version"],
+        "llm_attempt": _stable_attempt_diag(reducer),
+        "chunking": {
+            "complete_coverage": True,
+            "chunk_count": len(chunks),
+            "chunk_char_ranges": [
+                [item["char_start"], item["char_end"]] for item in chunks
+            ],
+            "chunk_char_lengths": [len(item["text"]) for item in chunks],
+            "mapper_prompt_family": (
+                f"{PUBLISHED_ARTICLE_PATTERN_CHUNK_FAMILY['family_id']}:"
+                f"{PUBLISHED_ARTICLE_PATTERN_CHUNK_FAMILY['version']}"
+            ),
+            "reducer_prompt_family": (
+                f"{PUBLISHED_ARTICLE_PATTERN_REDUCE_FAMILY['family_id']}:"
+                f"{PUBLISHED_ARTICLE_PATTERN_REDUCE_FAMILY['version']}"
+            ),
+            "chunk_attempts": chunk_attempts,
+        },
+    }, None
+
+
 def build_published_article_patterns(
     *,
     target_id: str,
@@ -190,8 +424,9 @@ def build_published_article_patterns(
 ) -> dict[str, Any]:
     """Read complete acquired bodies and create semantic article cards.
 
-    Only a complete extracted body counts toward HS-016. Partial extraction or
-    a body too large for the configured complete-pass budget stays a blocker.
+    Every counted article is grounded in the complete extracted body. Bodies
+    larger than one provider call are mapped over contiguous complete-coverage
+    chunks and reduced only after every chunk succeeds.
     """
     provider = provider or configured_provider("published_article_pattern_miner")
     limit = max_chars if max_chars is not None else max_article_chars()
@@ -276,54 +511,33 @@ def build_published_article_patterns(
         seen_content_hashes.add(content_hash)
         complete_seen += 1
 
-        if text_chars > limit:
-            failures.append({
-                "source_ref": artifact.source_ref,
-                "status": "input_too_large_requires_chunking",
-                "chars": text_chars,
-                "max_chars": limit,
-                "detail": "Complete text was not sent; article does not count.",
-            })
-            continue
-
         structural = model_article_text(text, source_ref=artifact.source_ref)
-        outcome = try_llm_call_with_outcome(
-            provider,
-            PUBLISHED_ARTICLE_PATTERN_FAMILY,
-            {
-                "target_id": target_id,
-                "source_ref": artifact.source_ref,
-                "title": artifact.title or "",
-                "structural_json": _safe_json(structural),
-                "article_text": text,
-            },
-            strict_schema=False,
-            temperature=0.0,
-            max_tokens=2600,
-            agent_role="published_article_pattern_miner",
-            model_role="published_article_pattern_miner",
+        semantic, semantic_failure = _run_complete_article_semantics(
+            provider=provider,
+            target_id=target_id,
+            source_ref=artifact.source_ref,
+            title=artifact.title or "",
+            text=text,
+            structural=structural,
+            max_chars=limit,
         )
-        parsed = _parsed_dict(outcome)
-        if parsed is None:
-            failures.append({
-                "source_ref": artifact.source_ref,
-                "status": "semantic_parse_failed",
-                "attempt": _stable_attempt_diag(outcome),
-            })
-            continue
-        validation = _validate_pattern(parsed)
-        if validation:
-            failures.append({
-                "source_ref": artifact.source_ref,
-                "status": "semantic_schema_failed",
-                "errors": validation,
-                "attempt": _stable_attempt_diag(outcome),
-            })
+        if semantic is None:
+            failure = dict(semantic_failure or {"status": "semantic_unknown_failure"})
+            failure["source_ref"] = artifact.source_ref
+            if text_chars > limit:
+                failure["chars"] = text_chars
+                failure["max_chars_per_chunk"] = limit
+            failures.append(failure)
             continue
 
+        parsed = semantic["parsed"]
         pattern = PublishedArticlePattern(
             published_article_pattern_id=_pattern_id(
-                content_hash, artifact.source_ref, parsed
+                content_hash,
+                artifact.source_ref,
+                parsed,
+                prompt_family_id=semantic["prompt_family_id"],
+                prompt_version=semantic["prompt_version"],
             ),
             article_source_id=artifact.source_ref,
             title=artifact.title,
@@ -342,21 +556,20 @@ def build_published_article_patterns(
             source_snapshot_id=snapshot.snapshot_id,
             content_hash=content_hash,
             evidence_status="corpus_observation",
-            semantic_status="llm_grounded_fulltext",
+            semantic_status=semantic["semantic_status"],
             prompt_family_version=(
-                f"{PUBLISHED_ARTICLE_PATTERN_FAMILY['family_id']}:"
-                f"{PUBLISHED_ARTICLE_PATTERN_FAMILY['version']}"
+                f"{semantic['prompt_family_id']}:{semantic['prompt_version']}"
             ),
             unknowns=list(parsed.get("unknowns") or []),
             warnings=list(parsed.get("warnings") or []),
             confidence=parsed.get("confidence") or "low",
         ).to_dict()
-        # Keep the semantic card durable and content-addressable. Runtime
-        # timing/token diagnostics belong to execution receipts, not the card.
         pattern.pop("created_at", None)
         pattern["structural_observation"] = structural
         pattern["source_text_chars"] = text_chars
-        pattern["llm_attempt"] = _stable_attempt_diag(outcome)
+        pattern["llm_attempt"] = semantic["llm_attempt"]
+        if semantic.get("chunking"):
+            pattern["chunking"] = semantic["chunking"]
         patterns.append(pattern)
 
     corpus_id = _corpus_id(target_id, patterns)
@@ -372,6 +585,7 @@ def build_published_article_patterns(
         "complete_fulltexts_seen": complete_seen,
         "min_article_chars": floor,
         "max_article_chars": limit,
+        "max_chars_per_semantic_chunk": limit,
         "unique_content_hashes_seen": len(seen_content_hashes),
     }
 
@@ -594,7 +808,10 @@ def aggregate_deep_target_model(
         },
         "all_patterns_fulltext_grounded": {
             "pass": bool(patterns) and all(
-                p.get("semantic_status") == "llm_grounded_fulltext"
+                p.get("semantic_status") in {
+                    "llm_grounded_fulltext",
+                    "llm_grounded_fulltext_chunked",
+                }
                 for p in patterns
             ),
         },
