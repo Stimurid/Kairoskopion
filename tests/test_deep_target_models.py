@@ -162,6 +162,25 @@ def _citation_response(patterns):
     }
 
 
+def _aggregate_with_genre(patterns, genre_response):
+    return aggregate_deep_target_model(
+        target_id="venue-1",
+        pattern_result={
+            "published_corpus_id": "deepcorpus:test",
+            "patterns": patterns,
+            "failures": [],
+        },
+        selection_strategy="recent_articles",
+        bias_notes=["recent sample"],
+        editor_profiles=[_meaningful_editor()],
+        provider=QueueProvider([
+            genre_response,
+            _citation_response(patterns),
+        ]),
+        min_fulltexts=10,
+    )
+
+
 def test_published_article_pattern_schema_restored():
     p = PublishedArticlePattern(
         article_source_id="src:1",
@@ -373,6 +392,166 @@ def test_ten_fulltexts_with_two_real_archetypes_can_close_target_gate():
     assert model["deep_model_gate"]["status"] == "READY"
     assert len(model["archetypes"]) == 2
     assert model["published_article_corpus"]["corpus_size"] == 10
+    requirements = model["deep_model_gate"]["requirements"]
+    assert requirements["countermodel_evidence"]["pass"] is True
+    assert requirements["corpus_membership_coverage"] == {
+        "required": 10,
+        "actual": 10,
+        "coverage_ratio": 1.0,
+        "missing_pattern_ids": [],
+        "pass": True,
+        "rule": (
+            "every modeled pattern must be accounted for by archetype "
+            "or countermodel membership"
+        ),
+    }
+
+
+def test_duplicate_archetype_id_and_identical_members_fail_closed():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["archetypes"][1] = dict(genre["archetypes"][0])
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    blockers = model["deep_model_gate"]["blockers"]
+    assert "archetype_id:duplicate:arch_conceptual" in blockers
+    assert any(item.startswith("archetype_membership:duplicate:") for item in blockers)
+
+
+def test_different_archetype_ids_cannot_mask_same_members_and_signature():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    duplicate = dict(genre["archetypes"][0])
+    duplicate["archetype_id"] = "arch_renamed_only"
+    genre["archetypes"][1] = duplicate
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    blockers = model["deep_model_gate"]["blockers"]
+    assert any(item.startswith("archetype_membership:duplicate:") for item in blockers)
+
+
+def test_zero_countermodels_fail_hs016_gate():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["countermodels"] = []
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert "countermodels_required" in model["deep_model_gate"]["blockers"]
+    requirement = model["deep_model_gate"]["requirements"][
+        "countermodel_evidence"
+    ]
+    assert requirement["actual"] == 0
+    assert requirement["pass"] is False
+
+
+def test_countermodel_unknown_member_fails_closed():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["countermodels"][0]["member_pattern_ids"] = ["papat_ghost"]
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert (
+        "countermodel[0]:unknown_members:papat_ghost"
+        in model["deep_model_gate"]["blockers"]
+    )
+
+
+def test_partial_archetype_coverage_is_reported_and_fails_closed():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["archetypes"][0]["member_pattern_ids"] = ["papat_0"]
+    genre["archetypes"][1]["member_pattern_ids"] = ["papat_0"]
+    genre["countermodels"][0]["member_pattern_ids"] = ["papat_9"]
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert "corpus_membership_coverage" in model["deep_model_gate"]["blockers"]
+    coverage = model["deep_model_gate"]["requirements"][
+        "corpus_membership_coverage"
+    ]
+    assert coverage["actual"] == 2
+    assert coverage["coverage_ratio"] == 0.2
+    assert coverage["missing_pattern_ids"] == [
+        f"papat_{i}" for i in range(1, 9)
+    ]
+
+
+def test_blank_archetype_ids_fail_closed():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    for archetype in genre["archetypes"]:
+        archetype["archetype_id"] = "   "
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    blockers = model["deep_model_gate"]["blockers"]
+    assert "archetype[0]:blank_archetype_id" in blockers
+    assert "archetype[1]:blank_archetype_id" in blockers
+
+
+def test_countermodel_requires_a_real_nonblank_contrast():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["countermodels"][0]["contrast"] = "   "
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert (
+        "countermodel[0]:blank_contrast"
+        in model["deep_model_gate"]["blockers"]
+    )
+
+
+def test_countermodel_cannot_relabel_an_archetype_membership():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["countermodels"][0]["member_pattern_ids"] = list(
+        genre["archetypes"][0]["member_pattern_ids"]
+    )
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert (
+        "countermodel[0]:same_members_as_archetype:arch_conceptual"
+        in model["deep_model_gate"]["blockers"]
+    )
+
+
+def test_archetype_requires_a_nonempty_semantic_signature():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    archetype = genre["archetypes"][0]
+    archetype["defining_moves"] = []
+    archetype["structure_signature"] = []
+    archetype["method_signature"] = ""
+    archetype["theory_signature"] = []
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert (
+        "archetype[0]:empty_semantic_signature"
+        in model["deep_model_gate"]["blockers"]
+    )
+
+
+def test_blank_or_duplicate_pattern_ids_fail_closed():
+    patterns = _semantic_patterns(10)
+    patterns[8]["published_article_pattern_id"] = ""
+    patterns[9]["published_article_pattern_id"] = "papat_0"
+    genre = _genre_response(patterns)
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    requirement = model["deep_model_gate"]["requirements"][
+        "pattern_ids_nonblank_unique"
+    ]
+    assert requirement["missing_ids"] == 1
+    assert requirement["duplicate_ids"] == 1
+    assert "pattern_ids_nonblank_unique" in model["deep_model_gate"]["blockers"]
 
 
 def test_duplicate_pattern_hashes_fail_deep_target_gate():
