@@ -155,6 +155,7 @@ def _pattern_id(
     *,
     prompt_family_id: str | None = None,
     prompt_version: str | None = None,
+    chunk_char_ranges: list[list[int]] | None = None,
 ) -> str:
     key = {
         "content_hash": content_hash,
@@ -163,7 +164,39 @@ def _pattern_id(
         "prompt_version": prompt_version or PUBLISHED_ARTICLE_PATTERN_FAMILY["version"],
         "semantic_output": semantic_output,
     }
+    # Keep legacy one-pass IDs stable while binding the effective chunking
+    # method into identities for chunked cards.
+    if chunk_char_ranges is not None:
+        key["chunk_char_ranges"] = chunk_char_ranges
     return f"papat_{_digest(key)[:16]}"
+
+
+def _published_pattern_prompt_versions(
+    patterns: list[dict[str, Any]],
+) -> list[str]:
+    """Return deterministic prompt-family provenance actually used by cards."""
+    versions: set[str] = set()
+    for pattern in patterns:
+        direct = str(pattern.get("prompt_family_version") or "").strip()
+        if direct:
+            versions.add(direct)
+        chunking = pattern.get("chunking") or {}
+        for field in ("mapper_prompt_family", "reducer_prompt_family"):
+            family = str(chunking.get(field) or "").strip()
+            if family:
+                versions.add(family)
+
+    # Older one-pass cards predate prompt_family_version. Preserve their
+    # established model-level provenance without guessing for chunked cards.
+    if not versions and patterns and all(
+        pattern.get("semantic_status") == "llm_grounded_fulltext"
+        for pattern in patterns
+    ):
+        versions.add(
+            f"{PUBLISHED_ARTICLE_PATTERN_FAMILY['family_id']}:"
+            f"{PUBLISHED_ARTICLE_PATTERN_FAMILY['version']}"
+        )
+    return sorted(versions)
 
 
 def _corpus_id(target_id: str, patterns: list[dict[str, Any]]) -> str:
@@ -531,6 +564,7 @@ def build_published_article_patterns(
             continue
 
         parsed = semantic["parsed"]
+        chunking = semantic.get("chunking")
         pattern = PublishedArticlePattern(
             published_article_pattern_id=_pattern_id(
                 content_hash,
@@ -538,6 +572,9 @@ def build_published_article_patterns(
                 parsed,
                 prompt_family_id=semantic["prompt_family_id"],
                 prompt_version=semantic["prompt_version"],
+                chunk_char_ranges=(
+                    chunking.get("chunk_char_ranges") if chunking else None
+                ),
             ),
             article_source_id=artifact.source_ref,
             title=artifact.title,
@@ -568,8 +605,8 @@ def build_published_article_patterns(
         pattern["structural_observation"] = structural
         pattern["source_text_chars"] = text_chars
         pattern["llm_attempt"] = semantic["llm_attempt"]
-        if semantic.get("chunking"):
-            pattern["chunking"] = semantic["chunking"]
+        if chunking:
+            pattern["chunking"] = chunking
         patterns.append(pattern)
 
     corpus_id = _corpus_id(target_id, patterns)
@@ -618,6 +655,7 @@ def aggregate_deep_target_model(
 ) -> dict[str, Any]:
     """Aggregate fulltext-grounded cards into restored Journal-Yuga profiles."""
     patterns = list(pattern_result.get("patterns") or [])
+    pattern_prompt_versions = _published_pattern_prompt_versions(patterns)
     corpus_id = str(pattern_result.get("published_corpus_id") or "")
     pattern_hashes = [
         str(p.get("content_hash") or "").strip() for p in patterns
@@ -864,8 +902,9 @@ def aggregate_deep_target_model(
         "pattern_failures": list(pattern_result.get("failures") or []),
         "prompt_versions": {
             "published_article_pattern": (
-                f"{PUBLISHED_ARTICLE_PATTERN_FAMILY['family_id']}:"
-                f"{PUBLISHED_ARTICLE_PATTERN_FAMILY['version']}"
+                pattern_prompt_versions[0]
+                if len(pattern_prompt_versions) == 1
+                else pattern_prompt_versions
             ),
             "genre_move_aggregation": (
                 f"{GENRE_MOVE_AGGREGATION_FAMILY['family_id']}:"
