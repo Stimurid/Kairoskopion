@@ -80,7 +80,7 @@ export function OpportunityWorkspace({ portfolio = null }: { portfolio?: Opportu
   const [routeFilter, setRouteFilter] = useState<RouteKind | 'ALL'>('ALL');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const rows = portfolio?.rows ?? [];
+  const rows = useMemo(() => portfolio?.rows ?? [], [portfolio]);
   const filtered = useMemo(() => {
     const q = query.trim().toLocaleLowerCase('ru-RU');
     return rows.filter((row) =>
