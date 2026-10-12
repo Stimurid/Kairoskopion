@@ -27,7 +27,7 @@ ROUTE_TYPES = frozenset({
 AUTHOR_DECISIONS = frozenset({"HOLD", "ACCEPT", "REJECT"})
 ENTITY_TYPES = frozenset({
     "Evidence", "World", "ArticleSeed", "ArticleOpportunity", "Journal",
-    "VenueWorld", "OpportunityRoute", "TargetVariant", "EditorialPacket",
+    "VenueWorld", "JournalIssue", "OpportunityRoute", "TargetVariant", "EditorialPacket",
     "AuthorProfile", "HuntTrace",
 })
 EXPECTED_W12 = {
@@ -69,6 +69,8 @@ def validate_record(kind: str, record: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("record must be a mapping")
     _required(record.get("id"), "id")
     _required(record.get("revision"), "revision")
+    if "kind" in record and record["kind"] != kind:
+        raise ValueError("entity kind cannot be overwritten")
 
     if kind == "Evidence":
         _required(record.get("source_ref"), "source_ref")
@@ -91,6 +93,9 @@ def validate_record(kind: str, record: dict[str, Any]) -> dict[str, Any]:
         _required(record.get("canonical_name"), "canonical_name")
         if not record.get("issn") and not record.get("official_url"):
             raise ValueError("journal needs official_url or ISSN")
+    elif kind == "JournalIssue":
+        _required(record.get("journal_id"), "journal_id")
+        _required(record.get("official_url"), "official_url")
     elif kind == "VenueWorld":
         _required(record.get("journal_id"), "journal_id")
         _required(record.get("target_world_version"), "target_world_version")
@@ -99,8 +104,8 @@ def validate_record(kind: str, record: dict[str, Any]) -> dict[str, Any]:
         _required(record.get("journal_id"), "journal_id")
         if record.get("route_type") not in ROUTE_TYPES:
             raise ValueError("route_type must be a known editorial action")
-        if record.get("deadline") and not record.get("deadline_stage"):
-            raise ValueError("deadline must belong to an exact editorial stage")
+        if record.get("deadline") and record.get("deadline_stage") != record["route_type"]:
+            raise ValueError("deadline_stage must match the exact editorial route type")
     elif kind == "TargetVariant":
         _required(record.get("seed_id"), "seed_id")
         _required(record.get("opportunity_id"), "opportunity_id")
@@ -121,6 +126,7 @@ def venue_world_status(world: dict[str, Any], evidence: dict[str, dict[str, Any]
         ref for ref in refs
         if ref in evidence
         and evidence[ref].get("read_depth") == "FULL_TEXT"
+        and evidence[ref].get("kind") == "PUBLISHED_ARTICLE"
         and bool(evidence[ref].get("passage_anchors"))
     }
     return "FULL_EVIDENCE" if len(fully_read) >= 3 else "PARTIAL_EVIDENCE"
@@ -151,6 +157,10 @@ def assess_route(
     ]
     if not policies:
         blockers.append("no_official_policy_evidence")
+    if route["route_type"] == "FORMAL_ABSTRACT_CFP" and not any(
+        policy.get("kind") == "OFFICIAL_CFP" for policy in policies
+    ):
+        blockers.append("formal_cfp_not_verified")
     if route.get("submission_channel_kind") not in _REAL_CHANNELS:
         blockers.append("unverified_editorial_channel")
     if world is None or venue_world_status(world, evidence) != "FULL_EVIDENCE":
@@ -236,6 +246,17 @@ class OpportunityGraphStore:
 
     def put(self, kind: str, record: dict[str, Any]) -> dict[str, Any]:
         value = validate_record(kind, record)
+        if kind == "Journal":
+            issn = str(value.get("issn") or "").replace("-", "").upper()
+            official = str(value.get("official_url") or "").rstrip("/").lower()
+            for path in self.records.glob("*.json"):
+                existing = json.loads(path.read_text(encoding="utf-8"))
+                if existing.get("kind") != "Journal" or existing.get("id") == value["id"]:
+                    continue
+                prev_issn = str(existing.get("issn") or "").replace("-", "").upper()
+                prev_url = str(existing.get("official_url") or "").rstrip("/").lower()
+                if (issn and issn == prev_issn) or (official and official == prev_url):
+                    raise ValueError("journal identity already registered under another id")
         key = _digest([kind, value["id"], value["revision"]])
         return self._write_once(self.records / f"{key}.json", {"kind": kind, **value})
 
