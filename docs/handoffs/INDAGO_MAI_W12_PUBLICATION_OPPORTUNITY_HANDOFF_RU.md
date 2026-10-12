@@ -20,7 +20,7 @@ W0–W69 и затем W1–W12 вручную воспроизвели цикл
 5. Читательский полный охотничий лог W10 и ссылки на семь первичных архивов W0–W69: https://docs.google.com/document/d/1k-0_b9N7hAzplcVdRIsPFvapZKLi1N3L0OokqSrliW8/edit
 6. Статейные A–F, статус и независимая генеалогия F (2025, Ирина): https://docs.google.com/document/d/1ISWZWzWi16ZxYtUP_K4g8gVTZL8zWQ2HHlpG8TaKXcU/edit
 7. Полный сценарий, на котором основана Тримурти: https://docs.google.com/document/d/13fh9ftyagik1Ip1fnWNBJQ6KfjskBTHDuTeA20a-b4I/edit
-8. Реальная публикационная ветка: https://docs.google.com/document/d/1eWIkkoHho2oHTqxGkUveT_HFlgys7DSIEpgTGVSiR3uI/edit (перед использованием разрешить этот URL по канону; не догадка об исполняемой ветке).
+8. Реальная публикационная ветка: https://docs.google.com/document/d/1eWIkkoHho2oHTqxGkUveT_HFgys7DSIEpgTGVSiR3uI/edit (перед использованием разрешить этот URL по канону; не догадка об исполняемой ветке).
 9. Статус/PR: https://github.com/Stimurid/Kairoskopion/pull/19 ; HS-016 https://github.com/Stimurid/Kairoskopion/issues/20 ; P06/P07 package integration https://github.com/Stimurid/Kairoskopion/issues/21 ; WhiteCrow factory https://github.com/Stimurid/whitecrow/pull/39 .
 
 ## 3. Объекты и связи, необходимые UI/внутреннему контракту
