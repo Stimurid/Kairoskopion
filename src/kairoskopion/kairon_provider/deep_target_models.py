@@ -51,6 +51,71 @@ from .models import CorpusArtifactManifest
 DEFAULT_MAX_ARTICLE_CHARS = 80_000
 DEFAULT_MIN_ARTICLE_CHARS = 5_000
 DEFAULT_MIN_DEEP_FULLTEXTS = 10
+# Hard ceilings: caller-controlled per-call size cannot remove the budget.
+MAX_BODY_CHARS = 2_000_000
+MAX_BODY_CHUNKS = 64
+MAX_CORPUS_CHARS = 20_000_000
+MAX_CORPUS_CHUNKS = 640
+
+
+def _body_budget_error(chars: int, limit: int) -> str | None:
+    if type(limit) is not int or limit <= 0:
+        return "invalid_semantic_chunk_limit"
+    if chars > MAX_BODY_CHARS:
+        return "body_char_budget_exceeded"
+    if (chars + limit - 1) // limit > MAX_BODY_CHUNKS:
+        return "body_chunk_budget_exceeded"
+    return None
+
+
+def _chunk_contract_errors(pattern: dict[str, Any]) -> list[str]:
+    """Validate persisted producer evidence, never infer coverage from status."""
+    if pattern.get("semantic_status") != "llm_grounded_fulltext_chunked":
+        return []
+    chunking = pattern.get("chunking")
+    if not isinstance(chunking, dict):
+        return ["chunk_coverage_missing", "chunk_prompt_provenance_missing"]
+    errors = []
+    ranges = chunking.get("chunk_char_ranges")
+    lengths = chunking.get("chunk_char_lengths")
+    count = chunking.get("chunk_count")
+    chars = pattern.get("source_text_chars")
+    valid = (
+        chunking.get("complete_coverage") is True
+        and type(chars) is int and chars > 0
+        and type(count) is int and count > 0
+        and isinstance(ranges, list) and len(ranges) == count
+        and isinstance(lengths, list) and len(lengths) == count
+    )
+    cursor = 0
+    if valid:
+        for span, length in zip(ranges, lengths):
+            if (not isinstance(span, list) or len(span) != 2
+                    or any(type(n) is not int for n in span)
+                    or type(length) is not int
+                    or span[0] != cursor or span[1] <= span[0]
+                    or length != span[1] - span[0]):
+                valid = False
+                break
+            cursor = span[1]
+        valid = valid and cursor == chars
+    if not valid:
+        errors.append("chunk_coverage_invalid")
+    fields = ("mapper_prompt_family", "reducer_prompt_family")
+    if any(not _valid_prompt_ref(chunking.get(field)) for field in fields):
+        errors.append("chunk_prompt_provenance_missing")
+    direct = pattern.get("prompt_family_version")
+    if (not _valid_prompt_ref(direct)
+            or direct != chunking.get("reducer_prompt_family")):
+        errors.append("chunk_prompt_provenance_mismatch")
+    return errors
+
+
+def _valid_prompt_ref(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    family, separator, version = value.strip().partition(":")
+    return bool(separator and family.strip() and version.strip())
 
 
 def _canonical_json(value: Any) -> str:
@@ -141,7 +206,7 @@ def _stable_semantic(value: Any) -> Any:
             key: _stable_semantic(item)
             for key, item in value.items()
             if key not in _VOLATILE_SEMANTIC_KEYS
-            and key not in {"attempt_diagnostics", "llm_attempt"}
+            and key not in {"attempt_diagnostics", "llm_attempt", "chunk_attempts"}
         }
     if isinstance(value, list):
         return [_stable_semantic(item) for item in value]
@@ -180,7 +245,15 @@ def _published_pattern_prompt_versions(
         direct = str(pattern.get("prompt_family_version") or "").strip()
         if direct:
             versions.add(direct)
-        chunking = pattern.get("chunking") or {}
+        if ("prompt_family_version" not in pattern
+                and pattern.get("semantic_status") == "llm_grounded_fulltext"):
+            versions.add(
+                f"{PUBLISHED_ARTICLE_PATTERN_FAMILY['family_id']}:"
+                f"{PUBLISHED_ARTICLE_PATTERN_FAMILY['version']}"
+            )
+        chunking = pattern.get("chunking")
+        if not isinstance(chunking, dict):
+            chunking = {}
         for field in ("mapper_prompt_family", "reducer_prompt_family"):
             family = str(chunking.get(field) or "").strip()
             if family:
@@ -280,6 +353,9 @@ def _run_complete_article_semantics(
     max_chars: int,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     """Run one-pass semantics or complete-body chunk map/reduce."""
+    budget_error = _body_budget_error(len(text), max_chars)
+    if budget_error:
+        return None, {"status": budget_error}
     if len(text) <= max_chars:
         outcome = try_llm_call_with_outcome(
             provider,
@@ -320,6 +396,8 @@ def _run_complete_article_semantics(
         }, None
 
     chunks = _split_complete_text(text, max_chars)
+    if len(chunks) > MAX_BODY_CHUNKS:
+        return None, {"status": "body_chunk_budget_exceeded"}
     chunk_results: list[dict[str, Any]] = []
     chunk_attempts: list[dict[str, Any]] = []
     for index, chunk in enumerate(chunks, start=1):
@@ -469,6 +547,8 @@ def build_published_article_patterns(
     attempted = 0
     complete_seen = 0
     seen_content_hashes: set[str] = set()
+    total_chars = 0
+    total_chunks = 0
 
     if provider is None:
         return {
@@ -514,6 +594,22 @@ def build_published_article_patterns(
             continue
 
         text_chars = len(text)
+        budget_error = _body_budget_error(text_chars, limit)
+        if budget_error:
+            failures.append({"source_ref": artifact.source_ref,
+                             "status": budget_error})
+            continue
+        # Paragraph-aware splitting may produce more than ceil(chars/limit).
+        chunk_count = len(_split_complete_text(text, limit))
+        if chunk_count > MAX_BODY_CHUNKS:
+            failures.append({"source_ref": artifact.source_ref,
+                             "status": "body_chunk_budget_exceeded"})
+            continue
+        if (total_chars + text_chars > MAX_CORPUS_CHARS
+                or total_chunks + chunk_count > MAX_CORPUS_CHUNKS):
+            failures.append({"source_ref": artifact.source_ref,
+                             "status": "corpus_semantic_budget_exceeded"})
+            break
         if text_chars < floor:
             failures.append({
                 "source_ref": artifact.source_ref,
@@ -543,6 +639,9 @@ def build_published_article_patterns(
             continue
         seen_content_hashes.add(content_hash)
         complete_seen += 1
+        # Failed attempts consume budget too; reserve before provider calls.
+        total_chars += text_chars
+        total_chunks += chunk_count
 
         structural = model_article_text(text, source_ref=artifact.source_ref)
         semantic, semantic_failure = _run_complete_article_semantics(
@@ -627,20 +726,126 @@ def build_published_article_patterns(
     }
 
 
+def _normalized_string_list(value: Any) -> list[str]:
+    return sorted({
+        str(item).strip() for item in (value or []) if str(item).strip()
+    })
+
+
+def _archetype_has_semantic_signature(item: dict[str, Any]) -> bool:
+    return bool(
+        _normalized_string_list(item.get("defining_moves"))
+        or _normalized_string_list(item.get("structure_signature"))
+        or str(item.get("method_signature") or "").strip()
+        or _normalized_string_list(item.get("theory_signature"))
+    )
+
+
 def _validate_archetypes(
     archetypes: list[dict[str, Any]], pattern_ids: set[str]
-) -> list[str]:
+) -> tuple[list[str], list[set[str]]]:
     errors: list[str] = []
+    seen_ids: dict[str, int] = {}
+    seen_memberships: dict[tuple[str, ...], str] = {}
+    memberships: list[set[str]] = []
     for i, item in enumerate(archetypes):
-        members = set(item.get("member_pattern_ids") or [])
+        archetype_id = str(item.get("archetype_id") or "").strip()
+        if not archetype_id:
+            errors.append(f"archetype[{i}]:blank_archetype_id")
+        elif archetype_id in seen_ids:
+            errors.append(f"archetype_id:duplicate:{archetype_id}")
+        else:
+            seen_ids[archetype_id] = i
+
+        raw_members = [
+            str(member).strip()
+            for member in (item.get("member_pattern_ids") or [])
+        ]
+        members = {member for member in raw_members if member}
+        memberships.append(members)
         if not members:
             errors.append(f"archetype[{i}]:no_members")
+        if any(not member for member in raw_members):
+            errors.append(f"archetype[{i}]:blank_members")
+        if len(raw_members) != len(set(raw_members)):
+            errors.append(f"archetype[{i}]:duplicate_members")
         unknown = members - pattern_ids
         if unknown:
             errors.append(
                 f"archetype[{i}]:unknown_members:{','.join(sorted(unknown))}"
             )
-    return errors
+
+        membership_key = tuple(sorted(members))
+        if membership_key and membership_key in seen_memberships:
+            other_id = seen_memberships[membership_key]
+            errors.append(
+                "archetype_membership:duplicate:"
+                f"{other_id},{archetype_id or f'index_{i}'}"
+            )
+        elif membership_key:
+            seen_memberships[membership_key] = archetype_id or f"index_{i}"
+
+        if not _archetype_has_semantic_signature(item):
+            errors.append(f"archetype[{i}]:empty_semantic_signature")
+    return errors, memberships
+
+
+def _validate_countermodels(
+    countermodels: list[dict[str, Any]],
+    pattern_ids: set[str],
+    archetypes: list[dict[str, Any]],
+    archetype_memberships: list[set[str]],
+) -> tuple[list[str], list[set[str]]]:
+    errors: list[str] = []
+    memberships: list[set[str]] = []
+    seen_signatures: set[tuple[tuple[str, ...], str]] = set()
+    archetype_ids = [
+        str(item.get("archetype_id") or "").strip()
+        for item in archetypes
+    ]
+    if not countermodels:
+        return ["countermodels_required"], memberships
+
+    for i, item in enumerate(countermodels):
+        label = str(item.get("label") or "").strip()
+        contrast = str(item.get("contrast") or "").strip()
+        raw_members = [
+            str(member).strip()
+            for member in (item.get("member_pattern_ids") or [])
+        ]
+        members = {member for member in raw_members if member}
+        memberships.append(members)
+        if not label:
+            errors.append(f"countermodel[{i}]:blank_label")
+        if not members:
+            errors.append(f"countermodel[{i}]:no_members")
+        if any(not member for member in raw_members):
+            errors.append(f"countermodel[{i}]:blank_members")
+        if len(raw_members) != len(set(raw_members)):
+            errors.append(f"countermodel[{i}]:duplicate_members")
+        unknown = members - pattern_ids
+        if unknown:
+            errors.append(
+                f"countermodel[{i}]:unknown_members:"
+                f"{','.join(sorted(unknown))}"
+            )
+        if not contrast:
+            errors.append(f"countermodel[{i}]:blank_contrast")
+        for archetype_index, archetype_members in enumerate(
+            archetype_memberships
+        ):
+            if members and members == archetype_members:
+                archetype_id = archetype_ids[archetype_index]
+                errors.append(
+                    f"countermodel[{i}]:same_members_as_archetype:"
+                    f"{archetype_id or f'index_{archetype_index}'}"
+                )
+        signature = (tuple(sorted(members)), contrast.casefold())
+        if signature in seen_signatures:
+            errors.append(f"countermodel[{i}]:duplicate_evidence_signature")
+        else:
+            seen_signatures.add(signature)
+    return errors, memberships
 
 
 def aggregate_deep_target_model(
@@ -656,6 +861,23 @@ def aggregate_deep_target_model(
     """Aggregate fulltext-grounded cards into restored Journal-Yuga profiles."""
     patterns = list(pattern_result.get("patterns") or [])
     pattern_prompt_versions = _published_pattern_prompt_versions(patterns)
+    contract_errors = []
+    for failure in pattern_result.get("failures") or []:
+        status = failure.get("status", "")
+        if status in {
+            "invalid_semantic_chunk_limit", "body_char_budget_exceeded",
+            "body_chunk_budget_exceeded", "corpus_semantic_budget_exceeded",
+        }:
+            contract_errors.append(status)
+    for index, pattern in enumerate(patterns):
+        contract_errors.extend(
+            f"pattern[{index}]:{error}" for error in _chunk_contract_errors(pattern)
+        )
+        # Missing provenance is allowed only for historical single-pass cards.
+        # An explicitly supplied blank/malformed value is never historical.
+        if ("prompt_family_version" in pattern
+                and not _valid_prompt_ref(pattern["prompt_family_version"])):
+            contract_errors.append(f"pattern[{index}]:prompt_provenance_invalid")
     corpus_id = str(pattern_result.get("published_corpus_id") or "")
     pattern_hashes = [
         str(p.get("content_hash") or "").strip() for p in patterns
@@ -666,9 +888,16 @@ def aggregate_deep_target_model(
     duplicate_pattern_hashes = (
         len(nonempty_pattern_hashes) - len(unique_pattern_hashes)
     )
-    pattern_ids = {
-        str(p.get("published_article_pattern_id") or "") for p in patterns
-    } - {""}
+    raw_pattern_ids = [
+        str(p.get("published_article_pattern_id") or "").strip()
+        for p in patterns
+    ]
+    nonempty_pattern_ids = [
+        pattern_id for pattern_id in raw_pattern_ids if pattern_id
+    ]
+    pattern_ids = set(nonempty_pattern_ids)
+    missing_pattern_ids = len(raw_pattern_ids) - len(nonempty_pattern_ids)
+    duplicate_pattern_ids = len(nonempty_pattern_ids) - len(pattern_ids)
     provider = provider or configured_provider("genre_move_aggregator")
 
     word_counts = [
@@ -711,7 +940,7 @@ def aggregate_deep_target_model(
                     "sample_size": len(patterns),
                 }),
                 "sample_size": str(len(patterns)),
-                "patterns_json": _safe_json(patterns),
+                "patterns_json": _safe_json(_stable_semantic(patterns)),
             },
             strict_schema=False,
             temperature=0.0,
@@ -731,7 +960,7 @@ def aggregate_deep_target_model(
             {
                 "target_id": target_id,
                 "published_corpus_id": corpus_id,
-                "patterns_json": _safe_json(patterns),
+                "patterns_json": _safe_json(_stable_semantic(patterns)),
             },
             strict_schema=False,
             temperature=0.0,
@@ -743,7 +972,18 @@ def aggregate_deep_target_model(
         citation_diag = _stable_attempt_diag(c_outcome)
 
     archetypes = list((genre_parsed or {}).get("archetypes") or [])
-    archetype_errors = _validate_archetypes(archetypes, pattern_ids)
+    countermodels = list((genre_parsed or {}).get("countermodels") or [])
+    archetype_errors, archetype_memberships = _validate_archetypes(
+        archetypes, pattern_ids
+    )
+    countermodel_errors, countermodel_memberships = _validate_countermodels(
+        countermodels, pattern_ids, archetypes, archetype_memberships
+    )
+    covered_pattern_ids = set().union(
+        *archetype_memberships, *countermodel_memberships
+    )
+    covered_known_pattern_ids = covered_pattern_ids & pattern_ids
+    uncovered_pattern_ids = pattern_ids - covered_known_pattern_ids
 
     genre_id_key = {
         "corpus_id": corpus_id,
@@ -839,6 +1079,10 @@ def aggregate_deep_target_model(
     ]
 
     requirements = {
+        "pattern_evidence_contract": {
+            "pass": not contract_errors,
+            "errors": contract_errors,
+        },
         "min_fulltext_semantic_patterns": {
             "required": int(min_fulltexts),
             "actual": len(patterns),
@@ -864,9 +1108,38 @@ def aggregate_deep_target_model(
                 and duplicate_pattern_hashes == 0
             ),
         },
+        "pattern_ids_nonblank_unique": {
+            "actual": len(pattern_ids),
+            "expected": len(patterns),
+            "missing_ids": missing_pattern_ids,
+            "duplicate_ids": duplicate_pattern_ids,
+            "pass": missing_pattern_ids == 0 and duplicate_pattern_ids == 0,
+        },
         "archetypes_2_to_6": {
             "actual": len(archetypes),
             "pass": 2 <= len(archetypes) <= 6 and not archetype_errors,
+        },
+        "countermodel_evidence": {
+            "actual": len(countermodels),
+            "pass": bool(countermodels) and not countermodel_errors,
+            "minimum_contract": (
+                "nonblank label and contrast + nonempty known membership + "
+                "membership distinct from every archetype"
+            ),
+        },
+        "corpus_membership_coverage": {
+            "required": len(pattern_ids),
+            "actual": len(covered_known_pattern_ids),
+            "coverage_ratio": (
+                round(len(covered_known_pattern_ids) / len(pattern_ids), 6)
+                if pattern_ids else 0.0
+            ),
+            "missing_pattern_ids": sorted(uncovered_pattern_ids),
+            "pass": bool(pattern_ids) and not uncovered_pattern_ids,
+            "rule": (
+                "every modeled pattern must be accounted for by archetype "
+                "or countermodel membership"
+            ),
         },
         "citation_ecology_profile": {"pass": citation_parsed is not None},
         "editor_scholarly_ecology": {
@@ -884,7 +1157,9 @@ def aggregate_deep_target_model(
     ]
     if genre_parsed is None:
         blockers.append("genre_move_aggregation")
+    blockers.extend(contract_errors)
     blockers.extend(archetype_errors)
+    blockers.extend(countermodel_errors)
     blockers = sorted(set(blockers))
 
     payload = {
@@ -895,9 +1170,7 @@ def aggregate_deep_target_model(
         "genre_move_profile": genre_profile,
         "citation_expectation_profile": citation_profile,
         "archetypes": archetypes,
-        "countermodels": list(
-            (genre_parsed or {}).get("countermodels") or []
-        ),
+        "countermodels": countermodels,
         "editor_scholarly_ecology": list(meaningful_editors),
         "pattern_failures": list(pattern_result.get("failures") or []),
         "prompt_versions": {
