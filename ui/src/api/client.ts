@@ -78,6 +78,8 @@ function patch<T>(path: string, body?: unknown) {
 
 // --- Cases ---
 
+import type { OpportunityPortfolio } from '../components/OpportunityWorkspace';
+
 import type {
   CaseSummary,
   CaseDetail,
@@ -120,6 +122,7 @@ export interface RegistryRecord {
 
 export const api = {
   health: () => get<{ status: string; version: string }>('/health'),
+  getOpportunityPortfolio: () => get<OpportunityPortfolio>('/api/opportunities/portfolio'),
 
   // Auth (staging soft-auth: no password, no verification)
   signup: (displayName: string, email?: string) =>
