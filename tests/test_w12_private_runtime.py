@@ -201,6 +201,7 @@ def test_user_scoped_http_research_stage_never_promotes_w12_fixture(staged_fixtu
 
     archive, pinned, original = staged_fixture
     monkeypatch.setenv("KAIROSKOPION_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("KAIROSKOPION_W12_PRIVATE_STAGE_READ_ENABLED", "1")
     a = User(user_id="user_aaaaaaaaaaaa", display_name="A")
     b = User(user_id="user_bbbbbbbbbbbb", display_name="B")
     owner = tmp_path / "users" / a.user_id
@@ -241,3 +242,29 @@ def test_research_stage_requires_authentication():
     from kairoskopion.api.app import app
 
     assert TestClient(app).get("/api/opportunities/research-stage").status_code == 401
+
+
+def test_http_private_w12_is_disabled_without_explicit_operator_enable(staged_fixture, tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from kairoskopion.api.app import app
+    from kairoskopion.api.auth import User, get_current_user
+
+    archive, pinned, original = staged_fixture
+    monkeypatch.setenv("KAIROSKOPION_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("KAIROSKOPION_W12_PRIVATE_STAGE_READ_ENABLED", raising=False)
+    owner = User(user_id="user_aaaaaaaaaaaa", display_name="A")
+    stage_private_research(
+        archive, tmp_path / "users" / owner.user_id,
+        expected_archive_sha256=pinned, expected_source_sha256=original,
+    )
+    app.dependency_overrides[get_current_user] = lambda: owner
+    try:
+        client = TestClient(app)
+        assert client.get("/api/opportunities/research-stage").status_code == 403
+        portfolio = client.get("/api/opportunities/portfolio")
+        assert portfolio.status_code == 200
+        assert portfolio.json()["importStatus"] == "RUNTIME_IMPORT_PENDING"
+        assert portfolio.json()["rows"] == []
+        assert portfolio.json()["independentOpportunityCount"] == 0
+    finally:
+        app.dependency_overrides.clear()
