@@ -192,3 +192,52 @@ def test_staged_file_tampering_and_symlink_blocked(staged_fixture, tmp_path):
     link.symlink_to(owner, target_is_directory=True)
     with pytest.raises(W12AdmissionError, match="symlink"):
         research_stage_projection(link)
+
+
+def test_user_scoped_http_research_stage_never_promotes_w12_fixture(staged_fixture, tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from kairoskopion.api.app import app
+    from kairoskopion.api.auth import User, get_current_user
+
+    archive, pinned, original = staged_fixture
+    monkeypatch.setenv("KAIROSKOPION_DATA_DIR", str(tmp_path))
+    a = User(user_id="user_aaaaaaaaaaaa", display_name="A")
+    b = User(user_id="user_bbbbbbbbbbbb", display_name="B")
+    owner = tmp_path / "users" / a.user_id
+    stage_private_research(
+        archive, owner, expected_archive_sha256=pinned,
+        expected_source_sha256=original,
+    )
+
+    client = TestClient(app)
+    app.dependency_overrides[get_current_user] = lambda: a
+    try:
+        result = client.get("/api/opportunities/research-stage")
+        assert result.status_code == 200
+        assert result.json()["status"] == "PRIVATE_RESEARCH_STAGED"
+        assert len(result.json()["rows"]) == 53
+        assert all(x["authorDecision"] == "HOLD" for x in result.json()["rows"])
+        assert "author_fields" not in str(result.json())
+        portfolio = client.get("/api/opportunities/portfolio")
+        assert portfolio.status_code == 200
+        assert portfolio.json()["importStatus"] == "PRIVATE_RESEARCH_STAGED"
+        assert portfolio.json()["seedCount"] == 0
+        assert portfolio.json()["independentOpportunityCount"] == 0
+
+        app.dependency_overrides[get_current_user] = lambda: b
+        other = client.get("/api/opportunities/research-stage")
+        assert other.status_code == 200
+        assert other.json()["status"] == "RUNTIME_IMPORT_PENDING"
+        assert other.json()["rows"] == []
+        other_portfolio = client.get("/api/opportunities/portfolio")
+        assert other_portfolio.json()["importStatus"] == "RUNTIME_IMPORT_PENDING"
+        assert other_portfolio.json()["rows"] == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_research_stage_requires_authentication():
+    from fastapi.testclient import TestClient
+    from kairoskopion.api.app import app
+
+    assert TestClient(app).get("/api/opportunities/research-stage").status_code == 401
