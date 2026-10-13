@@ -164,6 +164,8 @@ def test_record_versions_and_event_ids_are_immutable(tmp_path):
         "event_id": "W12:T1", "kind": "HUNT_RESULT",
         "subject_id": "opp-a-1", "source_ref": "official:journal:2026",
         "at": "2026-10-13T00:00:00Z", "result": "REJECTED_UNVERIFIED_CFP",
+        "intellectual_consequence": "no live formal CFP can be claimed",
+        "next_action": "verify official policy or reject route",
     }
     assert s.append_event(event) == s.append_event(event)
     assert len(s.replay_events()) == 1
@@ -205,4 +207,71 @@ def test_packet_never_pretends_to_be_sent():
         validate_record("EditorialPacket", {
             "id": "p", "revision": "1", "route_id": "route-1",
             "send_status": "SENT",
+        })
+
+
+def test_negative_discovery_cannot_disappear_without_intellectual_consequence(tmp_path):
+    store = OpportunityGraphStore(tmp_path)
+    negative = {
+        "event_id": "W12:NEG2", "kind": "HUNT_RESULT",
+        "subject_id": "MAI-A", "source_ref": "doi:source",
+        "result": "REJECTED_NOVELTY",
+        "next_action": "revisit underlying claim",
+    }
+    with pytest.raises(ValueError, match="intellectual_consequence"):
+        store.append_event(negative)
+    with pytest.raises(ValueError, match="next_action"):
+        store.append_event({
+            **negative,
+            "intellectual_consequence": "rival already established the previous result",
+            "next_action": "",
+        })
+
+
+def test_reopen_is_a_proposal_not_a_silent_change_to_protected_core(tmp_path):
+    store = OpportunityGraphStore(tmp_path)
+    seed = {
+        "id": "MAI-A", "revision": "r1",
+        "source_ref": "gdoc:original", "author_authority": "ARTIKL",
+        "protected_core": ["institutional judgment"],
+    }
+    store.put("ArticleSeed", seed)
+    finding = {
+        "event_id": "W12:NEG3", "kind": "HUNT_RESULT",
+        "subject_id": "MAI-A", "source_ref": "doi:counterexample",
+        "result": "CONTRADICTED",
+        "intellectual_consequence": "original claim no longer defensible",
+        "next_action": "reopen conceptual basis",
+    }
+    store.append_event(finding)
+    proposal = store.propose_field_reopen(
+        "W12:NEG3", reopen_level="L2",
+        next_question="Which distinction makes the claim testable?",
+    )
+    assert proposal["kind"] == "FIELD_REOPEN_PROPOSAL"
+    assert proposal["semantic_mutation"] == "NONE"
+    assert proposal["author_gate"] == "AUTHOR_REVIEW_REQUIRED"
+    assert store.propose_field_reopen(
+        "W12:NEG3", reopen_level="L2",
+        next_question="Which distinction makes the claim testable?",
+    ) == proposal
+    assert store.get("ArticleSeed", "MAI-A", "r1")["protected_core"] == ["institutional judgment"]
+
+
+def test_reopen_rejects_positive_observation_and_invalid_level(tmp_path):
+    store = OpportunityGraphStore(tmp_path)
+    store.append_event({
+        "event_id": "W12:POS", "kind": "HUNT_RESULT",
+        "subject_id": "opp-e", "source_ref": "doi:new",
+        "result": "MATCH_FOUND",
+    })
+    with pytest.raises(ValueError, match="negative research finding"):
+        store.propose_field_reopen(
+            "W12:POS", reopen_level="L1", next_question="What changed?",
+        )
+    with pytest.raises(ValueError, match="L0..L5"):
+        store.append_event({
+            "event_id": "W12:BAD", "kind": "FIELD_REOPEN_PROPOSAL",
+            "subject_id": "opp-e", "source_ref": "doi:new",
+            "reopen_level": "L9", "author_gate": "AUTHOR_REVIEW_REQUIRED",
         })
