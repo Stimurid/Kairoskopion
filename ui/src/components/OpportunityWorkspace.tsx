@@ -144,11 +144,19 @@ export function OpportunityWorkspace({ portfolio = null }: { portfolio?: Opportu
     if (portfolio) return;
     let active = true;
     api.getOpportunityPortfolio()
-      .then((value) => { if (active) { setRemotePortfolio(value); setFetchError(false); } })
+      .then((value) => {
+        if (!active) return;
+        setRemotePortfolio(value);
+        setFetchError(false);
+        // A private HTTP readback is intentionally disabled under soft-auth.
+        // Don't attempt it when the portfolio reports no authorized stage.
+        if (value.importStatus === 'PRIVATE_RESEARCH_STAGED') {
+          api.getW12ResearchStage()
+            .then((stage) => { if (active) { setResearchStage(stage); setResearchError(false); } })
+            .catch(() => { if (active) setResearchError(true); });
+        }
+      })
       .catch(() => { if (active) setFetchError(true); });
-    api.getW12ResearchStage()
-      .then((value) => { if (active) { setResearchStage(value); setResearchError(false); } })
-      .catch(() => { if (active) setResearchError(true); });
     return () => { active = false; };
   }, [portfolio]);
 
