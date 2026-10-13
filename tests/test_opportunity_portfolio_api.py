@@ -142,7 +142,7 @@ def test_authenticated_http_portfolio_is_user_scoped_and_never_fakes_w12(tmp_pat
         response_a = client.get("/api/opportunities/portfolio")
         assert response_a.status_code == 200
         assert response_a.json()["seedCount"] == 1
-        assert response_a.json()["importStatus"] == "BLOCKED_SOURCE_BYTES_UNAVAILABLE"
+        assert response_a.json()["importStatus"] == "RUNTIME_IMPORT_PENDING"
         app.dependency_overrides[get_current_user] = lambda: b
         response_b = client.get("/api/opportunities/portfolio")
         assert response_b.status_code == 200
