@@ -16,7 +16,7 @@ def _unique_count(records: list[dict[str, Any]]) -> int:
 
 def _evidence_depth(record: dict[str, Any]) -> bool:
     return bool(
-        record.get("kind") == "PUBLISHED_ARTICLE"
+        (record.get("source_kind") or record.get("kind")) == "PUBLISHED_ARTICLE"
         and record.get("read_depth") == "FULL_TEXT"
         and record.get("passage_anchors")
     )
