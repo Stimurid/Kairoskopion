@@ -47,8 +47,42 @@ export interface OpportunityTraceEvent {
   reason: string;
 }
 
+export interface W12ResearchRoute {
+  routeId: string;
+  sourceRowRef: string;
+  sourceRowSha256: string;
+  seedId: string;
+  researchVersionId: string;
+  venueId: string;
+  journalName: string;
+  workingTitle: string;
+  scholarlyOpponent: string;
+  researchPressure: string;
+  evidenceDebt: string;
+  routeType: 'POLICY_UNVERIFIED';
+  policyStatus: 'POLICY_UNVERIFIED';
+  sourceClaimOnly: true;
+  readDepthStatus: 'NO_QUALIFIED_FULLTEXT';
+  authorDecision: 'HOLD';
+  articleStatus: 'NOT_ARTIKL_ADMITTED';
+  externalSubmission: 'NOT_SENT';
+}
+
+export interface W12ResearchStage {
+  status: 'RUNTIME_IMPORT_PENDING' | 'PRIVATE_RESEARCH_STAGED';
+  sourceSha256?: string;
+  archiveSha256?: string;
+  sourceRowsStaged?: number;
+  researchSeedCount?: number;
+  researchVersionCount?: number;
+  researchVenueCount?: number;
+  researchRouteCount?: number;
+  researchActionCount?: number;
+  rows: W12ResearchRoute[];
+}
+
 export interface OpportunityPortfolio {
-  importStatus: 'IMPORTED_VERIFIED' | 'SOURCE_BYTES_VERIFIED_MAPPING_PENDING' | 'BLOCKED_SOURCE_BYTES_UNAVAILABLE';
+  importStatus: 'PRIVATE_RESEARCH_STAGED' | 'RUNTIME_IMPORT_PENDING' | 'IMPORTED_VERIFIED' | 'SOURCE_BYTES_VERIFIED_MAPPING_PENDING' | 'BLOCKED_SOURCE_BYTES_UNAVAILABLE';
   importReceipt?: string;
   seedCount: number;
   independentOpportunityCount: number;
@@ -73,20 +107,25 @@ const fitLabels: Record<OpportunityRow['fit'], string> = {
   UNKNOWN: 'Недостаточно данных',
 };
 
-type Tab = 'portfolio' | 'matrix' | 'venues' | 'lineage' | 'trace';
+type Tab = 'portfolio' | 'research' | 'matrix' | 'venues' | 'lineage' | 'trace';
 
 function ImportNotice({ portfolio }: { portfolio: OpportunityPortfolio | null }) {
   if (portfolio?.importStatus === 'IMPORTED_VERIFIED') {
     return <p className="opp-import-state">Импорт подтверждён. <span>{portfolio.importReceipt}</span></p>;
   }
+  const staged = portfolio?.importStatus === 'PRIVATE_RESEARCH_STAGED';
   return (
     <div className="opp-import-warning" role="status">
-      <strong>Корпус W12 ещё не импортирован.</strong>
-      <p>Индаго передала исследовательский handoff: 6 исходных замыслов, 27 смысловых версий,
-        81 журнал-кандидат и 53 редакционных маршрута. Это заявленные размеры источника,
-        а не количество допущенных или отправленных статей.</p>
-      <p>До получения проверяемых байтов XLSX/ZIP, SHA-256 и квитанции импорта данные
-        не переходят в состояние «подтверждено». Никаких отправок из этого экрана нет.</p>
+      <strong>{staged
+        ? 'Частный исследовательский W12 принят. Это ещё не статьи.'
+        : 'Источник W12 проверен в частном архиве; импорт в этот runtime не подтверждён.'}</strong>
+      <p>Верифицированы байты XLSX и частный архив: 6 исходных замыслов, 27 исследовательских
+        версий, 81 журнал-кандидат и 53 предварительных маршрута. Это разные научные
+        объекты, не 53 самостоятельные статьи и не 53 открытых CFP.</p>
+      <p>{staged
+        ? 'Маршруты доступны в разделе «Исследовательский W12», но все имеют статус POLICY_UNVERIFIED.'
+        : 'Оператор должен выполнить приватный импорт с SHA-256 и прочитать квитанцию именно этого пользователя.'}
+        {' '}Нет подтверждённых полнотекстовых журнальных моделей, решений автора или автоматических отправок.</p>
     </div>
   );
 }
@@ -98,12 +137,25 @@ export function OpportunityWorkspace({ portfolio = null }: { portfolio?: Opportu
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [remotePortfolio, setRemotePortfolio] = useState<OpportunityPortfolio | null>(null);
   const [fetchError, setFetchError] = useState(false);
+  const [researchStage, setResearchStage] = useState<W12ResearchStage | null>(null);
+  const [researchError, setResearchError] = useState(false);
 
   useEffect(() => {
     if (portfolio) return;
     let active = true;
     api.getOpportunityPortfolio()
-      .then((value) => { if (active) { setRemotePortfolio(value); setFetchError(false); } })
+      .then((value) => {
+        if (!active) return;
+        setRemotePortfolio(value);
+        setFetchError(false);
+        // A private HTTP readback is intentionally disabled under soft-auth.
+        // Don't attempt it when the portfolio reports no authorized stage.
+        if (value.importStatus === 'PRIVATE_RESEARCH_STAGED') {
+          api.getW12ResearchStage()
+            .then((stage) => { if (active) { setResearchStage(stage); setResearchError(false); } })
+            .catch(() => { if (active) setResearchError(true); });
+        }
+      })
       .catch(() => { if (active) setFetchError(true); });
     return () => { active = false; };
   }, [portfolio]);
@@ -135,14 +187,15 @@ export function OpportunityWorkspace({ portfolio = null }: { portfolio?: Opportu
       </header>
 
       <ImportNotice portfolio={activePortfolio} />
-      {fetchError && <p className="opp-fetch-warning" role="alert">
-        Не удалось получить живые данные реестра с сервера. Показанные нулевые значения
+      {(fetchError || researchError) && <p className="opp-fetch-warning" role="alert">
+        Не удалось получить часть пользовательских данных с сервера. Показанные нули
         не означают, что исследовательские возможности отсутствуют.
       </p>}
 
       <nav className="opp-tabs" aria-label="Разделы пространства возможностей">
         {([
           ['portfolio', 'Портфель'],
+          ['research', 'Исследовательский W12'],
           ['matrix', 'Матрица возможностей'],
           ['venues', 'Паспорта журналов'],
           ['lineage', 'Происхождение и версии'],
@@ -167,6 +220,47 @@ export function OpportunityWorkspace({ portfolio = null }: { portfolio?: Opportu
           </div>
           <p className="opp-small">Не создаём 53 самостоятельные статьи из 53 редакционных действий.
             Статусы автора и машинной проверки существуют раздельно.</p>
+        </section>
+      )}
+
+      {tab === 'research' && (
+        <section className="opp-section">
+          <h3>Частный исследовательский корпус Индаго · W12</h3>
+          <p className="opp-small">Исходные записи W12 видны только владельцу соответствующей
+            сессии. Они не становятся статьями Artikl, а редакционные действия остаются
+            неподтверждёнными до отдельного изучения первоисточников и согласования с автором.</p>
+          {researchStage?.status === 'PRIVATE_RESEARCH_STAGED' ? (
+            <>
+              <div className="opp-summary">
+                <div><strong>{researchStage.researchSeedCount ?? 0}</strong><span>Исходных направлений</span></div>
+                <div><strong>{researchStage.researchVersionCount ?? 0}</strong><span>Исследовательских версий</span></div>
+                <div><strong>{researchStage.researchVenueCount ?? 0}</strong><span>Журналов-кандидатов</span></div>
+                <div><strong>{researchStage.researchRouteCount ?? 0}</strong><span>Непроверенных маршрутов</span></div>
+                <div><strong>{researchStage.sourceRowsStaged ?? 0}</strong><span>Строк с сохранённым происхождением</span></div>
+              </div>
+              <div className="opp-table-scroll">
+                <table className="opp-table">
+                  <thead><tr><th>Замысел и версия</th><th>Журнал</th><th>Рабочая гипотеза</th>
+                    <th>Долг исследования</th><th>Статус / источник</th></tr></thead>
+                  <tbody>
+                    {researchStage.rows.map((row) => <tr key={row.routeId}>
+                      <td>{row.seedId} · {row.researchVersionId}</td>
+                      <td>{row.journalName}</td>
+                      <td>{row.workingTitle || 'Не заполнено'}
+                        <small>{row.researchPressure || 'Давление журнала не описано'}</small></td>
+                      <td>{row.evidenceDebt || 'Требуется проверка оснований'}</td>
+                      <td>POLICY_UNVERIFIED · HOLD
+                        <small>{row.sourceRowRef} · {row.routeId}</small></td>
+                    </tr>)}
+                  </tbody>
+                </table>
+              </div>
+              <p className="opp-small">Источник (SHA-256): {researchStage.sourceSha256}.
+                Нет разрешения на отправку, и статус этих строк не повышается при чтении.</p>
+            </>
+          ) : <p className="opp-empty">Частный W12 ещё не помещён в пользовательский runtime.
+            Проверенный архив существует в закрытом Drive, но этот экран не загружает
+            его автоматически и не показывает данные чужого пользователя.</p>}
         </section>
       )}
 
