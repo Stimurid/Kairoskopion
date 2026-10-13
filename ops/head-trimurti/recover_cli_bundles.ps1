@@ -1,5 +1,7 @@
 # HEAD-TRIMURTI source recovery from Codex ZIP; no SSH, deploy or external sending.
-$ErrorActionPreference='Stop'
+# Windows PowerShell 5.1 turns ordinary native stderr (e.g. git worktree progress)
+# into ErrorRecords under Stop. All native failures are checked by exit code.
+$ErrorActionPreference='Continue'
 [Console]::OutputEncoding=[Text.Encoding]::UTF8
 $OutputEncoding=[Text.Encoding]::UTF8
 $repoName='Stimurid/Kairoskopion'
