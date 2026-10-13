@@ -155,3 +155,70 @@ def test_authenticated_http_portfolio_is_user_scoped_and_never_fakes_w12(tmp_pat
 def test_unauthenticated_portfolio_is_forbidden():
     client = TestClient(app)
     assert client.get("/api/opportunities/portfolio").status_code == 401
+
+
+def test_three_distinct_mai_route_contracts_do_not_conflate_forms(tmp_path):
+    """FIXTURE-ONLY: MAI-E proposal, MAI-A manuscript, MAI-F precheck + rights HOLD."""
+    store = _store(tmp_path)
+    _admit_minimal_graph(store)  # E: formal CFP / accepted author review only
+    cases = [
+        ("MAI-A", "opp-a", "philosophical-ru", "FULL_MANUSCRIPT_ONLY", "HOLD", False),
+        ("MAI-F", "opp-f", "open-philosophy", "OPTIONAL_EDITORIAL_PRECHECK", "ACCEPT", True),
+    ]
+    for seed, op, journal, route_type, decision, needs_consent in cases:
+        store.put("ArticleSeed", {
+            "id": seed, "revision": "r1",
+            "source_ref": "fixture:" + seed,
+            "author_authority": "ARTIKL",
+            "coauthor_consent_required": needs_consent,
+            "coauthor_consent_verified": False,
+        })
+        store.put("ArticleOpportunity", {
+            "id": op, "revision": "r1",
+            "seed_id": seed, "scholarly_problem": "fictional test discourse",
+            "independent_claim": "fixture claim " + seed,
+            "author_decision": decision,
+        })
+        store.put("Journal", {
+            "id": journal, "revision": "r1",
+            "canonical_name": "Fixture: " + journal,
+            "official_url": "https://" + journal + ".example.test/fixture",
+        })
+        policy_id = "policy:" + journal
+        store.put("Evidence", {
+            "id": policy_id, "revision": "r1",
+            "source_ref": "fixture:" + journal,
+            "source_kind": "OFFICIAL_POLICY",
+            "official": True, "read_depth": "SECTIONS",
+            "passage_anchors": ["fixture-policy-text"],
+        })
+        world_id = "world:" + journal
+        store.put("VenueWorld", {
+            "id": world_id, "revision": "r1", "journal_id": journal,
+            "target_world_version": "fixture-world",
+            "published_example_evidence_ids": [],
+        })
+        store.put("OpportunityRoute", {
+            "id": "route:" + journal, "revision": "r1",
+            "opportunity_id": op, "journal_id": journal,
+            "target_world_version": "fixture-world",
+            "route_type": route_type,
+            "policy_evidence_ids": [policy_id],
+            "submission_channel_kind": "OFFICIAL_PORTAL",
+            "submission_channel_ref": "https://" + journal + ".example.test/portal",
+            "fit": "CONDITIONAL",
+        })
+
+    output = build_portfolio(store)
+    assert output["importStatus"] == "BLOCKED_SOURCE_BYTES_UNAVAILABLE"
+    assert output["seedCount"] == 3
+    assert output["independentOpportunityCount"] == 3
+    assert output["distinctVenueCount"] == 3
+    assert len(output["rows"]) == 3
+    by_seed = {row["seedId"]: row for row in output["rows"]}
+    assert by_seed["MAI-E"]["routeKind"] == "FORMAL_ABSTRACT_CFP"
+    assert by_seed["MAI-A"]["routeKind"] == "FULL_MANUSCRIPT_ONLY"
+    assert by_seed["MAI-F"]["routeKind"] == "OPTIONAL_EDITORIAL_PRECHECK"
+    assert "author_decision_pending" in by_seed["MAI-A"]["blockers"]
+    assert "coauthor_consent_missing" in by_seed["MAI-F"]["blockers"]
+    assert all(row["gateStatus"] != "SENT" for row in output["rows"])
