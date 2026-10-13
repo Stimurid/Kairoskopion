@@ -25,6 +25,20 @@ ROUTE_TYPES = frozenset({
     "POLICY_UNVERIFIED",
 })
 AUTHOR_DECISIONS = frozenset({"HOLD", "ACCEPT", "REJECT"})
+REOPEN_LEVELS = frozenset({"L0", "L1", "L2", "L3", "L4", "L5"})
+_NEGATIVE_MARKERS = (
+    "REJECT", "NOT_FOUND", "BLOCK", "STALE", "CONTRADICT",
+    "DUPLICATE", "INVALID", "INACCESSIBLE", "DISPROVED",
+)
+
+
+def is_negative_hunt_result(event: dict[str, Any]) -> bool:
+    """Negative intellectual findings survive as first-class trace events."""
+    if event.get("kind") not in {"HUNT_RESULT", "VENUE_REJECTION", "SOURCE_CONTRADICTION"}:
+        return False
+    result = str(event.get("result") or "").upper()
+    return any(marker in result for marker in _NEGATIVE_MARKERS)
+
 ENTITY_TYPES = frozenset({
     "Evidence", "World", "ArticleSeed", "ArticleOpportunity", "Journal",
     "VenueWorld", "JournalIssue", "OpportunityRoute", "TargetVariant", "EditorialPacket",
@@ -294,8 +308,50 @@ class OpportunityGraphStore:
         _required(event.get("source_ref"), "source_ref")
         if event.get("kind") == "AUTHOR_DECISION" and event.get("decision") not in AUTHOR_DECISIONS:
             raise ValueError("author decision event needs an explicit decision")
+        level = event.get("reopen_level")
+        if level is not None and level not in REOPEN_LEVELS:
+            raise ValueError("reopen_level must be L0..L5")
+        if is_negative_hunt_result(event):
+            _required(event.get("intellectual_consequence"), "negative intellectual_consequence")
+            _required(event.get("next_action"), "negative next_action")
+        if event.get("kind") == "FIELD_REOPEN_PROPOSAL":
+            if level not in REOPEN_LEVELS:
+                raise ValueError("field reopen needs a level L0..L5")
+            if event.get("author_gate") != "AUTHOR_REVIEW_REQUIRED":
+                raise ValueError("field reopen cannot bypass author gate")
         key = _digest(event_id)
         return self._write_once(self.events / f"{key}.json", dict(event))
+
+    def propose_field_reopen(
+        self, negative_event_id: str, *,
+        reopen_level: str,
+        next_question: str,
+    ) -> dict[str, Any]:
+        """Propose (never apply) a return from a negative discovery to L0-L5.
+
+        Replays preserve abandoned hypotheses and their source anchors. Artikl
+        and the author, not Kairon, decide whether to change protected meaning.
+        """
+        path = self.events / f"{_digest(negative_event_id)}.json"
+        if not path.is_file():
+            raise ValueError("negative source event not found")
+        negative = json.loads(path.read_text(encoding="utf-8"))
+        if not is_negative_hunt_result(negative):
+            raise ValueError("field reopen needs a negative research finding")
+        _required(next_question, "next_question")
+        proposal = {
+            "event_id": f"{negative_event_id}/reopen/{reopen_level}",
+            "kind": "FIELD_REOPEN_PROPOSAL",
+            "subject_id": negative["subject_id"],
+            "source_ref": negative["source_ref"],
+            "source_event_id": negative_event_id,
+            "intellectual_consequence": negative["intellectual_consequence"],
+            "next_action": str(next_question),
+            "reopen_level": reopen_level,
+            "author_gate": "AUTHOR_REVIEW_REQUIRED",
+            "semantic_mutation": "NONE",
+        }
+        return self.append_event(proposal)
 
     def replay_events(self) -> list[dict[str, Any]]:
         events = [json.loads(p.read_text(encoding="utf-8")) for p in self.events.glob("*.json")]
