@@ -5,6 +5,7 @@ unverified W12 XLSX upload. Internal writer/import adapter is a later gate.
 """
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -17,6 +18,16 @@ from ..kairon_provider.w12_private_runtime import W12AdmissionError, research_st
 
 
 router = APIRouter(prefix="/api/opportunities", tags=["opportunities"])
+
+def _private_research_read_enabled() -> bool:
+    """Default OFF while Kairoskopion uses staging soft-auth.
+
+    Operator may enable only in an isolated staging environment after
+    separately verifying identity and filesystem ACLs; never automatically
+    expose owner-private source rows on a public soft-auth service.
+    """
+    return os.environ.get("KAIROSKOPION_W12_PRIVATE_STAGE_READ_ENABLED") == "1"
+
 
 
 def _user_opportunity_root(user: User) -> Path:
@@ -35,10 +46,13 @@ def get_opportunity_portfolio(current_user: User = Depends(get_current_user)):
     result = build_portfolio(store)
     # A private staged research corpus is NOT an imported ArticleOpportunity.
     # Never self-certify source policies, full-text reads or author decisions.
-    try:
-        stage = research_stage_projection(user_root, limit=1)
-    except W12AdmissionError as exc:
-        raise HTTPException(status_code=503, detail="private W12 stage requires operator repair") from exc
+    if _private_research_read_enabled():
+        try:
+            stage = research_stage_projection(user_root, limit=1)
+        except W12AdmissionError as exc:
+            raise HTTPException(status_code=503, detail="private W12 stage requires operator repair") from exc
+    else:
+        stage = {"status": "RUNTIME_IMPORT_PENDING", "rows": []}
     result["importStatus"] = stage["status"]
     result["importReceipt"] = stage.get("sourceSha256")
     result["researchStage"] = {
@@ -65,6 +79,8 @@ def get_private_w12_research_stage(
     No private source/author profile download endpoint; only bounded route
     summaries with pinned sheet/row hashes and explicit authority blockers.
     """
+    if not _private_research_read_enabled():
+        raise HTTPException(status_code=403, detail="private W12 research readback is disabled")
     try:
         return research_stage_projection(
             _user_opportunity_root(current_user), offset=offset, limit=limit
