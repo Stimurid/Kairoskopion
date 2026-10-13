@@ -1052,8 +1052,7 @@ def test_failed_attempts_consume_total_corpus_budget(tmp_path, monkeypatch):
 def test_actual_paragraph_chunk_fanout_is_bounded(monkeypatch):
     from kairoskopion.kairon_provider import deep_target_models as deep
     monkeypatch.setattr(deep, "MAX_BODY_CHUNKS", 2)
-    text = ("A" * 549 + "
-") * 3 + "B" * 350
+    text = ("A" * 549 + "\n") * 3 + "B" * 350
     assert len(text) == 2000
     assert len(deep._split_complete_text(text, 1000)) > 2
     class NeverProvider:
