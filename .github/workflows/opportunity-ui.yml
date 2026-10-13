@@ -2,7 +2,7 @@ name: Opportunity UI verification
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'integration/**']
     paths:
       - 'ui/**'
       - '.github/workflows/opportunity-ui.yml'
