@@ -40,8 +40,14 @@ The `user_000000000000` value is an **example**, not the owner's account ID.
 This is not a remote upload API. The trusted operator must use the correct
 existing user and locally authorized artifact.
 
-5. Read back `GET /api/opportunities/research-stage` under that user's
-   authenticated Bearer session and compare the SHA and counts.
+5. Readback is **OFF by default**. The running server must be an isolated,
+   operator-controlled staging environment with independently verified user
+   identity and filesystem ACLs. Only there, set
+   `KAIROSKOPION_W12_PRIVATE_STAGE_READ_ENABLED=1` before launching the API.
+   A public installation using the built-in soft-auth must leave this flag
+   unset; the research endpoint otherwise returns HTTP 403.
+6. Read `GET /api/opportunities/research-stage` under that user’s
+   authenticated Bearer session, and compare SHA and counts.
 6. The Russian `Возможности → Исследовательский W12` tab shows only
    research rows, source sheet anchors and blocker labels, never an automatic
    SEND control. Other users' endpoints must stay empty.
