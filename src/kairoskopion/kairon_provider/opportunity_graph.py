@@ -267,6 +267,25 @@ class OpportunityGraphStore:
             return None
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def list_records(self, kind: str | None = None) -> list[dict[str, Any]]:
+        """Read immutable records. Versions remain separate, never silently promote."""
+        if kind is not None and kind not in ENTITY_TYPES:
+            raise ValueError("unknown entity type")
+        out = []
+        for path in sorted(self.records.glob("*.json")):
+            record = json.loads(path.read_text(encoding="utf-8"))
+            if record.get("kind") not in ENTITY_TYPES:
+                raise ValueError("corrupt opportunity record: invalid entity kind")
+            if kind is None or record["kind"] == kind:
+                out.append(record)
+        return sorted(
+            out, key=lambda r: (
+                str(r.get("kind", "")),
+                str(r.get("id", "")),
+                str(r.get("revision", "")),
+            ),
+        )
+
     def append_event(self, event: dict[str, Any]) -> dict[str, Any]:
         event_id = _required(event.get("event_id"), "event_id")
         _required(event.get("kind"), "event kind")
