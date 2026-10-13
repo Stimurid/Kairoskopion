@@ -78,6 +78,7 @@ def validate_record(kind: str, record: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("evidence read_depth must be explicit")
         if not isinstance(record.get("passage_anchors", []), list):
             raise ValueError("passage_anchors must be a list")
+        _required(record.get("source_kind"), "source_kind")
     elif kind == "ArticleSeed":
         _required(record.get("source_ref"), "seed source_ref")
         _required(record.get("author_authority"), "author_authority")
@@ -126,7 +127,7 @@ def venue_world_status(world: dict[str, Any], evidence: dict[str, dict[str, Any]
         ref for ref in refs
         if ref in evidence
         and evidence[ref].get("read_depth") == "FULL_TEXT"
-        and evidence[ref].get("kind") == "PUBLISHED_ARTICLE"
+        and (evidence[ref].get("source_kind") or evidence[ref].get("kind")) == "PUBLISHED_ARTICLE"
         and bool(evidence[ref].get("passage_anchors"))
     }
     return "FULL_EVIDENCE" if len(fully_read) >= 3 else "PARTIAL_EVIDENCE"
@@ -151,14 +152,14 @@ def assess_route(
     policies = [
         evidence[ref] for ref in policy_ids
         if ref in evidence
-        and evidence[ref].get("kind") in _RELEVANT_POLICY
+        and (evidence[ref].get("source_kind") or evidence[ref].get("kind")) in _RELEVANT_POLICY
         and evidence[ref].get("read_depth") in {"FULL_TEXT", "SECTIONS"}
         and evidence[ref].get("official", False) is True
     ]
     if not policies:
         blockers.append("no_official_policy_evidence")
     if route["route_type"] == "FORMAL_ABSTRACT_CFP" and not any(
-        policy.get("kind") == "OFFICIAL_CFP" for policy in policies
+        (policy.get("source_kind") or policy.get("kind")) == "OFFICIAL_CFP" for policy in policies
     ):
         blockers.append("formal_cfp_not_verified")
     if route.get("submission_channel_kind") not in _REAL_CHANNELS:
