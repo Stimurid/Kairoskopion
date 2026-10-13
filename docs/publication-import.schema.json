@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:kairoskopion:publication-import-v1",
+  "title": "Offline publication import manifest (not submission acceptance)",
+  "type": "object",
+  "required": ["schema_version", "evidence_mode", "spec", "sibling_file", "artifacts"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "publication-import-v1"},
+    "evidence_mode": {"enum": ["REAL", "FIXTURE"]},
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["article_id", "venue_id", "authoritative_sibling", "target_world_package", "submission_pack", "policy_snapshot_refs", "route_status", "author_fields_status"],
+      "properties": {
+        "article_id": {"$ref": "#/$defs/text"},
+        "venue_id": {"$ref": "#/$defs/text"},
+        "authoritative_sibling": {"$ref": "#/$defs/version"},
+        "target_world_package": {
+          "type": "object",
+          "required": ["package_id", "content_digest", "status", "catalog_status", "snapshot"],
+          "properties": {
+            "package_id": {"$ref": "#/$defs/text"},
+            "content_digest": {"$ref": "#/$defs/hash"},
+            "status": {"$ref": "#/$defs/text"},
+            "catalog_status": {"$ref": "#/$defs/text"},
+            "snapshot": {
+              "type": "object",
+              "required": ["snapshot_id", "target_id"],
+              "properties": {
+                "snapshot_id": {"$ref": "#/$defs/text"},
+                "target_id": {"$ref": "#/$defs/text"}
+              }
+            }
+          }
+        },
+        "submission_pack": {
+          "type": "object",
+          "required": ["submission_pack_id"],
+          "properties": {
+            "submission_pack_id": {"$ref": "#/$defs/text"},
+            "status": {"type": "string"},
+            "ready_status": {"type": "string"},
+            "blocking_issues": {"$ref": "#/$defs/texts"},
+            "missing_items": {"$ref": "#/$defs/texts"},
+            "unknowns": {"$ref": "#/$defs/texts"}
+          }
+        },
+        "policy_snapshot_refs": {"$ref": "#/$defs/texts"},
+        "route_status": {"enum": ["LIVE", "BLOCKED", "UNKNOWN"]},
+        "author_fields_status": {"enum": ["CONFIRMED", "OPEN", "NOT_REQUIRED"]},
+        "required_artifact_kinds": {"type": "array", "items": {"$ref": "#/$defs/kind"}},
+        "required_qa_types": {"type": "array", "items": {"$ref": "#/$defs/qaType"}}
+      }
+    },
+    "sibling_file": {"$ref": "#/$defs/file"},
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manuscript_docx", "title_page", "cover_letter", "submission_checklist"],
+      "properties": {
+        "manuscript_docx": {"$ref": "#/$defs/artifact"},
+        "title_page": {"$ref": "#/$defs/artifact"},
+        "cover_letter": {"$ref": "#/$defs/artifact"},
+        "submission_checklist": {"$ref": "#/$defs/artifact"}
+      }
+    }
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1},
+    "texts": {"type": "array", "items": {"$ref": "#/$defs/text"}},
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "kind": {"enum": ["manuscript_docx", "title_page", "cover_letter", "submission_checklist"]},
+    "qaType": {"enum": ["SEMANTIC_QA", "PRIVACY_SCRUB", "VISUAL_RENDER"]},
+    "version": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "properties": {
+        "ref": {"$ref": "#/$defs/text"},
+        "revision": {"type": ["string", "null"]},
+        "sha256": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/text"},
+        "sha256": {"$ref": "#/$defs/hash"},
+        "page": {"type": "integer", "minimum": 1}
+      }
+    },
+    "artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "file", "source_sibling", "qa"],
+      "properties": {
+        "version": {"$ref": "#/$defs/version"},
+        "file": {"$ref": "#/$defs/file"},
+        "source_sibling": {"$ref": "#/$defs/version"},
+        "qa": {
+          "type": "object", "additionalProperties": false,
+          "required": ["SEMANTIC_QA", "PRIVACY_SCRUB", "VISUAL_RENDER"],
+          "properties": {
+            "SEMANTIC_QA": {"$ref": "#/$defs/file"},
+            "PRIVACY_SCRUB": {"$ref": "#/$defs/file"},
+            "VISUAL_RENDER": {"$ref": "#/$defs/file"}
+          }
+        }
+      }
+    },
+    "receipt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["article_id", "kind", "qa_type", "artifact", "source_sibling", "target_world_package_id", "target_world_digest", "policy_snapshot_refs", "evidence_mode", "producer_ref", "status", "evidence_files"],
+      "properties": {
+        "article_id": {"$ref": "#/$defs/text"},
+        "kind": {"$ref": "#/$defs/kind"},
+        "qa_type": {"$ref": "#/$defs/qaType"},
+        "artifact": {"$ref": "#/$defs/version"},
+        "source_sibling": {"$ref": "#/$defs/version"},
+        "target_world_package_id": {"$ref": "#/$defs/text"},
+        "target_world_digest": {"$ref": "#/$defs/hash"},
+        "policy_snapshot_refs": {"$ref": "#/$defs/texts"},
+        "evidence_mode": {"enum": ["REAL", "FIXTURE"]},
+        "producer_ref": {"$ref": "#/$defs/text"},
+        "status": {"enum": ["PASS", "FAIL"]},
+        "evidence_files": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/file"}},
+        "page_count": {"type": "integer", "minimum": 1}
+      },
+      "allOf": [{
+        "if": {"properties": {"qa_type": {"const": "VISUAL_RENDER"}}},
+        "then": {"required": ["page_count"], "properties": {"evidence_files": {"items": {"required": ["page"]}}}}
+      }]
+    },
+    "approval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["manifest_digest", "evidence_mode", "decision", "authority_ref", "valid_until", "approved_qa_sha256"],
+      "properties": {
+        "manifest_digest": {"$ref": "#/$defs/hash"},
+        "evidence_mode": {"enum": ["REAL", "FIXTURE"]},
+        "decision": {"const": "APPROVED_FOR_LOCAL_DRY_RUN"},
+        "authority_ref": {"$ref": "#/$defs/text"},
+        "valid_until": {"type": "string", "format": "date-time"},
+        "approved_qa_sha256": {"type": "array", "items": {"$ref": "#/$defs/hash"}}
+      }
+    }
+  }
+}

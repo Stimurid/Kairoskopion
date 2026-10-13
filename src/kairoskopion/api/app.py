@@ -139,6 +139,10 @@ app.include_router(_workbench_router, prefix="/api")
 from .kairon_provider import router as _kairon_provider_router
 app.include_router(_kairon_provider_router)
 
+# Independent evidence-grounded opportunities; isolated from package factory.
+from .opportunities import router as _opportunity_router
+app.include_router(_opportunity_router)
+
 
 # ---------------------------------------------------------------------------
 # Health
