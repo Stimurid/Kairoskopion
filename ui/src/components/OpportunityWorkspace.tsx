@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '../api/client';
 import '../styles/opportunity.css';
 
 /** Data fed by a future verified importer; this view never invents W12 records. */
@@ -29,6 +30,21 @@ export interface OpportunityRow {
   authorDecision: 'HOLD' | 'ACCEPT' | 'REJECT';
   evidenceRefs: string[];
   lineage: string[];
+  gateStatus?: string;
+  blockers?: string[];
+}
+
+export interface OpportunityTraceEvent {
+  eventId: string;
+  kind: string;
+  subjectId: string;
+  sourceRef: string;
+  at: string;
+  result: string;
+  intellectualConsequence: string;
+  reopenLevel?: string | null;
+  nextAction: string;
+  reason: string;
 }
 
 export interface OpportunityPortfolio {
@@ -39,6 +55,7 @@ export interface OpportunityPortfolio {
   variantCount: number;
   distinctVenueCount: number;
   rows: OpportunityRow[];
+  events?: OpportunityTraceEvent[];
 }
 
 const routeLabels: Record<RouteKind, string> = {
@@ -56,7 +73,7 @@ const fitLabels: Record<OpportunityRow['fit'], string> = {
   UNKNOWN: 'Недостаточно данных',
 };
 
-type Tab = 'portfolio' | 'matrix' | 'venues' | 'lineage';
+type Tab = 'portfolio' | 'matrix' | 'venues' | 'lineage' | 'trace';
 
 function ImportNotice({ portfolio }: { portfolio: OpportunityPortfolio | null }) {
   if (portfolio?.importStatus === 'IMPORTED_VERIFIED') {
@@ -79,8 +96,22 @@ export function OpportunityWorkspace({ portfolio = null }: { portfolio?: Opportu
   const [query, setQuery] = useState('');
   const [routeFilter, setRouteFilter] = useState<RouteKind | 'ALL'>('ALL');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [remotePortfolio, setRemotePortfolio] = useState<OpportunityPortfolio | null>(null);
+  const [fetchError, setFetchError] = useState(false);
 
-  const rows = useMemo(() => portfolio?.rows ?? [], [portfolio]);
+  useEffect(() => {
+    if (portfolio) return;
+    let active = true;
+    api.getOpportunityPortfolio()
+      .then((value) => { if (active) { setRemotePortfolio(value); setFetchError(false); } })
+      .catch(() => { if (active) setFetchError(true); });
+    return () => { active = false; };
+  }, [portfolio]);
+
+  const activePortfolio = portfolio ?? remotePortfolio;
+  const rows = useMemo(() => activePortfolio?.rows ?? [], [activePortfolio]);
+  const events = activePortfolio?.events ?? [];
+
   const filtered = useMemo(() => {
     const q = query.trim().toLocaleLowerCase('ru-RU');
     return rows.filter((row) =>
@@ -103,7 +134,11 @@ export function OpportunityWorkspace({ portfolio = null }: { portfolio?: Opportu
         </div>
       </header>
 
-      <ImportNotice portfolio={portfolio} />
+      <ImportNotice portfolio={activePortfolio} />
+      {fetchError && <p className="opp-fetch-warning" role="alert">
+        Не удалось получить живые данные реестра с сервера. Показанные нулевые значения
+        не означают, что исследовательские возможности отсутствуют.
+      </p>}
 
       <nav className="opp-tabs" aria-label="Разделы пространства возможностей">
         {([
@@ -111,6 +146,7 @@ export function OpportunityWorkspace({ portfolio = null }: { portfolio?: Opportu
           ['matrix', 'Матрица возможностей'],
           ['venues', 'Паспорта журналов'],
           ['lineage', 'Происхождение и версии'],
+          ['trace', 'Охота и отрицательные результаты'],
         ] as const).map(([key, name]) => (
           <button key={key} type="button" onClick={() => setTab(key)}
             className={tab === key ? 'opp-tab opp-tab--active' : 'opp-tab'}>
@@ -121,13 +157,13 @@ export function OpportunityWorkspace({ portfolio = null }: { portfolio?: Opportu
 
       {tab === 'portfolio' && (
         <section className="opp-section">
-          <h3>Реально принятые объекты</h3>
+          <h3>Объекты в реестре (не обязательно импорт W12)</h3>
           <div className="opp-summary">
-            <div><strong>{portfolio?.seedCount ?? 0}</strong><span>Замыслов в хранилище</span></div>
-            <div><strong>{portfolio?.independentOpportunityCount ?? 0}</strong><span>Самостоятельных возможностей</span></div>
-            <div><strong>{portfolio?.variantCount ?? 0}</strong><span>Версий аргумента</span></div>
-            <div><strong>{portfolio?.distinctVenueCount ?? 0}</strong><span>Различных журналов</span></div>
-            <div><strong>{rows.length}</strong><span>Обоснованных маршрутов</span></div>
+            <div><strong>{activePortfolio?.seedCount ?? 0}</strong><span>Замыслов в хранилище</span></div>
+            <div><strong>{activePortfolio?.independentOpportunityCount ?? 0}</strong><span>Самостоятельных возможностей</span></div>
+            <div><strong>{activePortfolio?.variantCount ?? 0}</strong><span>Версий аргумента</span></div>
+            <div><strong>{activePortfolio?.distinctVenueCount ?? 0}</strong><span>Различных журналов</span></div>
+            <div><strong>{rows.length}</strong><span>Маршрутов, включая заблокированные</span></div>
           </div>
           <p className="opp-small">Не создаём 53 самостоятельные статьи из 53 редакционных действий.
             Статусы автора и машинной проверки существуют раздельно.</p>
@@ -202,12 +238,36 @@ export function OpportunityWorkspace({ portfolio = null }: { portfolio?: Opportu
               <p><strong>Недостающие доказательства:</strong> {selected.requiredEvidence.join('; ') || 'Не оценены'}</p>
               <p><strong>Происхождение:</strong> {selected.lineage.join(' → ') || 'Не зарегистрировано'}</p>
               <p><strong>Редакционное действие:</strong> {routeLabels[selected.routeKind]}</p>
+              <p><strong>Технические ограничения:</strong> {selected.blockers?.join('; ') || 'Не предъявлены'}</p>
               <p><strong>Авторское решение:</strong> {selected.authorDecision}. Внешняя отправка — вне полномочий интерфейса.</p>
             </article>
           ) : <p className="opp-empty">Пока нечего сравнивать. После проверяемого импорта здесь будут
             версии, отвергнутые гипотезы, источниковые якоря и изменения L0–L5.</p>}
         </section>
       )}
+      {tab === 'trace' && (
+        <section className="opp-section">
+          <h3>Дневник исследовательских решений</h3>
+          <p className="opp-small">Неудачная гипотеза, редакционный отказ и недоступный источник
+            — сохраняемые исследовательские события, а не повод стирать ветку.</p>
+          {events.length ? (
+            <div className="opp-trace-list">
+              {events.map((item) => (
+                <article className="opp-venue-card" key={item.eventId}>
+                  <h4>{item.kind} · {item.subjectId}</h4>
+                  <p><strong>Наблюдение:</strong> {item.result || 'Не описано'} · {item.reason || 'Основание не внесено'}</p>
+                  <p><strong>Научное следствие:</strong> {item.intellectualConsequence || 'Ещё не установлено'}</p>
+                  <p><strong>Возврат к уровню:</strong> {item.reopenLevel || 'Не назначен'}</p>
+                  <p><strong>Следующее действие:</strong> {item.nextAction || 'Не сформулировано'}</p>
+                  <p className="opp-small">Источник: {item.sourceRef} · {item.at || 'Дата отсутствует'}</p>
+                </article>
+              ))}
+            </div>
+          ) : <p className="opp-empty">В этом хранилище пока нет зафиксированных ходов.
+            Отсутствие записей не является отрицательным результатом охоты.</p>}
+        </section>
+      )}
+
     </main>
   );
 }
