@@ -278,14 +278,18 @@ def run_case(manifest_path: Path | str, storage_root: Path | str) -> dict[str, A
         if event_class not in DISCUSSION_CLASSES:
             raise ValueError(f"invalid discussion event class: {event_class}")
         quote = str(event.get("quote") or "")
+        subject_ref = str(event.get("subject_ref") or "")
+        if subject_ref and subject_ref not in {"HEAD-01", "HEAD-02", "HEAD-03"}:
+            raise ValueError("unknown provisional subject_ref")
         if len(quote) < 12 or texts[source_key].count(quote) != 1:
             raise ValueError(f"discussion quote missing or ambiguous: {source_key}")
         index = texts[source_key].index(quote)
         ref = by_key[source_key]
-        discussion_events.append({
-            "event_id": "disc_trm074_" + _digest(
-                ref["source_id"] + "|" + str(index) + "|" + quote
-            )[:24],
+        event_identity = ref["source_id"] + "|" + str(index) + "|" + quote
+        if subject_ref:
+            event_identity += "|" + subject_ref
+        discussion_event = {
+            "event_id": "disc_trm074_" + _digest(event_identity)[:24],
             "source_id": ref["source_id"],
             "source_key": source_key,
             "source_kind": ref["kind"],
@@ -298,7 +302,10 @@ def run_case(manifest_path: Path | str, storage_root: Path | str) -> dict[str, A
             "end_character": index + len(quote),
             "scientific_claim_status": "UNVALIDATED_SOURCE_DERIVED",
             "author_approved": False,
-        })
+        }
+        if subject_ref:
+            discussion_event["subject_ref"] = subject_ref
+        discussion_events.append(discussion_event)
 
     accepted_ids = {
         x["source_id"] for x in snapshots
@@ -370,14 +377,17 @@ def run_case(manifest_path: Path | str, storage_root: Path | str) -> dict[str, A
     }
     # Export event records for WhiteCrow/Artikl handoff readers. An event
     # is a quoted carrier observation, never an ArticleSeed authorization.
-    existing_event_ids = {
-        r.get("event_id") for r in read_all("talk_discussion_events", base_dir=registry_root)
+    existing_event_by_id = {
+        r["event_id"]: r for r in read_all("talk_discussion_events", base_dir=registry_root)
     }
     new_event_count = 0
     for event in discussion_events:
-        if event["event_id"] not in existing_event_ids:
+        current = existing_event_by_id.get(event["event_id"])
+        if current is not None and current != event:
+            raise ValueError("same immutable discussion event identity changed content")
+        if current is None:
             append("talk_discussion_events", event, base_dir=registry_root)
-            existing_event_ids.add(event["event_id"])
+            existing_event_by_id[event["event_id"]] = event
             new_event_count += 1
     out_dir = root / "talk_corpora" / case_id
     out_dir.mkdir(parents=True, exist_ok=True)

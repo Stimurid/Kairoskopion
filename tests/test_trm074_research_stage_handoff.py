@@ -123,3 +123,70 @@ def test_ledger_missing_or_wrong_case_fail_closed(tmp_path):
     run_case(manifest, storage)
     with pytest.raises(ValueError, match="ledger missing"):
         export_talk_research_evidence(storage, "ANOTHER-CASE")
+
+
+def test_manual_w1_research_return_has_provisional_subject_not_primary_proof(tmp_path):
+    manifest, storage, case = fixture_case(tmp_path)
+    w1 = tmp_path / "manual_w1.txt"
+    quote = "RETURN-A: the author's claim needs a prior-art qualification."
+    w1.write_text("Research W1\n\n" + quote +
+                  "\n\nNO FULL SOURCE READ CLAIMED.", encoding="utf-8")
+    case["sources"].append({
+        "family": "CROSS", "key": "TRM073_W1",
+        "source_id": "drive:W1_SYNTHETIC",
+        "source_url": "https://docs.google.com/document/d/W1_SYNTHETIC/edit",
+        "local_path": str(w1), "kind": "RESEARCH_SYNTHESIS",
+        "version": "W1", "scope": "MANUAL_HUNT_RETURN_ONLY",
+        "author_state": "RESEARCH_RETURN_NOT_AUTHOR_APPROVAL",
+        "read_coverage": "RESEARCH_SYNTHESIS_TEXT_ONLY",
+    })
+    case["discussion_events"] = [{
+        "source_key": "TRM073_W1",
+        "quote": quote,
+        "event_class": "RESEARCH_RETURN",
+        "actor_role": "INDAGO_MANUAL",
+        "subject_ref": "HEAD-01",
+    }]
+    manifest.write_text(json.dumps(case), encoding="utf-8")
+    run_case(manifest, storage)
+    export_talk_research_evidence(storage, "T3-SYNTHETIC")
+    evidence = next(x for x in OpportunityGraphStore(storage).list_records("Evidence")
+                    if x["source_ref"] == "drive:W1_SYNTHETIC")
+    assert evidence["source_kind"] == "RESEARCH_SYNTHESIS"
+    assert evidence["read_depth"] == "SECTIONS"
+    assert not evidence["qualified_for_article"]
+    anchor = evidence["passage_anchors"][0]
+    assert anchor["anchor_kind"] == "RESEARCH_RETURN_QUOTE_NOT_PRIMARY_EVIDENCE"
+    assert anchor["provisional_subject_ref"] == "HEAD-01"
+    assert OpportunityGraphStore(storage).list_records("ArticleSeed") == []
+    assert OpportunityGraphStore(storage).list_records("World") == []
+
+
+def test_research_return_subject_cannot_invent_authorized_article(tmp_path):
+    manifest, storage, case = fixture_case(tmp_path)
+    case["discussion_events"] = [{
+        "source_key": "B01",
+        "quote": "Hypothetical example is not empirical.",
+        "event_class": "RESEARCH_RETURN",
+        "actor_role": "AI_SYSTEM",
+        "subject_ref": "HEAD-99",
+    }]
+    manifest.write_text(json.dumps(case), encoding="utf-8")
+    with pytest.raises(ValueError, match="unknown provisional subject_ref"):
+        run_case(manifest, storage)
+
+
+def test_discussion_event_identity_is_immutable_under_role_mutation(tmp_path):
+    manifest, storage, case = fixture_case(tmp_path)
+    case["discussion_events"] = [{
+        "source_key": "B01",
+        "quote": "Hypothetical example is not empirical.",
+        "event_class": "CHAT_UTTERANCE",
+        "actor_role": "UNKNOWN",
+    }]
+    manifest.write_text(json.dumps(case), encoding="utf-8")
+    run_case(manifest, storage)
+    case["discussion_events"][0]["actor_role"] = "AUTHOR"
+    manifest.write_text(json.dumps(case), encoding="utf-8")
+    with pytest.raises(ValueError, match="immutable discussion event identity changed"):
+        run_case(manifest, storage)

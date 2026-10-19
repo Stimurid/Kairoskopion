@@ -87,7 +87,13 @@ def export_talk_research_evidence(
             "quote_sha256": event["quote_sha256"],
             "excerpt": event["quote_exact"][:360],
             "attribution": event["speaker_attribution"],
-        }, "DISCUSSION_QUOTE_UNVERIFIED_SPEAKER")
+            "event_class": event["event_class"],
+            "provisional_subject_ref": event.get("subject_ref"),
+        }, (
+            "RESEARCH_RETURN_QUOTE_NOT_PRIMARY_EVIDENCE"
+            if event["event_class"] == "RESEARCH_RETURN"
+            else "DISCUSSION_QUOTE_UNVERIFIED_SPEAKER"
+        ))
     for event in ledger.get("discussion_decisions", []):
         source_id = event["source_id"]
         add_anchor(source_id, {
@@ -100,7 +106,9 @@ def export_talk_research_evidence(
 
     graph = OpportunityGraphStore(storage)
     before_seeds = graph.list_records("ArticleSeed")
-    revision = "case:" + ledger_sha256[:24]
+    # Version the bridge schema in immutable Evidence revisions. A later
+    # semantic/anchor contract must never rewrite a prior research record.
+    revision = "case:" + ledger_sha256[:24] + ":bridge-v2"
     evidence_refs = []
     for source_id in sorted(passages):
         source = snapshots[source_id]
@@ -146,6 +154,7 @@ def export_talk_research_evidence(
         "world_ref": ledger.get("world_ref"),
         "graph_namespace": "kairon_provider/opportunity_graph",
         "graph_record_kind": "Evidence",
+        "bridge_schema_version": "v2",
         "evidence_refs": evidence_refs,
         "unread_media": [
             {
