@@ -127,6 +127,16 @@ class TargetWorldCatalog:
         if found is None:
             entries.append(entry)
         else:
+            # Exact replay must be a no-op.  In particular, do not churn
+            # observed_at on resumable/cold-replay staging runs.
+            same_observation = (
+                found.get("content_digest") == digest
+                and origin in (found.get("origins") or [found.get("origin")])
+                and status == found.get("status")
+                and (source_ref is None or source_ref in (found.get("source_refs") or []))
+            )
+            if same_observation:
+                return found
             found["origins"] = sorted(set((found.get("origins") or [found.get("origin")]) + [origin]) - {None})
             found["source_refs"] = sorted(set((found.get("source_refs") or []) + ([source_ref] if source_ref else [])))
             if STATUS_RANK[status] > int(found.get("status_rank") or -1):

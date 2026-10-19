@@ -66,6 +66,9 @@ vault/
 .kairoskopion_logos_trial/
 .kairoskopion_logos_trial_evidence/
 .kairoskopion_validation_matrix/
+.venue80-stage*/
+.pytest_tmp_*/
+.build_out/
 kairoskopion_demo_bundle.zip
 *.zip
 
