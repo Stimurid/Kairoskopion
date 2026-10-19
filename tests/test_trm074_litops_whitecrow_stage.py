@@ -129,6 +129,10 @@ def test_installed_litops_and_whitecrow_cold_replay_if_available(tmp_path, monke
     receipt = json.loads((storage / "talk_corpora" / "T3-SYNTHETIC" /
                           "litops_whitecrow_stage.json").read_text(encoding="utf-8"))
     assert receipt["whitecrow_status"] == "CONTEXT_ONLY_SCIENCE_AND_AUTHOR_GATE_HOLD"
+    assert len(receipt["whitecrow_first_workset_context_ids"]) == 3
+    assert receipt["whitecrow_first_workset_context_ids"] == receipt["whitecrow_imported_context_ids"]
+    assert receipt["whitecrow_first_workset_manuscript"] is False
+    assert receipt["whitecrow_w23_certification_available"] is False
     assert receipt["article_seed_created"] is False
     assert receipt["world_mutated"] is False
     assert receipt["external_send"] == "DISABLED"

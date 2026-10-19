@@ -458,6 +458,7 @@ def admit_talk_context_into_installed_litops(
     from litops.config import get_root
     from litops import registry as litops_registry
     from whitecrow.litops_import import build_import_pack
+    from whitecrow.first_workset import build_workset
 
     target = Path(litops_root).resolve()
     if not os.environ.get("LITOPS_SKIP_DOTENV"):
@@ -521,6 +522,12 @@ def admit_talk_context_into_installed_litops(
         for ident in expected_ids
     ):
         raise ValueError("WhiteCrow imported an unwarranted organ run/manuscript")
+    workset = build_workset(import_index, max_context_packs=len(expected_ids))
+    workset_ids = {r["litops_artifact_id"] for r in workset.context_packs}
+    if workset_ids != expected_ids or workset.is_manuscript:
+        raise ValueError("WhiteCrow first workset did not preserve source-only contexts")
+    if workset.primary_anchor_artifact_id or workset.w23_seed.get("available"):
+        raise ValueError("isolated talk workset cannot claim W23 certification")
     receipt = {
         "schema": "TRM074_LITOPS_WHITE_CROW_READBACK_V1",
         "case_id": case_id,
@@ -532,6 +539,9 @@ def admit_talk_context_into_installed_litops(
         "whitecrow_imported_context_ids": sorted(expected_ids),
         "whitecrow_blocked_contexts": blocked,
         "whitecrow_import_warnings": import_index.import_warnings,
+        "whitecrow_first_workset_context_ids": sorted(workset_ids),
+        "whitecrow_first_workset_manuscript": workset.is_manuscript,
+        "whitecrow_w23_certification_available": bool(workset.w23_seed.get("available")),
         "whitecrow_status": "CONTEXT_ONLY_SCIENCE_AND_AUTHOR_GATE_HOLD",
         "litops_real_registry": str(target / "05_REGISTRY_EXPORT"),
         "article_seed_created": False,
