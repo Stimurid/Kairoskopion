@@ -376,7 +376,7 @@ def build_talk_corpus_litops_staging_pack(
             "source_media_type": "text/plain",
             "status": "raw_registered",
             "language": "ru",
-            "threads": ["T3-TALK-20261019", family],
+            "threads": [case_id, family],
             "topics": [],
             "tags": ["trm074", "source-provenance-only"],
             "body_type": "txt",
@@ -396,7 +396,7 @@ def build_talk_corpus_litops_staging_pack(
             "semantic_acceptance": "NOT_ASSESSED",
             "external_send": "DISABLED",
         })
-    families = sorted(f for f in ids_by_family if f in {"A", "B", "C"})
+    families = sorted(f for f in ids_by_family if f != "CROSS")
     if not families:
         raise ValueError("no independently attributed talk families")
     context_ids = sorted(ids_by_family.get("CROSS", []))
@@ -408,7 +408,7 @@ def build_talk_corpus_litops_staging_pack(
         own_ids = sorted(ids_by_family[family])
         lit_artifacts.append({
             "artifact_id": aid,
-            "title": f"TRM-074 / {family} / pinned talk context — SCIENCE HOLD",
+            "title": f"{case_id} / {family} / pinned source context — SCIENCE HOLD",
             "artifact_type": "context_pack",
             "stage": "candidate",
             "status": "HOLD_SOURCE_PROVENANCE_ONLY",
@@ -416,7 +416,7 @@ def build_talk_corpus_litops_staging_pack(
             "family_source_ids": own_ids,
             "cross_context_source_ids": context_ids,
             "segment_ids": [],
-            "threads": ["T3-TALK-20261019", family],
+            "threads": [case_id, family],
             "topics": [],
             "reportable": False,
             "field_ready": False,
