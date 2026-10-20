@@ -204,7 +204,61 @@ def publication_evidence_for_route(
             }
     return published,model
 
-def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: Path | None = None, analysis_root: Path | None = None, science_index_path: Path | None = None, publisher_root: Path | None = None, model_root: Path | None = None) -> dict[str, Any]:
+def venue_web_source_for_route(route: dict[str, Any], output: Path, source_sha: str,
+                               venue_root: Path | None) -> dict[str, Any]:
+    if venue_root is None:
+        return {"status":"NOT_CAPTURED","receipt":"","text":"","http_status":None}
+    rid=route["route_id"]
+    path=venue_root/"routes"/(rid+".json")
+    if not path.is_file():
+        return {"status":"NOT_CAPTURED","receipt":"","text":"","http_status":None}
+    raw=path.read_bytes()
+    item=json.loads(raw.decode("utf-8"))
+    source=item.get("web_source") or {}
+    frozen_digest=sha((json.dumps(source,ensure_ascii=False,sort_keys=True,indent=2)+"\n").encode("utf-8"))
+    if (item.get("schema")!="MAI_KAIRON_OFFICIAL_VENUE_WEB_CAPTURE_v1"
+            or item.get("route_id")!=rid or item.get("W12_source_sha256")!=source_sha
+            or item.get("family")!=route["family"]
+            or item.get("variant")!=route["variant"]
+            or item.get("journal")!=route["journal"]
+            or item.get("w12_listed_official_url")!=route.get("official_url","")
+            or item.get("official_rules_acceptance")!="HOLD"
+            or item.get("author_gate")!="CLOSED" or item.get("send_count")!=0
+            or item.get("venue_page_domain_alone_is_not_policy_acceptance") is not True
+            or item.get("policy_freshness_verified") is not False
+            or item.get("web_source_receipt_sha256")!=frozen_digest
+            or any(source.get(k) is not False for k in (
+                "submission_policy_verified","cfp_deadline_verified",
+                "ai_authorship_policy_verified","official_publisher_status_verified"))):
+        raise ValueError("untrusted venue web source attempting publisher policy promotion "+rid)
+    dest=output/"venues"/(rid+".json")
+    dest.parent.mkdir(parents=True,exist_ok=True)
+    dest.write_bytes(raw)
+    link=""
+    url=item["w12_listed_official_url"]
+    source_text=venue_root/"url_capture_cache"/sha(url.encode("utf-8"))[:24]/"visible_text.txt"
+    if source.get("visible_text_sha256"):
+        if not source_text.is_file():
+            raise ValueError("venue web text missing from published source capture "+rid)
+        data=source_text.read_bytes()
+        visible=data.decode("utf-8").rstrip("\r\n")
+        if sha(visible.encode("utf-8"))!=source["visible_text_sha256"]:
+            raise ValueError("venue source text raw passage SHA mismatch "+rid)
+        text_dest=output/"venue_text"/(rid+".txt")
+        text_dest.parent.mkdir(parents=True,exist_ok=True)
+        text_dest.write_bytes(data)
+        link="venue_text/"+rid+".txt"
+    return {
+        "status":item["source_read_state"],
+        "receipt":"venues/"+rid+".json",
+        "text":link,
+        "http_status":source.get("http_status"),
+        "visible_chars":source.get("visible_chars",0),
+        "venue_policy_gate":"HOLD",
+        "receipt_sha256":sha(raw),
+    }
+
+def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: Path | None = None, analysis_root: Path | None = None, science_index_path: Path | None = None, publisher_root: Path | None = None, model_root: Path | None = None, venue_web_root: Path | None = None) -> dict[str, Any]:
     records,source_hash=read_records(source)
     snapshot_bytes=snapshot_path.read_bytes()
     snapshot=json.loads(snapshot_bytes.decode("utf-8-sig"))
@@ -272,6 +326,7 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
                         analysis["fit_label"]=m.group(1).strip()
         published,model=publication_evidence_for_route(
             r,output,source_hash,publisher_root,model_root)
+        venue=venue_web_source_for_route(r,output,source_hash,venue_web_root)
         packet={
             "schema":SCHEMA,"source_jsonl_sha256":source_hash,
             "snapshot_sha256":sha(snapshot_bytes),"outreach_sha256":events_sha,
@@ -280,6 +335,7 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
             "science_index":science,
             "published_source_evidence":published,
             "model_scientific_critique":model,
+            "venue_web_evidence":venue,
             "editorial_status":status,
             "scientific_state":"SOURCE_DRAFT_ONLY",
             "quality_receipts":{},
@@ -325,6 +381,10 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
             "published_packet":published["detail"],
             "model_critique_status":model["status"],
             "model_critique_packet":model["detail"],
+            "venue_web_status":venue["status"],
+            "venue_web_receipt":venue["receipt"],
+            "venue_web_text":venue["text"],
+            "venue_http_status":venue["http_status"],
             "scientific_status":"PRIOR_ART_INDEXED_ON_HOLD" if science["review_packet"] else "SOURCE_DRAFT_ONLY",
             "packet":f"routes/{r['route_id']}.json",
             "abstract":f"routes/{r['route_id']}.md",
@@ -349,6 +409,10 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
         "science_indexed_count":sum(bool(x["science_packet"]) for x in index),
         "published_source_indexed_count":sum(bool(x["published_packet"]) for x in index),
         "provisional_model_critique_count":sum(bool(x["model_critique_packet"]) for x in index),
+        "venue_pages_acquired_count":sum(bool(x["venue_web_receipt"]) for x in index),
+        "venue_web_text_readable_count":sum(bool(x["venue_web_text"]) for x in index),
+        "venue_web_blocked_count":sum(x["venue_web_status"]=="HTTP_REJECTED" for x in index),
+        "venue_policies_certified_count":0,
         "ready_for_human_send":0,
         "ready_for_author_rework":0,
         "source_note":"53 authentic W12 source route drafts; not independent article count, venue policy, or completed scholarly QA.",
@@ -428,10 +492,13 @@ c.append(el("div","Технический прогон: "+item.analysis_status+(
 c.append(el("div","Индаго: "+item.science_index_status+" · научные ориентиры "+item.science_opponents+" · HUMAN GATE CLOSED","meta"));
 c.append(el("div","Научные базы: "+item.published_abstracts+" аннотаций; "+item.published_status,"meta"));
 c.append(el("div","Критика: "+item.model_critique_status+" · авторский допуск ЗАКРЫТ","meta"));
+c.append(el("div","Кайрон / веб-страница: "+item.venue_web_status+" · правила журнала НЕ ПОДТВЕРЖДЕНЫ","meta"));
 const a=el("a","Исходный пакет ↗");a.href=item.packet;
 c.append(a);if(item.science_packet){const v=el("a"," · Научные возражения Индаго W69 ↗");v.href=item.science_packet;c.append(v)}
 if(item.published_packet){const v=el("a"," · Crossref/OpenAlex ↗");v.href=item.published_packet;c.append(v)}
-if(item.model_critique_packet){const v=el("a"," · Критика Codex ↗");v.href=item.model_critique_packet;c.append(v)}
+if(item.model_critique_packet){const v=el("a"," · Критика ↗");v.href=item.model_critique_packet;c.append(v)}
+if(item.venue_web_receipt){const v=el("a"," · Кайрон / ответ сайта ↗");v.href=item.venue_web_receipt;c.append(v)}
+if(item.venue_web_text){const v=el("a"," · Текст сайта ↗");v.href=item.venue_web_text;c.append(v)}
 node.append(c)}
 board.append(node)}
 }
@@ -450,8 +517,9 @@ def main(argv: list[str] | None=None) -> int:
     parser.add_argument("--science-index",type=Path)
     parser.add_argument("--published-sources",type=Path)
     parser.add_argument("--model-challenges",type=Path)
+    parser.add_argument("--venue-web",type=Path)
     args=parser.parse_args(argv)
-    manifest=materialize(args.source,args.snapshot,args.output,args.outreach,args.analysis_root,args.science_index,args.published_sources,args.model_challenges)
+    manifest=materialize(args.source,args.snapshot,args.output,args.outreach,args.analysis_root,args.science_index,args.published_sources,args.model_challenges,args.venue_web)
     print(json.dumps(manifest,ensure_ascii=False,indent=2))
     return 0
 

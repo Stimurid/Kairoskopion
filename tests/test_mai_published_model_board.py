@@ -68,7 +68,7 @@ def test_real_source_and_model_critique_visible_but_author_not_ready(tmp_path):
     assert card["ready_for_human_send"] is False
     assert (out/"reviews"/(rid+".json")).is_file()
     assert (out/"published"/(rid+".json")).is_file()
-    assert "Критика Codex" in (out/"index.html").read_text(encoding="utf-8")
+    assert "Критика ↗" in (out/"index.html").read_text(encoding="utf-8")
 
 def test_model_source_quote_drift_rejected(tmp_path):
     source,snap,pub,model,rid=fixture(tmp_path)
