@@ -42,13 +42,25 @@ The output directory contains:
 ```text
 private/citation-evidence/
   original_snapshots/<sha256>.<original extension>
-  runs/trm-cite-z0-v02_<first20sha>/citation_intake.json
+  runs/trm-cite-z0-v03_<first20sha>/citation_intake.json
+  runs/trm-cite-z0-v03_<first20sha>/citation_work_orders.jsonl
 ```
 
 The byte-exact snapshot is created exclusively and its full SHA-256 checked
 before the report is recorded. Rerunning the exact same manuscript is
 idempotent. A changed manuscript produces a new source hash, a new immutable
 snapshot and a different report path. The manuscript itself is never written.
+
+The JSONL file is a **transportable queue of unverified cases** for the
+Z2/Indago/Artikl verifier. Each citation group has one coordinating parent in
+the report, but only individual members create actionable work orders, so a
+three-source parenthetical does not trigger a redundant fourth hunt.
+`work_order_id`, `intake_id`, `group_id`, `original_cluster`, exact
+source text, snapshot SHA, claim context, V1–V5 statuses and next stage travel
+together. Neither external retrieval nor editor mutation is authorized by this
+file. Stage R1 is mandatory for existing sources; author wishes start with Z2.
+Accented and uncased historical author names use Unicode-aware detection
+rather than English-only name assumptions.
 
 The report carries:
 
@@ -140,7 +152,7 @@ AORUS Remote Desktop Commander registration reports offline. Tests and a
 passed Actions run establish **code behavior in that runner**, not installation
 under Hestia, successful private manuscript handling, or production readiness.
 
-Observed regression driver: an owner-authorized private 76 KB article had 43 author-year parentheticals, mostly multi-source. The v01 scanner recognized only two because it required a single author-year token per parentheses; v02 adds cluster and member detection. Do not expose private article text to public fixtures. Source-evidence receipt remains in the private AORUS audit directory.
+Observed regression driver: an owner-authorized private 76 KB article had 43 author-year parentheticals, mostly multi-source. The v01 scanner recognized only two because it required a single author-year token per parentheses; v02 adds cluster and member detection; v03 handles multilingual names and persists individual verification work orders. Do not expose private article text to public fixtures. Source-evidence receipt remains in the private AORUS audit directory.
 
 Future tests:
 - DOCX with complex tracked changes and threaded comments.
