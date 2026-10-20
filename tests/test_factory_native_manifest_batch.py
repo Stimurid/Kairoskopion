@@ -16,6 +16,14 @@ from tests.test_native_docs_source_capture import _doc
 
 @pytest.fixture
 def authorized_native_provider(monkeypatch):
+    # TRM040 is the installed, separately governed owner runtime, NOT part
+    # of public Kairoskopion. GitHub CI cannot provide it and must report
+    # SKIPPED_EXTERNAL_RUNTIME instead of pretending these end-to-end
+    # provider tests passed with an imitation transport.
+    pytest.importorskip(
+        "trimurti.native_docs_transport",
+        reason="TRM040 authorized native Docs runtime unavailable on CI host",
+    )
     from trimurti.docs_api_client import StaticDocsApiClient
     from trimurti.acquisition_store import TrustedAcquisitionStore
     from trimurti.native_docs_transport import NativeGoogleDocsTransport

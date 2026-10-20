@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main, 'integration/**']
+    branches: [main]
   pull_request:
     branches: [main, 'integration/**', 'fix/trm073-venue80-runtime-20261020']
 
@@ -10,6 +10,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
 
