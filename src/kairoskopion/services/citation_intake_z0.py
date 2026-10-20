@@ -24,7 +24,7 @@ PKG = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 DESIRED = [
     re.compile(r"\[\s*(?:citation needed|needs citation|нужна\s+(?:ссылка|цитата)|тут\s+цитата|цитата\s+[^\]\n]{2,80})\s*\]", re.I),
     re.compile(r"\b(?:TODO|FIXME)\s*:\s*(?:cite|citation|ссылк\w*|цитат\w*)[^\n;.]{0,90}", re.I),
-    re.compile(r"\b(?:тут|здесь|сюда)\s+(?:нужн[ао]\s+|добавить\s+|найти\s+|поставить\s+)?(?:цитат\w*|ссылк\w*)(?:\s+(?:из|по|у)\s+[^.,;\n]{1,65})?", re.I),
+    re.compile(r"\b(?:тут|здесь|сюда)\s+(?:нужн[ао]\s+|добавить\s+|найти\s+|поставить\s+)?(?:цитат\w*|ссылк\w*)(?:\s+(?:(?:из|по|у)\s+)?[А-ЯЁA-Z][^\]\n.,;]{0,65})?", re.I),
     re.compile(r"\b(?:кто[- ]?то\s+из\s+великих\s+сказал|как\s+(?:говорил|писал)\s+[А-ЯЁ][\wёЁ-]{2,})", re.I),
 ]
 PATTERNS = [
@@ -47,6 +47,7 @@ class Section:
     parent_anchor: str | None = None
     fields: tuple[str, ...] = ()
     links: tuple[str, ...] = ()
+    is_heading: bool = False
 
 
 @dataclass(frozen=True)
@@ -116,9 +117,12 @@ def _word_text(p: ET.Element, surface: str, locator: str,
             if rid in links:
                 urls.append(links[rid])
     field_text = "".join(instr).strip()
+    style = p.find(".//" + W + "pStyle")
+    value = (style.get(W + "val", "") if style is not None else "")
+    heading = bool(re.match(r"^(?:Heading|Заголовок)\s*\d+", value, re.I))
     return Section(surface, locator, "".join(text), parent,
                    (field_text,) if field_text else (),
-                   tuple(dict.fromkeys(urls)))
+                   tuple(dict.fromkeys(urls)), heading)
 
 
 def _docx_sections(path: Path) -> tuple[list[Section], dict[str, Any]]:
@@ -406,6 +410,10 @@ def audit_manuscript(path: str | Path) -> CitationAudit:
         if BIB.match(sec.text):
             bib_state[sec.surface] = True
             continue
+        if bib_state.get(sec.surface, False) and (
+            sec.is_heading or re.match(r"^\s*#{1,6}\s+\S", sec.text)
+        ):
+            bib_state[sec.surface] = False
         found.extend(_scan(sec, sha, bib_state.get(sec.surface, False)))
     found = sorted(
         {ci.intake_id: ci for ci in found}.values(),
