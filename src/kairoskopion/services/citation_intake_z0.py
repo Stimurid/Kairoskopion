@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "trm-cite-z0-v01"
+VERSION = "trm-cite-z0-v02"
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 PKG = "{http://schemas.openxmlformats.org/package/2006/relationships}"
@@ -28,13 +28,23 @@ DESIRED = [
     re.compile(r"\b(?:кто[- ]?то\s+из\s+великих\s+сказал|как\s+(?:говорил|писал)\s+[А-ЯЁ][\wёЁ-]{2,})", re.I),
 ]
 PATTERNS = [
-    ("AUTHOR_YEAR", re.compile(r"\([A-ZА-ЯЁ][A-Za-zА-Яа-яЁё.'’-]{2,}(?:\s+(?:et\s+al\.?|и\s+др\.?))?,?\s+(?:1[5-9]\d{2}|20\d{2}|21\d{2})(?:[,;:]\s*(?:с\.|p\.|pp\.)?\s*\d+(?:[-–]\d+)?)?\)")),
     ("NUMERIC_REFERENCE", re.compile(r"(?<!\w)\[\d{1,3}(?:\s*,\s*\d{1,3})*\](?!\w)")),
     ("FOOTNOTE_REFERENCE", re.compile(r"\[\^[\w-]+\]")),
     ("DOI_REFERENCE", re.compile(r"\b10\.\d{4,9}/[-._;()/:\w]+\b", re.I)),
     ("CITEKEY", re.compile(r"(?<!\w)@[A-Za-z][A-Za-z0-9:_-]{2,}")),
     ("LATEX_CITE", re.compile(r"\\cite(?:p|t|author|year)?\{[^{}\n]{1,120}\}")),
 ]
+# Detect compound citations before individual patterns: a source cluster
+# represents several distinct claims of authority, even within parentheses.
+# Examples: (Author et al. 2021; Another and Third 2007).
+PAREN_CITATION = re.compile(r"\([^()\r\n]{3,300}\)")
+CITATION_YEAR = re.compile(r"(?<!\d)(?:1[5-9]\d{2}|20\d{2}|21\d{2})(?!\d)")
+AUTHOR_LEXEME = re.compile(r"[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё'\-]{1,}")
+NON_AUTHOR_PREFIX = re.compile(
+    r"^\s*(?:fig(?:ure)?|table|табл(?:ица)?|рис(?:унок)?|"
+    r"equation|eq\.?|section|sec\.?|iso|гост|n\s*=)\b", re.I
+)
+
 QUOTE = re.compile(r"«[^»\n]{18,}»|“[^”\n]{18,}”|\"[^\"\n]{22,}\"")
 BIB = re.compile(r"^\s*(?:#{1,6}\s*)?(?:References|Bibliography|Works\s+Cited|Список\s+(?:использованной\s+)?литературы|Библиография|Литература)\s*:?\s*$", re.I)
 
@@ -65,6 +75,9 @@ class CitationIntake:
     verification_status: str = "NOT_CHECKED"
     source_read_depth: str = "NONE"
     classification: str = "CANDIDATE_ONLY"
+    group_id: str | None = None
+    group_index: int | None = None
+    original_cluster: str | None = None
 
 
 @dataclass(frozen=True)
@@ -287,7 +300,11 @@ def _load_sections(path: Path) -> tuple[list[Section], dict[str, Any]]:
 
 def _intake(sha: str, sec: Section, origin: str, kind: str,
             start: int, end: int, raw: str,
-            classification: str = "CANDIDATE_ONLY") -> CitationIntake:
+            classification: str = "CANDIDATE_ONLY",
+            source_hints: tuple[str, ...] | None = None,
+            group_id: str | None = None,
+            group_index: int | None = None,
+            original_cluster: str | None = None) -> CitationIntake:
     anchor = {
         "locator": sec.locator,
         "start_codepoint": start, "end_codepoint": end,
@@ -299,9 +316,78 @@ def _intake(sha: str, sec: Section, origin: str, kind: str,
     return CitationIntake(
         _id("ci", sha, sec.surface, sec.locator, origin, kind,
             str(start), str(end), raw), origin, kind, sec.surface,
-        anchor, raw, sec.text, (raw,), sec.parent_anchor, sha,
+        anchor, raw, sec.text, (raw,) if source_hints is None else source_hints,
+        sec.parent_anchor, sha,
         classification=classification,
+        group_id=group_id, group_index=group_index,
+        original_cluster=original_cluster,
     )
+
+
+def _looks_like_author_year(part: str) -> bool:
+    """Conservative bibliographic shape check, not a citation verdict."""
+    date = CITATION_YEAR.search(part)
+    if date is None or len(part) > 160:
+        return False
+    before = part[:date.start()].strip()
+    return bool(before and AUTHOR_LEXEME.search(before)
+                and not NON_AUTHOR_PREFIX.match(before))
+
+
+def _parenthetical_intakes(sec: Section, sha: str) -> list[CitationIntake]:
+    """Keep both original citation cluster and each independently testable member.
+
+    Offsets in member records refer to the actual substring inside the same
+    extracted paragraph; group_id links every member to its verbatim cluster.
+    Ambiguous members of a mixed cluster are retained as review debt.
+    """
+    result: list[CitationIntake] = []
+    for match in PAREN_CITATION.finditer(sec.text):
+        original = match.group(0)
+        body = original[1:-1]
+        portions = body.split(";")
+        if not any(_looks_like_author_year(p.strip()) for p in portions):
+            continue
+        if len(portions) == 1:
+            if _looks_like_author_year(body.strip()):
+                result.append(_intake(
+                    sha, sec, "EXISTING", "AUTHOR_YEAR",
+                    match.start(), match.end(), original,
+                    "HEURISTIC_BIBLIOGRAPHIC_MATCH",
+                    source_hints=(body.strip(),),
+                ))
+            continue
+        hints = tuple(p.strip() for p in portions)
+        group = _intake(
+            sha, sec, "EXISTING", "AUTHOR_YEAR_CLUSTER",
+            match.start(), match.end(), original,
+            "HEURISTIC_BIBLIOGRAPHIC_CLUSTER",
+            source_hints=hints,
+        )
+        result.append(group)
+        pos = 0
+        for i, portion in enumerate(portions):
+            leading = len(portion) - len(portion.lstrip())
+            fragment = portion.strip()
+            start = match.start() + 1 + pos + leading
+            end = start + len(fragment)
+            pos += len(portion) + 1
+            if not fragment:
+                continue
+            recognized = _looks_like_author_year(fragment)
+            result.append(_intake(
+                sha, sec, "EXISTING",
+                "AUTHOR_YEAR_MEMBER" if recognized
+                else "AUTHOR_YEAR_MEMBER_UNPARSED",
+                start, end, fragment,
+                "HEURISTIC_BIBLIOGRAPHIC_MATCH" if recognized
+                else "UNPARSED_CLUSTER_MEMBER_REVIEW",
+                source_hints=(fragment,),
+                group_id=group.intake_id,
+                group_index=i,
+                original_cluster=original,
+            ))
+    return result
 
 
 def _scan(sec: Section, sha: str, bibliography: bool) -> list[CitationIntake]:
@@ -318,6 +404,7 @@ def _scan(sec: Section, sha: str, bibliography: bool) -> list[CitationIntake]:
                     sha, sec, "AUTHOR_DESIRED", "CITATION_WISH",
                     m.start(), m.end(), m.group(0),
                 ))
+        found.extend(_parenthetical_intakes(sec, sha))
         for kind, pattern in PATTERNS:
             for m in pattern.finditer(text):
                 found.append(_intake(
@@ -364,6 +451,18 @@ def _repair_case(ci: CitationIntake) -> CitationRepairCase:
             "Z5_EXACT_PASSAGE_AND_ANCHOR",
             "Z6_INDEPENDENT_V1_V5_AND_AUTHOR_GATE",
             "Z7_PROPOSE_REVERSIBLE_INSERTION_AND_RECHECK",
+        )
+    elif ci.kind in (
+        "AUTHOR_YEAR_CLUSTER", "AUTHOR_YEAR_MEMBER_UNPARSED",
+    ):
+        reason = ("SOURCE_CLUSTER_REQUIRES_MEMBER_RESOLUTION",)
+        operations = (
+            "Z2_DECOMPOSE_CLAIM_TO_EACH_CITED_SOURCE",
+            "Z4_RESOLVE_EACH_MEMBER_WORK_EDITION_WITNESS",
+            "Z5_INDEPENDENT_PASSAGE_FOR_EACH_SOURCE",
+            "Z6_INDEPENDENT_V1_V5_FOR_EACH_SOURCE",
+            "R3_REPAIR_EACH_INVALID_MEMBER_WITH_AUTHOR_CONTROL",
+            "R6_RECHECK_FINAL_MULTI_REFERENCE_PRESENTATION",
         )
     elif ci.kind == "UNATTRIBUTED_QUOTE_CANDIDATE":
         reason = ("ATTRIBUTION_UNCONFIRMED",)
