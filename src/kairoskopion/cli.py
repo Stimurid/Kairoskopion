@@ -1696,6 +1696,38 @@ def cmd_export_review_packet(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_cite_intake(args: argparse.Namespace) -> int:
+    """Read-only first Z0 step; source manuscript is never patched."""
+    from pathlib import Path
+    from .services.citation_intake_z0 import persist_audit
+
+    try:
+        audit, receipt = persist_audit(
+            Path(args.manuscript), Path(args.output_dir),
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(f"Z0 citation intake failed: {exc}", file=sys.stderr)
+        return 2
+
+    origins: dict[str, int] = {}
+    for item in audit.intakes:
+        origins[item.origin_type] = origins.get(item.origin_type, 0) + 1
+    print(json.dumps({
+        "schema_version": audit.schema_version,
+        "source_sha256": audit.source["sha256"],
+        "original_snapshot_verified":
+            audit.source["original_snapshot_sha256_verified"],
+        "intakes": len(audit.intakes),
+        "repair_cases": len(audit.repair_cases),
+        "origins": origins,
+        "coverage_status": audit.coverage["status"],
+        "coverage_debts": audit.coverage["debts"],
+        "scientific_verification": "NOT_PERFORMED",
+        "report_file": str(receipt),
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="kairoskopion",
@@ -1714,6 +1746,14 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     sub = parser.add_subparsers(dest="command")
+
+    z0_parser = sub.add_parser(
+        "cite-intake",
+        help="Z0: read existing/wanted citations, preserve original, emit unverified repair cases",
+    )
+    z0_parser.add_argument("--manuscript", required=True, help="Local .md/.txt/.docx/.pdf or structured .json")
+    z0_parser.add_argument("--output-dir", required=True, help="Immutable local evidence directory")
+
     sub.add_parser("status", help="Show environment status")
 
     run_fixture_parser = sub.add_parser("run-fixture", help="Run fixture pipeline and persist results")
@@ -2109,6 +2149,7 @@ def main(argv: list[str] | None = None) -> int:
         "list-acquisition-tasks": cmd_list_acquisition_tasks,
         "run-verification-gate": cmd_run_verification_gate,
         "export-review-packet": cmd_export_review_packet,
+        "cite-intake": cmd_cite_intake,
     }
 
     handler = commands.get(args.command)
