@@ -227,3 +227,24 @@ def test_unsupported_future_observation_date_fails_closed(tmp_path):
     path.write_text(json.dumps(packet),encoding="utf-8")
     with pytest.raises(ValueError,match="future"):
         stage_w12_research_route(path,stage)
+
+
+
+def test_abstract_only_opponent_page_cannot_masquerade_as_fulltext(tmp_path):
+    packet,path,stage,_,_,_=fixture_route(tmp_path)
+    packet["official_evidence"]["published_opponent"]["read_depth"]="ABSTRACT_ONLY"
+    path.write_text(json.dumps(packet),encoding="utf-8")
+    out=stage_w12_research_route(path,stage)
+    stored=json.loads(Path(out["receipt_path"]).read_text(encoding="utf-8"))
+    assert stored["opponent_read_depth"]=="ABSTRACT_ONLY_NOT_CERTIFIED_FULL_TEXT"
+    assert stored["counts"]["DEEP_QUALIFIED"]==0
+    assert stored["counts"]["W12_EQUIVALENT_HELD"]==1
+
+
+def test_unattested_fulltext_opponent_claim_fails_before_route_write(tmp_path):
+    packet,path,stage,_,_,_=fixture_route(tmp_path)
+    packet["official_evidence"]["published_opponent"]["read_depth"]="FULL_TEXT_CERTIFIED"
+    path.write_text(json.dumps(packet),encoding="utf-8")
+    with pytest.raises(ValueError,match="opponent read depth not supported"):
+        stage_w12_research_route(path,stage)
+    assert OpportunityGraphStore(stage).list_records("HuntTrace")==[]

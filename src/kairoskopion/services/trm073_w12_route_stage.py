@@ -214,6 +214,11 @@ def _validate(packet: dict[str, Any], graph: OpportunityGraphStore) -> dict[str,
             captures, capture_key, info.get("url", ""), host,
             info.get("anchor_quote", ""),
         )
+        if kind == "published_opponent":
+            depth = info.get("read_depth", "SELECTED_SECTIONS")
+            if depth not in {"ABSTRACT_ONLY", "SELECTED_SECTIONS"}:
+                raise ValueError("opponent read depth not supported by actual article HTML")
+            refs[kind]["read_depth"] = depth
     if refs["published_opponent"]["url"] != packet.get("opponent_url"):
         raise ValueError("journal-native published opponent URL mismatch")
     if str(packet.get("opponent_doi") or "") not in _strip(
@@ -309,7 +314,7 @@ def stage_w12_research_route(
         "source_line": safe["source"]["line"],
         "publisher_evidence": safe["official"],
         "source_read_depth": "EXACT_QUOTE_VERSION_PINNED",
-        "opponent_read_depth": "SELECTED_SECTIONS_NOT_CERTIFIED_FULL_TEXT",
+        "opponent_read_depth": safe["official"]["published_opponent"]["read_depth"] + "_NOT_CERTIFIED_FULL_TEXT",
         "editorial_route_kind": "REGULAR_MANUSCRIPT",
         "readback_required": True,
         "counts": {"W12_EQUIVALENT_HELD": 1, "DEEP_QUALIFIED": 0,

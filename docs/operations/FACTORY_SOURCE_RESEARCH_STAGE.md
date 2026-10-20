@@ -366,3 +366,61 @@ ARTIKL/AUTHOR_ACCEPTED=0; not a production publication capability.
 tamper, bad DOI, W3 source-byte binding, changed claim-version
 packet, missing rights/author and future-date negative tests.
 No CI pass, no second-host acceptance, no production deployment.
+
+
+## Second W12-equivalent HELD route from real A07 native source
+
+The SAME reusable W12 stage was invoked with another actual W3-head,
+publication venue and primary intellectual provenance, without
+rewriting the route implementation or inflating one journal/paper as
+multiple opportunities:
+
+- Original source: A07 "Sysli" v0.7, exact stable Drive ID
+  1XUTyB5IsN9oBjKKTcRK6gJs4G7N4FeQnUsVtcyq6ZE0, original private
+  source raw SHA256
+  4252d0bffd3d1aae25bb69faa3206b4543fa4502725106027650a776deaa2e4e.
+  Exact line 77 anchors the question about a new capability of the
+  person-language-means-methods-learning system.
+- W3 A-EPISTEMIC-POSITION HEAD-01; journal:
+  Epistemology & Philosophy of Science / Эпистемология и философия науки,
+  verified official scope https://journal.iphras.ru/about
+  source SHA ce98eef2fffe136a30c5d6d0f6f9740bec8a08be721c9693f1e7fb49c3dee86c.
+- Official article submission page
+  https://journal.iphras.ru/about/submissions
+  SHA 1eac75e44a90e6ab84868438b3430e279ad6917814b99ea8f971739e08fdefc2;
+  this is a REGULAR_MANUSCRIPT route, not an asserted active CFP.
+- Real journal-native science comparator: Lisenkova/Bylieva 2026
+  DOI 10.5840/eps202663350,
+  https://journal.iphras.ru/article/view/12654
+  HTML SHA a49daaddb122f4bcf4ddf5e4c25e7469d25f6357ea9ab08dd8820bca66d65523.
+  Journal-native HTML provided article abstract and references; the
+  route records ABSTRACT_ONLY, not full published research read.
+- Strongest opponent already argues AI has metascientific role
+  reconfiguring research field; general AI-as-participant cannot serve
+  as novelty. Source-specific proposed distinction: reproducible
+  operations that transform available methods, evidence warrants,
+  conceptual distinctions and learning organization; empirical/
+  philosophical counterexamples and author decision pending.
+- Exact original line, DOI, source-version W3 VERIFIED_BYTES binding,
+  official scope/guidelines/opponent quotes, separate RU/EN route
+  abstracts and unresolved author co-consent are present in private
+  packet W4_EPS_A_EPISTEMIC_OWNER_PRIVATE_20261020.json.
+- Source/venue verifier returned 1 W12_EQUIVALENT_HELD, 0 deep
+  certified, 0 author-approved, 0 sends; direct W12 readback SHA256
+  7342130758c04dba3e37bfb22c6ced7547fb1f9f92751bbda2d1ac0d9dc03508.
+
+NEW owner-private full single factory command, W1+W2+W3+TWO
+distinct W12 research-route packets, installed LitOps and WhiteCrow:
+C:\projects\trimurti\_ops\T3-TALK-20261019\TRM074_FACTORY_W1W2W3_TWO_W12_ONECMD_20261020.ps1
+Fresh output root factory-W1W2W3-W12-two-20261020.
+First command real work complete; cold second command 0 new source or
+WhiteCrow objects, same Factory receipt SHA256
+ff0b78e5054b7274408c5de437a73d09b7febdea67f78723a3f96c70779936c4.
+W12_EQUIVALENT_HELD=2 of owner >=80; 9 W3 found routes still remain
+proposed/prequalification; DEEP_QUALIFIED=0; ARTICLE_SEED=0;
+AUTHOR_APPROVED=0; EXTERNAL_SEND=0; PROD=NO.
+
+189 targeted real-installed-host Python tests PASS, including tests
+that abstract-only opponent HTML can never silently self-certify
+full published scholarly paper depth. Research route status still
+author-HOLD, never a blanket article publication approval.
