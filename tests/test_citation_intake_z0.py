@@ -301,6 +301,88 @@ def test_docx_heading_stops_bibliography_scope(tmp_path):
                 if ci.kind == "BIBLIOGRAPHY_ENTRY"]) == 1
 
 
+
+def test_parenthetical_compound_cluster_preserves_all_sources(tmp_path):
+    manuscript = tmp_path / "compound.md"
+    manuscript.write_text(
+        "This is a claim (Smith et al. 2021; Lee and Brown 2019; "
+        "de Vries 2007).",
+        encoding="utf-8",
+    )
+    audit = audit_manuscript(manuscript)
+    clusters = [i for i in audit.intakes if i.kind == "AUTHOR_YEAR_CLUSTER"]
+    members = [i for i in audit.intakes if i.kind == "AUTHOR_YEAR_MEMBER"]
+    assert len(clusters) == 1
+    assert len(members) == 3
+    group = clusters[0]
+    assert len(group.source_hints) == 3
+    assert group.original_fragment == (
+        "(Smith et al. 2021; Lee and Brown 2019; de Vries 2007)"
+    )
+    assert {i.group_index for i in members} == {0, 1, 2}
+    for item in members:
+        assert item.group_id == group.intake_id
+        assert item.original_cluster == group.original_fragment
+        assert (
+            item.claim_context[
+                item.anchor["start_codepoint"]:item.anchor["end_codepoint"]
+            ] == item.original_fragment
+        )
+        assert item.verification_status == "NOT_CHECKED"
+    cases = {c.intake_id: c for c in audit.repair_cases}
+    assert "Z2_DECOMPOSE_CLAIM_TO_EACH_CITED_SOURCE" in (
+        cases[group.intake_id].required_operations
+    )
+
+
+def test_mixed_cluster_member_retained_as_debt(tmp_path):
+    p = tmp_path / "mixed.txt"
+    p.write_text(
+        "Some claim (Smith 2020; unpublished correspondence; Lee 2015).",
+        encoding="utf-8",
+    )
+    report = audit_manuscript(p)
+    assert sum(i.kind == "AUTHOR_YEAR_CLUSTER" for i in report.intakes) == 1
+    assert sum(i.kind == "AUTHOR_YEAR_MEMBER_UNPARSED"
+               for i in report.intakes) == 1
+    assert any("SOURCE_CLUSTER_REQUIRES_MEMBER_RESOLUTION"
+               in case.reason_codes for case in report.repair_cases)
+
+
+def test_single_parenthetical_reference_retained(tmp_path):
+    p = tmp_path / "single.txt"
+    p.write_text("Claim (Выготский, 1978, с. 45).", encoding="utf-8")
+    audit = audit_manuscript(p)
+    singles = [i for i in audit.intakes if i.kind == "AUTHOR_YEAR"]
+    assert len(singles) == 1
+    assert singles[0].original_fragment == "(Выготский, 1978, с. 45)"
+    assert singles[0].source_hints == ("Выготский, 1978, с. 45",)
+
+
+def test_parenthesized_year_without_author_is_not_citation(tmp_path):
+    p = tmp_path / "not_reference.txt"
+    p.write_text(
+        "Total (2021). Figure (Figure 2, 2020). (ISO 9001:2015).",
+        encoding="utf-8",
+    )
+    audit = audit_manuscript(p)
+    assert not any(i.kind.startswith("AUTHOR_YEAR") for i in audit.intakes)
+
+
+def test_compound_quote_nearby_does_not_create_orphan(tmp_path):
+    p = tmp_path / "cluster_quote.txt"
+    p.write_text(
+        "«Словосочетание с достаточно длинным содержанием для проверки» "
+        "(Ivanov 2018; Petrov 2020).",
+        encoding="utf-8",
+    )
+    audit = audit_manuscript(p)
+    assert any(i.kind == "AUTHOR_YEAR_CLUSTER" for i in audit.intakes)
+    assert not any(i.kind == "UNATTRIBUTED_QUOTE_CANDIDATE"
+                   for i in audit.intakes)
+
+
+
 def test_json_native_envelope_keeps_coverage_debt(tmp_path):
     p = tmp_path / "doc_sections.json"
     p.write_text(json.dumps({
