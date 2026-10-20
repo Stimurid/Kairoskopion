@@ -22,6 +22,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from fetch_mai_prior_art import execute as get_prior_art, stable as provider_stable, normalize_doi
 from run_mai_claim_challenge import run as run_criticism
 from merge_mai_scholarly_reviews import run as merge_criticism
+from fetch_mai_venue_pages import capture as capture_venues
 
 SCHEMA="MAI_W12_RESEARCH_OPERATOR_ONE_COMMAND_v1"
 
@@ -89,6 +90,51 @@ def attest_reusable_publications(path:Path,packet_root:Path)->dict[str,Any]:
             verify_cached_provider_sources(path,work)
     return meta
 
+def attest_reusable_venues(root:Path,packets:Path)->dict[str,Any]:
+    source=load(packets/"manifest.json")
+    data=load(root/"venue_acquisition_receipt.json")
+    if (data.get("schema")!="MAI_KAIRON_VENUE_WEB_ACQUISITION_BATCH_v1"
+            or data.get("source_W12_sha256")!=source.get("source_jsonl_sha256")
+            or data.get("routes_requested")!=source.get("records")
+            or data.get("policies_certified")!=0 or data.get("cfp_deadlines_verified")!=0
+            or data.get("author_gate_ready")!=0 or data.get("external_submissions")!=0):
+        raise ValueError("Kairon cached web capture cannot promote policy / unknown W12 corpus")
+    for f in sorted((packets/"routes").glob("MAI-W12-*.json")):
+        original=load(f)["route"]
+        rid=f.stem
+        capfile=root/"routes"/f.name
+        if not capfile.is_file():
+            raise ValueError("missing actual Kairon web source route "+rid)
+        route=load(capfile)
+        web=route.get("web_source") or {}
+        if (route.get("schema")!="MAI_KAIRON_OFFICIAL_VENUE_WEB_CAPTURE_v1"
+                or route.get("route_id")!=rid
+                or route.get("W12_source_sha256")!=source["source_jsonl_sha256"]
+                or route.get("w12_listed_official_url")!=original.get("official_url","")
+                or route.get("official_rules_acceptance")!="HOLD"
+                or route.get("author_gate")!="CLOSED"
+                or route.get("send_count")!=0
+                or route.get("venue_page_domain_alone_is_not_policy_acceptance") is not True
+                or route.get("policy_freshness_verified") is not False
+                or any(web.get(k) is not False for k in (
+                    "submission_policy_verified","cfp_deadline_verified",
+                    "ai_authorship_policy_verified","official_publisher_status_verified"))):
+            raise ValueError("stale or forged Kairon venue status "+rid)
+        rawsha=web.get("raw_sha256")
+        if rawsha:
+            rootpath=root/"url_capture_cache"/hashlib.sha256(
+                route["w12_listed_official_url"].encode("utf-8")).hexdigest()[:24]
+            raw=rootpath/"source.bin"
+            if not raw.is_file() or hashlib.sha256(raw.read_bytes()).hexdigest()!=rawsha:
+                raise ValueError("stale raw publisher HTML source "+rid)
+        visible=web.get("visible_text_sha256")
+        if visible:
+            txt=root/"url_capture_cache"/hashlib.sha256(
+                route["w12_listed_official_url"].encode("utf-8")).hexdigest()[:24]/"visible_text.txt"
+            if not txt.is_file() or hashlib.sha256(txt.read_text(encoding="utf-8").rstrip("\r\n").encode("utf-8")).hexdigest()!=visible:
+                raise ValueError("stale original extracted HTML paragraph "+rid)
+    return data
+
 def run_workflow(
     packets:Path, science_index:Path, published:Path, model:Path,
     merged:Path, *, existing_model_roots:list[Path]|None=None,
@@ -97,6 +143,7 @@ def run_workflow(
     board_repo:Path|None=None, board_root:Path|None=None,
     native_w12:Path|None=None, native_w12_snapshot:Path|None=None,
     outreach_events:Path|None=None, diagnostics:Path|None=None,
+    venue_root:Path|None=None,replay_venues:bool=False,
 )->dict[str,Any]:
     source=load(packets/"manifest.json")
     if source.get("schema")!="MAI_W12_BATCH_OUTPUT_MANIFEST_v1" or source.get("records")!=53:
@@ -124,6 +171,18 @@ def run_workflow(
         roots=[model]
         model_phase="EXECUTED_OR_REPLAYED_BOUNDED_CLI_CHALLENGE"
     combined=merge_criticism(packets,published,roots,merged)
+    venue_data=None
+    venue_phase="NOT_REQUESTED"
+    if venue_root is not None:
+        if replay_venues:
+            venue_data=attest_reusable_venues(venue_root,packets)
+            venue_phase="CACHED_BY_W12_AND_RAW_HTML_SHA256"
+        else:
+            venue_data=capture_venues(packets,venue_root,limit=53,
+                                      workers=max_workers)
+            if venue_data.get("routes_requested")!=53:
+                raise RuntimeError("Kairon web source run incomplete")
+            venue_phase="EXECUTED_OR_REPLAYED_OFFICIAL_URL_HTML_CAPTURE"
     board_state="NOT_REQUESTED"
     board_manifest_sha=None
     if board_repo is not None:
@@ -141,6 +200,7 @@ def run_workflow(
         ]
         if outreach_events:args.extend(["--outreach",str(outreach_events)])
         if diagnostics:args.extend(["--analysis-root",str(diagnostics)])
+        if venue_root is not None:args.extend(["--venue-web",str(venue_root)])
         env=os.environ.copy()
         env["PYTHONPATH"]=str(board_repo/"src")
         proc=subprocess.run(args,cwd=str(board_repo),env=env,
@@ -156,6 +216,9 @@ def run_workflow(
             raise ValueError("board promoted or lost routes")
         if board_meta.get("provisional_model_critique_count")!=combined["model_reviews_validated"]:
             raise ValueError("board has missing scholarly critiques")
+        if venue_data is not None and (board_meta.get("venue_pages_acquired_count")!=53
+                or board_meta.get("venue_policies_certified_count")!=0):
+            raise ValueError("board misrepresented actual Kairon web evidence")
         board_manifest_sha=hashlib.sha256((board_root/"manifest.json").read_bytes()).hexdigest()
         board_state="UPDATED_FROM_VERIFIED_SOURCE_REVIEW_RECORDS"
     report={
@@ -175,6 +238,10 @@ def run_workflow(
         "merged_receipt_sha256":hashlib.sha256((merged/"merged_challenge_receipt.json").read_bytes()).hexdigest(),
         "board_state":board_state,
         "board_manifest_sha256":board_manifest_sha,
+        "kairon_venue_capture_phase":venue_phase,
+        "kairon_pages_acquired_count":venue_data["routes_requested"] if venue_data else 0,
+        "kairon_route_statuses":venue_data["routes_by_http_status"] if venue_data else {},
+        "kairon_venue_policies_certified":0,
         "publisher_fulltexts_certified":0,"author_gates_ready":0,"external_submission_actions":0,
         "quality_claim":"PROVISIONAL_DATABASE_ABSTRACT_SCHOLARLY_CHALLENGE",
     }
@@ -200,6 +267,8 @@ def main()->int:
     p.add_argument("--w12-native-snapshot",type=Path)
     p.add_argument("--outreach-events",type=Path)
     p.add_argument("--existing-diagnostics",type=Path)
+    p.add_argument("--venue-web",type=Path)
+    p.add_argument("--reuse-venues",action="store_true")
     a=p.parse_args()
     result=run_workflow(a.packets,a.prior_index,a.published,a.model_output,
         a.merged_output,existing_model_roots=a.existing_model_root,
@@ -207,7 +276,8 @@ def main()->int:
         chunk_size=a.chunk_size,provider=a.provider,timeout=a.timeout,
         board_repo=a.board_repo,board_root=a.board_output,
         native_w12=a.w12_rows,native_w12_snapshot=a.w12_native_snapshot,
-        outreach_events=a.outreach_events,diagnostics=a.existing_diagnostics)
+        outreach_events=a.outreach_events,diagnostics=a.existing_diagnostics,
+        venue_root=a.venue_web,replay_venues=a.reuse_venues)
     print(json.dumps(result,ensure_ascii=False,indent=2))
     return 0 if not result["pending_route_ids"] else 2
 

@@ -94,3 +94,22 @@ def test_raw_crossref_cache_hash_is_verified_before_offline_replay(tmp_path,monk
     tampered.write_bytes(b"forged replacement of Crossref API response")
     with pytest.raises(ValueError,match="raw Crossref/OpenAlex response SHA drift"):
         workflow.attest_reusable_publications(root,packet)
+
+def test_venue_raw_source_attestation_fails_closed(tmp_path,monkeypatch):
+    from scripts import fetch_mai_venue_pages as venue_capture
+    from tests.test_mai_venue_pages import WebResponse
+    from tests.test_mai_w12_indago_bind import prepare
+    packets,_,_=prepare(tmp_path)
+    route_file=packets/"routes"/"MAI-W12-001.json"
+    route=json.loads(route_file.read_text(encoding="utf-8"))
+    route["route"]["official_url"]="https://example.org/cfp"
+    route_file.write_text(json.dumps(route),encoding="utf-8")
+    monkeypatch.setattr(venue_capture,"_request",lambda url,timeout:WebResponse(url))
+    root=tmp_path/"venues"
+    venue_capture.capture(packets,root,limit=1)
+    assert workflow.attest_reusable_venues(root,packets)["routes_requested"]==1
+    key=hashlib.sha256(b"https://example.org/cfp").hexdigest()[:24]
+    raw=root/"url_capture_cache"/key/"source.bin"
+    raw.write_bytes(b"FORGED HTML")
+    with pytest.raises(ValueError,match="stale raw publisher HTML"):
+        workflow.attest_reusable_venues(root,packets)
