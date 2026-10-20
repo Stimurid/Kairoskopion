@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VERSION = "trm-cite-z0-v02"
+VERSION = "trm-cite-z0-v03"
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 PKG = "{http://schemas.openxmlformats.org/package/2006/relationships}"
@@ -39,7 +39,6 @@ PATTERNS = [
 # Examples: (Author et al. 2021; Another and Third 2007).
 PAREN_CITATION = re.compile(r"\([^()\r\n]{3,300}\)")
 CITATION_YEAR = re.compile(r"(?<!\d)(?:1[5-9]\d{2}|20\d{2}|21\d{2})(?!\d)")
-AUTHOR_LEXEME = re.compile(r"[A-ZА-ЯЁ][A-Za-zА-Яа-яЁё'\-]{1,}")
 NON_AUTHOR_PREFIX = re.compile(
     r"^\s*(?:fig(?:ure)?|table|табл(?:ица)?|рис(?:унок)?|"
     r"equation|eq\.?|section|sec\.?|iso|гост|n\s*=)\b", re.I
@@ -330,8 +329,14 @@ def _looks_like_author_year(part: str) -> bool:
     if date is None or len(part) > 160:
         return False
     before = part[:date.start()].strip()
-    return bool(before and AUTHOR_LEXEME.search(before)
-                and not NON_AUTHOR_PREFIX.match(before))
+    if not before or NON_AUTHOR_PREFIX.match(before):
+        return False
+    letters = [char for char in before if char.isalpha()]
+    # Includes accented Latin (Rüegg), Cyrillic and uncased CJK names.
+    return bool(letters) and (
+        any(char.isupper() for char in letters)
+        or not any(char.islower() for char in letters)
+    )
 
 
 def _parenthetical_intakes(sec: Section, sha: str) -> list[CitationIntake]:
@@ -452,17 +457,23 @@ def _repair_case(ci: CitationIntake) -> CitationRepairCase:
             "Z6_INDEPENDENT_V1_V5_AND_AUTHOR_GATE",
             "Z7_PROPOSE_REVERSIBLE_INSERTION_AND_RECHECK",
         )
-    elif ci.kind in (
-        "AUTHOR_YEAR_CLUSTER", "AUTHOR_YEAR_MEMBER_UNPARSED",
-    ):
-        reason = ("SOURCE_CLUSTER_REQUIRES_MEMBER_RESOLUTION",)
+    elif ci.kind == "AUTHOR_YEAR_CLUSTER":
+        reason = ("SOURCE_CLUSTER_NEEDS_MEMBER_COORDINATION",)
+        # This is a grouping/coordination case, NOT a second source hunt.
         operations = (
             "Z2_DECOMPOSE_CLAIM_TO_EACH_CITED_SOURCE",
-            "Z4_RESOLVE_EACH_MEMBER_WORK_EDITION_WITNESS",
-            "Z5_INDEPENDENT_PASSAGE_FOR_EACH_SOURCE",
-            "Z6_INDEPENDENT_V1_V5_FOR_EACH_SOURCE",
-            "R3_REPAIR_EACH_INVALID_MEMBER_WITH_AUTHOR_CONTROL",
-            "R6_RECHECK_FINAL_MULTI_REFERENCE_PRESENTATION",
+            "WAIT_FOR_MEMBER_V1_V5_RESULTS",
+            "R6_CHECK_REASSEMBLED_CLUSTER_AND_AUTHOR_INTENT",
+        )
+    elif ci.kind == "AUTHOR_YEAR_MEMBER_UNPARSED":
+        reason = ("UNPARSED_SOURCE_CLUSTER_MEMBER",)
+        operations = (
+            "Z2_IDENTIFY_UNPARSED_MEMBER_WITH_AUTHOR_CONTEXT",
+            "Z3_FIND_AUTHORITATIVE_WORK_OR_NEGATIVE_RESULT",
+            "Z4_RESOLVE_MEMBER_WORK_EDITION_WITNESS",
+            "Z5_VERIFY_EXACT_PASSAGE",
+            "Z6_INDEPENDENT_V1_V5_AND_AUTHOR_GATE",
+            "R6_RECHECK_MEMBER_IN_ORIGINAL_CLUSTER",
         )
     elif ci.kind == "UNATTRIBUTED_QUOTE_CANDIDATE":
         reason = ("ATTRIBUTION_UNCONFIRMED",)
@@ -488,11 +499,73 @@ def _repair_case(ci: CitationIntake) -> CitationRepairCase:
             "R6_READBACK_CLICKTEST_AND_NEGATIVE_TRAIL",
         )
     return CitationRepairCase(
-        _id("cr", ci.intake_id), ci.intake_id, "OPEN_UNVERIFIED",
+        _id("cr", ci.intake_id), ci.intake_id,
+        "GROUP_AWAITING_MEMBERS" if ci.kind == "AUTHOR_YEAR_CLUSTER"
+        else "OPEN_UNVERIFIED",
         True, reason, operations,
         {f"V{i}": "NOT_CHECKED" for i in range(1, 6)},
         "REQUIRED_IF_MEANING_CHANGES",
     )
+
+
+def make_work_orders(audit: CitationAudit) -> list[dict[str, Any]]:
+    """Prepare per-source, evidence-bound requests for downstream R1/Z2.
+
+    A cluster parent stays in the audit as coordination provenance only;
+    its members each receive exactly one actionable work order.
+    """
+    by_id = {ci.intake_id: ci for ci in audit.intakes}
+    orders: list[dict[str, Any]] = []
+    for case in audit.repair_cases:
+        ci = by_id[case.intake_id]
+        if ci.kind == "AUTHOR_YEAR_CLUSTER":
+            continue
+        route = (
+            "Z2_CONDENSE_AUTHOR_WISH"
+            if ci.origin_type == "AUTHOR_DESIRED"
+            else "R1_AUDIT_BIBLIOGRAPHIC_IDENTITY"
+            if ci.kind == "BIBLIOGRAPHY_ENTRY"
+            else "R1_FORENSIC_CHECK_BEFORE_CONDITIONAL_REPAIR"
+        )
+        orders.append({
+            "work_order_id": _id("wo", VERSION, case.case_id),
+            "case_id": case.case_id,
+            "intake_id": ci.intake_id,
+            "source_sha256": audit.source["sha256"],
+            "snapshot_path": audit.source.get("original_snapshot_path"),
+            "origin_type": ci.origin_type,
+            "citation_kind": ci.kind,
+            "manuscript_anchor": ci.anchor,
+            "surface": ci.surface,
+            "parent_anchor": ci.parent_anchor,
+            "original_fragment": ci.original_fragment,
+            "original_cluster": ci.original_cluster,
+            "group_id": ci.group_id,
+            "group_index": ci.group_index,
+            "source_hints": ci.source_hints,
+            "claim_context": ci.claim_context,
+            "required_operations": case.required_operations,
+            "reason_codes": case.reason_codes,
+            "verification": case.verification,
+            "author_gate": case.author_gate,
+            "next_stage": route,
+            "execution_status": "QUEUED_UNVERIFIED",
+            "external_search_authorized_by_this_file": False,
+            "original_manuscript_mutation_authorized": False,
+        })
+    return orders
+
+
+def _write_immutable(path: Path, content: bytes) -> None:
+    """Exclusive create, verify bytes, and refuse silent receipt changes."""
+    if path.exists():
+        if path.read_bytes() != content:
+            raise RuntimeError(
+                "Immutable citation work-order/report conflict: " + str(path)
+            )
+        return
+    with path.open("xb") as stream:
+        stream.write(content)
 
 
 def audit_manuscript(path: str | Path) -> CitationAudit:
@@ -562,10 +635,14 @@ def persist_audit(source_path: str | Path,
     dest = folder / "citation_intake.json"
     payload = (json.dumps(audit.to_dict(), ensure_ascii=False,
                           sort_keys=True, indent=2) + "\n").encode()
-    if dest.exists():
-        if dest.read_bytes() != payload:
-            raise RuntimeError("Immutable report conflict; open a new run")
-    else:
-        with dest.open("xb") as file:
-            file.write(payload)
+    _write_immutable(dest, payload)
+    orders = make_work_orders(audit)
+    queue = folder / "citation_work_orders.jsonl"
+    queue_bytes = (
+        "".join(
+            json.dumps(order, ensure_ascii=False, sort_keys=True) + "\n"
+            for order in orders
+        )
+    ).encode("utf-8")
+    _write_immutable(queue, queue_bytes)
     return audit, dest
