@@ -29,7 +29,8 @@ def verify_operation(root:Path,rid:str,record:dict[str,Any])->str:
     matches=[]
     for path in sorted((root/"chunks").glob("*/accepted_reviews.json")):
         op=load(path)
-        if rid in op.get("route_ids",[]):matches.append((path,op))
+        if rid in op.get("route_ids",[]) and op.get("input_key")==record.get("input_key"):
+            matches.append((path,op))
     if len(matches)!=1:raise ValueError("missing/duplicate original model receipt "+rid)
     path,operation=matches[0]
     if (operation.get("schema")!=SCHEMA or
