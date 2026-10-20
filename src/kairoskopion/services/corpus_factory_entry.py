@@ -53,6 +53,7 @@ def execute_factory_source_stage(
     *,
     research_packet_path: Path | str | None = None,
     litops_root: Path | str | None = None,
+    native_capture_root: Path | str | None = None,
     manual_w1_reopen: bool = False,
 ) -> dict[str, Any]:
     """Compose installed components with exact input pins and idempotent readback.
@@ -83,6 +84,28 @@ def execute_factory_source_stage(
             raise ValueError("isolated LitOps requires LITOPS_SKIP_DOTENV")
         if Path(litops_root).resolve() == storage:
             raise ValueError("LitOps registry must use a distinct isolated target")
+    # Host-native Google Docs intake reuses immutable TRM040 source snapshots.
+    # Pinned per-source checkpoint resumes partial 429/fetch failures without
+    # repeating completed reads, and NEVER silently refreshes a prior revision.
+    native_count = new_native_captures = reused_native_captures = 0
+    derived_manifest_sha = None
+    modes = {s.get("capture_transport") for s in case.get("sources", [])}
+    if any(mode not in {None, "local", "native_docs"} for mode in modes):
+        raise ValueError("unsupported source capture transport")
+    if "native_docs" in modes:
+        if native_capture_root is None:
+            raise ValueError("native Docs input requires explicit private capture root")
+        capture_root = Path(native_capture_root).resolve()
+        if capture_root.is_relative_to(storage) or storage.is_relative_to(capture_root):
+            raise ValueError("native captures and Factory storage must be isolated")
+        if manifest_path.resolve().is_relative_to(capture_root):
+            raise ValueError("original source manifest must be outside materialized native capture root")
+        from ..integrations.native_docs_capture import materialize_native_manifest
+        manifest_path, native_count, new_native_captures, reused_native_captures = (
+            materialize_native_manifest(case, manifest_sha, capture_root)
+        )
+        case, derived_manifest_sha = _safe_manifest(manifest_path)
+
     report_file = storage / "factory_research_cases" / case_id / "source_stage_receipt.json"
     if report_file.exists():
         previous = json.loads(report_file.read_text(encoding="utf-8"))
@@ -108,6 +131,9 @@ def execute_factory_source_stage(
                 role=SourceRole.BACKGROUND_RESEARCH,
                 source_id=source["source_id"],
             )
+            if source.get("read_coverage") == "STRUCTURAL_TEXT_PROJECTION_COMMENTS_NOT_ACQUIRED":
+                from ..integrations.native_docs_capture import verify_native_source
+                verify_native_source(source)
             if (snapshot.extraction_status != "extracted"
                     or _digest(observed_text.encode("utf-8")) != pin["content_sha256"]):
                 raise ValueError("immutable checkpoint source content changed or disappeared")
@@ -136,6 +162,9 @@ def execute_factory_source_stage(
         "schema": "FACTORY_SOURCE_RESEARCH_STAGE_V1",
         "case_id": case_id,
         "input_manifest_sha256": manifest_sha,
+        "native_source_count": native_count,
+        "derived_manifest_sha256": derived_manifest_sha,
+        "native_replay_policy": "IMMUTABLE_PIN_NO_PROVIDER_RECHECK",
         "research_packet_sha256": research_sha,
         "source_ledger_sha256": intake["ledger_sha256"],
         "research_handoff_sha256": stage["handoff_sha256"],
@@ -177,6 +206,8 @@ def execute_factory_source_stage(
         "manual_w1_proposals": receipt["w1_return_proposals"],
         "w2_proposals": receipt["w2_return_proposals"],
         "new_source_snapshots": intake["new_source_snapshots"],
+        "new_native_captures": new_native_captures,
+        "reused_native_captures": reused_native_captures,
         "new_discussion_events": intake["new_discussion_events"],
         "new_whitecrow_sources": litops["new_sources"] if litops else None,
         "new_whitecrow_contexts": litops["new_context_packs"] if litops else None,

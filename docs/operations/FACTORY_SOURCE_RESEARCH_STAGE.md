@@ -173,3 +173,84 @@ audio and comments require their own typed adapters (#38/#39).
 Authorized direct multi-file capture and a single manifest-to-fetch
 invocation remain #37 follow-up. This code is DRAFT only, no CI or
 production authorization claimed.
+
+
+## Multi-GDoc manifest -> provider -> Factory, one operator action (2026-10-20)
+
+One bounded Factory source CLI accepts --native-capture-root alongside
+--manifest, --storage-root and optional --litops-root. A source element
+with capture_transport=native_docs, original drive:GOOGLE_DOC_ID and
+source_url is fetched by the EXISTING installed TRM040 native Docs
+transport. No previous source fragment or temporary text path must
+be supplied through ChatGPT. Normal local carrier rows may coexist,
+but their own read authority remains explicitly limited.
+
+Example PRIVATE author input (replace exact source ID; no real text in Git):
+
+    {
+      "schema": "TRM074_COLD_CASE_V1",
+      "case_id": "EXAMPLE-OWNER-CORPUS-001",
+      "publication_send": "DISALLOWED",
+      "sources": [
+        {
+          "key": "N01", "family": "A", "kind": "SPEECH_SCRIPT",
+          "version": "v0.1", "author_state": "NOT_VERIFIED",
+          "capture_transport": "native_docs",
+          "source_id": "drive:EXACT_GOOGLE_DOC_ID",
+          "source_url": "https://docs.google.com/document/d/EXACT_GOOGLE_DOC_ID/edit"
+        }
+      ],
+      "version_edges": [], "delta_pairs": [],
+      "decision_events": [], "discussion_events": []
+    }
+
+Owner host configures the existing TRIMURTI_DOCS_FETCH_COMMAND (or
+read-only TRIMURTI_GOOGLE_TOKEN_FILE), and installed native trimurti
+code on PYTHONPATH. No new HTTP client or OAuth code was created.
+LITOPS_ROOT and LITOPS_SKIP_DOTENV=1 are required if the operator
+also requests real installed LitOps/WhiteCrow.
+
+    python scripts\run_factory_source_stage.py --manifest C:\owner\case.json --storage-root C:\owner\factory --native-capture-root C:\owner\native-snapshots --litops-root C:\owner\litops
+
+Original manifest, Factory storage, and capture root are isolated.
+Source content and OAuth credentials never enter GitHub. Source ID
+is exact; title and modifiedTime are not identity. The source must
+be a Google-native Doc; Word, Slides, comments, audio and chats have
+separate typed capture engines. No unproven FULL reads.
+
+Durable partial resume: each completed native source is pinned in
+owner-private case_pins/<case_id>/ keyed by ORIGINAL manifest SHA,
+case ID and original Google Doc ID. Failure of the second document
+retains a verified first. Retry re-verifies old TrustedAcquisitionStore
+record and text projection before using the pin, fetching only missing
+documents. A changed provider identity, forged snapshot, changed text,
+missing snapshot, unsafe ID, duplicate ID or unauthorized author-state
+promotion fails closed.
+
+A pinned replay is an OLD-REVISION REPLAY, not evidence that the source
+is still current in Drive. To refresh changed source text, explicitly
+create a new case/wave/version; never silently rewrite the previous
+scientific history. The durable receipt includes native_source_count,
+derived_manifest_sha256 and native_replay_policy. CLI additionally
+reports new_native_captures and reused_native_captures.
+
+ACTUAL AORUS TWO-DOC NO-CHAT FACTORY RUN: authorized A06 and A07 exact
+Google Docs IDs, fresh independent case T3-NATIVE-BATCH-20261020.
+One operator command read both from Google Docs through existing native
+provider; saved stable revision structural snapshots; admitted 2
+SourceSnapshots; wrote 2 Kairon Evidence; 2 LitOps Sources; WhiteCrow
+received 1 context_pack. Cold replay: 0 new native capture, 2 reused
+pins, 0 new SourceSnapshot or LitOps/WhiteCrow record. Independent
+Factory receipt SHA256:
+807210bc7d008bc15e41c273ed6601e2642a05c0f8703ff6c7ffa7ec37d3d8cc .
+All raw captures and the owner-only launch script live privately at
+C:\projects\trimurti\_ops\T3-TALK-20261019\native-batch-direct .
+Google comments NOT_ACQUIRED. No ArticleSeed, World mutation,
+Artikl manuscript acceptance, published venue route or SEND.
+
+147 targeted local tests passed, including 9 new native-manifest tests
+for partial provider failure/retry, document-content revision under
+a pinned case, forged provider/ID/snapshot, changed local text, author
+decision gate, duplicate and unsafe IDs, mixed carrier types and
+private root isolation. CI, independent host and production remain
+unverified. Broader >=80 W12-qualified routes remains issue #43.

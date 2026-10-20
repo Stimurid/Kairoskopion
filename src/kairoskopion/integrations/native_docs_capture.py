@@ -24,7 +24,10 @@ def _digest(raw: bytes) -> str:
 def _identity(source_id: str, url: str) -> str:
     if not source_id.startswith("drive:") or len(source_id) <= 6:
         raise ValueError("native Docs requires pinned Drive source ID")
+    import re
     document_id = source_id[6:]
+    if not re.fullmatch(r"[A-Za-z0-9_-]{5,200}", document_id):
+        raise ValueError("native Docs provider object ID is not a safe fixed ID")
     expected = "https://docs.google.com/document/d/" + document_id + "/"
     if not url.startswith(expected):
         raise ValueError("native source Drive ID and URL disagree")
@@ -203,3 +206,148 @@ def verify_native_source(source: dict[str, Any]) -> dict[str, str]:
         "projection_text_sha256": _digest(projected),
         "read_coverage": STRUCTURAL_TEXT_SCOPE,
     }
+
+
+
+# ---------------------------------------------------------------------------
+# Owner-authorized pinned multi-document collection for Factory case input
+# ---------------------------------------------------------------------------
+
+
+def materialize_native_manifest(
+    case: dict[str, Any],
+    original_manifest_sha256: str,
+    capture_root: Path | str,
+) -> tuple[Path, int, int, int]:
+    """Use existing TRM040 to hydrate all native_docs sources in one bounded call.
+
+    Each successfully captured source is durably pinned *before* starting the
+    next document. On partial failure, a retry verifies and reuses those
+    provider-bound snapshots. A replay deliberately does not claim that the
+    provider has not changed since the pinned read; author must create a
+    new case/wave for refresh rather than rewriting scientific provenance.
+    """
+    import copy
+    import re
+
+    sources = case.get("sources")
+    if not isinstance(sources, list) or not 1 <= len(sources) <= 200:
+        raise ValueError("native manifest source list must be bounded and nonempty")
+    case_id = str(case.get("case_id") or "")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{3,100}", case_id):
+        raise ValueError("invalid case identity")
+    if case.get("publication_send") != "DISALLOWED":
+        raise ValueError("external send must remain DISALLOWED")
+    if not isinstance(original_manifest_sha256, str) or not re.fullmatch(
+        r"[0-9a-f]{64}", original_manifest_sha256
+    ):
+        raise ValueError("source manifest immutable SHA-256 missing")
+    if not isinstance(capture_root, (str, Path)):
+        raise ValueError("explicit owner-private capture root required")
+
+    keys: set[str] = set()
+    ids: set[str] = set()
+    count = 0
+    # Preflight *all* entries before any external reads.
+    for source in sources:
+        if not isinstance(source, dict):
+            raise ValueError("manifest source is not an object")
+        key, source_id = str(source.get("key") or ""), str(source.get("source_id") or "")
+        if not key or key in keys or not source_id or source_id in ids:
+            raise ValueError("duplicate or missing source key/Drive identity")
+        keys.add(key)
+        ids.add(source_id)
+        mode = source.get("capture_transport")
+        if mode not in (None, "local", "native_docs"):
+            raise ValueError("unsupported source capture transport")
+        if mode == "native_docs":
+            _identity(source_id, str(source.get("source_url") or ""))
+            if source.get("local_path"):
+                raise ValueError("native manifest may not predeclare source local_path")
+            if not source.get("family") or not source.get("kind") or not source.get("version"):
+                raise ValueError("native source needs family, carrier kind and version")
+            if source.get("author_state") == "USER_ACCEPTED_CONCEPTS_ONLY":
+                has_decision = any(
+                    event.get("role") == "USER" and event.get("artifact") == key
+                    for event in case.get("decision_events", [])
+                )
+                if not has_decision:
+                    raise ValueError("author-accepted source lacks explicit author decision")
+            count += 1
+    if not count:
+        raise ValueError("native batch contains no native_docs sources")
+
+    root = Path(capture_root).resolve()
+    derived_case = copy.deepcopy(case)
+    new_count = reused_count = 0
+    for item in derived_case["sources"]:
+        if item.get("capture_transport") != "native_docs":
+            continue
+        item_id = str(item["source_id"])
+        pin_sha = _digest(
+            (case_id + "|" + original_manifest_sha256 + "|" + item_id).encode("utf-8")
+        )
+        pin_file = root / "case_pins" / case_id / f"{pin_sha}.json"
+        native: dict[str, Any]
+        if pin_file.is_file():
+            pin = json.loads(pin_file.read_text(encoding="utf-8"))
+            if (pin.get("schema") != "TRM074_NATIVE_DOCS_MANIFEST_PIN_V1"
+                    or pin.get("manifest_sha256") != original_manifest_sha256
+                    or pin.get("case_id") != case_id
+                    or pin.get("source_id") != item_id
+                    or pin.get("source_url") != item["source_url"]):
+                raise ValueError("native Docs immutable case pin conflicts with manifest")
+            native = pin.get("source_receipt")
+            if not isinstance(native, dict):
+                raise ValueError("native Docs existing source pin malformed")
+            verify_native_source(native)
+            reused_count += 1
+        else:
+            native = capture_native_doc(item_id, item["source_url"], root)
+            verify_native_source(native)
+            pin = {
+                "schema": "TRM074_NATIVE_DOCS_MANIFEST_PIN_V1",
+                "manifest_sha256": original_manifest_sha256,
+                "case_id": case_id,
+                "source_id": item_id,
+                "source_url": item["source_url"],
+                "source_receipt": native,
+            }
+            pin_file.parent.mkdir(parents=True, exist_ok=True)
+            encoded_pin = (
+                json.dumps(pin, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+            ).encode("utf-8")
+            if pin_file.exists():
+                raise ValueError("concurrent native Docs case pin appeared")
+            temp = pin_file.with_suffix(".tmp")
+            temp.write_bytes(encoded_pin)
+            os.replace(temp, pin_file)
+            new_count += 1
+        if native.get("source_id") != item_id or native.get("source_url") != item["source_url"]:
+            raise ValueError("native source pin substituted another Drive identity")
+        if Path(str(native.get("native_store_root") or "")).resolve() != (root / "trusted_native_docs").resolve():
+            raise ValueError("native case pin points outside authorized trusted store")
+        if (not Path(str(native.get("local_path") or "")).resolve().is_relative_to(root)
+                or not Path(str(native.get("native_receipt_path") or "")).resolve().is_relative_to(root)):
+            raise ValueError("native case pin projects outside owner-private capture root")
+        prior_author = item.get("author_state", "NOT_VERIFIED")
+        item.update(native)
+        item["author_state"] = prior_author
+        item["source_mime"] = "application/vnd.google-apps.document"
+        item["scope"] = "PROVIDER_BOUND_NATIVE_DOCS_TEXT_COMMENT_AND_MEDIA_UNREAD"
+        # Private source manifest is now locally pinned; an explicit second
+        # execution may reuse it with independent verify_native_source.
+        item["capture_transport"] = "local"
+        item["captured_from_transport"] = "native_docs"
+
+    payload = (json.dumps(derived_case, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    derived_path = root / "manifests" / f"{case_id}_{_digest(payload)[:20]}.json"
+    derived_path.parent.mkdir(parents=True, exist_ok=True)
+    if derived_path.exists():
+        if derived_path.read_bytes() != payload:
+            raise ValueError("native derived manifest immutable collision")
+    else:
+        temp = derived_path.with_suffix(".tmp")
+        temp.write_bytes(payload)
+        os.replace(temp, derived_path)
+    return derived_path, count, new_count, reused_count

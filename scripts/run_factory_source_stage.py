@@ -19,6 +19,8 @@ def main() -> int:
     parser.add_argument("--storage-root", type=Path, required=True)
     parser.add_argument("--research-packet", type=Path)
     parser.add_argument("--litops-root", type=Path)
+    parser.add_argument("--native-capture-root", type=Path,
+                        help="Private TRM040 native Docs store for sources marked capture_transport=native_docs")
     parser.add_argument("--manual-w1-reopen", action="store_true")
     args = parser.parse_args()
     try:
@@ -26,6 +28,7 @@ def main() -> int:
             args.manifest, args.storage_root,
             research_packet_path=args.research_packet,
             litops_root=args.litops_root,
+            native_capture_root=args.native_capture_root,
             manual_w1_reopen=args.manual_w1_reopen,
         )
     except (ValueError, KeyError, OSError, ImportError) as exc:
