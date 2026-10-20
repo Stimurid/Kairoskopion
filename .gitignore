@@ -73,6 +73,8 @@ kairoskopion_demo_bundle.zip
 *.zip
 
 private_inputs/
+.trm073_private_replay/
+.replay_acceptance/
 
 # Claude Code
 .claude/

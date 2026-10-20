@@ -62,6 +62,24 @@ def test_source_read_depth_must_be_explicit():
         })
 
 
+def test_journal_discovery_candidate_rejects_canonical_official_url(tmp_path):
+    store = OpportunityGraphStore(tmp_path)
+    store.put("JournalDiscoveryCandidate", {
+        "id": "journal-cand-1",
+        "revision": "1",
+        "canonical_name": "Candidate Journal",
+        "research_status": "PROVISIONAL_DISCOVERY",
+        "official_author_policy_status": "UNRESOLVED",
+    })
+    with pytest.raises(ValueError, match="must not assert canonical official_url"):
+        store.put("JournalDiscoveryCandidate", {
+            "id": "journal-cand-2",
+            "revision": "1",
+            "canonical_name": "Bad Candidate",
+            "official_url": "https://example.test/policy",
+        })
+
+
 def test_a_journal_is_not_a_special_issue_and_has_a_stable_identity(tmp_path):
     store = OpportunityGraphStore(tmp_path)
     journal = {
