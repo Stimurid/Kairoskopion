@@ -248,3 +248,48 @@ def test_unattested_fulltext_opponent_claim_fails_before_route_write(tmp_path):
     with pytest.raises(ValueError,match="opponent read depth not supported"):
         stage_w12_research_route(path,stage)
     assert OpportunityGraphStore(stage).list_records("HuntTrace")==[]
+
+
+def test_fails_if_source_id_is_wrong_drive_id_not_in_ledger(tmp_path):
+    packet,path,stage,_,_,_=fixture_route(tmp_path)
+    packet["original_source"]["source_id"]="drive:WRONG-NOT-IN-LEDGER"
+    path.write_text(json.dumps(packet),encoding="utf-8")
+    with pytest.raises(ValueError,match="not uniquely bound to admitted Factory corpus"):
+        stage_w12_research_route(path,stage)
+    assert OpportunityGraphStore(stage).list_records("HuntTrace")==[]
+
+
+def test_fails_if_source_version_does_not_match_admitted_corpus(tmp_path):
+    packet,path,stage,_,_,_=fixture_route(tmp_path)
+    packet["original_source"]["source_version"]="v0.5"
+    path.write_text(json.dumps(packet),encoding="utf-8")
+    with pytest.raises(ValueError,match="not uniquely bound to admitted Factory corpus"):
+        stage_w12_research_route(path,stage)
+    assert OpportunityGraphStore(stage).list_records("HuntTrace")==[]
+
+
+def test_fails_if_original_source_excerpt_is_blank(tmp_path):
+    packet,path,stage,_,_,_=fixture_route(tmp_path)
+    packet["original_source"]["anchor_quote"]=""
+    path.write_text(json.dumps(packet),encoding="utf-8")
+    with pytest.raises(ValueError,match="SOURCE_TEXT quote outside bounded evidence limits"):
+        stage_w12_research_route(path,stage)
+    assert OpportunityGraphStore(stage).list_records("HuntTrace")==[]
+
+
+def test_fails_if_coauthor_consent_speculatively_confirmed(tmp_path):
+    packet,path,stage,_,_,_=fixture_route(tmp_path)
+    packet["coauthor_consent"]="CONFIRMED"
+    path.write_text(json.dumps(packet),encoding="utf-8")
+    with pytest.raises(ValueError,match="coauthor approval cannot be synthesized"):
+        stage_w12_research_route(path,stage)
+    assert OpportunityGraphStore(stage).list_records("HuntTrace")==[]
+
+
+def test_fails_if_external_send_enabled(tmp_path):
+    packet,path,stage,_,_,_=fixture_route(tmp_path)
+    packet["external_send"]="ENABLED"
+    path.write_text(json.dumps(packet),encoding="utf-8")
+    with pytest.raises(ValueError,match="publication and World changes not authorized"):
+        stage_w12_research_route(path,stage)
+    assert OpportunityGraphStore(stage).list_records("HuntTrace")==[]
