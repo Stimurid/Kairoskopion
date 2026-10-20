@@ -1724,6 +1724,13 @@ def cmd_cite_intake(args: argparse.Namespace) -> int:
         "coverage_debts": audit.coverage["debts"],
         "scientific_verification": "NOT_PERFORMED",
         "report_file": str(receipt),
+        "work_orders_file": str(receipt.with_name("citation_work_orders.jsonl")),
+        "work_orders": sum(
+            1 for ci in audit.intakes if ci.kind != "AUTHOR_YEAR_CLUSTER"
+        ),
+        "cluster_coordination_cases": sum(
+            1 for ci in audit.intakes if ci.kind == "AUTHOR_YEAR_CLUSTER"
+        ),
     }, ensure_ascii=False, indent=2))
     return 0
 
