@@ -98,7 +98,7 @@ class TestCitationEcologyReport:
 class TestVenueGroundedCitationNeeds:
     def test_explicit_minimum_is_a_review_task(self):
         bib = build_bibliography_profile(
-            "## References\\n\\n- Descartes (1641). Meditations.\\n"
+            "## References\n\n- Descartes (1641). Meditations.\n"
             "- Locke (1690). Essay Concerning Human Understanding."
         )
         report = build_citation_ecology_report(
@@ -112,11 +112,11 @@ class TestVenueGroundedCitationNeeds:
 
     def test_historical_bibliography_is_not_a_recency_deficit(self):
         bib = build_bibliography_profile(
-            "## References\\n\\n"
-            "- Descartes (1641). Meditations.\\n"
-            "- Locke (1690). Essay Concerning Human Understanding.\\n"
-            "- Kant (1781). Critique of Pure Reason.\\n"
-            "- Hegel (1807). Phenomenology of Spirit.\\n"
+            "## References\n\n"
+            "- Descartes (1641). Meditations.\n"
+            "- Locke (1690). Essay Concerning Human Understanding.\n"
+            "- Kant (1781). Critique of Pure Reason.\n"
+            "- Hegel (1807). Phenomenology of Spirit.\n"
             "- Aristotle (1900). Metaphysics."
         )
         assert bib.recency_profile in ("historical", "dated")
@@ -129,9 +129,9 @@ class TestVenueGroundedCitationNeeds:
         assert "venue_reference_minimum_unmet" not in kinds
 
     def test_venue_reference_maximum_still_checked(self):
-        refs = "\\n".join(f"- Author{i} (2000). Historical book."
+        refs = "\n".join(f"- Author{i} (2000). Historical book."
                            for i in range(6))
-        bib = build_bibliography_profile("## References\\n\\n" + refs)
+        bib = build_bibliography_profile("## References\n\n" + refs)
         report = build_citation_ecology_report(
             bib, _make_article(), _make_venue(),
             "Maximum 3 references allowed."
