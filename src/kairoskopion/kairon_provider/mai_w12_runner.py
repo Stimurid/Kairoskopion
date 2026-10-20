@@ -79,16 +79,26 @@ def run(source_root: Path, output_root: Path, limit: int = 10, start: int=0, rer
     selected=paths[start:start+limit]
     receipts=[]
     for i,path in enumerate(selected,1):
-        original=path.read_bytes()
-        packet=json.loads(original.decode("utf-8"))
+        packet=json.loads(path.read_text(encoding="utf-8"))
         rid=packet["route"]["route_id"]
         jobroot=output_root/rid
         inputs=prepare_input(packet,jobroot/"inputs")
         receipt_file=jobroot/"receipt.json"
-        input_key=digest("|".join([digest(original),inputs["source_sha256"],inputs["venue_summary_sha256"],inputs["scenario_sha256"]]).encode("ascii"))
+        # Only the three actual run-local inputs control the diagnostic
+        # cache. Editorial emails and newly attached INDAGO objections
+        # change the board, not the underlying manuscript/venue analysis.
+        input_key=digest("|".join([inputs["source_sha256"],inputs["venue_summary_sha256"],inputs["scenario_sha256"]]).encode("ascii"))
         if receipt_file.exists() and not rerun:
             old=json.loads(receipt_file.read_text(encoding="utf-8"))
-            if old.get("input_key")==input_key and old.get("status")=="LOCAL_DIAGNOSTIC_COMPLETED":
+            previous=old.get("inputs") or {}
+            same_inputs=all(previous.get(k)==inputs[k] for k in (
+                "source_sha256","venue_summary_sha256","scenario_sha256"))
+            same_source=(old.get("real_source_snapshot")==packet.get("source_jsonl_sha256"))
+            valid_old=(old.get("status")=="LOCAL_DIAGNOSTIC_COMPLETED"
+                and old.get("route_id")==rid and same_inputs and same_source
+                and old.get("adapter_mode")=="mock"
+                and old.get("outbound_send_count")==0)
+            if valid_old:
                 receipts.append({"route_id":rid,"status":"CACHED","input_key":input_key,"original_status":"LOCAL_DIAGNOSTIC_COMPLETED"})
                 continue
         cmd=[

@@ -113,7 +113,26 @@ def load_outreach(path: Path | None) -> tuple[list[dict[str, Any]], str | None]:
         seen.add(key)
     return raw,sha(b)
 
-def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: Path | None = None, analysis_root: Path | None = None) -> dict[str, Any]:
+def load_science_index(path: Path | None, expected_source_sha: str, expected_routes: set[str]) -> tuple[dict[str,dict[str,Any]],str | None]:
+    if path is None:
+        return {},None
+    raw=path.read_bytes()
+    body=json.loads(raw.decode("utf-8"))
+    if (body.get("schema")!="MAI_W12_PRIOR_RESEARCH_INDEX_V1"
+            or body.get("source_W12_sha256")!=expected_source_sha
+            or body.get("real_research_operations_this_wave")!=0
+            or body.get("route_author_ready_count")!=0
+            or body.get("external_send_count")!=0):
+        raise ValueError("science index cannot promote unverified research")
+    cards=body.get("review_cards") or []
+    if not isinstance(cards,list) or len(cards)!=len(expected_routes):
+        raise ValueError("science index route count mismatch")
+    indexed={c["route_id"]:c for c in cards}
+    if len(indexed)!=len(cards) or indexed.keys()!=expected_routes:
+        raise ValueError("science index route IDs mismatch")
+    return indexed,sha(raw)
+
+def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: Path | None = None, analysis_root: Path | None = None, science_index_path: Path | None = None) -> dict[str, Any]:
     records,source_hash=read_records(source)
     snapshot_bytes=snapshot_path.read_bytes()
     snapshot=json.loads(snapshot_bytes.decode("utf-8-sig"))
@@ -129,6 +148,7 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
     for rid in eventmap:
         if rid not in known:
             raise ValueError("orphan outreach route id "+rid)
+    science_cards,science_sha=load_science_index(science_index_path,source_hash,known)
     route_dir=output/"routes"
     route_dir.mkdir(parents=True,exist_ok=True)
     index=[]
@@ -138,6 +158,31 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
         # with full event history, never inferred from message subject.
         last=related[-1] if related else None
         status=last["status"] if last else "SOURCE_ROUTE_EXTRACTED"
+        science={"status":"NOT_INDEXED","opponents":0,"review_packet":""}
+        if science_index_path is not None:
+            rid=r["route_id"]
+            candidate=science_cards[rid]
+            sciencefile=science_index_path.parent/"routes"/(rid+".json")
+            source_review=json.loads(sciencefile.read_text(encoding="utf-8"))
+            if (source_review.get("route_id")!=rid
+                    or source_review.get("family")!=r["family"]
+                    or source_review.get("source_jsonl_sha256")!=source_hash
+                    or source_review.get("author_ready") is not False
+                    or source_review.get("journal_send_authorized") is not False
+                    or source_review.get("scholarly_execution_state")!="HOLD_UNTIL_REAL_ARTIKL_INDAGO_OPERATION"
+                    or candidate.get("research_status")!="HOLD_UNTIL_REAL_ARTIKL_INDAGO_OPERATION"):
+                raise ValueError("science route requires unverified research HOLD "+rid)
+            raw_review=sciencefile.read_bytes()
+            science_dest=output/"science"/(rid+".json")
+            science_dest.parent.mkdir(parents=True,exist_ok=True)
+            science_dest.write_bytes(raw_review)
+            science={
+                "status":"PREEXISTING_FAMILY_OPPOSITION_INDEXED",
+                "opponents":candidate.get("opponents_indexed_from_prior_indago",0),
+                "review_packet":"science/"+rid+".json",
+                "review_sha256":sha(raw_review),
+                "read_depth":"SECONDARY_INDAGO_RESEARCH_NOT_INDEPENDENT_PUBLISHER_READ",
+            }
         analysis={"status":"NOT_RUN"}
         if analysis_root is not None:
             rpath=analysis_root/r["route_id"]/"receipt.json"
@@ -158,6 +203,7 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
             "snapshot_sha256":sha(snapshot_bytes),"outreach_sha256":events_sha,
             "route":r,"outreach_events":related,
             "local_analysis":analysis,
+            "science_index":science,
             "editorial_status":status,
             "scientific_state":"SOURCE_DRAFT_ONLY",
             "quality_receipts":{},
@@ -194,7 +240,10 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
             "route":r["route_raw"],"editorial_status":status,
             "analysis_status":analysis.get("status","NOT_RUN"),
             "fit_label":analysis.get("fit_label",""),
-            "scientific_status":"SOURCE_DRAFT_ONLY",
+            "science_index_status":science["status"],
+            "science_opponents":science["opponents"],
+            "science_packet":science["review_packet"],
+            "scientific_status":"PRIOR_ART_INDEXED_ON_HOLD" if science["review_packet"] else "SOURCE_DRAFT_ONLY",
             "packet":f"routes/{r['route_id']}.json",
             "abstract":f"routes/{r['route_id']}.md",
             "source_page":r["official_url"],
@@ -214,6 +263,8 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
         "meaning_versions":len(set(r["variant"] for r in routes)),
         "status_counts":stats,
         "analysis_counts":{key:sum(x["analysis_status"]==key for x in index) for key in sorted(set(x["analysis_status"] for x in index))},
+        "science_index_sha256":science_sha,
+        "science_indexed_count":sum(bool(x["science_packet"]) for x in index),
         "ready_for_human_send":0,
         "ready_for_author_rework":0,
         "source_note":"53 authentic W12 source route drafts; not independent article count, venue policy, or completed scholarly QA.",
@@ -290,8 +341,9 @@ c.append(el("div",item.family+" · "+item.variant+" · "+item.id,"meta"));
 c.append(el("p",item.title));
 c.append(el("div","Дедлайн W12: "+(item.deadline||"не указан"),"meta"));
 c.append(el("div","Технический прогон: "+item.analysis_status+(item.fit_label?" · fit "+item.fit_label:""),"meta"));
+c.append(el("div","Индаго: "+item.science_index_status+" · научные ориентиры "+item.science_opponents+" · HUMAN GATE CLOSED","meta"));
 const a=el("a","Исходный пакет ↗");a.href=item.packet;
-c.append(a);node.append(c)}
+c.append(a);if(item.science_packet){const v=el("a"," · Научные возражения ↗");v.href=item.science_packet;c.append(v)}node.append(c)}
 board.append(node)}
 }
 document.getElementById("search").addEventListener("input",render);
@@ -306,8 +358,9 @@ def main(argv: list[str] | None=None) -> int:
     parser.add_argument("--output",type=Path,required=True)
     parser.add_argument("--outreach",type=Path)
     parser.add_argument("--analysis-root",type=Path)
+    parser.add_argument("--science-index",type=Path)
     args=parser.parse_args(argv)
-    manifest=materialize(args.source,args.snapshot,args.output,args.outreach,args.analysis_root)
+    manifest=materialize(args.source,args.snapshot,args.output,args.outreach,args.analysis_root,args.science_index)
     print(json.dumps(manifest,ensure_ascii=False,indent=2))
     return 0
 
