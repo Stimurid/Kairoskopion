@@ -483,3 +483,67 @@ manual Google Drive connector fallback. It does NOT prove an autonomous
 multi-day Indago research hunt, a complete new article, CI success,
 author approval or a full native Google Docs capture. Another unrelated
 owner corpus and direct authorized TRM040 Docs access remain required.
+
+
+## Owner-private SECOND CORPUS — L3 real identical Factory operator (2026-10-20)
+
+Unlike a synthetic fixture or reuse of the three talks, the independently
+owner-authorized L3 corpus has an existing nine-item capture receipt
+with seven native Docs text-only projections, one historical original
+DOCX and one historical XLSX. Existing L3 experimental code-v07
+produced a scoped receipt with l3_pass=FALSE; no false full science
+admission may be inferred from passing its local tests.
+
+A new bounded source-adapter in this SAME codebase maps the exact
+historical L3 owner/capture receipt to a standard TRM074_COLD_CASE_V1
+input without ChatGPT restating private text, inventing version
+chronology or removing sources:
+kairoskopion.integrations.owner_corpus_manifest_bridge.convert_owner_corpus_manifest.
+Source identity, raw SHA256, provider/capture agreement, local file and
+owner author-status detail are checked on every conversion. The native
+text projections remain TEXT_EXTRACT_ONLY, no independent native
+provider revision/currentness is claimed; the original DOCX is parsed
+by the existing Kairoskopion local DOCX adapter as
+DOCX_BODY_TEXT_COMMENTS_UNREAD and never as fully covered author
+comments. The historical 2023 XLSX is held as
+BINARY_HELD_NO_SCIENTIFIC_EXTRACTION with byte/hash/provider pin in
+the immutable Factory receipt; 2023 is NOT current 2026 policy.
+No XLSX cells or formulae are alleged to have been scientifically read.
+
+The exact same scripts/run_factory_source_stage.py entrypoint and
+TRM074 source snapshots → actual isolated installed LitOps →
+WhiteCrow source-only context bridge ran on the L3 corpus. Private
+source conversion manifest SHA256:
+d2f1a17e4392c1bfe2084294b4447d6a45fb53ee8d1714b35b593016b9371acf.
+Actual fresh independent L3 output:
+- 8 source snapshots with extracted text + preserved owner-origin tags
+- 1 held SHA-verifiable binary XLSX, total provider pins 9/9
+- 4 source-only WhiteCrow context packs from distinct source families
+- EXACT 2 independent Python executions from one PowerShell operator,
+  second produced 0 new sources and 0 new WhiteCrow contexts
+- Both complete source-Factory receipt SHA256:
+  00ec38f476808122dcf44ebe3974ee661f839340a673a9b820c4b005304f248c
+- Scientifically examined L3 objections in THIS PR46 source pass: ZERO;
+  no L3 Indago re-hunt or L3 Artikl candidate self-certified.
+- ArticleSeed=0, accepted author scientific edit=0,
+  W12_EQUIVALENT_HELD for L3=0, deep venue=0,
+  World mutation=0, sends=0, production deployment=NO.
+
+Owner-private actual operator:
+C:\projects\trimurti\_ops\L3-CORPUS-20261020\TRM074_L3_SECOND_CORPUS_LITOPS_COLD_20261020.ps1
+Owner-private manifest bridge:
+C:\projects\trimurti\_ops\L3-CORPUS-20261020\convert_l3_into_existing_factory_20261020.py
+Local full staging output stays private under L3-CORPUS-20261020;
+original manuscript text, inherited Drive IDs, Word/Excel bytes,
+private author comments and publisher-capture receipts never enter Git.
+The test suite asserts a second independent corpus is not accidentally
+identified as the three talks, no duplicate/faked author decisions,
+actual XLSX raw-byte tampering causes refusal, changed DOCX/text
+raw-file hash causes refusal, source URL/provider swaps cause refusal,
+and same human titles do not collapse distinct provider IDs.
+
+GENERIC NEXT-CORPUS SOURCE INTAKE = demonstrated; generic research→
+article/venue loop for L3 = OPEN; native Google Docs credentials =
+UNAVAILABLE ON THIS AORUS and separately remain blocked.
+This is SRC/LITOPS/WHITECROW_CONTEXT acceptance, not real scientific
+pipeline acceptance, Deep TargetWorld or production deployment.

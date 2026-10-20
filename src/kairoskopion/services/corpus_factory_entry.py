@@ -32,6 +32,53 @@ def _canonical(value: dict[str, Any]) -> bytes:
     return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
+def _auxiliary_binary_pins(case: dict[str, Any]) -> list[dict[str, Any]]:
+    """Bind bytes of sources not semantically extractable by source_intake.
+
+    Retaining a held spreadsheet is not evidence that its tables, formulae or
+    current regulatory status were read or accepted. Recheck raw bytes on EVERY
+    Factory invocation and keep those bytes outside the public repository.
+    """
+    rows = case.get("auxiliary_sources") or []
+    if not isinstance(rows, list) or len(rows) > 20:
+        raise ValueError("auxiliary source list exceeds bounded source policy")
+    original_ids = {str(s.get("source_id")) for s in case.get("sources", [])}
+    seen = set()
+    pins = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("auxiliary source record is not a mapping")
+        source_id = str(row.get("source_id") or "")
+        if not source_id.startswith("drive:") or source_id in seen or source_id in original_ids:
+            raise ValueError("auxiliary provider ID missing or duplicated")
+        provider = source_id[6:]
+        url = str(row.get("source_url") or "")
+        if url != f"https://drive.google.com/file/d/{provider}/view":
+            raise ValueError("auxiliary file URL/Drive identity mismatch")
+        if (row.get("read_coverage") != "BINARY_HELD_NO_SCIENTIFIC_EXTRACTION"
+                or row.get("source_mime") !=
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"):
+            raise ValueError("auxiliary spreadsheet cannot claim scientific text coverage")
+        path = Path(str(row.get("local_path") or ""))
+        if path.suffix.lower() != ".xlsx" or path.is_symlink() or not path.is_file():
+            raise ValueError("auxiliary source backing XLSX missing or unsupported")
+        size = path.stat().st_size
+        if not 0 < size <= 30_000_000:
+            raise ValueError("auxiliary source exceeds byte limits")
+        observed = sha256(path.read_bytes()).hexdigest()
+        if observed != str(row.get("raw_sha256") or "").lower():
+            raise ValueError("auxiliary binary raw byte SHA mismatch")
+        seen.add(source_id)
+        pins.append({
+            "source_id": source_id, "source_mime": row["source_mime"],
+            "source_url": url, "byte_sha256": observed, "bytes": size,
+            "read_coverage": "BINARY_HELD_NO_SCIENTIFIC_EXTRACTION",
+            "currentness": str(row.get("currentness") or "UNVERIFIED"),
+            "author_gate": "HOLD",
+        })
+    return pins
+
+
 def _safe_manifest(path: Path) -> tuple[dict[str, Any], str]:
     if not path.is_file() or path.is_symlink():
         raise ValueError("owner case manifest must be a regular local file")
@@ -73,6 +120,7 @@ def execute_factory_source_stage(
     if not case_id or any(c not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
                               for c in case_id):
         raise ValueError("invalid case identity")
+    auxiliary_pins = _auxiliary_binary_pins(case)
     if manifest_path.resolve().is_relative_to(storage):
         raise ValueError("private input manifest must not be generated inside output storage")
     research_paths = (
@@ -164,6 +212,7 @@ def execute_factory_source_stage(
     if report_file.exists():
         previous = json.loads(report_file.read_text(encoding="utf-8"))
         if (previous.get("input_manifest_sha256") != manifest_sha
+                or previous.get("auxiliary_binary_pins", []) != auxiliary_pins
                 or previous.get("research_packet_sha256") != research_sha
                 or previous.get("research_set_sha256") != research_set_sha
                 or previous.get("venue_route_set_sha256") != venue_set_sha):
@@ -182,6 +231,11 @@ def execute_factory_source_stage(
             pin = old_sources.get(source["source_id"])
             if pin is None:
                 raise ValueError("immutable checkpoint is missing a manifest source identity")
+            if source.get("raw_sha256"):
+                raw_path = Path(source["local_path"])
+                if (raw_path.is_symlink() or not raw_path.is_file()
+                        or sha256(raw_path.read_bytes()).hexdigest() != str(source["raw_sha256"]).lower()):
+                    raise ValueError("immutable checkpoint source raw byte SHA mismatch")
             snapshot, observed_text = register_local_source(
                 Path(source["local_path"]),
                 role=SourceRole.BACKGROUND_RESEARCH,
@@ -283,7 +337,12 @@ def execute_factory_source_stage(
         "full_real_case_accepted": False,
         "production_deployed": False,
     }
+    if auxiliary_pins:
+        receipt["auxiliary_binary_pins"] = auxiliary_pins
+        receipt["auxiliary_binary_count"] = len(auxiliary_pins)
     encoded = _canonical(receipt)
+    if report_file.is_file() and report_file.read_bytes() != encoded:
+        raise ValueError("immutable Factory receipt changed during cold replay")
     report_file.parent.mkdir(parents=True, exist_ok=True)
     temp = report_file.with_suffix(".tmp")
     temp.write_bytes(encoded)
@@ -294,6 +353,8 @@ def execute_factory_source_stage(
         "receipt_path": str(report_file),
         "receipt_sha256": _digest(encoded),
         "source_count": receipt["source_snapshots_count"],
+        "auxiliary_binary_count": len(auxiliary_pins),
+        "total_provider_pins": receipt["source_snapshots_count"] + len(auxiliary_pins),
         "kairon_evidence_count": receipt["kairon_evidence_count"],
         "whitecrow_context_packs": receipt["whitecrow_context_packs"],
         "manual_w1_proposals": receipt["w1_return_proposals"],

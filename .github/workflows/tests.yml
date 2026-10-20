@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [main]
-  pull_request:
     branches: [main, 'integration/**']
+  pull_request:
+    branches: [main, 'integration/**', 'fix/trm073-venue80-runtime-20261020']
 
 jobs:
   test:

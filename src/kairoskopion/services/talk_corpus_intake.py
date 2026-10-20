@@ -107,8 +107,16 @@ def _validate_source_id(source: dict[str, Any]) -> None:
     source_id = str(source["source_id"])
     url = str(source["source_url"])
     if source_id.startswith("drive:"):
-        expected = "https://docs.google.com/document/d/" + source_id[6:]
-        if not url.startswith(expected + "/"):
+        docid = source_id[6:]
+        expected_doc = "https://docs.google.com/document/d/" + docid + "/"
+        expected_file = "https://drive.google.com/file/d/" + docid + "/view"
+        mime = source.get("source_mime")
+        binary_file = mime in {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }
+        if not (url.startswith(expected_doc)
+                or (binary_file and url == expected_file)):
             raise ValueError(f"source identity/url mismatch: {source['key']}")
     elif not source_id or not url.startswith("https://"):
         raise ValueError(f"unverified source identity: {source['key']}")
@@ -159,6 +167,16 @@ def run_case(manifest_path: Path | str, storage_root: Path | str) -> dict[str, A
             raise ValueError(f"chat log attribution not certified: {key}")
         _validate_source_id(source)
         source_id = source["source_id"]
+        raw_sha = source.get("raw_sha256")
+        if raw_sha is not None:
+            expected_sha = str(raw_sha).lower()
+            if not re.fullmatch(r"[a-f0-9]{64}", expected_sha):
+                raise ValueError(f"invalid source raw byte SHA: {key}")
+            path = Path(source["local_path"])
+            if path.is_symlink() or not path.is_file() or path.stat().st_size > 30_000_000:
+                raise ValueError(f"source raw backing bytes missing or unsafe: {key}")
+            if sha256(path.read_bytes()).hexdigest() != expected_sha:
+                raise ValueError(f"source raw byte SHA mismatch: {key}")
         snap, text = register_local_source(
             Path(source["local_path"]), role=SourceRole.BACKGROUND_RESEARCH,
             source_id=source_id,
@@ -201,6 +219,10 @@ def run_case(manifest_path: Path | str, storage_root: Path | str) -> dict[str, A
             "snapshot_id": "snap_trm074_" + _digest(source_id + ":" + _digest(text))[:20],
             "native_structural_attestation": native_attestation,
         }
+        if source.get("owner_author_state_detail"):
+            record["owner_author_state_detail"] = str(source["owner_author_state_detail"])
+        if raw_sha:
+            record["raw_source_sha256"] = str(raw_sha).lower()
         texts[key] = text
         by_key[key] = record
         by_id[source_id] = record
