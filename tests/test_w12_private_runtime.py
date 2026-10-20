@@ -179,7 +179,7 @@ def test_checksum_fail_closed_and_source_revisions_are_immutable(staged_fixture,
         stage_private_research(changed, owner, expected_archive_sha256=digest(changed.read_bytes()), expected_source_sha256=src)
 
 
-def test_staged_file_tampering_and_symlink_blocked(staged_fixture, tmp_path):
+def test_staged_file_tampering_is_always_blocked(staged_fixture, tmp_path):
     archive, pin, src = staged_fixture
     owner = tmp_path / "users" / "user_abcdefabcdef"
     stage_private_research(archive, owner, expected_archive_sha256=pin, expected_source_sha256=src)
@@ -188,8 +188,22 @@ def test_staged_file_tampering_and_symlink_blocked(staged_fixture, tmp_path):
         fp.write(b"unauthorized")
     with pytest.raises(W12AdmissionError, match="mutated"):
         research_stage_projection(owner)
+
+
+def test_staged_symlink_is_blocked_if_os_grants_symlink_creation(staged_fixture, tmp_path):
+    archive, pin, src = staged_fixture
+    owner = tmp_path / "users" / "user_abcdefabcdef"
+    stage_private_research(archive, owner, expected_archive_sha256=pin, expected_source_sha256=src)
     link = tmp_path / "shortcut"
-    link.symlink_to(owner, target_is_directory=True)
+    try:
+        link.symlink_to(owner, target_is_directory=True)
+    except OSError as exc:
+        # WinError 1314 means this Windows account cannot create the test
+        # symlink. No security success is claimed; Linux CI still exercises
+        # the actual symlink refusal with a real symlink and must pass.
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows token cannot create symlink; live symlink gate NOT_TESTED")
+        raise
     with pytest.raises(W12AdmissionError, match="symlink"):
         research_stage_projection(link)
 
