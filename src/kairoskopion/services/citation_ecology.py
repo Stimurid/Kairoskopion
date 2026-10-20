@@ -93,13 +93,28 @@ def _check_reference_count(
     ref_limit = _extract_reference_limit(guidelines)
     total = bib.total_references
 
-    if total < 5:
+    # A short bibliography is not evidence of poor scholarship.
+    # Require the venue's actual numeric rule before creating a gap.
+    minimum = _extract_reference_minimum(guidelines)
+    if minimum is not None and total < minimum:
         gaps.append(CitationGap(
-            gap_id="gap_low_ref_count",
-            gap_type="insufficient_references",
-            description=f"Only {total} references — most journals expect significantly more",
+            gap_id="gap_venue_reference_minimum",
+            gap_type="venue_reference_minimum_unmet",
+            description=(
+                f"{total} references; venue explicitly requires "
+                f"at least {minimum}"
+            ),
             severity=CitationGapSeverity.MAJOR.value,
-            suggested_action="Add relevant references to strengthen literature grounding",
+            suggested_action=(
+                "Check the actual requirement and seek only genuinely "
+                "relevant, verified sources; do not pad references"
+            ),
+        ).to_dict())
+        tasks.append(CitationTask(
+            task_id="task_review_reference_minimum",
+            task_type="review_reference_requirement",
+            description="Resolve the explicit minimum without adding irrelevant sources",
+            priority="high",
         ).to_dict())
 
     if ref_limit and total > ref_limit:
@@ -122,30 +137,19 @@ def _check_recency(
     tasks: list,
     warnings: list,
 ) -> None:
-    if bib.recency_profile in ("dated", "historical"):
-        gaps.append(CitationGap(
-            gap_id="gap_dated_refs",
-            gap_type="outdated_bibliography",
-            description=f"Bibliography recency: {bib.recency_profile} (median year: {bib.year_median})",
-            severity=CitationGapSeverity.MAJOR.value,
-            suggested_action="Add recent publications (last 5 years) relevant to the topic",
-        ).to_dict())
-        tasks.append(CitationTask(
-            task_id="task_add_recent",
-            task_type="add_recent_references",
-            description="Search for and add recent publications to update bibliography",
-            priority="high",
-            requires_external_api=True,
-        ).to_dict())
+    """Descriptive dates do not create a scholarly deficit by themselves.
 
-    if bib.year_min and bib.year_max:
-        span = bib.year_max - bib.year_min
-        if span < 5 and bib.total_references > 3:
-            warnings.append(
-                f"Narrow year range ({bib.year_min}–{bib.year_max}): "
-                "may signal limited literature coverage"
-            )
-
+    Venue-specific actionable recency requirements belong to
+    _check_venue_expectations. Old primary texts can be required sources.
+    """
+    if bib.recency_profile == "dated" and re.search(
+        r"\b(?:recent|current|last\s+\d+\s+years)\b",
+        guidelines.lower(),
+    ):
+        warnings.append(
+            "Venue mentions recent work; review the precise requirement "
+            "and the manuscript's research question"
+        )
 
 def _check_source_diversity(
     bib: BibliographyProfile,
@@ -188,11 +192,14 @@ def _check_doi_coverage(
 
     doi_ratio = bib.doi_count / bib.total_references
     if doi_ratio == 0:
-        unknowns.append("No DOIs detected — cannot verify references without external API")
+        unknowns.append(
+            "No DOIs found: DOI-based matching unavailable; books, archival "
+            "sources and critical editions can use other catalogues and witnesses"
+        )
     elif doi_ratio < 0.3:
         unknowns.append(
-            f"Low DOI coverage ({bib.doi_count}/{bib.total_references}) — "
-            "many references cannot be machine-verified"
+            f"Limited DOI coverage ({bib.doi_count}/{bib.total_references}): "
+            "use other identifiers, editions and source witnesses"
         )
 
 
@@ -277,6 +284,16 @@ def _check_venue_expectations(
         )
         if not has_data_refs:
             unknowns.append("Venue may expect data references — none detected in bibliography")
+
+
+def _extract_reference_minimum(guidelines: str) -> int | None:
+    """Return a numeric minimum only when venue text actually states one."""
+    match = re.search(
+        r"(?:minimum|min|at\s+least|no\s+fewer\s+than)"
+        r"\s*[:\s]*(\d+)\s*(?:references|citations)\b",
+        guidelines.lower(),
+    )
+    return int(match.group(1)) if match else None
 
 
 def _extract_reference_limit(guidelines: str) -> int | None:
