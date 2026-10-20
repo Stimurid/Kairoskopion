@@ -42,7 +42,7 @@ The output directory contains:
 ```text
 private/citation-evidence/
   original_snapshots/<sha256>.<original extension>
-  runs/trm-cite-z0-v01_<first20sha>/citation_intake.json
+  runs/trm-cite-z0-v02_<first20sha>/citation_intake.json
 ```
 
 The byte-exact snapshot is created exclusively and its full SHA-256 checked
@@ -57,6 +57,7 @@ The report carries:
   `all_citations_scientifically_verified: false`.
 - `intakes[]`: stable ids, entry origin, kind, exact detected fragment,
   original context, source hash, tentative location and any DOCX parent anchor.
+- Compound author-year clusters are represented by a full original citation group and individual AUTHOR_YEAR_MEMBER entries linked by group_id, group_index and original_cluster. Unknown cluster members remain typed review debt; each member can have an independent Z4/V1-V5 outcome.
 - `repair_cases[]`: one per intake, with either Z2-Z7 route for author wishes
   or R1 initial forensic check followed by conditional R2-R6 full recovery
   for existing citations.
@@ -138,6 +139,8 @@ CI in GitHub Actions is the available reproducible test host while
 AORUS Remote Desktop Commander registration reports offline. Tests and a
 passed Actions run establish **code behavior in that runner**, not installation
 under Hestia, successful private manuscript handling, or production readiness.
+
+Observed regression driver: an owner-authorized private 76 KB article had 43 author-year parentheticals, mostly multi-source. The v01 scanner recognized only two because it required a single author-year token per parentheses; v02 adds cluster and member detection. Do not expose private article text to public fixtures. Source-evidence receipt remains in the private AORUS audit directory.
 
 Future tests:
 - DOCX with complex tracked changes and threaded comments.
