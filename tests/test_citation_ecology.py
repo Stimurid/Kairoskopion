@@ -77,7 +77,8 @@ class TestCitationEcologyReport:
         bib = build_bibliography_profile(text)
         report = build_citation_ecology_report(bib, _make_article(), _make_venue(), "")
         gap_types = [g["gap_type"] for g in report.gaps]
-        assert "insufficient_references" in gap_types
+        assert "insufficient_references" not in gap_types
+        assert "venue_reference_minimum_unmet" not in gap_types
 
     def test_does_not_mark_verified(self):
         text = FIXTURES.joinpath("manuscript_sample.md").read_text(encoding="utf-8")
@@ -92,6 +93,51 @@ class TestCitationEcologyReport:
         bib = build_bibliography_profile(text)
         report = build_citation_ecology_report(bib, _make_article(), _make_venue(), guidelines)
         assert any("exceeds" in w for w in report.warning_signals)
+
+
+class TestVenueGroundedCitationNeeds:
+    def test_explicit_minimum_is_a_review_task(self):
+        bib = build_bibliography_profile(
+            "## References\\n\\n- Descartes (1641). Meditations.\\n"
+            "- Locke (1690). Essay Concerning Human Understanding."
+        )
+        report = build_citation_ecology_report(
+            bib, _make_article(), _make_venue(),
+            "Minimum 5 references required."
+        )
+        kinds = [gap["gap_type"] for gap in report.gaps]
+        assert "venue_reference_minimum_unmet" in kinds
+        assert any(task["task_type"] == "review_reference_requirement"
+                   for task in report.tasks)
+
+    def test_historical_bibliography_is_not_a_recency_deficit(self):
+        bib = build_bibliography_profile(
+            "## References\\n\\n"
+            "- Descartes (1641). Meditations.\\n"
+            "- Locke (1690). Essay Concerning Human Understanding.\\n"
+            "- Kant (1781). Critique of Pure Reason.\\n"
+            "- Hegel (1807). Phenomenology of Spirit.\\n"
+            "- Aristotle (1900). Metaphysics."
+        )
+        assert bib.recency_profile in ("historical", "dated")
+        report = build_citation_ecology_report(
+            bib, _make_article(), _make_venue(), ""
+        )
+        kinds = [gap["gap_type"] for gap in report.gaps]
+        assert "outdated_bibliography" not in kinds
+        assert "insufficient_references" not in kinds
+        assert "venue_reference_minimum_unmet" not in kinds
+
+    def test_venue_reference_maximum_still_checked(self):
+        refs = "\\n".join(f"- Author{i} (2000). Historical book."
+                           for i in range(6))
+        bib = build_bibliography_profile("## References\\n\\n" + refs)
+        report = build_citation_ecology_report(
+            bib, _make_article(), _make_venue(),
+            "Maximum 3 references allowed."
+        )
+        assert any("exceeds" in warning
+                   for warning in report.warning_signals)
 
 
 class TestPipelineIntegration:
