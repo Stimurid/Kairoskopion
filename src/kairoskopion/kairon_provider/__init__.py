@@ -133,6 +133,29 @@ from .trimurti_scheduler import (
     next_phase,
     plan_summary,
 )
+from .stage_operation import (
+    EVIDENCE_REF_FORBIDDEN_LITERALS,
+    EVIDENCE_REF_PATTERN,
+    EvidenceRef,
+    OperationDigest,
+    REFUSAL_EVIDENCE_REF_INVALID,
+    REFUSAL_EVIDENCE_REF_STUB,
+    REFUSAL_NEEDS_REAL_OPERATION_ADAPTER,
+    REFUSAL_OPERATION_DIGEST_MISSING,
+    REFUSAL_SOURCE_BYTES_MISSING,
+    ScholarlyChallengeStageAdapter,
+    SourceBytesStageAdapter,
+    SourceRoot,
+    StageAdapter,
+    StageResult,
+    drive_stage,
+    is_valid_evidence_ref,
+    make_operation_digest,
+    parse_evidence_ref,
+    parse_evidence_refs,
+    run_batch_first_source_evidence,
+    validate_evidence_refs_for_phase,
+)
 
 __all__ = [
     "AcademicWorldNode",
