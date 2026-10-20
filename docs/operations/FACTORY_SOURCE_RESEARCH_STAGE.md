@@ -424,3 +424,62 @@ AUTHOR_APPROVED=0; EXTERNAL_SEND=0; PROD=NO.
 that abstract-only opponent HTML can never silently self-certify
 full published scholarly paper depth. Research route status still
 author-HOLD, never a blanket article publication approval.
+
+
+## W4-R1 source science: actual Factory research-stage readback, scientific HOLD
+
+New third W4 science schema: TRM073_W4_SCHOLARLY_SOURCE_RETURN_INPUT_V1.
+The same stage_research_packet dispatch and existing Kairon OpportunityGraphStore
+now process W2, W3, W4 and then separate W12 venue-route packets. This is
+one Factory, no second parallel scholarly workbench.
+
+Real source C04 v0.4, original Drive ID
+16dAYSIhubAVUmx7Hp5ZXxrf2E_A2v5F3jRAnsUEMM2Y, exact original raw
+SHA256 807df2a6d8f0f2eef0ef7052f8653c41727566a54693a5333be4c9414b2a54da;
+line 11 re-read and W3 VERIFIED_BYTES source binding checked on replay.
+Canonical WORLD W4-R1 science notes:
+https://docs.google.com/document/d/1cwW5doPsSNBge0KNqu8ZBU9UY5Vebp_RmlC9rcWXvko/edit
+Private text-byte SHA256 ef379d56ba633aea47a6387f8e86cf76b5f97442ce9fed273d21107c56be55ce.
+The host direct authenticated TRM040 reader returned UNAVAILABLE because
+neither TRIMURTI_DOCS_FETCH_COMMAND nor TRIMURTI_GOOGLE_TOKEN_FILE is set.
+Therefore W4-R1 input was copied to owner-private AORUS through the connected
+Drive connector and explicitly labeled GOOGLE_DRIVE_CONNECTOR_CHAT_RELAY_NOT_NATIVE_TRM040.
+No native revision/full content certification is claimed for this fallback.
+
+Owner-private W4_R1_C04_STAGED_OWNER_PRIVATE_20261020.json raw SHA256
+9d25d191903f61fdb51359dc1ab4650a53629727c732c46cd07b0df38cd7af3e.
+Five exact W3 DOI comparator edges were tested; three qualified as
+source-specific SCIENTIFIC_OBJECTION_HELD:
+Ohlert/Broring 2026 RMS SELECTED_FULL_HTML (verified publisher HTML passage);
+Borsato/Cefis 2026 ICC ABSTRACT_ONLY; Li/Xia/Tang/Tang 2026 I&I ABSTRACT_ONLY.
+Each caused one separate L2 FieldReopenProposal to C04, all AUTHOR_HOLD.
+Calvino/Fontanelli ICC was REJECTED_READING_INSUFFICIENT (W3 metadata only).
+Bohnsack/Pinkse/Reischauer I&I was REJECTED_READING_INSUFFICIENT (TARGET_ARTICLE
+genre, not a peer-empirical original). Negative trails and falsifiers persisted.
+One C-INDUSTRIAL-CAPABILITY-v0 working hypothesis stored as research-only
+HuntTrace; NOT an owner-admitted ArticleSeed or protected WORLD mutation.
+
+Direct W4 source-read stage SHA256
+56888c29ac919b64ac1645c249b57c3315a76683fb7aaffb052468b6482dd83a;
+independent cold readback SHA256
+56c1abd776c138febca13a9425f7948d75b1d858817476776e8aac5013293ab1.
+Cold readback rehashes exact W4 input, dossier, original C04 and selected
+publisher HTML, then verifies W3 DOI edges, passage anchors and Kairon events.
+
+Full owner-private W1/W2/W3/W4/W12/LitOps/WhiteCrow runner:
+C:\projects\trimurti\_ops\T3-TALK-20261019\TRM074_FACTORY_W1W2W3W4_TWO_W12_ONECMD_20261020.ps1
+Two real independent process executions in a NEW isolated store succeeded
+with exactly the same whole-Factory receipt SHA256:
+84ec5d865f7fbae257b1fff6627c4ac3209b5dc64e934c92b465365b1f428376.
+Second call produced ZERO duplicate source captures or WhiteCrow contexts.
+Total retained: 34 source snapshots, 3 WhiteCrow context packs,
+3 W4 source challenges, 2 rejected negative trails, 1 held article hypothesis,
+and 2/80 earlier genuinely distinct W12_EQUIVALENT_HELD routes; no additional
+W12 credit merely for W4 challenges. ARTICLESEED=0, AUTHOR_APPROVAL=0,
+WORLD_MUTATION=0, TARGETWORLD_DEEP=0, EXTERNAL_SEND=0, PROD=NO.
+
+This is science-dossier staging over existing publisher evidence and a
+manual Google Drive connector fallback. It does NOT prove an autonomous
+multi-day Indago research hunt, a complete new article, CI success,
+author approval or a full native Google Docs capture. Another unrelated
+owner corpus and direct authorized TRM040 Docs access remain required.

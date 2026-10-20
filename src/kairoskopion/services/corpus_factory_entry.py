@@ -18,7 +18,7 @@ from .talk_corpus_intake import run_case
 from .talk_corpus_research_bridge import export_talk_research_evidence
 from .talk_corpus_reopen import propose_w1_return
 from .trm073_research_stage import (
-    MAX_PACKET_BYTES, PACKET_SCHEMA, PACKET_SCHEMA_W3,
+    MAX_PACKET_BYTES, PACKET_SCHEMA, PACKET_SCHEMA_W3, PACKET_SCHEMA_W4,
     _read_packet_file, _validate_w2_packet, _validate_w3_packet,
     stage_research_packet,
 )
@@ -90,6 +90,14 @@ def execute_factory_source_stage(
             _validate_w2_packet(packet)
         elif schema == PACKET_SCHEMA_W3:
             _validate_w3_packet(packet)
+        elif schema == PACKET_SCHEMA_W4:
+            if (packet.get("author_decision") != "HOLD"
+                    or packet.get("world_mutation") is not False
+                    or packet.get("article_seed_created") is not False
+                    or packet.get("external_send") != "DISABLED"):
+                raise ValueError("W4 packet cannot bypass scientific source/owner gate")
+            if Path(str(packet.get("private_packet_path") or "")).resolve() != research_path.resolve():
+                raise ValueError("W4 packet private source path does not identify input bytes")
         else:
             raise ValueError("unsupported research packet schema")
         if packet.get("case_id") != case_id:
@@ -199,6 +207,7 @@ def execute_factory_source_stage(
     }
     w2 = (by_schema.get(PACKET_SCHEMA) or [None])[0]
     w3 = (by_schema.get(PACKET_SCHEMA_W3) or [None])[0]
+    w4 = (by_schema.get(PACKET_SCHEMA_W4) or [None])[0]
     from .trm073_w12_route_stage import stage_w12_research_route
     venue_receipts = [stage_w12_research_route(path, storage) for path in venue_paths]
     litops = (
@@ -254,6 +263,10 @@ def execute_factory_source_stage(
         "w2_return_proposals": (w2.get("counts", {}).get("field_reopen_proposals", 0) if w2 else 0),
         "w3_return_proposals": (w3.get("counts", {}).get("field_reopen_proposals", 0) if w3 else 0),
         "w3_proposed_unqualified_routes": (w3.get("counts", {}).get("proposed_routes", 0) if w3 else 0),
+        "w4_scientific_challenges": (w4.get("counts", {}).get("scientific_challenges", 0) if w4 else 0),
+        "w4_rejected_comparators": (w4.get("counts", {}).get("rejected_comparator_trails", 0) if w4 else 0),
+        "w4_field_reopen_proposals": (w4.get("counts", {}).get("field_reopen_proposals", 0) if w4 else 0),
+        "w4_held_article_hypotheses": (w4.get("counts", {}).get("article_versions_proposed_held", 0) if w4 else 0),
         "whitecrow_context_packs": (litops["whitecrow_imported"] if litops else 0),
         "whitecrow_status": (
             "CONTEXT_ONLY_SCIENCE_HOLD" if litops else "NOT_RUN"
@@ -287,6 +300,10 @@ def execute_factory_source_stage(
         "w2_proposals": receipt["w2_return_proposals"],
         "w3_proposals": receipt["w3_return_proposals"],
         "w3_proposed_unqualified_routes": receipt["w3_proposed_unqualified_routes"],
+        "w4_scientific_challenges": receipt["w4_scientific_challenges"],
+        "w4_rejected_comparators": receipt["w4_rejected_comparators"],
+        "w4_field_reopen_proposals": receipt["w4_field_reopen_proposals"],
+        "w4_held_article_hypotheses": receipt["w4_held_article_hypotheses"],
         "w12_equivalent_routes_held": receipt["w12_equivalent_routes"],
         "research_wave_count": len(research_pins),
         "new_source_snapshots": intake["new_source_snapshots"],
