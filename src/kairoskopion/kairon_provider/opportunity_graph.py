@@ -41,6 +41,7 @@ def is_negative_hunt_result(event: dict[str, Any]) -> bool:
 
 ENTITY_TYPES = frozenset({
     "Evidence", "World", "ArticleSeed", "ArticleOpportunity", "Journal",
+    "JournalDiscoveryCandidate",
     "VenueWorld", "JournalIssue", "OpportunityRoute", "TargetVariant", "EditorialPacket",
     "AuthorProfile", "HuntTrace",
 })
@@ -108,6 +109,10 @@ def validate_record(kind: str, record: dict[str, Any]) -> dict[str, Any]:
         _required(record.get("canonical_name"), "canonical_name")
         if not record.get("issn") and not record.get("official_url"):
             raise ValueError("journal needs official_url or ISSN")
+    elif kind == "JournalDiscoveryCandidate":
+        _required(record.get("canonical_name"), "canonical_name")
+        if record.get("official_url"):
+            raise ValueError("discovery candidate must not assert canonical official_url")
     elif kind == "JournalIssue":
         _required(record.get("journal_id"), "journal_id")
         _required(record.get("official_url"), "official_url")
@@ -347,6 +352,7 @@ class OpportunityGraphStore:
             "source_event_id": negative_event_id,
             "intellectual_consequence": negative["intellectual_consequence"],
             "next_action": str(next_question),
+            "next_question": str(next_question),
             "reopen_level": reopen_level,
             "author_gate": "AUTHOR_REVIEW_REQUIRED",
             "semantic_mutation": "NONE",
