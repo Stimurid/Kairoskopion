@@ -38,6 +38,7 @@ READ_STATES = frozenset({
     "FULL_FETCHED_TEXT_ONLY", "TEXT_EXTRACT_ONLY",
     "CHAT_LOG_TEXT_ONLY", "RESEARCH_SYNTHESIS_TEXT_ONLY",
     "DOCX_BODY_TEXT_COMMENTS_UNREAD",
+    "STRUCTURAL_TEXT_PROJECTION_COMMENTS_NOT_ACQUIRED",
 })
 DISCUSSION_CLASSES = frozenset({
     "CHAT_UTTERANCE", "RESEARCH_RETURN", "EDITORIAL_PROPOSAL",
@@ -164,6 +165,12 @@ def run_case(manifest_path: Path | str, storage_root: Path | str) -> dict[str, A
         )
         if snap.extraction_status != "extracted":
             raise ValueError(f"source not fully read: {key}: {snap.extraction_status}")
+        native_attestation = None
+        if read_state == "STRUCTURAL_TEXT_PROJECTION_COMMENTS_NOT_ACQUIRED":
+            from ..integrations.native_docs_capture import verify_native_source
+            native_attestation = verify_native_source(source)
+            if native_attestation["projection_text_sha256"] != _digest(text):
+                raise ValueError("native Docs structural text does not match source intake")
         current = by_id.get(source_id)
         if current is not None:
             raise ValueError(
@@ -192,6 +199,7 @@ def run_case(manifest_path: Path | str, storage_root: Path | str) -> dict[str, A
             "content_sha256": _digest(text),
             "content_characters": len(text),
             "snapshot_id": "snap_trm074_" + _digest(source_id + ":" + _digest(text))[:20],
+            "native_structural_attestation": native_attestation,
         }
         texts[key] = text
         by_key[key] = record
@@ -201,6 +209,8 @@ def run_case(manifest_path: Path | str, storage_root: Path | str) -> dict[str, A
         r["snapshot_id"] = record["snapshot_id"]
         r["url"] = record["source_url"]
         r["read_coverage"] = record["read_coverage"]
+        if native_attestation:
+            r["native_structural_attestation"] = native_attestation
         if (r["source_id"], r.get("content_hash")) not in existing_keys:
             append("source_snapshots", r, base_dir=registry_root)
             existing_keys.add((r["source_id"], r.get("content_hash")))

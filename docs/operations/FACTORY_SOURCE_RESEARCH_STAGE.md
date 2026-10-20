@@ -106,3 +106,70 @@ This qualifies only source/research-stage reproducibility.
 
 Missing LitOps/WhiteCrow installs make only specific live integration tests
 skip; never claim WhiteCrow acceptance or CI success from that state.
+
+
+## Existing TRM040 native Google Docs provider -> Factory source adapter
+
+AORUS already has an installed read-only native Google Docs transport in
+WhiteCrow/Trimurti (see WhiteCrow issue #40 and unmerged native-transport
+code). It runs documents.get(includeTabsContent=true), independently
+brackets provider revision, captures provider-bound immutable structural
+JSON inside TrustedAcquisitionStore, re-verifies that snapshot from disk
+and preserves missing comment/media coverage. Reuse it. Do NOT build
+another Google API/OAuth client or copy credential material into Git.
+
+When installed and authorized on the operator host, set the existing
+TRIMURTI_DOCS_FETCH_COMMAND (a JSON argv template with explicit mode and
+document-id slots) or TRIMURTI_GOOGLE_TOKEN_FILE outside the repository.
+The operator chooses private paths. Python import environment must expose
+both this checkout's src package and the already installed trimurti native
+transport code.
+
+    set PYTHONPATH=src;C:\installed\whitecrow-native-docs-worktree
+    python scripts\run_native_docs_source_capture.py --source-id drive:FIXED_ORIGINAL_ID --source-url https://docs.google.com/document/d/FIXED_ORIGINAL_ID/edit --owner-capture-root C:\owner-private\native-captures
+
+The script uses NativeGoogleDocsTransport and TrustedAcquisitionStore.
+It writes the native structural snapshot under owner-private
+trusted_native_docs and a separate text-run projection under text.
+The written receipt proves exact provider object ID, stable revision,
+independent complete structural traversal, snapshot SHA and a bytewise
+relationship to the projected text. Source content and OAuth tokens are
+never printed, checked into Git or sent to a journal.
+
+To admit this source, copy the resulting receipt-fragment fields into
+the PRIVATE case manifest, adding only the case-specific family/key,
+carrier kind/version and author_state. The source's read_coverage must
+be STRUCTURAL_TEXT_PROJECTION_COMMENTS_NOT_ACQUIRED. Existing
+talk_corpus_intake will call verify_native_source on the provider-bound
+trusted snapshot, re-derive the text projection, and reject a forged
+local file/ID, corrupted record, changed revision or missing snapshot.
+The verification result is pinned in the resulting SourceSnapshot.
+
+Direct live AORUS test on 20 October 2026, case T3-NATIVE-DOCS-20261020:
+- A06 Drive ID 1sFMFo3xzDBr4R3JIatouBDmIvQVfMDLpCuAcMVyPytk,
+  structural SHA256 0b41678d9d687d0ddc4c277b646f526689b1e0047a6d446a67de52297c835059,
+  projection SHA256 34eee646084b6a20fbaf7f6189125870328fc1a23debb61fd895cb6717fc6fdb.
+- A07 Drive ID 1XUTyB5IsN9oBjKKTcRK6gJs4G7N4FeQnUsVtcyq6ZE0,
+  structural SHA256 edbf16a30be2a18940645efb84b29cd184664aa0875b9669d4874bc0bc7d9cdb,
+  projection SHA256 75cd0288024485cf67cea84412e553fe564cd8c2b3d09d9f51712cd607737e83.
+- Both: actual read-only native Docs API; REVISION_STABLE,
+  STRUCTURAL_FULL_TRAVERSAL, verified immutable snapshot;
+  comments NOT_ACQUIRED and external media not silently promoted.
+- Private independent source-stage root:
+  C:\projects\trimurti\_ops\T3-TALK-20261019\factory-native-verified-A06A07-v1
+- Factory source count=2, textual old/new comparison A06->A07,
+  Kairon Evidence=2, LitOps Source=2, WhiteCrow context_pack=1,
+  author approval=0, journal SEND=0. Cold process re-run: 0 duplicates.
+  Immutable Factory receipt SHA256
+  6b533919246df2ab940527e0c03b0e48edeebebeba985f4ed35aa68ef7aa7249,
+  independently checked with certutil.
+- 138 local regression tests PASS across native source mock adversity,
+  TRM074 core/WhiteCrow, TRM073 W2 and factory/graph modules.
+
+This is a full proof for TWO directly acquired Google-native documents
+and the source/context stage only. It does not prove all 34 source
+carriers can be fetched with this transport: DOCX, slides, raw chat,
+audio and comments require their own typed adapters (#38/#39).
+Authorized direct multi-file capture and a single manifest-to-fetch
+invocation remain #37 follow-up. This code is DRAFT only, no CI or
+production authorization claimed.
