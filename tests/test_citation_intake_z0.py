@@ -345,7 +345,7 @@ def test_mixed_cluster_member_retained_as_debt(tmp_path):
     assert sum(i.kind == "AUTHOR_YEAR_CLUSTER" for i in report.intakes) == 1
     assert sum(i.kind == "AUTHOR_YEAR_MEMBER_UNPARSED"
                for i in report.intakes) == 1
-    assert any("SOURCE_CLUSTER_REQUIRES_MEMBER_RESOLUTION"
+    assert any("UNPARSED_SOURCE_CLUSTER_MEMBER"
                in case.reason_codes for case in report.repair_cases)
 
 
