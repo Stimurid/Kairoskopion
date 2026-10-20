@@ -22,7 +22,7 @@ R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
 PKG = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 
 DESIRED = [
-    re.compile(r"\[\s*(?:citation needed|needs citation|нужна\s+(?:ссылка|цитата)|тут\s+цитата|цитата\s+[^\]\n]{2,80})\s*\]", re.I),
+    re.compile(r"\[\s*(?:citation needed|needs citation|(?:нужна\s+)?(?:цитат\w*|ссылк\w*)(?:\s+[^\]\n]{1,100})?|(?:тут|здесь)\s+(?:цитат\w*|ссылк\w*)(?:\s+[^\]\n]{1,100})?)\s*\]", re.I),
     re.compile(r"\b(?:TODO|FIXME)\s*:\s*(?:cite|citation|ссылк\w*|цитат\w*)[^\n;.]{0,90}", re.I),
     re.compile(r"\b(?:тут|здесь|сюда)\s+(?:нужн[ао]\s+|добавить\s+|найти\s+|поставить\s+)?(?:цитат\w*|ссылк\w*)(?:\s+(?:(?:из|по|у)\s+)?[А-ЯЁA-Z][^\]\n.,;]{0,65})?", re.I),
     re.compile(r"\b(?:кто[- ]?то\s+из\s+великих\s+сказал|как\s+(?:говорил|писал)\s+[А-ЯЁ][\wёЁ-]{2,})", re.I),
