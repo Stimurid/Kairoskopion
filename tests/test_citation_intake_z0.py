@@ -149,7 +149,8 @@ def test_docx_reads_comment_wish_and_body_citation_with_parent_anchor(tmp_path):
     assert len(desired) == 1
     assert desired[0].parent_anchor == "word/document.xml/p[0]"
     assert "AUTHOR_YEAR" in _kinds(result)
-    assert result.coverage["surfaces"]["comments" if False else "comment"] == "SCANNED"
+    assert "Выготского" in desired[0].original_fragment
+    assert result.coverage["surfaces"]["comment"] == "SCANNED"
 
 
 def test_docx_reads_split_word_zotero_field(tmp_path):
@@ -260,6 +261,44 @@ def test_no_editor_mutation_and_no_fake_verified_claim(tmp_path):
                for x in report.repair_cases)
     assert all(x.author_gate == "REQUIRED_IF_MEANING_CHANGES"
                for x in report.repair_cases)
+
+
+
+def test_wish_preserves_requested_author_exactly(tmp_path):
+    p = tmp_path / "wish.txt"
+    p.write_text("а тут цитата Выготского", encoding="utf-8")
+    audit = audit_manuscript(p)
+    assert any(ci.original_fragment == "тут цитата Выготского"
+               for ci in _origin(audit, "AUTHOR_DESIRED"))
+
+
+def test_bibliography_scope_ends_at_next_heading(tmp_path):
+    p = tmp_path / "appendix.md"
+    p.write_text(
+        "## References\n- Descartes (1641). Regulae.\n"
+        "## Appendix\nЗдесь [citation needed] для новой мысли.",
+        encoding="utf-8",
+    )
+    audit = audit_manuscript(p)
+    assert any(ci.origin_type == "AUTHOR_DESIRED"
+               for ci in audit.intakes)
+    assert len([ci for ci in audit.intakes
+                if ci.kind == "BIBLIOGRAPHY_ENTRY"]) == 1
+
+
+def test_docx_heading_stops_bibliography_scope(tmp_path):
+    body = (
+        _p("References") + _p("Descartes (1641). Regulae.")
+        + f'<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
+        + '<w:r><w:t>Appendix</w:t></w:r></w:p>'
+        + _p("Как говорил Выготский, это нужно проверить.")
+    )
+    p = _docx(tmp_path / "appendix.docx", body)
+    audit = audit_manuscript(p)
+    assert any(ci.origin_type == "AUTHOR_DESIRED"
+               for ci in audit.intakes)
+    assert len([ci for ci in audit.intakes
+                if ci.kind == "BIBLIOGRAPHY_ENTRY"]) == 1
 
 
 def test_json_native_envelope_keeps_coverage_debt(tmp_path):
