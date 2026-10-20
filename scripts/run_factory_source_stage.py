@@ -20,6 +20,8 @@ def main() -> int:
     parser.add_argument("--research-packet", type=Path, action="append", default=[],
                         help="Repeat for bounded independent W2/W3 research waves")
     parser.add_argument("--litops-root", type=Path)
+    parser.add_argument("--venue-route-packet", type=Path, action="append", default=[],
+                        help="Owner-private source/venue W12 research-route input; repeat for each route")
     parser.add_argument("--native-capture-root", type=Path,
                         help="Private TRM040 native Docs store for sources marked capture_transport=native_docs")
     parser.add_argument("--manual-w1-reopen", action="store_true")
@@ -28,6 +30,7 @@ def main() -> int:
         receipt = execute_factory_source_stage(
             args.manifest, args.storage_root,
             research_packet_paths=args.research_packet,
+            venue_route_packet_paths=args.venue_route_packet,
             litops_root=args.litops_root,
             native_capture_root=args.native_capture_root,
             manual_w1_reopen=args.manual_w1_reopen,

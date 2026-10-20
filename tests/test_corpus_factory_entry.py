@@ -265,3 +265,45 @@ def test_unknown_future_wave_schema_fails_closed_preflight(tmp_path):
             manifest, storage, research_packet_paths=[w2, w3],
         )
     assert not storage.exists()
+
+
+
+def test_w12_route_input_wrong_case_refuses_before_factory_io(tmp_path):
+    from tests.test_trm073_w12_route_stage import fixture_route
+    manifest, _, _ = new_unrelated_case(tmp_path)
+    other, route, _, _, _, _ = fixture_route(tmp_path / "venue-owner")
+    target = tmp_path / "do-not-mutate"
+    with pytest.raises(ValueError, match="belongs to another source case"):
+        execute_factory_source_stage(
+            manifest, target, venue_route_packet_paths=[route],
+        )
+    assert not target.exists()
+
+
+def test_w12_same_version_journal_duplicate_refuses_before_factory_io(tmp_path):
+    from tests.test_trm073_w12_route_stage import fixture_route
+    manifest, _, _ = new_unrelated_case(tmp_path)
+    original, route, _, _, _, _ = fixture_route(tmp_path / "owner-venue")
+    original["case_id"] = "NEW-CORPUS-001"
+    route.write_text(json.dumps(original), encoding="utf-8")
+    target = tmp_path / "do-not-mutate"
+    with pytest.raises(ValueError, match="duplicate or empty claim-version/journal pairing"):
+        execute_factory_source_stage(
+            manifest, target, venue_route_packet_paths=[route,route],
+        )
+    assert not target.exists()
+
+
+def test_w12_future_route_schema_is_not_silently_inferred(tmp_path):
+    from tests.test_trm073_w12_route_stage import fixture_route
+    manifest, _, _ = new_unrelated_case(tmp_path)
+    original, route, _, _, _, _ = fixture_route(tmp_path / "owner-venue")
+    original["case_id"] = "NEW-CORPUS-001"
+    original["schema"] = "TRM073_W12_ROUTE_MAYBE_V99"
+    route.write_text(json.dumps(original), encoding="utf-8")
+    target = tmp_path / "do-not-mutate"
+    with pytest.raises(ValueError, match="unknown or unsupported W12"):
+        execute_factory_source_stage(
+            manifest, target, venue_route_packet_paths=[route],
+        )
+    assert not target.exists()

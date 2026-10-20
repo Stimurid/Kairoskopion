@@ -55,6 +55,7 @@ def execute_factory_source_stage(
     *,
     research_packet_path: Path | str | None = None,
     research_packet_paths: list[Path | str] | None = None,
+    venue_route_packet_paths: list[Path | str] | None = None,
     litops_root: Path | str | None = None,
     native_capture_root: Path | str | None = None,
     manual_w1_reopen: bool = False,
@@ -103,6 +104,27 @@ def execute_factory_source_stage(
         })
     research_sha = research_pins[0]["source_packet_sha256"] if len(research_pins) == 1 else None
     research_set_sha = _digest(_canonical({"waves": research_pins})) if research_pins else None
+    venue_paths = [Path(x) for x in (venue_route_packet_paths or [])]
+    if len(venue_paths) > 80:
+        raise ValueError("venue-route batch exceeds bounded operator stage")
+    venue_pins: list[dict[str, str]] = []
+    route_keys: set[tuple[str, str]] = set()
+    for venue_path in venue_paths:
+        route_raw = venue_path.read_bytes()
+        if not 0 < len(route_raw) <= 75_000:
+            raise ValueError("venue route packet exceeds bounded input policy")
+        route = json.loads(route_raw.decode("utf-8"))
+        if route.get("schema") != "TRM073_W12_SOURCE_VENUE_ROUTE_INPUT_V1":
+            raise ValueError("unknown or unsupported W12 route schema")
+        if route.get("case_id") != case_id:
+            raise ValueError("W12 route belongs to another source case")
+        pair = (str(route.get("claim_version_id") or ""), str(route.get("journal_id") or ""))
+        if not all(pair) or pair in route_keys:
+            raise ValueError("duplicate or empty claim-version/journal pairing")
+        route_keys.add(pair)
+        venue_pins.append({"route_candidate_id": str(route.get("route_candidate_id") or ""),
+                           "source_packet_sha256": _digest(route_raw)})
+    venue_set_sha = _digest(_canonical({"venue_routes": venue_pins})) if venue_pins else None
     if litops_root is not None:
         if not os.environ.get("LITOPS_SKIP_DOTENV"):
             raise ValueError("isolated LitOps requires LITOPS_SKIP_DOTENV")
@@ -135,7 +157,8 @@ def execute_factory_source_stage(
         previous = json.loads(report_file.read_text(encoding="utf-8"))
         if (previous.get("input_manifest_sha256") != manifest_sha
                 or previous.get("research_packet_sha256") != research_sha
-                or previous.get("research_set_sha256") != research_set_sha):
+                or previous.get("research_set_sha256") != research_set_sha
+                or previous.get("venue_route_set_sha256") != venue_set_sha):
             raise ValueError("immutable case checkpoint pins different source/research bytes")
         case_file = storage / "talk_corpora" / case_id / "case_ledger.json"
         if not case_file.is_file() or _digest(case_file.read_bytes()) != previous.get("source_ledger_sha256"):
@@ -176,6 +199,8 @@ def execute_factory_source_stage(
     }
     w2 = (by_schema.get(PACKET_SCHEMA) or [None])[0]
     w3 = (by_schema.get(PACKET_SCHEMA_W3) or [None])[0]
+    from .trm073_w12_route_stage import stage_w12_research_route
+    venue_receipts = [stage_w12_research_route(path, storage) for path in venue_paths]
     litops = (
         admit_talk_context_into_installed_litops(storage, litops_root, case_id)
         if litops_root is not None else None
@@ -201,6 +226,14 @@ def execute_factory_source_stage(
         "native_replay_policy": "IMMUTABLE_PIN_NO_PROVIDER_RECHECK",
         "research_packet_sha256": research_sha,
         "research_set_sha256": research_set_sha,
+        "venue_route_set_sha256": venue_set_sha,
+        "venue_route_packets": venue_pins,
+        "venue_route_receipts": [
+            {"route_candidate_id": pin["route_candidate_id"],
+             "receipt_sha256": receipt["receipt_sha256"],
+             "readback_verified": receipt["readback"]["verified"]}
+            for pin, receipt in zip(venue_pins, venue_receipts)
+        ],
         "research_packet_pins": research_pins,
         "research_wave_receipts": [
             {"wave_id": pin["wave_id"], "schema": pin["schema"],
@@ -226,7 +259,9 @@ def execute_factory_source_stage(
             "CONTEXT_ONLY_SCIENCE_HOLD" if litops else "NOT_RUN"
         ),
         "indago_new_hunt": "NOT_RUN_EXISTING_MANUAL_RESEARCH_ONLY",
-        "w12_equivalent_routes": 0,
+        "w12_equivalent_routes": sum(
+            int(receipt["counts"]["W12_EQUIVALENT_HELD"]) for receipt in venue_receipts
+        ),
         "qualified_targetworld": 0,
         "article_seed_created": 0,
         "author_approved": False,
@@ -252,6 +287,7 @@ def execute_factory_source_stage(
         "w2_proposals": receipt["w2_return_proposals"],
         "w3_proposals": receipt["w3_return_proposals"],
         "w3_proposed_unqualified_routes": receipt["w3_proposed_unqualified_routes"],
+        "w12_equivalent_routes_held": receipt["w12_equivalent_routes"],
         "research_wave_count": len(research_pins),
         "new_source_snapshots": intake["new_source_snapshots"],
         "new_native_captures": new_native_captures,

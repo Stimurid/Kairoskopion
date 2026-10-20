@@ -295,3 +295,74 @@ LitOps/WhiteCrow runtime, including 5 new multiwave tests (typed
 admission, duplicate wave-ID refusal, wrong case refusal before any
 source writes, tampered prior wave packet, unsupported future W4 schema).
 No GitHub CI run or production deployment is implied.
+
+
+## W12 first official-publisher-backed held route (20 October 2026)
+
+Current owner-private Factory single command also accepts repeated
+--venue-route-packet inputs (up to 80). It verifies exact original
+claim/version evidence, separately acquired real official publisher
+scope and submission policy, published opponent DOI, actual selected
+opponent paragraph, target-specific RU/EN scholarly thesis, strongest
+objection, negative evidence, falsification/design and author/rights
+HOLD. The parser rejects unknown/future schemas, wrong case, duplicate
+claim-version/journal pair, changed packet checkpoint and every
+unreadable or mismatched source. This uses existing Kairon
+SCHOLARLY_ROUTE_CHALLENGE and SOURCE_CONTRADICTION with VERIFIED_BYTES,
+without creating ArticleSeed/OpportunityRoute or changing the WORLD.
+Route stage records a research-only immutable HuntTrace and an
+independently revalidated private receipt.
+
+First REAL provisional W12-equivalent address:
+- source: MFTI C04 v0.4, fixed original Drive document ID and source
+  file raw SHA256 807df2a6d8f0f2eef0ef7052f8653c41727566a54693a5333be4c9414b2a54da;
+  source paragraph 11 anchors the source question to reproducing new
+  functions, common productive means and stable division of labor.
+- existing W3 C-CROSS-INDUSTRY, HEAD-03, journal Review of Managerial
+  Science; publication type REGULAR_MANUSCRIPT not special/active CFP.
+- real official Springer RMS aims/scope bytes, SHA
+  0fea34568b4e1aa775fff832db40a90aad17816e07a9aaaf715ec31f53244824,
+  publicly accessible from
+  https://link.springer.com/journal/11846/aims-and-scope.
+- real RMS author instructions bytes SHA
+  4ce6fd44808737b1abd1d1f56c5953ff3cb5746f3d3ff7eada581cfcf9023706,
+  https://link.springer.com/journal/11846/submission-guidelines.
+- real publisher full HTML of strongest opponent Ohlert/Broering 2026
+  DOI 10.1007/s11846-026-01031-y bytes SHA
+  72881a27eed879fc65f86378588383225f2a3a5b7aa99692e141d18a262d44f3,
+  https://link.springer.com/article/10.1007/s11846-026-01031-y.
+  Concrete read anchor: Methodology, survey of 60 managers as unit of
+  opportunity exploitation. The study already discusses cross-industry
+  structural transformation; the proposed delta cannot falsely claim
+  that prior art ignores emerging industries. Proposed empirical
+  falsifier: test longitudinal collective standards/third-party
+  reproductions against manager-level exploitation conditions.
+  An acquired complete HTML source is not itself certification that
+  every section has been scientifically studied. The route's bounded
+  science read is SELECTED_SECTIONS, deep TargetWorld count remains 0.
+
+The W12 route packet, original Google Docs captures and published
+papers are held only on OWNER-PRIVATE AORUS outside Git. Original
+author permission is not assumed. Target-specific bilingual work and
+opposition are still RESEARCH proposals and await intellectual review.
+
+REAL fresh owner-private full chain W1 -> W2 -> W3 -> W12 ->
+installed LitOps -> WhiteCrow:
+C:\projects\trimurti\_ops\T3-TALK-20261019\TRM074_FACTORY_W1W2W3_RMS_W12_ONECMD_20261020.ps1
+New storage root factory-W1W2W3-W12-first-20261020: first command
+34 sources, 35 Kairon Evidence, 11 held research field reopens,
+9 W3 UNQUALIFIED journal possibilities + 1 separate
+W12_EQUIVALENT_HELD source/venue research route; 3 WhiteCrow
+context packs, ArticleSeed=0, World mutations=0, journal sends=0.
+Cold second process: ZERO new source snapshots/WhiteCrow writes and
+identical Factory receipt SHA
+969ade181dff4912e4ce74b7e324ca54c6ae5300f66ce198d71b972b7ffb8092.
+Direct W12 source/venue route readback receipt SHA:
+f7742390a64cfe935267ef400de73e4033358a9fe2a7dfd505cde315f004777d.
+W12_EQUILVALENT_HELD=1 of owner target >=80; DEEP_QUALIFIED=0,
+ARTIKL/AUTHOR_ACCEPTED=0; not a production publication capability.
+
+187 local targeted tests PASS including new exact-passage, policy
+tamper, bad DOI, W3 source-byte binding, changed claim-version
+packet, missing rights/author and future-date negative tests.
+No CI pass, no second-host acceptance, no production deployment.
