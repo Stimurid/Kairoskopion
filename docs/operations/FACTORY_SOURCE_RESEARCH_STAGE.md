@@ -254,3 +254,44 @@ a pinned case, forged provider/ID/snapshot, changed local text, author
 decision gate, duplicate and unsafe IDs, mixed carrier types and
 private root isolation. CI, independent host and production remain
 unverified. Broader >=80 W12-qualified routes remains issue #43.
+
+
+## W1/W2/W3 same-case SCIENTIFIC research-stage execution
+
+The case runner accepts multiple repeatable --research-packet paths
+(maximum 8 per invocation). Every packet must carry the supported W2
+or W3 schema, exact same case_id, unique wave_id, pinned original bytes
+and no author/World/send escalation. New independent W3 packet staging
+was merged cleanly from existing public PR #44 (source commit ba48234),
+preserving original scientifically bounded W3 research return.
+
+Private AORUS operator handle:
+C:\projects\trimurti\_ops\T3-TALK-20261019\TRM074_FULL_W1W2W3_OWNER_PRIVATE_20261020.ps1
+
+Run with owner-private TRM073_W1_SOURCE_MANIFEST and exact
+TRM073_ORIGINAL_HEAD_SOURCES source ID/version/byte SHA binding overlay,
+real W1 manifest, real W2 and W3 science packets, isolated LitOps root.
+The existing StageResearchPacket W3 verifier reopens and independently
+re-hashes source A07 and C04 on its cold readback; do not mistake this
+for independent researcher or author approval.
+
+Verified REAL case on a NEW storage root:
+34 source snapshots; 27 source evidence + 8 W2 official publisher
+works; W3 source refs remain bounded scientific return, no false
+extra fully-read items; 3 W1 author-HOLD proposals, 6 W2 held
+field-reopens, 2 W3 held field-reopens; 9 proposed
+DISCOVERED_PREQUALIFICATION routes (0 W12-equivalent); 3 LitOps/
+WhiteCrow context packs. Research-stage W2 receipt remains
+b76b50a4a6a14af147c20d3a9f1b0b2d4a50089f391da74f0ad3797183a5060b,
+W3 receipt remains
+40c43a9b93881f8de3d234fa53df39e751f7bb4ed94f8de3b7781490eb84f11a.
+Two independent process CLI calls produced identical full-case receipt
+SHA256 3827252a9e1a6e2c4567d35aefd52a600f678c50f920ac21ee393fdd3ef3ba72.
+The second run added ZERO new source snapshots or WhiteCrow contexts.
+No World/ArticleSeed/send mutation, no autonomous Indago hunt.
+
+176 targeted local AORUS tests PASS on the combined W1/W2/W3/Docs/
+LitOps/WhiteCrow runtime, including 5 new multiwave tests (typed
+admission, duplicate wave-ID refusal, wrong case refusal before any
+source writes, tampered prior wave packet, unsupported future W4 schema).
+No GitHub CI run or production deployment is implied.

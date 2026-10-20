@@ -18,7 +18,9 @@ from .talk_corpus_intake import run_case
 from .talk_corpus_research_bridge import export_talk_research_evidence
 from .talk_corpus_reopen import propose_w1_return
 from .trm073_research_stage import (
-    MAX_PACKET_BYTES, _load_packet, _validate_packet, stage_research_packet,
+    MAX_PACKET_BYTES, PACKET_SCHEMA, PACKET_SCHEMA_W3,
+    _read_packet_file, _validate_w2_packet, _validate_w3_packet,
+    stage_research_packet,
 )
 
 
@@ -52,6 +54,7 @@ def execute_factory_source_stage(
     storage_root: Path | str,
     *,
     research_packet_path: Path | str | None = None,
+    research_packet_paths: list[Path | str] | None = None,
     litops_root: Path | str | None = None,
     native_capture_root: Path | str | None = None,
     manual_w1_reopen: bool = False,
@@ -71,14 +74,35 @@ def execute_factory_source_stage(
         raise ValueError("invalid case identity")
     if manifest_path.resolve().is_relative_to(storage):
         raise ValueError("private input manifest must not be generated inside output storage")
-    research_path = Path(research_packet_path) if research_packet_path else None
-    research_sha = None
-    if research_path is not None:
-        packet, raw = _load_packet(research_path)
-        _validate_packet(packet)
+    research_paths = (
+        ([Path(research_packet_path)] if research_packet_path is not None else [])
+        + [Path(x) for x in (research_packet_paths or [])]
+    )
+    if len(research_paths) > 8:
+        raise ValueError("research-wave count exceeds bounded operator stage")
+    research_pins: list[dict[str, str]] = []
+    wave_ids: set[str] = set()
+    for research_path in research_paths:
+        packet, raw = _read_packet_file(research_path)
+        schema = str(packet.get("schema") or "")
+        if schema == PACKET_SCHEMA:
+            _validate_w2_packet(packet)
+        elif schema == PACKET_SCHEMA_W3:
+            _validate_w3_packet(packet)
+        else:
+            raise ValueError("unsupported research packet schema")
         if packet.get("case_id") != case_id:
             raise ValueError("external research packet belongs to a different case")
-        research_sha = _digest(raw)
+        wave = str(packet.get("wave_id") or "")
+        if wave in wave_ids:
+            raise ValueError("duplicate research-wave ID in one factory invocation")
+        wave_ids.add(wave)
+        research_pins.append({
+            "wave_id": wave, "schema": schema,
+            "source_packet_sha256": _digest(raw),
+        })
+    research_sha = research_pins[0]["source_packet_sha256"] if len(research_pins) == 1 else None
+    research_set_sha = _digest(_canonical({"waves": research_pins})) if research_pins else None
     if litops_root is not None:
         if not os.environ.get("LITOPS_SKIP_DOTENV"):
             raise ValueError("isolated LitOps requires LITOPS_SKIP_DOTENV")
@@ -110,7 +134,8 @@ def execute_factory_source_stage(
     if report_file.exists():
         previous = json.loads(report_file.read_text(encoding="utf-8"))
         if (previous.get("input_manifest_sha256") != manifest_sha
-                or previous.get("research_packet_sha256") != research_sha):
+                or previous.get("research_packet_sha256") != research_sha
+                or previous.get("research_set_sha256") != research_set_sha):
             raise ValueError("immutable case checkpoint pins different source/research bytes")
         case_file = storage / "talk_corpora" / case_id / "case_ledger.json"
         if not case_file.is_file() or _digest(case_file.read_bytes()) != previous.get("source_ledger_sha256"):
@@ -141,7 +166,16 @@ def execute_factory_source_stage(
     intake = run_case(manifest_path, storage)
     stage = export_talk_research_evidence(storage, case_id)
     w1 = propose_w1_return(storage, case_id) if manual_w1_reopen else None
-    w2 = stage_research_packet(research_path, storage) if research_path is not None else None
+    wave_receipts = [
+        stage_research_packet(path, storage) for path in research_paths
+    ]
+    by_schema = {
+        pin["schema"]: [receipt for p, receipt in zip(research_pins, wave_receipts)
+                         if p["schema"] == pin["schema"]]
+        for pin in research_pins
+    }
+    w2 = (by_schema.get(PACKET_SCHEMA) or [None])[0]
+    w3 = (by_schema.get(PACKET_SCHEMA_W3) or [None])[0]
     litops = (
         admit_talk_context_into_installed_litops(storage, litops_root, case_id)
         if litops_root is not None else None
@@ -166,6 +200,15 @@ def execute_factory_source_stage(
         "derived_manifest_sha256": derived_manifest_sha,
         "native_replay_policy": "IMMUTABLE_PIN_NO_PROVIDER_RECHECK",
         "research_packet_sha256": research_sha,
+        "research_set_sha256": research_set_sha,
+        "research_packet_pins": research_pins,
+        "research_wave_receipts": [
+            {"wave_id": pin["wave_id"], "schema": pin["schema"],
+             "receipt_sha256": result["receipt_sha256"],
+             "readback_sha256": result["readback_sha256"],
+             "counts": result["counts"]}
+            for pin, result in zip(research_pins, wave_receipts)
+        ],
         "source_ledger_sha256": intake["ledger_sha256"],
         "research_handoff_sha256": stage["handoff_sha256"],
         "manual_w1_reopen_sha256": w1["sha256"] if w1 else None,
@@ -176,6 +219,8 @@ def execute_factory_source_stage(
         "kairon_evidence_count": len(graph.list_records("Evidence")),
         "w1_return_proposals": w1["count"] if w1 else 0,
         "w2_return_proposals": (w2.get("counts", {}).get("field_reopen_proposals", 0) if w2 else 0),
+        "w3_return_proposals": (w3.get("counts", {}).get("field_reopen_proposals", 0) if w3 else 0),
+        "w3_proposed_unqualified_routes": (w3.get("counts", {}).get("proposed_routes", 0) if w3 else 0),
         "whitecrow_context_packs": (litops["whitecrow_imported"] if litops else 0),
         "whitecrow_status": (
             "CONTEXT_ONLY_SCIENCE_HOLD" if litops else "NOT_RUN"
@@ -205,6 +250,9 @@ def execute_factory_source_stage(
         "whitecrow_context_packs": receipt["whitecrow_context_packs"],
         "manual_w1_proposals": receipt["w1_return_proposals"],
         "w2_proposals": receipt["w2_return_proposals"],
+        "w3_proposals": receipt["w3_return_proposals"],
+        "w3_proposed_unqualified_routes": receipt["w3_proposed_unqualified_routes"],
+        "research_wave_count": len(research_pins),
         "new_source_snapshots": intake["new_source_snapshots"],
         "new_native_captures": new_native_captures,
         "reused_native_captures": reused_native_captures,

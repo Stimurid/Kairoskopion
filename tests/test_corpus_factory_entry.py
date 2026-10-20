@@ -165,3 +165,103 @@ def test_w1_not_silently_inferred_for_unrelated_case(tmp_path):
     good = execute_factory_source_stage(manifest, storage)
     assert good["new_source_snapshots"] == 0
     assert good["manual_w1_proposals"] == 0
+
+
+def _multiwave_packets(tmp_path: Path):
+    from tests.test_trm073_w3_discovery import _synthetic_w3_packet
+    w2 = packet()
+    w2["case_id"] = "NEW-CORPUS-001"
+    w3 = _synthetic_w3_packet()
+    w3["case_id"] = "NEW-CORPUS-001"
+    w2_path = tmp_path / "W2-packet.json"
+    w3_path = tmp_path / "W3-packet.json"
+    w2_path.write_text(json.dumps(w2, ensure_ascii=False), encoding="utf-8")
+    w3_path.write_text(json.dumps(w3, ensure_ascii=False), encoding="utf-8")
+    return w2_path, w3_path
+
+
+def test_one_factory_entry_runs_both_independent_wave_schemas_with_cold_replay(tmp_path):
+    manifest, storage, _ = new_unrelated_case(tmp_path)
+    w2, w3 = _multiwave_packets(tmp_path)
+    first = execute_factory_source_stage(
+        manifest, storage, research_packet_paths=[w2, w3],
+    )
+    second = execute_factory_source_stage(
+        manifest, storage, research_packet_paths=[w2, w3],
+    )
+    assert first["research_wave_count"] == 2
+    assert first["w2_proposals"] == 6
+    assert first["w3_proposed_unqualified_routes"] == 3
+    assert first["w3_proposals"] == 2
+    assert first["receipt_sha256"] == second["receipt_sha256"]
+    assert second["new_source_snapshots"] == 0
+    receipt = json.loads(Path(first["receipt_path"]).read_text(encoding="utf-8"))
+    assert [r["wave_id"] for r in receipt["research_packet_pins"]] == [
+        "W2", "W3-SYNTH"
+    ] or len(set(r["wave_id"] for r in receipt["research_packet_pins"])) == 2
+    assert len(receipt["research_wave_receipts"]) == 2
+    assert receipt["w12_equivalent_routes"] == 0
+    assert receipt["article_seed_created"] == 0
+    assert not receipt["world_mutated"]
+    assert receipt["external_send"] == "DISABLED"
+    graph = OpportunityGraphStore(storage)
+    assert graph.list_records("ArticleSeed") == []
+    assert graph.list_records("OpportunityRoute") == []
+    assert len(graph.list_records("Evidence")) > 10
+
+
+def test_multiwave_input_different_case_fails_before_source_intake(tmp_path):
+    manifest, storage, _ = new_unrelated_case(tmp_path)
+    w2, w3 = _multiwave_packets(tmp_path)
+    data = json.loads(w3.read_text(encoding="utf-8"))
+    data["case_id"] = "ANOTHER-CASE"
+    w3.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="different case"):
+        execute_factory_source_stage(
+            manifest, storage, research_packet_paths=[w2, w3],
+        )
+    assert not storage.exists()
+
+
+def test_multiwave_repeated_wave_id_rejected_before_source_intake(tmp_path):
+    manifest, storage, _ = new_unrelated_case(tmp_path)
+    w2, w3 = _multiwave_packets(tmp_path)
+    data = json.loads(w3.read_text(encoding="utf-8"))
+    first = json.loads(w2.read_text(encoding="utf-8"))
+    data["wave_id"] = first["wave_id"]
+    w3.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="duplicate research-wave ID"):
+        execute_factory_source_stage(
+            manifest, storage, research_packet_paths=[w2, w3],
+        )
+    assert not storage.exists()
+
+
+def test_existing_multiwave_checkpoint_rejects_changed_w3_bytes(tmp_path):
+    manifest, storage, _ = new_unrelated_case(tmp_path)
+    w2, w3 = _multiwave_packets(tmp_path)
+    baseline = execute_factory_source_stage(
+        manifest, storage, research_packet_paths=[w2, w3],
+    )
+    obj = json.loads(w3.read_text(encoding="utf-8"))
+    obj["route_candidates"][0]["required_next_test"] += " Another hypothesis."
+    w3.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError, match="immutable case checkpoint"):
+        execute_factory_source_stage(
+            manifest, storage, research_packet_paths=[w2, w3],
+        )
+    assert Path(baseline["receipt_path"]).is_file()
+    assert len(OpportunityGraphStore(storage).list_records("ArticleSeed")) == 0
+
+
+def test_unknown_future_wave_schema_fails_closed_preflight(tmp_path):
+    manifest, storage, _ = new_unrelated_case(tmp_path)
+    w2, w3 = _multiwave_packets(tmp_path)
+    obj = json.loads(w3.read_text(encoding="utf-8"))
+    obj["schema"] = "W4_CONJECTURAL_UNSUPPORTED"
+    w3.write_text(json.dumps(obj), encoding="utf-8")
+    with pytest.raises(ValueError, match="unsupported research packet schema"):
+        execute_factory_source_stage(
+            manifest, storage, research_packet_paths=[w2, w3],
+        )
+    assert not storage.exists()
