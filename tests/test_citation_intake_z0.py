@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from kairoskopion.services.citation_intake_z0 import (
-    VERSION, audit_manuscript, persist_audit,
+    VERSION, audit_manuscript, persist_audit, make_work_orders,
 )
 
 WORD = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -400,6 +400,67 @@ def test_json_native_envelope_keeps_coverage_debt(tmp_path):
     assert any("footnotes" in x for x in a.coverage["debts"])
 
 
+
+def test_extended_latin_and_cjk_author_names_are_recognized(tmp_path):
+    p = tmp_path / "historians.md"
+    p.write_text(
+        "См. (Rüegg 2004; de Ridder-Symoens 1992; 王小明 2020).",
+        encoding="utf-8",
+    )
+    report = audit_manuscript(p)
+    members = [x for x in report.intakes if x.kind == "AUTHOR_YEAR_MEMBER"]
+    assert len(members) == 3
+    assert not any(x.kind == "AUTHOR_YEAR_MEMBER_UNPARSED"
+                   for x in report.intakes)
+    assert any("Rüegg" in x.original_fragment for x in members)
+    assert all(x.group_id for x in members)
+
+
+def test_parent_cluster_only_coordinates_work_orders(tmp_path):
+    p = tmp_path / "body.md"
+    p.write_text(
+        "[нужна цитата Выготского]\n"
+        "Дальнейшая мысль (Smith et al. 2021; Lee 2022).",
+        encoding="utf-8",
+    )
+    audit, receipt = persist_audit(p, tmp_path / "private")
+    groups = [x for x in audit.intakes if x.kind == "AUTHOR_YEAR_CLUSTER"]
+    assert len(groups) == 1
+    case = next(c for c in audit.repair_cases
+                if c.intake_id == groups[0].intake_id)
+    assert case.status == "GROUP_AWAITING_MEMBERS"
+    orders = make_work_orders(audit)
+    assert len(orders) == len(audit.intakes) - 1
+    assert not any(o["intake_id"] == groups[0].intake_id for o in orders)
+    members = [o for o in orders if o["group_id"] == groups[0].intake_id]
+    assert len(members) == 2
+    assert all(o["source_hints"] and o["execution_status"] ==
+               "QUEUED_UNVERIFIED" for o in members)
+    assert all(o["external_search_authorized_by_this_file"] is False
+               for o in orders)
+    assert all(o["original_manuscript_mutation_authorized"] is False
+               for o in orders)
+    queue = receipt.with_name("citation_work_orders.jsonl")
+    persisted = [json.loads(x) for x in
+                 queue.read_text(encoding="utf-8").splitlines()]
+    assert len(persisted) == len(orders)
+    assert all(x["snapshot_path"] == audit.source["original_snapshot_path"]
+               for x in persisted)
+
+
+def test_repeated_audit_stabilizes_work_order_bytes(tmp_path):
+    p = tmp_path / "quote.md"
+    p.write_text("Source (Rüegg 2004; 王小明 2020).", encoding="utf-8")
+    _, report = persist_audit(p, tmp_path / "runs")
+    queue = report.with_name("citation_work_orders.jsonl")
+    before = queue.read_bytes()
+    _, second = persist_audit(p, tmp_path / "runs")
+    assert report == second
+    assert before == queue.read_bytes()
+    assert len(queue.read_text(encoding="utf-8").splitlines()) == 2
+
+
+
 def test_bad_json_not_certified(tmp_path):
     p = tmp_path / "bad.json"
     p.write_text('{"sections":[]}', encoding="utf-8")
@@ -423,3 +484,11 @@ def test_cli_writes_original_receipt_and_unverified_work_orders(tmp_path, capsys
     assert report["coverage"]["manuscript_mutated"] is False
     assert report["source"]["original_snapshot_sha256_verified"] is True
     assert report["repair_cases"]
+    assert data["work_orders"] > 0
+    queue = Path(data["work_orders_file"])
+    assert queue.is_file()
+    actual = [json.loads(line) for line in queue.read_text(
+        encoding="utf-8").splitlines()]
+    assert len(actual) == data["work_orders"]
+    assert all(item["verification"]["V5"] == "NOT_CHECKED"
+               for item in actual)
