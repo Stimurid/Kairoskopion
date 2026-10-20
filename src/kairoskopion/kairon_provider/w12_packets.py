@@ -132,7 +132,79 @@ def load_science_index(path: Path | None, expected_source_sha: str, expected_rou
         raise ValueError("science index route IDs mismatch")
     return indexed,sha(raw)
 
-def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: Path | None = None, analysis_root: Path | None = None, science_index_path: Path | None = None) -> dict[str, Any]:
+def publication_evidence_for_route(
+    route: dict[str, Any], output: Path, source_sha: str,
+    publisher_root: Path | None, model_root: Path | None
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    rid=route["route_id"]
+    published={"status":"NOT_RUN","abstracts":0,"works":0,"detail":""}
+    model={"status":"AWAITING_CRITIQUE","detail":"","cited_anchor":""}
+    source_work=None
+    if publisher_root is not None:
+        rawpath=publisher_root/"routes"/(rid+".json")
+        if rawpath.exists():
+            raw=rawpath.read_bytes()
+            q=json.loads(raw.decode("utf-8"))
+            if (q.get("schema")!="MAI_PRIOR_ART_AUTHENTICATED_API_EVIDENCE_v1"
+                    or q.get("route_id")!=rid or q.get("W12_source_sha256")!=source_sha
+                    or q.get("scientific_family")!=route["family"]
+                    or q.get("science_gate")!="HOLD"
+                    or q.get("human_author_gate")!="CLOSED"
+                    or q.get("external_send_count")!=0
+                    or q.get("publisher_fulltexts_read")!=0):
+                raise ValueError("published source artifact cannot promote route "+rid)
+            outpath=output/"published"/(rid+".json")
+            outpath.parent.mkdir(parents=True,exist_ok=True)
+            outpath.write_bytes(raw)
+            source_work=q
+            published={
+                "status":q["operation_status"],
+                "works":q["published_work_count"],
+                "abstracts":q["database_abstract_count"],
+                "detail":"published/"+rid+".json",
+                "receipt_sha256":sha(raw),
+                "read_depth":"CROSSREF_OPENALEX_DATABASE_ABSTRACT_NOT_PUBLISHER_FULLTEXT",
+            }
+    if model_root is not None:
+        path=model_root/"routes"/(rid+".json")
+        if path.exists():
+            raw=path.read_bytes()
+            q=json.loads(raw.decode("utf-8"))
+            review=q.get("review") or {}
+            passage=review.get("source_passage")
+            if (q.get("schema")!="MAI_W12_SOURCE_LINKED_PROVISIONAL_SCHOLARLY_CHALLENGE_v1"
+                    or q.get("route_id")!=rid
+                    or review.get("route_id")!=rid
+                    or q.get("human_gate")!="HOLD"
+                    or q.get("journal_send_count")!=0
+                    or q.get("published_fulltext_read") is not False
+                    or review.get("scientific_claim_accepted") is not False
+                    or q.get("scientific_stage")!="PROVISIONAL_MODEL_ABSTRACT_CHALLENGE"):
+                raise ValueError("model review cannot promote scholarly route "+rid)
+            if passage:
+                if source_work is None:
+                    raise ValueError("model review must have independently held published source "+rid)
+                works=source_work.get("published_works") or []
+                matched=next((w for w in works if w.get("doi")==passage.get("doi")),None)
+                if (matched is None or
+                        review.get("source_anchor_id")!=passage.get("passage_id") or
+                        passage.get("text") not in matched.get("abstract",{}).get("abstract_text","")):
+                    raise ValueError("model review cited unverified abstract anchor "+rid)
+            elif review.get("status")!="INSUFFICIENT_ABSTRACT":
+                raise ValueError("model without anchor cannot claim sourced critique "+rid)
+            outpath=output/"reviews"/(rid+".json")
+            outpath.parent.mkdir(parents=True,exist_ok=True)
+            outpath.write_bytes(raw)
+            model={
+                "status":"ABSTRACT_LINKED_PROVISIONAL_CRITIQUE" if passage else "ABSTAINED_NOT_ENOUGH_SOURCE",
+                "detail":"reviews/"+rid+".json",
+                "cited_anchor":review.get("source_anchor_id",""),
+                "receipt_sha256":sha(raw),
+                "semantic_authority":"PROVISIONAL_LLM_CRITICISM_NOT_VALIDATED_BY_AUTHOR",
+            }
+    return published,model
+
+def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: Path | None = None, analysis_root: Path | None = None, science_index_path: Path | None = None, publisher_root: Path | None = None, model_root: Path | None = None) -> dict[str, Any]:
     records,source_hash=read_records(source)
     snapshot_bytes=snapshot_path.read_bytes()
     snapshot=json.loads(snapshot_bytes.decode("utf-8-sig"))
@@ -198,12 +270,16 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
                     m=re.search(r"Overall label:\s*([^\r\n]+)",stdoutpath.read_text(encoding="utf-8"))
                     if m:
                         analysis["fit_label"]=m.group(1).strip()
+        published,model=publication_evidence_for_route(
+            r,output,source_hash,publisher_root,model_root)
         packet={
             "schema":SCHEMA,"source_jsonl_sha256":source_hash,
             "snapshot_sha256":sha(snapshot_bytes),"outreach_sha256":events_sha,
             "route":r,"outreach_events":related,
             "local_analysis":analysis,
             "science_index":science,
+            "published_source_evidence":published,
+            "model_scientific_critique":model,
             "editorial_status":status,
             "scientific_state":"SOURCE_DRAFT_ONLY",
             "quality_receipts":{},
@@ -243,6 +319,12 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
             "science_index_status":science["status"],
             "science_opponents":science["opponents"],
             "science_packet":science["review_packet"],
+            "published_status":published["status"],
+            "published_works":published["works"],
+            "published_abstracts":published["abstracts"],
+            "published_packet":published["detail"],
+            "model_critique_status":model["status"],
+            "model_critique_packet":model["detail"],
             "scientific_status":"PRIOR_ART_INDEXED_ON_HOLD" if science["review_packet"] else "SOURCE_DRAFT_ONLY",
             "packet":f"routes/{r['route_id']}.json",
             "abstract":f"routes/{r['route_id']}.md",
@@ -265,6 +347,8 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
         "analysis_counts":{key:sum(x["analysis_status"]==key for x in index) for key in sorted(set(x["analysis_status"] for x in index))},
         "science_index_sha256":science_sha,
         "science_indexed_count":sum(bool(x["science_packet"]) for x in index),
+        "published_source_indexed_count":sum(bool(x["published_packet"]) for x in index),
+        "provisional_model_critique_count":sum(bool(x["model_critique_packet"]) for x in index),
         "ready_for_human_send":0,
         "ready_for_author_rework":0,
         "source_note":"53 authentic W12 source route drafts; not independent article count, venue policy, or completed scholarly QA.",
@@ -342,8 +426,13 @@ c.append(el("p",item.title));
 c.append(el("div","Дедлайн W12: "+(item.deadline||"не указан"),"meta"));
 c.append(el("div","Технический прогон: "+item.analysis_status+(item.fit_label?" · fit "+item.fit_label:""),"meta"));
 c.append(el("div","Индаго: "+item.science_index_status+" · научные ориентиры "+item.science_opponents+" · HUMAN GATE CLOSED","meta"));
+c.append(el("div","Научные базы: "+item.published_abstracts+" аннотаций; "+item.published_status,"meta"));
+c.append(el("div","Критика: "+item.model_critique_status+" · авторский допуск ЗАКРЫТ","meta"));
 const a=el("a","Исходный пакет ↗");a.href=item.packet;
-c.append(a);if(item.science_packet){const v=el("a"," · Научные возражения ↗");v.href=item.science_packet;c.append(v)}node.append(c)}
+c.append(a);if(item.science_packet){const v=el("a"," · Научные возражения Индаго W69 ↗");v.href=item.science_packet;c.append(v)}
+if(item.published_packet){const v=el("a"," · Crossref/OpenAlex ↗");v.href=item.published_packet;c.append(v)}
+if(item.model_critique_packet){const v=el("a"," · Критика Codex ↗");v.href=item.model_critique_packet;c.append(v)}
+node.append(c)}
 board.append(node)}
 }
 document.getElementById("search").addEventListener("input",render);
@@ -359,8 +448,10 @@ def main(argv: list[str] | None=None) -> int:
     parser.add_argument("--outreach",type=Path)
     parser.add_argument("--analysis-root",type=Path)
     parser.add_argument("--science-index",type=Path)
+    parser.add_argument("--published-sources",type=Path)
+    parser.add_argument("--model-challenges",type=Path)
     args=parser.parse_args(argv)
-    manifest=materialize(args.source,args.snapshot,args.output,args.outreach,args.analysis_root,args.science_index)
+    manifest=materialize(args.source,args.snapshot,args.output,args.outreach,args.analysis_root,args.science_index,args.published_sources,args.model_challenges)
     print(json.dumps(manifest,ensure_ascii=False,indent=2))
     return 0
 
