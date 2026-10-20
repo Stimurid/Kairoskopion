@@ -13,6 +13,7 @@ No LLM calls. No network. Pure deterministic mapping.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -346,7 +347,26 @@ def build_talk_corpus_litops_staging_pack(
     for entry in sorted(snapshots, key=lambda x: x["key"]):
         source_id = entry["source_id"]
         sha = entry["content_sha256"]
-        if not source_id.startswith("drive:") or len(sha) != 64:
+        is_w12_sheet = False
+        sheet = re.fullmatch(
+            r"w12-sheet:([A-Za-z0-9_-]{20,}):(A(\d+):M\3):MAI-20261020",
+            source_id,
+        )
+        if sheet:
+            expected_url = (
+                "https://docs.google.com/spreadsheets/d/" + sheet.group(1)
+                + "/edit#range=" + sheet.group(2)
+            )
+            is_w12_sheet = (
+                entry.get("source_url") == expected_url
+                and entry.get("kind") == "RESEARCH_SYNTHESIS"
+                and entry.get("read_coverage") == "RESEARCH_SYNTHESIS_TEXT_ONLY"
+                and entry.get("author_state") == "RESEARCH_RETURN_NOT_AUTHOR_APPROVAL"
+                and entry.get("scope") == "W12_SECONDARY_RESEARCH_SYNTHESIS_ONLY"
+            )
+            if not is_w12_sheet:
+                raise ValueError("W12 derived sheet source has incompatible provenance/URL/read-depth/rights")
+        if not (source_id.startswith("drive:") or is_w12_sheet) or len(sha) != 64:
             raise ValueError("unpinned source identity or content digest")
         if (source_id, sha[:16]) not in known:
             raise ValueError(f"source not admitted by existing intake registry: {entry['key']}")
@@ -378,15 +398,16 @@ def build_talk_corpus_litops_staging_pack(
             "language": "ru",
             "threads": [case_id, family],
             "topics": [],
-            "tags": ["trm074", "source-provenance-only"],
+            "tags": ["trm074", "source-provenance-only"] + (["w12-secondary-sheet-not-author-original"] if is_w12_sheet else []),
             "body_type": "txt",
-            "origin": "mixed" if family == "CROSS" else "user_prior_work",
+            "origin": "mixed" if (family == "CROSS" or is_w12_sheet) else "user_prior_work",
             "capture_mode": "manual_upload",
             "content_genre": textual_genre,
             "work_roles": ["source_material", "needs_review"],
             "processing_state": "text_extracted",
             "source_document_id": source_id,
             "source_document_url": entry["source_url"],
+            "source_authority_kind": "W12_GOOGLE_SHEET_DERIVED" if is_w12_sheet else "GOOGLE_DOC_OR_EXISTING_CAPTURE",
             "source_capture_sha256": sha,
             "source_version_label": entry["version"],
             "source_author_state": entry["author_state"],
