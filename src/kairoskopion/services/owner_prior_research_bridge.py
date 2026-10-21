@@ -13,6 +13,7 @@ from hashlib import sha256
 from contextlib import contextmanager
 import json
 import os
+import stat
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -42,9 +43,29 @@ def _private_file(path: str | Path, upper: int = MAX_BYTES) -> bytes:
     if not isinstance(path, (str, Path)) or not str(path):
         raise ValueError("owner private source path/locator missing")
     p = Path(path)
-    if p.is_symlink() or not p.is_file() or not 0 < p.stat().st_size <= upper:
+    if ".." in p.parts:
+        raise ValueError("owner private source parent traversal is forbidden")
+    # Inspect the lexical path, not Path.resolve(), which would conceal a
+    # symlink or a Windows directory junction in an otherwise pinned path.
+    probe = p if p.is_absolute() else Path.cwd() / p
+    while True:
+        try:
+            attrs = probe.lstat()
+        except OSError as exc:
+            raise ValueError("owner private frozen source/receipt absent or unsafe") from exc
+        if (stat.S_ISLNK(attrs.st_mode)
+                or getattr(attrs, "st_file_attributes", 0)
+                   & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)):
+            raise ValueError("owner private path traverses symlink/junction")
+        if probe.parent == probe:
+            break
+        probe = probe.parent
+    if not p.is_file() or not 0 < p.stat().st_size <= upper:
         raise ValueError("owner private frozen source/receipt absent or unsafe")
-    return p.read_bytes()
+    data = p.read_bytes()
+    if not 0 < len(data) <= upper:
+        raise ValueError("owner private frozen source/receipt changed during read")
+    return data
 
 
 def _legacy_evidence(

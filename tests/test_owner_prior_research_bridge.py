@@ -7,6 +7,8 @@ and the newly admitted 8+1 source stage. No DOI fulltexts or author assent.
 from __future__ import annotations
 
 from hashlib import sha256
+import os
+import subprocess
 import json
 from pathlib import Path
 
@@ -14,7 +16,7 @@ import pytest
 
 from kairoskopion.kairon_provider.opportunity_graph import OpportunityGraphStore
 from kairoskopion.services.owner_prior_research_bridge import (
-    _fp, _legacy_evidence, import_owner_prior_science, readback_owner_prior_science,
+    _fp, _legacy_evidence, _private_file, import_owner_prior_science, readback_owner_prior_science,
 )
 
 
@@ -384,3 +386,37 @@ def test_tampered_prior_import_intent_is_not_accepted_as_complete(tmp_path):
         readback_owner_prior_science(storage)
     with pytest.raises(ValueError, match="intent is pinned to other source bytes"):
         import_owner_prior_science(source, legacy, storage)
+
+
+def test_parent_directory_symlink_private_source_refused(tmp_path):
+    _, _, _, ownerdir = _seed_synthetic_owner_science(tmp_path)
+    alias = tmp_path / "redirected-owner"
+    try:
+        alias.symlink_to(ownerdir, target_is_directory=True)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"symlink privilege unavailable: {exc}")
+    assert not (alias / "F01_B09.txt").is_symlink()
+    with pytest.raises(ValueError, match="symlink/junction"):
+        _private_file(alias / "F01_B09.txt")
+
+
+def test_parent_traversal_private_source_refused(tmp_path):
+    _, _, _, ownerdir = _seed_synthetic_owner_science(tmp_path)
+    disguised = ownerdir / ".." / ownerdir.name / "F01_B09.txt"
+    with pytest.raises(ValueError, match="parent traversal"):
+        _private_file(disguised)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows junction negative regression")
+def test_windows_junction_private_source_refused(tmp_path):
+    _, _, _, ownerdir = _seed_synthetic_owner_science(tmp_path)
+    alias = tmp_path / "redirected-junction"
+    creation = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(alias), str(ownerdir)],
+        capture_output=True, text=True,
+    )
+    if creation.returncode != 0:
+        pytest.skip("Windows junction creation unavailable on this host")
+    assert alias.exists()
+    with pytest.raises(ValueError, match="symlink/junction"):
+        _private_file(alias / "F01_B09.txt")
