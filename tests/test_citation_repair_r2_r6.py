@@ -81,6 +81,22 @@ def _prior_state(tmp_path, case, outcome="BLOCKED", read_depth="NONE",
     return state
 
 
+def _consulted_negative_state(tmp_path, case):
+    """Fictional witness was actually read and explicitly assessed as unrelated."""
+    state = _prior_state(
+        tmp_path, case, outcome="NEGATIVE", read_depth="SECTION_TEXT",
+        negatives=("FICTIONAL_WITNESS_READ_CLAIM_NOT_SUPPORTED",))
+    state["source_identity"].update({
+        "witness_id": "SYNTHETIC_TEST_WITNESS_FERROW",
+        "edition_id": "FICTIONAL_PRESS_2014",
+    })
+    state["source_to_claim_relation"] = "DOES_NOT_SUPPORT_CLAIM"
+    state["source_excerpt_note"] = "Imaginary source excerpt actually read."
+    (tmp_path / f"{case['case_id']}.state.json").write_text(
+        json.dumps(state), encoding="utf-8")
+    return state
+
+
 def _candidate_text(tmp_path, entries):
     path = tmp_path / "candidate_text.json"
     path.write_text(json.dumps({
@@ -229,7 +245,7 @@ def test_plan_produces_reversible_patch_and_never_touches_the_original(tmp_path)
     draft = _draft(tmp_path)
     before = draft.read_bytes()
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -299,7 +315,7 @@ def test_operator_supplied_wording_renders_a_ready_proposal(tmp_path):
 def test_pending_gate_refuses_apply_without_a_bound_author_receipt(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -326,7 +342,7 @@ def test_pending_gate_refuses_apply_without_a_bound_author_receipt(tmp_path):
 def test_reject_and_revision_decisions_never_apply(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -343,7 +359,7 @@ def test_reject_and_revision_decisions_never_apply(tmp_path):
 def test_receipt_must_be_bound_to_this_exact_patch(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -369,7 +385,7 @@ def test_receipt_must_be_bound_to_this_exact_patch(tmp_path):
 def test_tampered_or_unidentified_decision_id_is_refused(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -399,7 +415,7 @@ def test_tampered_or_unidentified_decision_id_is_refused(tmp_path):
 def test_synthetic_receipt_cannot_authorize_a_real_apply(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -419,7 +435,7 @@ def test_sandboxed_approval_applies_to_copy_and_emits_inverse_patch(tmp_path):
     draft = _draft(tmp_path)
     original = draft.read_bytes()
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -454,7 +470,7 @@ def test_sandboxed_approval_applies_to_copy_and_emits_inverse_patch(tmp_path):
 def test_apply_refuses_to_overwrite_the_original_and_sibling_copies(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -473,7 +489,7 @@ def test_apply_refuses_to_overwrite_the_original_and_sibling_copies(tmp_path):
 def test_r6_rereads_copy_and_reports_debt_not_fabricated_success(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -505,7 +521,7 @@ def test_r6_rereads_copy_and_reports_debt_not_fabricated_success(tmp_path):
 def test_r6_refuses_without_a_real_apply_or_on_a_stale_copy(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -526,7 +542,7 @@ def test_r6_refuses_without_a_real_apply_or_on_a_stale_copy(tmp_path):
 def test_r6_refuses_when_nothing_was_applied(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -552,7 +568,7 @@ def test_undo_restores_exact_original_source_bytes(tmp_path):
     draft = _draft(tmp_path)
     original = draft.read_bytes()
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -577,7 +593,7 @@ def test_undo_restores_exact_original_source_bytes(tmp_path):
 def test_undo_refuses_on_snapshot_or_copy_drift(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -607,7 +623,7 @@ def test_undo_refuses_on_snapshot_or_copy_drift(tmp_path):
 def test_replay_is_immutable_and_identical_after_reset(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     states = repair.load_prior_states([tmp_path])
     first = repair.plan_repair(audit, tmp_path / "out", case["case_id"], draft,
                                prior_states=states, queue_orders=orders)
@@ -662,7 +678,7 @@ def test_wrong_manifest_sha_fails_closed(tmp_path):
 def test_edited_manuscript_makes_the_proposal_unreproducible_at_apply(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -701,7 +717,7 @@ def test_colliding_anchor_text_fails_closed(tmp_path):
 def test_missing_anchor_locator_fails_closed(tmp_path):
     draft = _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     proposal = _proposal(
         repair.plan_repair(audit, tmp_path / "out", case["case_id"], draft,
                            prior_states=repair.load_prior_states([tmp_path]),
@@ -763,7 +779,7 @@ def test_crlf_and_bom_manuscripts_round_trip_exactly(tmp_path):
         draft = case_dir / "synthetic_manuscript.md"
         draft.write_bytes(raw)
         audit, _, _, case = _z0(case_dir, draft)
-        _prior_state(case_dir, case)
+        _consulted_negative_state(case_dir, case)
         bundle = repair.plan_repair(
             audit, case_dir / "out", case["case_id"], draft,
             prior_states=repair.load_prior_states([case_dir]))
@@ -786,7 +802,7 @@ def test_crlf_and_bom_manuscripts_round_trip_exactly(tmp_path):
 def _ready_bundle(tmp_path, draft=None):
     draft = draft or _draft(tmp_path)
     audit, queue, orders, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     bundle = repair.plan_repair(
         audit, tmp_path / "out", case["case_id"], draft,
         prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
@@ -1317,7 +1333,7 @@ def test_cli_apply_check_and_undo_round_trip(tmp_path, capsys):
     draft = _draft(tmp_path)
     original = draft.read_bytes()
     audit, _, _, case = _z0(tmp_path, draft)
-    _prior_state(tmp_path, case)
+    _consulted_negative_state(tmp_path, case)
     cli_main(["cite-repair", "plan", "--audit", str(audit), "--case",
               case["case_id"], "--manuscript", str(draft),
               "--out", str(tmp_path / "out"),
@@ -1389,3 +1405,72 @@ def test_cli_refusal_returns_two_and_leaves_no_artifact(tmp_path, capsys):
     assert code == 2
     assert "refused" in capsys.readouterr().err
     assert not (tmp_path / "out").exists()
+
+def test_blocked_source_cannot_justify_deleting_a_citation(tmp_path):
+    draft = _draft(tmp_path)
+    audit, queue, orders, case = _z0(tmp_path, draft)
+    _prior_state(tmp_path, case, outcome="BLOCKED", read_depth="NONE",
+                 negatives=("SOURCE_READER_NOT_AVAILABLE",))
+    bundle = repair.plan_repair(
+        audit, tmp_path / "out", case["case_id"], draft,
+        prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
+    candidate = _candidate(bundle, "REMOVE_UNSUPPORTED_CITATION")
+    proposal = _proposal(bundle, "REMOVE_UNSUPPORTED_CITATION")
+    assert candidate["applicable"] is False
+    assert "NO_EVIDENCE_ON_RECORD_THAT_THE_SOURCE_LACKS_SUPPORT" in candidate["refusal_codes"]
+    assert proposal["applicability"] != "READY_FOR_AUTHOR_REVIEW"
+
+
+def test_observed_unassessed_source_does_not_justify_deletion(tmp_path):
+    draft = _draft(tmp_path)
+    audit, queue, orders, case = _z0(tmp_path, draft)
+    state = _prior_state(tmp_path, case, outcome="OBSERVED",
+                         read_depth="SECTION_TEXT", negatives=())
+    state["source_identity"]["witness_id"] = "FICTIONAL_SECTION_WITNESS"
+    (tmp_path / f"{case['case_id']}.state.json").write_text(json.dumps(state))
+    bundle = repair.plan_repair(
+        audit, tmp_path / "out", case["case_id"], draft,
+        prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
+    assert _candidate(bundle,"REMOVE_UNSUPPORTED_CITATION")["applicable"] is False
+
+
+def test_negative_without_readable_witness_cannot_justify_deletion(tmp_path):
+    draft = _draft(tmp_path)
+    audit, queue, orders, case = _z0(tmp_path, draft)
+    state = _prior_state(tmp_path, case, outcome="NEGATIVE",
+                         read_depth="NONE", negatives=("LOOKUP_EMPTY",))
+    state["source_to_claim_relation"] = "DOES_NOT_SUPPORT_CLAIM"
+    (tmp_path / f"{case['case_id']}.state.json").write_text(json.dumps(state))
+    bundle = repair.plan_repair(
+        audit, tmp_path / "out", case["case_id"], draft,
+        prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
+    assert _candidate(bundle,"REMOVE_UNSUPPORTED_CITATION")["applicable"] is False
+
+
+def test_synthetic_witness_class_persists_when_flag_missing(tmp_path):
+    draft, _, bundle, _ = _ready_bundle(tmp_path)
+    proposal = _proposal(bundle, "REMOVE_UNSUPPORTED_CITATION")
+    receipt = _synthetic_receipt(proposal)
+    del receipt["synthetic"]
+    receipt["receipt_id"] = repair.receipt_identity(receipt)
+    copied = tmp_path / "synthetic-copy.md"
+    applied = repair.apply_patch(draft, proposal, receipt, copied,
+                                allow_synthetic_test=True)
+    assert applied["synthetic_test_receipt"] is True
+    assert applied["decision_witness_class"] == "SYNTHETIC_TEST"
+    checked = repair.post_patch_check(copied, proposal, applied)
+    assert checked["synthetic_test_receipt"] is True
+    assert checked["decision_witness_class"] == "SYNTHETIC_TEST"
+
+
+def test_missing_original_after_apply_returns_typed_refusal(tmp_path):
+    draft, _, bundle, _ = _ready_bundle(tmp_path)
+    proposal = _proposal(bundle, "REMOVE_UNSUPPORTED_CITATION")
+    copied = tmp_path / "copy.md"
+    applied = repair.apply_patch(draft, proposal,
+                                 _synthetic_receipt(proposal), copied,
+                                 allow_synthetic_test=True)
+    draft.unlink()
+    with pytest.raises(repair.RepairRefusal) as caught:
+        repair.post_patch_check(copied, proposal, applied)
+    assert caught.value.code == "ORIGINAL_MISSING_AFTER_APPLY"

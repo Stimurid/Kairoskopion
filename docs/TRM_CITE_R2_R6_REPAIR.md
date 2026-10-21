@@ -93,9 +93,11 @@ arrived through a channel the author controls.
   `BLOCKED_NO_SUGGESTED_TEXT` until the author or analyst supplies wording via a
   `trm-cite-r5-candidate-text-v1` file.
 - **No repair is offered that asserts an unevidenced defect.** Deleting a
-  citation is refused unless the source was actually consulted and did not
-  deliver an entailing passage. An **anchored passage on record vetoes
-  removal** — the machine will not propose deleting a citation it holds
+  citation is refused unless an identified source witness was actually
+  consulted (SECTION_TEXT or stronger) and R1 explicitly records
+  DOES_NOT_SUPPORT_CLAIM together with a negative finding. A BLOCKED/ERROR
+  lookup or an OBSERVED transport alone cannot establish a defect.
+  An **anchored passage on record vetoes removal** — the machine will not propose deleting a citation it holds
   evidence supports, whatever else is on file.
 - **No source search, no fetch, no provider.** R3 is `QUEUED_NOT_EXECUTED` and
   `acquisition_authorized_by_this_object: false`.

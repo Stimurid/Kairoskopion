@@ -684,13 +684,20 @@ def build_candidates(intent: IntentReconstruction,
         s.get("outcome") == "OBSERVED"
         and (s.get("source_identity") or {}).get("read_depth")
         in ANCHORED_READ_DEPTHS for s in states)
-    has_negative = any(s.get("outcome") in ("BLOCKED", "ERROR", "NEGATIVE")
-                       for s in states)
-    # A defect is evidenced only when the source was consulted and did not
-    # deliver an entailing passage. An anchored passage on record VETOS
-    # deletion: the machine must not propose deleting a citation it holds
-    # evidence supports, whatever else is on file.
-    defect_evidenced = (not has_anchored) and (has_negative or has_observed)
+    # Failed access (BLOCKED/ERROR) is epistemically unknown, not negative
+    # evidence; a mere OBSERVED transport is not a scientific mismatch.
+    # R1 must explicitly identify a readable witness and judge the specific
+    # claim to be unsupported before any machine deletion is proposed.
+    consulted_mismatch = any(
+        s.get("outcome") in ("NEGATIVE", "OBSERVED")
+        and (s.get("source_identity") or {}).get("read_depth")
+        in {"SECTION_TEXT", "ANCHORED_PASSAGE", "FULL_TEXT"}
+        and bool((s.get("source_identity") or {}).get("witness_id"))
+        and s.get("source_to_claim_relation") == "DOES_NOT_SUPPORT_CLAIM"
+        and bool(s.get("negative_evidence"))
+        for s in states)
+    # An anchored passage on record still VETOS machine deletion.
+    defect_evidenced = (not has_anchored) and consulted_mismatch
     labels = sorted({evidence_label(s) for s in states}) or ["NO_SOURCE_EVIDENCE"]
 
     candidates: list[RepairCandidate] = []
@@ -1261,7 +1268,10 @@ def apply_patch(manuscript_path: Path, proposal: dict[str, Any],
         "author_gate": "AUTHOR_APPROVED_THIS_PATCH_ONLY",
         "original_manuscript_mutated": False,
         "original_manuscript_reverified": True,
-        "synthetic_test_receipt": bool(receipt.get("synthetic")),
+        "synthetic_test_receipt": (
+            receipt.get("synthetic") is True
+            or receipt.get("witness_class") == "SYNTHETIC_TEST"),
+        "decision_witness_class": receipt.get("witness_class"),
         "verification": dict(NOT_CHECKED),
         "citation_gate": "NOT_PUBLICATION_READY",
     }
@@ -1352,7 +1362,13 @@ def post_patch_check(copy_path: Path, proposal: dict[str, Any],
         raise RepairRefusal(
             "R6 requires the apply receipt to record the original manuscript "
             "path so the original can be re-verified", "ORIGINAL_PATH_MISSING")
-    original_reverified = _digest(Path(original_path).read_bytes()) == original_sha
+    try:
+        original_bytes = Path(original_path).read_bytes()
+    except OSError as exc:
+        raise RepairRefusal(
+            "The original manuscript is not readable during R6",
+            "ORIGINAL_MISSING_AFTER_APPLY") from exc
+    original_reverified = _digest(original_bytes) == original_sha
     if not original_reverified:
         raise RepairRefusal(
             "The original manuscript changed after apply; R6 cannot certify a "
@@ -1397,6 +1413,10 @@ def post_patch_check(copy_path: Path, proposal: dict[str, Any],
     )
     payload = check.to_dict()
     payload["z0_reread_schema_version"] = reread.schema_version
+    payload["synthetic_test_receipt"] = bool(
+        apply_receipt.get("synthetic_test_receipt"))
+    payload["decision_witness_class"] = apply_receipt.get(
+        "decision_witness_class", "UNKNOWN")
     return payload
 
 
