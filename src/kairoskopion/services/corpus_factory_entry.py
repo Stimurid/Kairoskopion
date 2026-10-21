@@ -312,7 +312,10 @@ def execute_factory_source_stage(
         "litops_whitecrow_receipt_sha256": litops["sha256"] if litops else None,
         "source_snapshots_count": intake["source_count"],
         "discussion_event_count": intake["discussion_events"],
-        "kairon_evidence_count": len(graph.list_records("Evidence")),
+        "kairon_evidence_count": len([
+            e for e in graph.list_records("Evidence")
+            if not e.get("owner_prior_receipt_case")
+        ]),
         "w1_return_proposals": w1["count"] if w1 else 0,
         "w2_return_proposals": (w2.get("counts", {}).get("field_reopen_proposals", 0) if w2 else 0),
         "w3_return_proposals": (w3.get("counts", {}).get("field_reopen_proposals", 0) if w3 else 0),

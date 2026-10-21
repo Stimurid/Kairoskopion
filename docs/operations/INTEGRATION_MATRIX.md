@@ -92,3 +92,65 @@ or related private manifest contents to Git.
    production deployed=NO, external sends=0.
 
 Do not confuse source-only acceptance with scientific or production acceptance.
+
+
+## L3 prior scientific-return bridge into the SAME Factory — 2026-10-21
+
+The first L3 transfer accepted **sources and WhiteCrow context ONLY**.
+The existing owner-private L3 code-v07 trial also contained a previously
+tested scientific challenge. A second explicit CLI option now imports THAT
+prior result into the SAME Kairon opportunity graph, without a new hunting
+or text-generation engine.
+
+Public code: src/kairoskopion/services/owner_prior_research_bridge.py.
+CLI: scripts/run_factory_source_stage.py --owner-prior-research-receipt
+<private_existing_L3_receipt.json> --owner-prior-graph-root
+<private_verified_L3_graph_root>, together with standard --manifest,
+--storage-root and optional --litops-root.
+Both owner-prior flags MUST appear together; the restricted importer accepts
+only a real matching L3 legacy-receipt schema and original case ID.
+
+Source provenance proof is a live three-way comparison:
+1. previous L3 full-content fingerprints for 11 Evidence, one Journal,
+   one source contradiction and one FIELD_REOPEN_PROPOSAL;
+2. nine owner source identities / raw byte SHA from the archived legacy
+   receipt and original publisher-note annotations;
+3. current eight Factory SourceSnapshot paths physically re-read and
+   re-hashed + one independently re-hashed historical workbook.
+Source collision, duplicate physical event ID, edited source, altered
+receipt, injected ArticleSeed/World/Route, stale research note, or absent
+original field reopen causes refusal. The historic XLSX remains
+BINARY_HELD_NO_SCIENTIFIC_EXTRACTION; never treat its 2023 categories
+as current VAK policy or its sheets as read scientific arguments.
+
+The two published rivals are transferred as *INDEX_ONLY*
+owner-research-note pointers with verified DOI identity, never as
+FULL_TEXT publisher-exemplar proof. Exactly one old B09 source
+contradiction and one proposed L2 field reopen are transferred with a
+W2 research-note line and passage SHA. Their origin is attributed to
+the previous OWNER SCIENCE NOTE. AuthorGate=HOLD;
+ArticleSeed=0, World=0, W12_EQUIVALENT=0,
+TargetWorld=unqualified, external send=disabled.
+
+Real independent L3 V02 output on AORUS:
+- existing source-only contexts admitted: eight texts, one binary HOLD,
+  four actual WhiteCrow contexts;
+- imported earlier source-bound research: two INDEX_ONLY DOI evidence
+  pointers, one challenge, one L2 field reopen, one provenance HuntTrace;
+- two separate same-operator Python runs; second 0 new sources,
+  0 new WhiteCrow records, 0 new scientific event identities;
+- joint SHA256:
+  94c12f6bbde822c8f399e73cf2e8b088bf29479f40c339f92788c220a50ca256;
+- source stage SHA256:
+  17fd0cfff5c5780cb0c48cbbe95bf974168ee1fb040183a1bffdd880105add45;
+- reconciled prior science SHA256:
+  58e14de028131b42f0d536618b95e87a1e63c2d554d6bca1bba866df06e11791.
+
+Important: this is **PROVISIONAL OWNER-RESEARCH-RETURN INTEGRATED**;
+it does not certify a full journal field, regenerate an article, resolve
+the F02 A/C/D author comments, run live Indago, or deploy to production.
+It closes the prior-L3-results-disconnected-from-Factory defect, while
+deep source reading, scholarly novelty adjudication, explicit author
+decision, journal fit and permitted publications remain open.
+The previous V01 private outputs are immutable and preserved as
+historical receipts; V02 uses a fresh isolated storage root.

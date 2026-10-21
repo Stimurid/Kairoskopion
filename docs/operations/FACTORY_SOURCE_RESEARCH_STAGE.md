@@ -547,3 +547,26 @@ article/venue loop for L3 = OPEN; native Google Docs credentials =
 UNAVAILABLE ON THIS AORUS and separately remain blocked.
 This is SRC/LITOPS/WHITECROW_CONTEXT acceptance, not real scientific
 pipeline acceptance, Deep TargetWorld or production deployment.
+
+
+## Owner prior-science import: exclusive writer and replay (2026-10-21)
+
+If a previous owner-approved research trial is supplied using both CLI flags
+--owner-prior-research-receipt and --owner-prior-graph-root, validate the
+old receipt, readback, legacy graph SHA, all nine original source bytes and
+all eight current Factory source snapshot backing files BEFORE mutating the
+new research graph. The original author HOLD is retained.
+
+All scientific graph writes for this scoped importer use an owner-private
+single-writer lock. A second concurrent invocation or stale lock is BLOCKED;
+the lock is never automatically stolen or erased. An operator must inspect
+the stopped run to recover a stale lock. Successful calls remove their own
+lock. Byte-identical retry creates zero duplicate evidence, contradiction
+or reopened-field events. The source-only Factory checkpoint stays
+immutable, and a separate immutable linked research-return receipt records
+the original-note SHA + new graph content fingerprints.
+
+The L3 source+research one-command, two-process real V02 pilot is retained
+privately, including a full frozen SHA readback. It is a PROVISIONAL
+SCIENCE NOTE with DOI INDEX_ONLY pointers and AUTHOR_HOLD, not a live
+scientific search, full publisher reading, manuscript acceptance or send.

@@ -6,6 +6,7 @@ WhiteCrow scientific judgment, Artikl author approval or publication send.
 from __future__ import annotations
 
 import argparse
+from hashlib import sha256
 import json
 from pathlib import Path
 import sys
@@ -25,7 +26,13 @@ def main() -> int:
     parser.add_argument("--native-capture-root", type=Path,
                         help="Private TRM040 native Docs store for sources marked capture_transport=native_docs")
     parser.add_argument("--manual-w1-reopen", action="store_true")
+    parser.add_argument("--owner-prior-research-receipt", type=Path,
+                        help="Previously executed owner-private research receipt, held and verified")
+    parser.add_argument("--owner-prior-graph-root", type=Path,
+                        help="Exact private previous Kairon graph root, NOT a new research engine")
     args = parser.parse_args()
+    if bool(args.owner_prior_research_receipt) != bool(args.owner_prior_graph_root):
+        parser.error("owner prior-research receipt and graph root must be supplied together")
     try:
         receipt = execute_factory_source_stage(
             args.manifest, args.storage_root,
@@ -35,6 +42,22 @@ def main() -> int:
             native_capture_root=args.native_capture_root,
             manual_w1_reopen=args.manual_w1_reopen,
         )
+        if args.owner_prior_research_receipt:
+            from kairoskopion.services.owner_prior_research_bridge import (
+                import_owner_prior_science,
+            )
+            owner_prior = import_owner_prior_science(
+                args.owner_prior_research_receipt,
+                args.owner_prior_graph_root,
+                args.storage_root,
+            )
+            receipt["owner_prior_research"] = owner_prior
+            receipt["joined_factory_research_sha256"] = sha256(
+                json.dumps({
+                    "factory_sha256": receipt["receipt_sha256"],
+                    "owner_prior_sha256": owner_prior["receipt_sha256"],
+                }, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
     except (ValueError, KeyError, OSError, ImportError) as exc:
         print("FACTORY_SOURCE_STAGE_BLOCKED: " + str(exc), file=sys.stderr)
         return 2
