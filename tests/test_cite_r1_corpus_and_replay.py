@@ -184,6 +184,7 @@ def test_anchor_verification_requires_unique_occurrence(tmp_path):
     assert good["duplicate_passage"] is False
     assert good["locator_present"] is True
     assert good["verified_passage_id"].startswith("passage:")
+    assert good["verified_passage_id"] != "passage:anchor_missing"
     dup_corpus = tmp_path / "dup.txt"
     dup_corpus.write_text(SYNTHETIC_PLAINTEXT + SYNTHETIC_PASSAGE,
                           encoding="utf-8")
@@ -761,3 +762,75 @@ def test_accept_preplaced_opt_in_adopts_legitimate_priors(tmp_path):
                           fixtures_dir=fixture, test_mode=True,
                           accept_preplaced=True)
     assert summary_a["observed"] == summary_b["observed"]
+
+
+# Source-grounded PDF extraction and locator controls (2026-10-21).
+
+def test_pdf_real_page_text_extraction_from_synthetic_pdf(tmp_path):
+    """Binary PDF internals must never masquerade as readable source text."""
+    pymupdf = pytest.importorskip("pymupdf")
+    doc = pymupdf.open()
+    page = doc.new_page()
+    passage = "SYNTHETIC TEST ONLY: The laboratory protocol is explicitly fictional."
+    page.insert_text((72, 90), passage, fontsize=11)
+    path = tmp_path / "synthetic_source.pdf"
+    path.write_bytes(doc.tobytes())
+    doc.close()
+
+    record = parse_owner_corpus(path, out_dir=tmp_path / "pt")
+    assert record.parser_name == "pdf_page_text_extraction"
+    assert record.parse_confidence == "HIGH"
+    extracted = record.plain_text_path.read_text(encoding="utf-8")
+    assert "[PDF_PAGE_INDEX_1]" in extracted
+    assert passage in extracted
+    assert record.text_length < record.bytes_total
+    assert "stream" not in extracted[:20]
+
+
+def test_malformed_pdf_never_gets_high_confidence_binary_text(tmp_path):
+    source = tmp_path / "fake.pdf"
+    source.write_bytes(b"%PDF-1.4\nstream\n" + bytes(range(256)) * 12
+                       + b"\nendstream\n%%EOF")
+    record = parse_owner_corpus(source, out_dir=tmp_path / "pt")
+    assert record.parse_confidence == "UNREADABLE"
+    assert record.text_length == 0
+    assert any(x.startswith("PDF_") for x in record.parse_debt)
+
+
+def test_corpus_missing_locator_or_ambiguous_passage_cannot_be_observed(tmp_path):
+    from dataclasses import replace
+    setup = _setup_r1_batch(tmp_path)
+    corpus = _write_synthetic_corpus(tmp_path)
+    record = parse_owner_corpus(corpus, out_dir=tmp_path / "pt")
+    anchor = _anchor()
+    request = json.loads(
+        (setup["requests"] / "r1-corpus-00.request.json").read_text(
+            encoding="utf-8-sig"))
+    order = setup["orders"][0]
+    invalid_locator = replace(anchor, locator_label="NO_SUCH_PDF_PAGE_INDEX")
+    invalid_verification = verify_anchor_against_plaintext(
+        invalid_locator, record.plain_text_path)
+    assert invalid_verification["passage_occurrences"] == 1
+    assert invalid_verification["verified_passage_id"] == "passage:anchor_missing"
+    with pytest.raises(ValueError, match="declared locator missing"):
+        build_r1_return_from_anchor(
+            request=request, work_order=order,
+            source_uri=str(corpus), source_sha256=setup["source_sha"],
+            ingest=record, anchor=invalid_locator,
+            provenance=PROVENANCE_OWNER, verification=invalid_verification,
+            authorized_by="TEST_OWNER", permit_id=None)
+
+    duplicate = tmp_path / "duplicated.txt"
+    duplicate.write_text(SYNTHETIC_PLAINTEXT + SYNTHETIC_PASSAGE, encoding="utf-8")
+    dup_record = parse_owner_corpus(duplicate, out_dir=tmp_path / "pt2")
+    dup_verification = verify_anchor_against_plaintext(
+        anchor, dup_record.plain_text_path)
+    assert dup_verification["duplicate_passage"] is True
+    assert dup_verification["verified_passage_id"] == "passage:anchor_missing"
+    with pytest.raises(ValueError, match="non-unique"):
+        build_r1_return_from_anchor(
+            request=request, work_order=order,
+            source_uri=str(duplicate), source_sha256=setup["source_sha"],
+            ingest=dup_record, anchor=anchor,
+            provenance=PROVENANCE_OWNER, verification=dup_verification,
+            authorized_by="TEST_OWNER", permit_id=None)

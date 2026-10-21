@@ -176,35 +176,62 @@ def _parse_plain_text(raw: bytes, source_path: Path) -> tuple[str, tuple[str, ..
 
 
 def _parse_pdf(raw: bytes, source_path: Path) -> tuple[str, tuple[str, ...]]:
-    """Best-effort PDF -> text without third-party deps.
+    """Read actual PDF page text; never decode compressed object streams.
 
-    A worker that lacks ``pdfminer`` / ``PyPDF2`` / ``pdftotext`` falls
-    back to extracting any readable ASCII between stream markers so
-    that ``parse_confidence`` can honestly downgrade to ``LOW``.  The
-    original bytes stay unchanged.
+    A raw stream may contain megabytes of binary noise that superficially
+    looks like text. The previous stream-strip fallback incorrectly labelled
+    that noise HIGH confidence on real Russian journal PDFs. If a genuine
+    page-text engine is absent or the text layer is not extractable, return
+    UNREADABLE debt, never a fabricated quotation or a false page locator.
     """
-    text_chunks: list[str] = []
-    debt: tuple[str, ...] = ()
+    if not raw.lstrip()[:8].startswith(b"%PDF-"):
+        return "", ("PDF_INVALID_HEADER",)
+    debt: list[str] = []
+    pages: list[str] = []
     try:
-        decoded = raw.decode("latin-1", errors="replace")
-    except Exception:
-        decoded = raw.decode("utf-8", errors="replace")
-        debt = debt + ("PDF_DECODE_FALLBACK",)
-    pattern = re.compile(r"stream\s*(.*?)\s*endstream", re.S)
-    hits = 0
-    for chunk in pattern.findall(decoded):
-        cleaned = re.sub(r"[^\x09\x0a\x20-\x7e\xc0-\xff]", " ", chunk)
-        cleaned = re.sub(r"\s+", " ", cleaned).strip()
-        if len(cleaned) > 24:
-            text_chunks.append(cleaned)
-            hits += 1
-            if hits > 2000:
-                debt = debt + ("PDF_STREAM_TRUNCATED_AT_2000_HITS",)
-                break
-    text = "\n".join(text_chunks)
-    if hits == 0:
-        debt = debt + ("PDF_NO_TEXT_LAYER_DETECTED_POSSIBLE_IMAGE_ONLY",)
-    return text, debt
+        import pymupdf
+    except ImportError:
+        pymupdf = None
+    if pymupdf is not None:
+        try:
+            with pymupdf.open(stream=raw, filetype="pdf") as document:
+                if document.needs_pass:
+                    return "", ("PDF_PASSWORD_REQUIRED",)
+                for i, page in enumerate(document):
+                    extracted = page.get_text("text", sort=True).strip()
+                    if extracted:
+                        pages.append(f"[PDF_PAGE_INDEX_{i + 1}]\n{extracted}")
+        except Exception:
+            debt.append("PDF_PYMUPDF_EXTRACTION_FAILED")
+    if not pages:
+        try:
+            import io
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(raw), strict=False)
+            if reader.is_encrypted:
+                return "", tuple(debt + ["PDF_PASSWORD_REQUIRED"])
+            for i, page in enumerate(reader.pages):
+                extracted = (page.extract_text() or "").strip()
+                if extracted:
+                    pages.append(f"[PDF_PAGE_INDEX_{i + 1}]\n{extracted}")
+            if pages:
+                debt.append("PDF_PYPDF_FALLBACK_USED")
+        except ImportError:
+            debt.append("PDF_TEXT_EXTRACTOR_NOT_INSTALLED")
+        except Exception:
+            debt.append("PDF_PYPDF_EXTRACTION_FAILED")
+    if not pages:
+        return "", tuple(debt + ["PDF_NO_EXTRACTABLE_TEXT_LAYER_POSSIBLE_OCR"])
+    text = "\n\n".join(pages)
+    non_space = [char for char in text if not char.isspace()]
+    # Unicode .isalpha() includes Cyrillic and many non-Latin scripts.
+    letter_fraction = (sum(char.isalpha() for char in non_space)
+                       / max(1, len(non_space)))
+    if letter_fraction < 0.24 and len(non_space) > 100:
+        return "", tuple(debt + ["PDF_TEXT_LAYER_IMPLAUSIBLE_BINARY_OR_GLYPH_NOISE"])
+    if text.count("\ufffd") > max(12, len(text) // 250):
+        return "", tuple(debt + ["PDF_TEXT_LAYER_REPLACEMENT_GLYPHS"])
+    return text, tuple(debt)
 
 
 def _parse_docx(raw: bytes, source_path: Path) -> tuple[str, tuple[str, ...]]:
@@ -251,7 +278,7 @@ def parse_owner_corpus(
         parser_name = "docx_xml_strip"
     elif suffix == ".pdf":
         text, debt = _parse_pdf(raw, path)
-        parser_name = "pdf_stream_strip"
+        parser_name = "pdf_page_text_extraction"
     else:
         text, debt = _parse_plain_text(raw, path)
         parser_name = "utf8_fallback_unknown_suffix"
@@ -325,7 +352,7 @@ def verify_anchor_against_plaintext(
         "plaintext_sha256": _sha256(folded_text.encode("utf-8")),
         "verified_passage_id": (
             "passage:" + _sha256(folded_passage.encode("utf-8"))[:16]
-            if occurrences >= 1 and not locator_present else "passage:anchor_missing"
+            if occurrences == 1 and locator_present else "passage:anchor_missing"
         ),
     }
 
@@ -368,6 +395,16 @@ def build_r1_return_from_anchor(
              "corpus: provenance not in allowed set: " + provenance)
     _require(verification.get("passage_present") is True,
              "corpus: anchor passage missing from plaintext")
+    _require(verification.get("passage_occurrences") == 1
+             and verification.get("duplicate_passage") is False,
+             "corpus: non-unique or unverified passage anchor")
+    _require(verification.get("locator_present") is True,
+             "corpus: declared locator missing from plaintext")
+    _require(str(verification.get("verified_passage_id", "")).startswith("passage:")
+             and verification.get("verified_passage_id") != "passage:anchor_missing",
+             "corpus: passage id was not verified")
+    _require(ingest.parse_confidence != PARSE_CONF_UNREADABLE,
+             "corpus: source is unreadable, no reliable passage")
     _require(work_order.get("source_sha256") == source_sha256,
              "corpus: manuscript sha256 drift; refusing to mint witness")
     payload: dict[str, Any] = {
