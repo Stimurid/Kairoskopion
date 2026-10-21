@@ -293,3 +293,76 @@ def test_reopen_rejects_positive_observation_and_invalid_level(tmp_path):
             "subject_id": "opp-e", "source_ref": "doi:new",
             "reopen_level": "L9", "author_gate": "AUTHOR_REVIEW_REQUIRED",
         })
+
+
+
+def test_immutable_graph_identity_atomic_no_clobber_on_race(tmp_path, monkeypatch):
+    """Force a rival writer to win between our tmp write and atomic link."""
+    import json
+    import os
+
+    graph = OpportunityGraphStore(tmp_path)
+    pending = {
+        "id": "same", "revision": "v1", "source_ref": "doi:pending",
+        "source_kind": "PUBLISHED_ARTICLE",
+        "read_depth": "INDEX_ONLY", "full_text_certified": False,
+        "passage_anchors": [],
+    }
+    winner = {**pending, "kind": "Evidence", "source_ref": "doi:other-author"}
+    def rival_wins(tmp, dest):
+        # Same identity, DIFFERENT evidence. Old tmp.replace() clobbered this.
+        from pathlib import Path
+        Path(dest).write_text(json.dumps(winner), encoding="utf-8")
+        raise FileExistsError("competing writer created immutable record first")
+    monkeypatch.setattr(os, "link", rival_wins)
+    with pytest.raises(ValueError, match="immutable identity"):
+        graph.put("Evidence", pending)
+    assert graph.get("Evidence", "same", "v1") == winner
+    assert not list(graph.records.glob("*.pending"))
+
+
+def test_immutable_graph_race_identical_writer_returns_existing(tmp_path, monkeypatch):
+    import json
+    import os
+
+    graph = OpportunityGraphStore(tmp_path)
+    record = {
+        "id": "same", "revision": "v1", "source_ref": "doi:seen",
+        "source_kind": "PUBLISHED_ARTICLE", "read_depth": "INDEX_ONLY",
+        "passage_anchors": [],
+    }
+    def equal_rival_wins(tmp, dest):
+        from pathlib import Path
+        Path(dest).write_text(
+            json.dumps({"kind": "Evidence", **record}), encoding="utf-8",
+        )
+        raise FileExistsError("same immutable identity already won")
+    monkeypatch.setattr(os, "link", equal_rival_wins)
+    assert graph.put("Evidence", record)["source_ref"] == "doi:seen"
+    assert len(graph.list_records("Evidence")) == 1
+    assert not list(graph.records.glob("*.pending"))
+
+
+def test_parallel_graph_immutable_writers_never_overwrite_each_other(tmp_path):
+    """Real competing writers, not relying on a timing-sensitive interleave."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    g = OpportunityGraphStore(tmp_path)
+    def write(index):
+        try:
+            return g.put("Evidence", {
+                "id": "one", "revision": "v1", "source_ref": f"doi:source-{index}",
+                "source_kind": "PUBLISHED_ARTICLE", "read_depth": "INDEX_ONLY",
+                "passage_anchors": [],
+            })
+        except ValueError as exc:
+            assert "same immutable identity" in str(exc)
+            return None
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(pool.map(write, range(12)))
+    winners = [r for r in results if r is not None]
+    assert len(winners) >= 1
+    assert len(g.list_records("Evidence")) == 1
+    assert g.list_records("Evidence")[0]["source_ref"] == winners[0]["source_ref"]
+    assert all(x["source_ref"] == winners[0]["source_ref"] for x in winners)
+    assert not list(g.records.glob("*.pending"))

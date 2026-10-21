@@ -254,15 +254,36 @@ class OpportunityGraphStore:
 
     @staticmethod
     def _write_once(path: Path, obj: dict[str, Any]) -> dict[str, Any]:
-        if path.exists():
-            existing = json.loads(path.read_text(encoding="utf-8"))
-            if _canonical(existing) != _canonical(obj):
-                raise ValueError("same immutable identity used with different content")
-            return existing
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
-        tmp.replace(path)
-        return obj
+        """Publish immutable identity by atomic create-if-absent, never replace.
+
+        os.replace() permits two concurrent processes to silently overwrite an
+        immutable (kind,id,revision) or event_id with different content.
+        os.link() is an atomic no-clobber create on the local filesystem;
+        an existing identity MUST be read back and compared instead.
+        """
+        import os
+        import tempfile
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=path.name + ".", suffix=".pending", dir=path.parent,
+        )
+        tmp = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as out:
+                out.write(json.dumps(obj, ensure_ascii=False, indent=2))
+                out.flush()
+                os.fsync(out.fileno())
+            try:
+                os.link(tmp, path)
+            except FileExistsError:
+                existing = json.loads(path.read_text(encoding="utf-8"))
+                if _canonical(existing) != _canonical(obj):
+                    raise ValueError("same immutable identity used with different content")
+                return existing
+            return obj
+        finally:
+            tmp.unlink(missing_ok=True)
 
     def put(self, kind: str, record: dict[str, Any]) -> dict[str, Any]:
         value = validate_record(kind, record)

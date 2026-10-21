@@ -27,9 +27,9 @@ def main() -> int:
                         help="Private TRM040 native Docs store for sources marked capture_transport=native_docs")
     parser.add_argument("--manual-w1-reopen", action="store_true")
     parser.add_argument("--owner-prior-research-receipt", type=Path,
-                        help="Previously executed owner-private research receipt, held and verified")
+                        help="L3-only: verified owner-private code-v07 prior science receipt; all decisions HELD")
     parser.add_argument("--owner-prior-graph-root", type=Path,
-                        help="Exact private previous Kairon graph root, NOT a new research engine")
+                        help="L3-only: exact prior code-v07 graph root, not an autonomous research engine")
     args = parser.parse_args()
     if bool(args.owner_prior_research_receipt) != bool(args.owner_prior_graph_root):
         parser.error("owner prior-research receipt and graph root must be supplied together")

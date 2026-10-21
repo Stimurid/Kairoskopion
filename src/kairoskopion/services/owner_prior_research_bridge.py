@@ -307,6 +307,28 @@ def _import_owner_prior_science_unlocked(
         old = json.loads(_private_file(path).decode("utf-8"))
         if old.get("source_receipt_sha256") != pin:
             raise ValueError("prior L3 science route checkpoint points to different receipt")
+    # Intent is durable BEFORE any graph writes. A crash may leave provisional
+    # evidence behind, but the absent completion receipt marks it INCOMPLETE.
+    # The same CLI invocation resumes from these immutable identities; it
+    # must never create an ArticleSeed or silently steal a stale writer lock.
+    intent_path = path.with_name("intent.json")
+    intent_bytes = _canon({
+        "schema": "TRM074_PRIOR_SCIENCE_INTENT_V1",
+        "case_id": case_id, "source_receipt_sha256": pin,
+        "owner_note_sha256": verified["source_w2_raw_sha"],
+        "author_gate": "HOLD",
+        "semantic_status": "STAGING_UNTIL_COMPLETION_RECEIPT",
+        "publication_send": "DISABLED",
+    })
+    if intent_path.exists() and intent_path.read_bytes() != intent_bytes:
+        raise ValueError("owner prior import intent is pinned to other source bytes")
+    if not intent_path.exists():
+        intent_path.parent.mkdir(parents=True, exist_ok=True)
+        intent_tmp = intent_path.with_suffix(".pending")
+        intent_tmp.write_bytes(intent_bytes)
+        os.replace(intent_tmp, intent_path)
+    if intent_path.read_bytes() != intent_bytes:
+        raise ValueError("owner prior science intent was not durably recorded")
     for work in verified["opponents"]:
         graph.put("Evidence", {
             "id": "trm074-l3-ref-"+_sha(("doi:"+work["doi"]).encode("utf-8"))[:20],
@@ -411,6 +433,15 @@ def readback_owner_prior_science(factory_storage_root: str | Path) -> dict[str, 
     receipt=json.loads(data.decode("utf-8"))
     if receipt.get("schema")!=SCHEMA or receipt.get("author_gate")!="HOLD":
         raise ValueError("owner science import readback schema/authority invalid")
+    intent_path = path.with_name("intent.json")
+    intent = json.loads(_private_file(intent_path).decode("utf-8"))
+    if (intent.get("schema") != "TRM074_PRIOR_SCIENCE_INTENT_V1"
+            or intent.get("case_id") != receipt.get("case_id")
+            or intent.get("source_receipt_sha256") != receipt.get("source_receipt_sha256")
+            or intent.get("owner_note_sha256") != receipt.get("w2_source_sha256")
+            or intent.get("author_gate") != "HOLD"
+            or intent.get("publication_send") != "DISABLED"):
+        raise ValueError("owner prior science import intent/receipt mismatch")
     proof=_legacy_evidence(Path(receipt["source_receipt_path"]),
                            Path(receipt["legacy_graph_root"]),storage)
     if (proof["source_receipt_sha256"] != receipt["source_receipt_sha256"]

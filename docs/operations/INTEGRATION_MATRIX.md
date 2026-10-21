@@ -154,3 +154,40 @@ deep source reading, scholarly novelty adjudication, explicit author
 decision, journal fit and permitted publications remain open.
 The previous V01 private outputs are immutable and preserved as
 historical receipts; V02 uses a fresh isolated storage root.
+
+
+## Independent Claude Code read-only review of PR46 b29a7b2, 2026-10-21
+
+A distinct model reviewed eight public code/tests/docs files and returned
+CHANGES_REQUIRED. **This is a review of the earlier SHA b29a7b2**,
+not acceptance of the subsequent repair. Full report and input log remain
+owner-private on AORUS; no original manuscripts or owner private source
+carriers were made available to reviewer.
+
+- P1 CONFIRMED: global OpportunityGraphStore._write_once previously used
+  exists/read then temp.replace, permitting concurrent immutable-ID overwrite.
+  REPAIRED: unique temp + fsync + atomic os.link no-clobber, then compare
+  actual winner; stable bytes stay untouched. Three targeted regressions
+  include a forced incompatible racing writer, equal-content conflict and
+  actual parallel competing writers.
+- P2 RECOVERY: prior L3 bridge writes multiple provisional graph records
+  before final receipt. Explicit owner-private immutable intent.json now
+  precedes graph writes; absence of receipt means INCOMPLETE.
+  Injected failure after both Evidence records confirms no completion
+  receipt, and rerunning EXACT same one-command operation automatically
+  resumes and yields one graph set and verified receipt without duplicates.
+  A hard crash may strand exclusive lock; intentional fail-closed manual
+  inspection is required before replay. This is recoverable-on-reinvoke,
+  NOT a general ACID multi-object transaction, and readers must gate on
+  completion receipt. Original published DOI notes never gain manuscript
+  acceptance.
+- P2 SCOPE: the prior science adapter is deliberately L3-specific; new
+  unrelated corpora still need explicit schema/contract instead of lying
+  about generic admission. CLI options mean "import verified L3 legacy
+  research"; no general legacy-research promise.
+- P3 OPEN: parent-junction ancestry verification across platform mounts
+  and event ordering (lexicographic event_id without explicit timestamp)
+  remain backlog hygiene; SHA-pin tampering checks are enforced.
+
+Do not mark INDEPENDENT_RE_REVIEW=PASS until a distinct second review of
+the repaired SHA. Production and deep field-science gates remain open.

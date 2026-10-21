@@ -333,3 +333,54 @@ def test_successful_writer_removes_own_lock(tmp_path):
     lock = (storage / "research_stage" / "L3-CORPUS-20261020"
             / "L3-PRIOR-SCIENCE-IMPORT" / ".owner-prior-import.lock")
     assert not lock.exists()
+
+
+
+def test_mid_import_error_can_be_resumed_without_duplicate_graph_writes(tmp_path, monkeypatch):
+    """Independent reviewer P2: missing receipt = incomplete, CLI rerun repairs."""
+    source, legacy, storage, _ = _seed_synthetic_owner_science(tmp_path)
+    original = OpportunityGraphStore.append_event
+    failed = {"yes": False}
+
+    def fail_after_both_evidence(self, event):
+        if event.get("kind") == "SOURCE_CONTRADICTION" and not failed["yes"]:
+            failed["yes"] = True
+            raise RuntimeError("simulated crash after two Evidence writes")
+        return original(self, event)
+
+    monkeypatch.setattr(OpportunityGraphStore, "append_event", fail_after_both_evidence)
+    with pytest.raises(RuntimeError, match="simulated crash"):
+        import_owner_prior_science(source, legacy, storage)
+
+    folder = (storage/"research_stage"/"L3-CORPUS-20261020"
+              /"L3-PRIOR-SCIENCE-IMPORT")
+    assert (folder/"intent.json").is_file()
+    assert not (folder/"receipt.json").exists()
+    assert not (folder/".owner-prior-import.lock").exists()
+    assert len(OpportunityGraphStore(storage).list_records("Evidence")) == 2
+    with pytest.raises(ValueError, match="owner private frozen source/receipt absent"):
+        readback_owner_prior_science(storage)
+
+    monkeypatch.setattr(OpportunityGraphStore, "append_event", original)
+    first = import_owner_prior_science(source, legacy, storage)
+    second = import_owner_prior_science(source, legacy, storage)
+    assert first == second and first["readback_verified"] is True
+    graph = OpportunityGraphStore(storage)
+    assert len(graph.list_records("Evidence")) == 2
+    assert len(graph.replay_events()) == 2
+    assert len(graph.list_records("HuntTrace")) == 1
+    assert readback_owner_prior_science(storage)["verified"] is True
+
+
+def test_tampered_prior_import_intent_is_not_accepted_as_complete(tmp_path):
+    source, legacy, storage, _ = _seed_synthetic_owner_science(tmp_path)
+    import_owner_prior_science(source, legacy, storage)
+    intent = (storage/"research_stage"/"L3-CORPUS-20261020"
+              /"L3-PRIOR-SCIENCE-IMPORT"/"intent.json")
+    receipt = json.loads(intent.read_text(encoding="utf-8"))
+    receipt["author_gate"] = "ACCEPT"
+    _json(intent, receipt)
+    with pytest.raises(ValueError, match="intent/receipt mismatch"):
+        readback_owner_prior_science(storage)
+    with pytest.raises(ValueError, match="intent is pinned to other source bytes"):
+        import_owner_prior_science(source, legacy, storage)
