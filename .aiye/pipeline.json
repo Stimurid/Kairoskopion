@@ -1,0 +1,4 @@
+{
+  "version": 1,
+  "test_command": "python scripts/run_project_qa.py"
+}

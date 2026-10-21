@@ -1,10 +1,12 @@
 # Project Status — Kairoskopion
 
 **2026-10-21 isolated TRM-CITE-001 R1 continuation:** `services/citation_r1.py`
-adds a local request/return consumer with immutable readback and guarded V1
-proposals. This is an untested code candidate in the PR56 pinned worktree:
-Python execution and the external five-case inputs were unavailable to this
-delegated sandbox. No source passage, 13-order run, or scientific PASS is claimed.
+retains the Z0 request/return consumer. `citation_r1_batch.py` adds the missing
+13-task followup import, Z0 linkage, unanchored author-source needs, immutable
+negative return and per-task readback. This remains an unexecuted code candidate:
+Python execution and private five-case inputs were unavailable in this delegated
+sandbox. No source passage, actual 13-task run, pytest pass, Hub pass, or scientific
+PASS is claimed.
 See `docs/TRM_CITE_R1_RETURN.md`.
 
 **Last updated:** 2026-07-09 (post-P10 operational harvest merge + LLM hardening + intake metadata)

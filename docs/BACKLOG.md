@@ -1,10 +1,11 @@
 # Engineering Backlog — Kairoskopion
 
-**TRM-CITE-001 R1 continuation (2026-10-21):** Run the new local consumer on
-the owner-validated 13 work orders after checking the supplied hashes; acquire
-the Luckin and Descartes witnesses through an authorized provider; compare
-all five machine states to manual R1 protocols; run tests and independent
-review. The isolated worktree contains the consumer but no verified live run.
+**TRM-CITE-001 R1 continuation (2026-10-21):** Run the task batch on the
+owner's 13 private followups after checking the supplied hashes and compare
+the expected 13/4/3/5 counts. Acquire Luckin and Descartes witnesses only
+through an authorized provider, then independently review V1–V5 and the five
+manual protocols. Run pytest and Hub QA. The isolated worktree has no verified
+live run.
 
 **Last updated:** 2026-06-14 (Mavrinsky golden-run integration pass)
 
