@@ -17,6 +17,11 @@ DEPTHS = {"SEARCH_RESULT", "PUBLISHER_ABSTRACT", "SECTION_TEXT",
           "ANCHORED_PASSAGE", "FULL_BOOK", "NONE"}
 OUTCOMES = {"OBSERVED", "BLOCKED", "ERROR", "NEGATIVE"}
 MODES = {"PARAPHRASE", "QUOTE", "UNKNOWN"}
+KNOWN_WITNESS_CLASSES = frozenset({
+    "LIVE_AUTHORIZED_SOURCE_READ",
+    "MANUAL_WEB_OBSERVED",
+    "SYNTHETIC_TEST",
+})
 
 
 def _digest(raw: bytes) -> str:
@@ -116,6 +121,13 @@ def _validate_return(request: dict, ret: dict) -> None:
     if ret["outcome"] == "OBSERVED":
         if not ret.get("acquisition_authorized") or not ret.get("provider") or ret["provider"] == "NONE":
             raise ValueError("Observed source lacks authorized provider")
+        wc = ret.get("witness_class")
+        if not isinstance(wc, str) or not wc:
+            raise ValueError("Observed source lacks witness_class")
+        if wc not in KNOWN_WITNESS_CLASSES:
+            raise ValueError(
+                "Observed source has unknown witness_class: " + repr(wc)
+            )
         for key in ("source_kind", "retrieved_at", "access", "license", "work_id",
                     "edition_id", "witness_id", "locator"):
             if not ret.get(key):

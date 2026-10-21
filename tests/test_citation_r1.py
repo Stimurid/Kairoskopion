@@ -96,6 +96,7 @@ def test_observation_is_proposal_not_scientific_pass(tmp_path):
         "locator": "abstract", "source_author_claim": "sample claim",
         "article_author_claim": "stronger sample claim",
         "citation_mode": "PARAPHRASE",
+        "witness_class": "MANUAL_WEB_OBSERVED",
     }
     path = tmp_path / "ret.json"
     path.write_text(json.dumps(ret))

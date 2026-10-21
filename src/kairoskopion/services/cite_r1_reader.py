@@ -689,12 +689,22 @@ def run_batch(
     allowed_hosts: frozenset[str] = DEFAULT_ALLOWED_HOSTS,
     test_mode: bool = False,
     live_fetcher=acquire_live_witness,
+    accept_preplaced: bool = False,
 ) -> dict[str, Any]:
     """Run the provider across an entire request batch.
 
     Each ``*.request.json`` produces one ``*.return.json``; the consumer
     will then correlate the batch.  The provider never mutates
     ``audit_path`` or any Z0 artifact.
+
+    B-1: When ``provider_summary.json`` is absent, this is treated as a
+    cold start.  Any ``*.return.json`` already in ``output_dir`` MUST
+    carry the new run's ``transport_run_id``; an unauthenticated return
+    file cannot graduate into OBSERVED simply by sitting there.  The
+    operator may explicitly opt in via ``accept_preplaced=True`` after
+    reviewing the directory, but the default refuses pre-existing
+    files with the new run id's mismatch to keep the partial-run
+    forge path closed.
     """
     work_orders, requests = _read_batch_inputs(audit_path, queue_path, request_dir)
     prior_summary = output_dir / "provider_summary.json"
@@ -711,12 +721,18 @@ def run_batch(
                 raise ValueError("Persisted return was modified after completion")
         if prior.get("tasks") != len(requests):
             raise ValueError("Persisted provider summary differs from request batch")
+        _require_known_witness_classes_in_return_dir(output_dir)
         return prior
     provider = SourceReaderProvider(
         permits=permits, fixtures_dir=fixtures_dir, allowed_hosts=allowed_hosts,
         test_mode=test_mode, live_fetcher=live_fetcher,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
+    _enforce_cold_start_no_preplaced(
+        output_dir=output_dir, run_id=provider.run_id,
+        expected_task_ids=set(requests),
+        accept_preplaced=accept_preplaced,
+    )
     summary = {"schema": "trm-cite-r1-batch-provider-summary-v1",
                "audit_sha256": None, "queue_sha256": None,
                "tasks": 0, "observed": 0, "blocked": 0,
@@ -734,6 +750,12 @@ def run_batch(
                           "work_order_ids", "correlation_id"):
                 if ret.get(field) != request.get(field):
                     raise ValueError("Existing immutable return correlation mismatch")
+            existing_run = ret.get("transport_run_id")
+            if existing_run != provider.run_id:
+                raise ValueError(
+                    "Existing return was minted by another run: "
+                    + target.name + " " + repr(existing_run)
+                )
         else:
             ret = provider.read_request(request, work_orders)
             _write_immutable(target, _json_dumps(ret))
@@ -748,7 +770,80 @@ def run_batch(
     summary["stats"] = provider.stats.to_dict()
     target = output_dir / "provider_summary.json"
     _write_immutable(target, _json_dumps(summary))
+    _require_known_witness_classes_in_return_dir(output_dir)
     return summary
+
+
+def _enforce_cold_start_no_preplaced(
+    *,
+    output_dir: Path,
+    run_id: str,
+    expected_task_ids: set[str],
+    accept_preplaced: bool,
+) -> None:
+    """B-1: refuse to adopt pre-existing returns when no provider summary exists.
+
+    The previous behaviour was "if a return is already there, read it back"
+    which silently trusted any forged or partial-run file.  We now treat
+    cold starts as a fresh process: every existing ``*.return.json``
+    must carry the new ``transport_run_id`` (i.e. it can only have been
+    written by ``SourceReaderProvider`` we just constructed).  A
+    requested task id that we never got to write is also a problem;
+    the operator must opt in explicitly via ``accept_preplaced=True``
+    if the directory was left over from a prior, valid run.
+    """
+    if accept_preplaced:
+        return
+    for path in sorted(output_dir.glob("*.return.json")):
+        try:
+            ret = json.loads(path.read_text(encoding="utf-8-sig"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                "B-1: cold start refuses malformed preplaced return "
+                + path.name + " (" + str(exc) + ")"
+            ) from exc
+        if not isinstance(ret, dict):
+            raise ValueError(
+                "B-1: cold start refuses non-object preplaced return "
+                + path.name
+            )
+        task_id = ret.get("task_id") or path.stem
+        if task_id not in expected_task_ids:
+            raise ValueError(
+                "B-1: cold start refuses preplaced return for unknown "
+                "task " + path.name
+            )
+        existing_run = ret.get("transport_run_id")
+        if existing_run != run_id:
+            raise ValueError(
+                "B-1: cold start refuses preplaced return whose run id "
+                "mismatches this provider (" + path.name + " had "
+                + repr(existing_run) + ", expected " + repr(run_id) + ")"
+            )
+
+
+def _require_known_witness_classes_in_return_dir(output_dir: Path) -> None:
+    """M-2 helper: refuse ``*.return.json`` whose witness_class is not in
+    the R1 known enum.  Both the cold-start and warm-replay paths run
+    this so tampered return files cannot punch a hole through to
+    production R1 with an unknown class label.
+    """
+    for path in sorted(output_dir.glob("*.return.json")):
+        try:
+            ret = json.loads(path.read_text(encoding="utf-8-sig"))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(ret, dict):
+            continue
+        if ret.get("outcome") != "OBSERVED":
+            continue
+        from .citation_r1 import KNOWN_WITNESS_CLASSES as _KNOWN
+        wc = ret.get("witness_class")
+        if not isinstance(wc, str) or wc not in _KNOWN:
+            raise ValueError(
+                "M-2: return has unknown witness_class at "
+                + path.name + ": " + repr(wc)
+            )
 
 
 # ---------------------------------------------------------------------------

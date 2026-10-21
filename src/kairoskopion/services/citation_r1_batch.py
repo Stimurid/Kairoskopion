@@ -19,6 +19,167 @@ def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+KNOWN_WITNESS_CLASSES: frozenset[str] = frozenset({
+    "LIVE_AUTHORIZED_SOURCE_READ",
+    "MANUAL_WEB_OBSERVED",
+    "SYNTHETIC_TEST",
+})
+
+
+def _require_known_witness_class(value: str | None, label: str) -> None:
+    """Reject an unknown, missing, or empty witness_class on a return envelope.
+
+    M-1: the previous consumer accepted any non-SYNTHETIC value, including
+    None, empty strings, and arbitrary junk names.  An honest R1 seal
+    only recognises the three classes above; everything else is treated
+    as a forged or partially filled envelope and refused with a typed
+    reason that names the offending field.
+    """
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{label}: witness_class must be a non-empty string")
+    if value not in KNOWN_WITNESS_CLASSES:
+        raise ValueError(
+            f"{label}: unknown witness_class {value!r}; "
+            f"allowed={sorted(KNOWN_WITNESS_CLASSES)}"
+        )
+
+
+def recompute_summary_from_returns(return_dir: Path) -> dict[str, Any]:
+    """M-2: derive the truth from the immutable return bytes.
+
+    A ``provider_summary.json`` file is convenient but anyone who can
+    write the directory can rewrite that single file.  The real
+    evidence is the per-task ``*.return.json`` set, so this helper
+    rebuilds the summary strictly from those bytes, computing:
+
+    * per-task outcome counts (OBSERVED / BLOCKED / ERROR / NEGATIVE);
+    * per-task SHA-256 digest of the on-disk return;
+    * the per-task outcome's reason distribution;
+    * the aggregate observed/blocked counters and the witness-class
+      distribution across all observed tasks.
+
+    The function never reads or trusts ``provider_summary.json``; the
+    caller is expected to compare the recomputed result against the
+    stored summary (or to use the recomputed result directly when no
+    stored summary exists).  The digest map is keyed by ``task_id``
+    from the JSON content, matching how the provider records digests.
+    """
+    return_dir = Path(return_dir)
+    summary: dict[str, Any] = {
+        "schema": "trm-cite-r1-batch-recomputed-v1",
+        "tasks": 0,
+        "observed": 0,
+        "blocked": 0,
+        "errors": 0,
+        "negatives": 0,
+        "reasons": {},
+        "witness_class_distribution": {},
+        "return_digests": {},
+        "outcomes": {},
+    }
+    if not return_dir.exists():
+        return summary
+    for path in sorted(return_dir.glob("*.return.json")):
+        raw = path.read_bytes()
+        try:
+            ret = json.loads(raw)
+        except json.JSONDecodeError:
+            ret = None
+        task_id = None
+        if isinstance(ret, dict):
+            task_id = ret.get("task_id") or path.stem
+        else:
+            task_id = path.stem
+        summary["return_digests"][task_id] = _sha(raw)
+        if not isinstance(ret, dict):
+            summary["tasks"] += 1
+            summary["blocked"] += 1
+            summary["outcomes"][task_id] = "BLOCKED"
+            summary["reasons"]["MALFORMED_RETURN"] = (
+                summary["reasons"].get("MALFORMED_RETURN", 0) + 1
+            )
+            continue
+        summary["tasks"] += 1
+        outcome = ret.get("outcome")
+        if outcome == "OBSERVED":
+            summary["observed"] += 1
+            wc = ret.get("witness_class") or "UNKNOWN"
+            distribution = summary["witness_class_distribution"]
+            distribution[wc] = distribution.get(wc, 0) + 1
+        else:
+            if outcome == "ERROR":
+                summary["errors"] += 1
+            elif outcome == "NEGATIVE":
+                summary["negatives"] += 1
+            else:
+                summary["blocked"] += 1
+            reason = ret.get("reason") or "UNKNOWN"
+            summary["reasons"][reason] = summary["reasons"].get(reason, 0) + 1
+        summary["outcomes"][task_id] = outcome or "MISSING"
+    return summary
+
+
+def verify_provider_summary(
+    return_dir: Path,
+    *,
+    expected_run_id: str | None = None,
+) -> dict[str, Any]:
+    """M-2: refuse a stored ``provider_summary.json`` whose claims do not
+    match what the immutable return bytes actually contain.
+
+    Returns the recomputed summary.  When a stored summary is present
+    it is hashed against the recomputed one on three counts:
+
+    * ``observed`` and ``blocked`` totals,
+    * ``tasks`` count,
+    * per-task ``return_digests`` table.
+
+    A mismatch raises ``ValueError`` so the consumer treats the
+    batch as untrusted.  When no stored summary exists, the recomputed
+    summary is returned untouched — the consumer will use it directly
+    as the authoritative roll-up.
+
+    ``expected_run_id`` lets the caller require that every persisted
+    return carry a specific provider ``transport_run_id``.  This is
+    extra defence: a stale directory from a different provider cannot
+    be smuggled in even if the per-task digests coincidentally match.
+    """
+    return_dir = Path(return_dir)
+    truth = recompute_summary_from_returns(return_dir)
+    stored_path = return_dir / "provider_summary.json"
+    if not stored_path.exists():
+        return truth
+    stored = json.loads(stored_path.read_text(encoding="utf-8-sig"))
+    if not isinstance(stored, dict):
+        raise ValueError("M-2: stored provider_summary.json is not a JSON object")
+    for key in ("observed", "blocked", "tasks"):
+        if stored.get(key) != truth.get(key):
+            raise ValueError(
+                f"M-2: stored provider_summary.{key} = {stored.get(key)} "
+                f"!= recomputed {truth.get(key)}; counts were tampered"
+            )
+    for task_id, digest in truth["return_digests"].items():
+        if stored.get("return_digests", {}).get(task_id) != digest:
+            raise ValueError(
+                f"M-2: stored provider_summary.return_digests[{task_id}] "
+                f"drifted from immutable bytes"
+            )
+    if expected_run_id is not None:
+        for path in sorted(return_dir.glob("*.return.json")):
+            ret = json.loads(path.read_text(encoding="utf-8-sig"))
+            if not isinstance(ret, dict):
+                continue
+            if ret.get("outcome") != "OBSERVED":
+                continue
+            existing = ret.get("transport_run_id")
+            if existing != expected_run_id:
+                raise ValueError(
+                    "M-2: return " + path.name + " carries stale "
+                    "transport_run_id " + repr(existing)
+                )
+    return truth
+
+
 def _lines(path: Path) -> list[dict]:
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
     if any(not isinstance(row, dict) for row in rows):
@@ -123,6 +284,7 @@ def consume(audit: Path, queue: Path, followups: Path, protocols: Path,
             expected_sha: str | None = None) -> dict:
     rows, orders, cases = _inputs(audit, queue, followups, protocols, expected_sha)
     expected = prepare(audit, queue, followups, protocols, request_dir, expected_sha)
+    truth = verify_provider_summary(Path(return_dir))
     if _json(request_dir / "manifest.json") != expected:
         raise ValueError("Batch manifest mismatch")
     out.mkdir(parents=True, exist_ok=True)
@@ -144,11 +306,15 @@ def consume(audit: Path, queue: Path, followups: Path, protocols: Path,
                 raise ValueError("Observed return lacks source evidence")
             if ret.get("test_only") or ret.get("witness_class") == "SYNTHETIC_TEST":
                 raise ValueError("Synthetic evidence cannot enter production R1")
+            _require_known_witness_class(ret.get("witness_class"),
+                                         "task return witness_class")
             for item in evidence:
                 if not isinstance(item, dict):
                     raise ValueError("Evidence item is not an object")
                 if item.get("test_only") or item.get("witness_class") == "SYNTHETIC_TEST":
                     raise ValueError("Synthetic witness cannot enter production R1")
+                _require_known_witness_class(item.get("witness_class"),
+                                             "evidence witness_class")
                 order_id = item.get("work_order_id")
                 if order_id is None and len(req["work_order_ids"]) == 1:
                     order_id = req["work_order_ids"][0]
@@ -212,7 +378,20 @@ def consume(audit: Path, queue: Path, followups: Path, protocols: Path,
               "scientific_status": "NO_EVIDENCE_ALL_BLOCKED" if all(
                   _json(out / (r["task_id"] + ".state.json"))["outcome"] == "BLOCKED" for r in rows
               ) else "AWAITING_INDEPENDENT_SCIENTIFIC_REVIEW",
-              "manual_comparison": "STRUCTURAL_ONLY_AUTHOR_REVIEW_REQUIRED"}
+              "manual_comparison": "STRUCTURAL_ONLY_AUTHOR_REVIEW_REQUIRED",
+              "provider_summary_truth": {
+                  "recomputed_tasks": truth["tasks"],
+                  "recomputed_observed": truth["observed"],
+                  "recomputed_blocked": truth["blocked"],
+                  "recomputed_reasons": truth["reasons"],
+                  "witness_class_distribution": truth["witness_class_distribution"],
+                  "match_observed": truth["observed"] == sum(
+                      _json(out / (r["task_id"] + ".state.json"))["outcome"] == "OBSERVED"
+                      for r in rows),
+                  "match_blocked": truth["blocked"] == sum(
+                      _json(out / (r["task_id"] + ".state.json"))["outcome"] == "BLOCKED"
+                      for r in rows),
+              }}
     _write_immutable(out / "result.json", (json.dumps(result, sort_keys=True) + "\n").encode())
     return result
 

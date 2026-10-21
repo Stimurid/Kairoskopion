@@ -108,6 +108,7 @@ def test_observed_evidence_real_correlation_and_limited_science(tmp_path):
         "source_kind": "SYNTHETIC_PUBLIC_PRIMARY",
         "access": "READABLE_FULL", "license": "CC0_TEST_FIXTURE",
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "witness_class": "MANUAL_WEB_OBSERVED",
         "source_evidence": [{
             "work_order_id": req["work_order_ids"][0],
             "intake_id": order["intake_id"], "z0_case_id": order["case_id"],
@@ -117,6 +118,7 @@ def test_observed_evidence_real_correlation_and_limited_science(tmp_path):
             "provider": "SYNTHETIC_AUTHORIZED_FIXTURE",
             "retrieved_at": datetime.now(timezone.utc).isoformat(),
             "acquisition_authorized": True,
+            "witness_class": "MANUAL_WEB_OBSERVED",
             "work_id": "work-fixture", "edition_id": "edition-fixture",
             "witness_id": "witness-fixture", "locator": "p.1 exact",
             "passage_id": "passage-fixture", "byte_sha256": "a" * 64
@@ -147,10 +149,12 @@ def test_observed_wrong_intake_and_compound_without_order_rejected(tmp_path):
         "acquisition_authorized": True, "read_depth": "ANCHORED_PASSAGE",
         "retrieved_at": datetime.now(timezone.utc).isoformat(),
         "source_kind": "SYNTHETIC_PRIMARY", "access": "READABLE_FULL", "license": "CC0",
+        "witness_class": "MANUAL_WEB_OBSERVED",
         "source_evidence": [{
             "work_order_id": req["work_order_ids"][0], "intake_id": "forged",
             "work_id": "a", "edition_id": "b", "witness_id": "c",
-            "locator": "p1", "passage_id": "p", "byte_sha256": "a"*64
+            "locator": "p1", "passage_id": "p", "byte_sha256": "a"*64,
+            "witness_class": "MANUAL_WEB_OBSERVED",
         }]
     })
     rp.write_text(json.dumps(ret))
