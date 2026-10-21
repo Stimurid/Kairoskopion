@@ -1,0 +1,28 @@
+Source: BMC Medical Education (Springer open-access)
+URI: https://link.springer.com/article/10.1186/s41239-019-0171-0
+Witness: springer-bmc-med-edu-2019-0171 abstract page
+Edition: BMC Medical Education 19:113 (2019)
+License: Open Access — CC-BY 4.0 (publisher-declared)
+
+==============================================================================
+Using intelligent tutoring systems for educational purposes
+==============================================================================
+
+Abstract:
+Intelligent tutoring systems (ITS) are computer programs that are
+designed to simulate a human tutor's behaviour when guiding a student.
+We review literature on ITS with a particular focus on the educational
+purpose of these tools. The review covers 96 articles published between
+2010 and 2018 and synthesizes reported effects on learner outcomes,
+instructional design choices, and evaluation methods. The analysis
+specifically addresses the question of how ITS performance is
+transferred to classroom practice and reports mixed evidence for
+practice-transfer effects in a typical school deployment.
+
+[NOTE: this fixture ships only with the abstract level.  An OBSERVED
+return against this fixture must declare read_depth = PUBLISHER_ABSTRACT
+and must not claim passage_anchor for any unverified excerpt.  The text
+"Using intelligent tutoring systems for educational purposes" is the
+machine-correct title; verbatim quote claims require the live URL.]
+
+— end of fixture —

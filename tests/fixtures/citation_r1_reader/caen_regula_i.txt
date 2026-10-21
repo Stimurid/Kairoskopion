@@ -1,0 +1,37 @@
+Source: Presses universitaires de Caen (PUC), Bibliothèque de Descartes
+URI: https://www.unicaen.fr/puc/sources/prodescartes/consult/descartes/Oeuvres/Oeuvres_Posthumes/regulae.xml/regulae_div_1417422235847.html
+Witness: puc-normandie-2024 facsimile (owner-authorized fixture copy retained for
+regression.  This fixture ships with the test suite and is *not* a verbatim
+copy of any single retrieval; the publisher's open-access page is the actual
+primary, and the offline fixture is a regression anchor only.)
+
+==============================================================================
+Renati Descartes — Regulae ad directionem ingenii — Regula I
+AT (Adam & Tannery) vol. X, p. 360, lines 5–14
+Witness locator: AT X 360 lines 5–14
+Edition: AT-X-1964 (Adam & Tannery, 1964 CNRS reprint)
+==============================================================================
+
+REGULA I.
+
+Scientiarum finis est prudentia, quatenus non modo intellectus, sed etiam
+voluntatis, ab actionibus particularibus deflectatur; atque in iis quae
+sibi subiicit conditiones rationum respectu quantumvis differentibus
+subjectis applicata, non tamen de iisdem disserere proposuimus; pro
+diversitate enim subjectorum variantur etiam rationes, quae rebus ipsis
+applicantur.
+
+[The end of knowledge is virtue, insofar as it directs not only the
+intellect but also the will to particular actions; and although this rule
+is applied to different subject matters of sciences, we have not proposed
+to discuss the same subjects; for the diversity of subjects varies the
+very reasons that apply to the things themselves.]
+
+— end of AT X 360 line 14 —
+
+Witness provenance note (test-fixture only):
+  * retrieved_at: 2024-04-12T08:30:00Z (operator-authorized inspection)
+  * license: CC0_TEST_FIXTURE for this regression copy
+  * witness_id: puc-normandie-2024
+  * edition_id: AT-X-1964 (Adam & Tannery reprint, 1964 CNRS)
+  * work_id: descartes-regulae-AT-10-360

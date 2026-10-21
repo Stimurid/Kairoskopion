@@ -6,6 +6,24 @@ Status: **PARTIAL; operator execution and independent scientific review pending*
 
 This delegated workspace could not read the off-worktree private inputs, call a permitted source reader, write the private run directory, or launch Python (`uv trampoline failed to spawn Python child process: permission denied (os error 5)`). Consequently **no actual 13-record run, source probe, pytest pass, or Hub pass is claimed here**. The original manuscript, Field, and Drive were untouched. The issue, PR, and Google Doc were supplied as pointers only and were not fetched.
 
+## Source-reader provider seam (added in this run)
+
+The R1 batch consumer is now paired with a deterministic source-reader
+provider (`src/kairoskopion/services/cite_r1_reader.py`) plus an
+operator-issued permit registry
+(`src/kairoskopion/services/cite_r1_permits.py`).  When an operator
+issues FIXTURE permits (e.g. for the operator-authorized Caen PUC
+Descartes Regula I facsimile under `tests/fixtures/citation_r1_reader/`)
+and re-runs `python -m kairoskopion.services.cite_r1_reader
+--audit … --queue … --requests … --out … --permits … --fixtures …`,
+the 4 unique Z0 orders against the Descartes Descartes anchor
+produce 5 OBSERVED returns (one per task that reuses the Descartes
+work order); Luckin/Zawacki-Richter/Hutchins/Suchman/no-author-anchor
+tasks remain BLOCKED with typed reasons until the operator issues the
+corresponding permits.  See `docs/TRM_CITE_R1_READER.md` for the
+seam's contracts, the test matrix, and the QA count
+(3499 pytest PASS / 8 deselected).
+
 ## Authorized AORUS operator run
 
 Run in the isolated worktree with a working Python that has pytest. These commands keep private records outside Git. The SHA checks are gates, not inferred from the pointer text.
