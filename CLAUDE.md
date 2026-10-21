@@ -2,9 +2,12 @@
 
 TRM-CITE-001 R1 isolated continuation (2026-10-21): see
 `docs/TRM_CITE_R1_RETURN.md` and `docs/TRM_CITE_R1_READER.md`.
-Return consumer + tests are present; this run added the source-reader
-provider seam (permit registry + OBSERVED emitter) plus 18 focused tests.
-3499 pytest PASS / 8 deselected, import_origin verified against this worktree.
+Return consumer and source-reader permit seam are present. The first
+OpenCode witness fixtures were rejected by independent review because
+they fabricated text for real authors. The provenance-correction branch
+deleted them, added source class / SHA / observation date / task scope and
+generated entirely fictional tests. Only exact current checkout QA receipts
+are valid; neither source observation nor unit tests certify V1-V5.
 
 ## What is Kairoskopion
 
@@ -257,9 +260,9 @@ multiple fields into one query string.
 | `ui/` | React+TypeScript cockpit (29 components) |
 | `ui/src/api/client.ts` | Typed API client |
 | `ui/src/styles/cockpit.css` | Dark theme CSS |
-| `tests/` | 3499 tests (TRM-CITE-001 R1 source-reader seam adds 18) |
+| `tests/` | Test count depends on pinned commit; execute scripts/run_project_qa.py |
 | `tests/fixtures/` | Synthetic manuscript, venue, scenario |
-| `tests/fixtures/citation_r1_reader/` | Caen Regula I + Springer BMC OA witness fixtures |
+| `tests/test_citation_r1_reader.py` | Fictional ephemeral fixtures, source provenance and permission negatives; no fabricated real text |
 | `src/kairoskopion/services/cite_r1_permits.py` | R1 source-reader permit dataclass + load/save |
 | `src/kairoskopion/services/cite_r1_reader.py` | R1 source-reader provider (FIXTURE + LIVE) |
 | `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` | Master spec |

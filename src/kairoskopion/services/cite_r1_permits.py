@@ -64,6 +64,9 @@ class Permit:
     """One authorized read of one source for one work order."""
 
     work_order_id: str
+    # One approved source may support several investigations, but each task
+    # must be explicitly permitted. Sharing a Z0 child is not carte blanche.
+    allowed_task_ids: tuple[str, ...]
     provider: str
     authorized_by: str
     mode: str
@@ -75,8 +78,12 @@ class Permit:
     expected_passage: str
     citation_mode: str = "QUOTE"
     read_depth: str = "ANCHORED_PASSAGE"
-    source_kind: str = "OPEN_PERMITTED_PRIMARY"
-    access: str = "READABLE_FULL"
+    source_kind: str = "SOURCE_NEEDS_INDEPENDENT_REVIEW"
+    access: str = "READABILITY_NOT_CERTIFIED"
+    # Witness provenance cannot be inferred from a fixture path or a source URL.
+    witness_class: str = "SYNTHETIC_TEST"
+    witness_sha256: str = ""
+    observed_at: str | None = None
     notes: str | None = None
     fixture_path: str | None = None
     live_url: str | None = None
@@ -85,6 +92,10 @@ class Permit:
 
     def __post_init__(self) -> None:
         _require(bool(self.work_order_id), "permit.work_order_id is required")
+        object.__setattr__(self, "allowed_task_ids", tuple(self.allowed_task_ids))
+        _require(bool(self.allowed_task_ids) and
+                 len(self.allowed_task_ids) == len(set(self.allowed_task_ids)),
+                 "Permit must list unique allowed_task_ids")
         _require(bool(self.provider), "permit.provider is required")
         _require(bool(self.authorized_by), "permit.authorized_by is required")
         _require(self.mode in _KNOWN_MODES, f"permit.mode must be FIXTURE or LIVE; got {self.mode!r}")
@@ -99,11 +110,25 @@ class Permit:
                  "permit.expected_locator is required")
         _require(bool(self.expected_passage),
                  "permit.expected_passage is required")
+        _require(self.witness_class in {
+            "SYNTHETIC_TEST", "MANUAL_WEB_OBSERVED", "LIVE_AUTHORIZED_SOURCE_READ"
+        }, "Unknown witness_class")
+        _require(re.fullmatch(r"[0-9a-fA-F]{64}", self.witness_sha256 or "") is not None,
+                 "permit.witness_sha256 must be a pinned 64-char digest")
         if self.mode == "FIXTURE":
+            _require(self.witness_class in {"SYNTHETIC_TEST", "MANUAL_WEB_OBSERVED"},
+                     "FIXTURE must not claim LIVE_AUTHORIZED_SOURCE_READ")
+            _require(bool(self.observed_at), "FIXTURE must contain original observed_at")
+            observed = datetime.fromisoformat(self.observed_at.replace("Z", "+00:00"))
+            _require(observed.tzinfo is not None, "FIXTURE observed_at requires timezone")
             _require(bool(self.fixture_path),
                      "FIXTURE permit must declare fixture_path")
+            _require(re.fullmatch(r"[A-Za-z0-9_.-]{1,180}", self.fixture_path) is not None,
+                     "FIXTURE path must be one safe filename, not a directory or traversal")
             _require(self.live_url is None, "FIXTURE permit must not declare live_url")
         else:
+            _require(self.witness_class == "LIVE_AUTHORIZED_SOURCE_READ",
+                     "LIVE permit requires LIVE_AUTHORIZED_SOURCE_READ")
             _require(bool(self.live_url),
                      "LIVE permit must declare live_url")
             _require(self.fixture_path is None,
@@ -115,7 +140,9 @@ class Permit:
                     (self.work_order_id + "|" + self.authorized_by + "|" +
                      self.work_id + "|" + self.edition_id + "|" +
                      self.witness_id + "|" + self.expected_locator + "|" +
-                     self.expected_passage).encode()
+                     self.expected_passage + "|" + self.witness_sha256 + "|" +
+                     self.witness_class + "|" +
+                     ",".join(sorted(self.allowed_task_ids))).encode()
                 )[:24],
             )
 
@@ -189,8 +216,8 @@ def validate_permit_against_hosts(
     if not permit.live_url:
         return False, "LIVE permit has no URL"
     parsed = urlparse(permit.live_url)
-    if parsed.scheme not in {"http", "https"}:
-        return False, "non-HTTP(S) URL is not permitted"
+    if parsed.scheme != "https":
+        return False, "Only HTTPS public-source reads are permitted"
     host = parsed.hostname or ""
     if not host:
         return False, "URL host could not be parsed"

@@ -142,9 +142,13 @@ def consume(audit: Path, queue: Path, followups: Path, protocols: Path,
             evidence = ret.get("source_evidence")
             if not isinstance(evidence, list) or not evidence:
                 raise ValueError("Observed return lacks source evidence")
+            if ret.get("test_only") or ret.get("witness_class") == "SYNTHETIC_TEST":
+                raise ValueError("Synthetic evidence cannot enter production R1")
             for item in evidence:
                 if not isinstance(item, dict):
                     raise ValueError("Evidence item is not an object")
+                if item.get("test_only") or item.get("witness_class") == "SYNTHETIC_TEST":
+                    raise ValueError("Synthetic witness cannot enter production R1")
                 order_id = item.get("work_order_id")
                 if order_id is None and len(req["work_order_ids"]) == 1:
                     order_id = req["work_order_ids"][0]

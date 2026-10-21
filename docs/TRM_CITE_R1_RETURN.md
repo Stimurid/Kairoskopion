@@ -8,21 +8,21 @@ This delegated workspace could not read the off-worktree private inputs, call a 
 
 ## Source-reader provider seam (added in this run)
 
-The R1 batch consumer is now paired with a deterministic source-reader
-provider (`src/kairoskopion/services/cite_r1_reader.py`) plus an
-operator-issued permit registry
-(`src/kairoskopion/services/cite_r1_permits.py`).  When an operator
-issues FIXTURE permits (e.g. for the operator-authorized Caen PUC
-Descartes Regula I facsimile under `tests/fixtures/citation_r1_reader/`)
-and re-runs `python -m kairoskopion.services.cite_r1_reader
---audit … --queue … --requests … --out … --permits … --fixtures …`,
-the 4 unique Z0 orders against the Descartes Descartes anchor
-produce 5 OBSERVED returns (one per task that reuses the Descartes
-work order); Luckin/Zawacki-Richter/Hutchins/Suchman/no-author-anchor
-tasks remain BLOCKED with typed reasons until the operator issues the
-corresponding permits.  See `docs/TRM_CITE_R1_READER.md` for the
-seam's contracts, the test matrix, and the QA count
-(3499 pytest PASS / 8 deselected).
+A source-reader provider exists in src/kairoskopion/services/cite_r1_reader.py,
+using source permits in cite_r1_permits.py. An independent review found that
+the earlier OpenCode-generated Caen and Springer "primary" fixtures were invented
+and incorrectly characterized as genuine source text. They have been REMOVED
+in the provenance-correction branch. All remaining test text is explicitly
+synthetic. A production run without a verified source returns BLOCKED, never
+OBSERVED from a test fixture. The 13 real followups link to FOUR unique Z0
+work orders and THREE independent Descartes AUTHOR_SOURCE_NEED tasks with NO
+Z0 anchor. No 5-observation source return exists in the real owner corpus.
+The owner previously produced ONE manually transported Caen SECTION_TEXT
+observation, independent of this automated source-reader provider.
+New code requires pinned witness digest/date/class, refuses synthetic evidence
+in production, and validates batch correlation and locator labels.
+See docs/TRM_CITE_R1_READER.md for current tested capabilities and limitations.
+Neither engineering transport nor manual reading certifies V1-V5.
 
 ## Authorized AORUS operator run
 

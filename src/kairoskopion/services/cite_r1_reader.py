@@ -30,17 +30,16 @@ Required design constraints enforced here:
     ``adapters.http_client.fetch_text_safe`` (stdlib urllib, cached,
     rate-limited); no shell-out to curl/PowerShell invocations; no custom
     TLS handling; no retries on 401/403/404/429;
-(d) OBSERVED returns provide work_id, edition_id, witness_id, locator,
-    passage_id, byte_sha256, plus a fixture/source path.  Real permitted
-    sources include both the operator's Caen Descartes Regula I witness
-    and the Springer OA abstract used in R1-02.
-(e) negative paths: wrong edition / wrong witness / stale source /
-    incorrect quote / duplicate anchor / replay / bad read depth /
-    permission denial / spoofed correlation each raise ``ValueError`` or
-    produce a typed BLOCKED return;
-(f) the original manuscript SHA is carried through the return; no write
-    to the source path; ``verify_against_published`` defaults to True
-    when a witness is used.
+(d) OBSERVED transports a dated, SHA-pinned witness with an explicit
+    provenance class. Synthetic test text is refused in production.
+    Cached publisher-visible text can be returned only as a separate
+    operator-recorded source derivation with original capture provenance.
+(e) negative paths include digest, permission, stale observation,
+    missing/duplicate phrase, missing locator label, source ID, task
+    scope, replay and task-correlation errors. Declared edition labels
+    remain unverified until independent bibliographic V1 review.
+(f) original manuscript bytes and SHA remain immutable; source reading
+    alone is never V1-V5 PASS or permission to rewrite the manuscript.
 """
 
 from __future__ import annotations
@@ -146,23 +145,18 @@ def acquire_fixture_witness(permit: Permit, *,
                             fixtures_dir: Path | None) -> WitnessBytes:
     """Read the cached witness file recorded by the permit.
 
-    The fixture path is operator-curated: a real primary text preserved
-    locally because the publisher's open-access mirror is intermittently
-    available or has been access-scoped.
+    A cached body remains exactly the original captured bytes, not a
+    fresh fetch. Its identity must match the operator-pinned SHA-256.
     """
     if permit.fixture_path is None:
         raise ValueError("FIXTURE permit must declare fixture_path")
-    base = fixtures_dir.resolve() if fixtures_dir is not None else None
-    candidates = []
-    if base is not None:
-        candidates.append((base / permit.fixture_path).resolve())
-    candidates.append(Path(permit.fixture_path).resolve())
-    text_path: Path | None = None
-    for cand in candidates:
-        if cand.is_file():
-            text_path = cand
-            break
-    if text_path is None:
+    if fixtures_dir is None:
+        raise ValueError(REASON_FIXTURE_MISSING)
+    base = Path(fixtures_dir).resolve()
+    text_path = (base / permit.fixture_path).resolve()
+    if not text_path.is_relative_to(base):
+        raise ValueError("FIXTURE_PATH_OUTSIDE_AUTHORIZED_ROOT")
+    if not text_path.is_file():
         raise ValueError(REASON_FIXTURE_MISSING)
     raw = text_path.read_bytes()
     return WitnessBytes(
@@ -172,7 +166,7 @@ def acquire_fixture_witness(permit: Permit, *,
         source_uri=str(text_path),
         license_tag=permit.license,
         retrieval_mode="FIXTURE",
-        fetched_at=_now_iso(),
+        fetched_at=permit.observed_at or "",
         citation_mode=permit.citation_mode,
     )
 
@@ -241,6 +235,15 @@ def verify_witness_against_permit(permit: Permit, witness: WitnessBytes) -> Veri
     Multiple hits are treated as DUPLICATE_ANCHOR so a reader cannot
     silently pick the first occurrence.
     """
+    if permit.witness_class == "SYNTHETIC_TEST":
+        for marker, identity in (
+            ("WORK", permit.work_id), ("EDITION", permit.edition_id),
+            ("WITNESS", permit.witness_id),
+        ):
+            if f"{marker}: {identity}" not in witness.text:
+                return VerificationResult(False, "SYNTHETIC_IDENTITY_MISMATCH",
+                                          witness.sha256, "identity:unknown",
+                                          permit.expected_locator, False)
     folded_passage = " ".join(permit.expected_passage.split())
     folded_text = " ".join(witness.text.split())
     occurrences = folded_text.count(folded_passage)
@@ -252,6 +255,13 @@ def verify_witness_against_permit(permit: Permit, witness: WitnessBytes) -> Veri
         return VerificationResult(False, REASON_DUPLICATE_ANCHOR,
                                   witness.sha256, "passage:multi",
                                   permit.expected_locator, True)
+    # The label must actually be carried in the witness, not merely declared
+    # by a permit. This is a locator-label check, not proof of printed page.
+    folded_locator = " ".join(permit.expected_locator.split()).casefold()
+    if folded_locator not in folded_text.casefold():
+        return VerificationResult(False, REASON_LOCATOR_MISMATCH,
+                                  witness.sha256, "locator:unverified",
+                                  permit.expected_locator, False)
     return VerificationResult(True, None, witness.sha256,
                               "passage:" + witness.sha256[:16],
                               permit.expected_locator, False)
@@ -288,7 +298,11 @@ class SourceReaderProvider:
         replay_window_hours: int = 24,
         live_fetcher=acquire_live_witness,
         fixture_fetcher=acquire_fixture_witness,
+        test_mode: bool = False,
     ) -> None:
+        # Injected fetchers are test doubles; never issue production-class evidence.
+        self.test_mode = bool(test_mode or live_fetcher is not acquire_live_witness
+                              or fixture_fetcher is not acquire_fixture_witness)
         self._permits = dict(permits)
         self._fixtures_dir = fixtures_dir
         self._allowed_hosts = frozenset(allowed_hosts)
@@ -341,6 +355,7 @@ class SourceReaderProvider:
             "edition_id": permit.edition_id,
             "witness_id": permit.witness_id,
             "citation_mode": permit.citation_mode,
+            "witness_class": permit.witness_class,
         }
 
     def _build_blocked(
@@ -349,6 +364,7 @@ class SourceReaderProvider:
         errors: list[str] | None = None,
         extra_fields: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        self.stats.requests_blocked += 1
         blocked: dict[str, Any] = {
             "schema": RETURN_SCHEMA,
             "task_id": request["task_id"],
@@ -361,6 +377,7 @@ class SourceReaderProvider:
             "acquisition_authorized_by_request":
                 bool(request.get("acquisition_authorized_by_request", False)),
             "acquisition_authorized": False,
+            "witness_class": "NO_WITNESS",
             "outcome": "BLOCKED",
             "reason": reason,
             "provider": "NONE",
@@ -441,6 +458,16 @@ class SourceReaderProvider:
                     request=request, reason=REASON_PERMIT_NOT_FOUND,
                     errors=[REASON_PERMIT_NOT_FOUND],
                 )
+            if request["task_id"] not in permit.allowed_task_ids:
+                self.stats.rejections_permission += 1
+                return self._build_blocked(
+                    request=request, reason="TASK_NOT_IN_SOURCE_PERMIT",
+                    errors=["TASK_NOT_IN_SOURCE_PERMIT"],
+                )
+            if permit.witness_class == "SYNTHETIC_TEST" and not self.test_mode:
+                return self._build_blocked(request=request,
+                    reason="SYNTHETIC_TEST_NOT_ADMISSIBLE",
+                    errors=["SYNTHETIC_TEST_NOT_ADMISSIBLE"])
             try:
                 witness = self._acquire(permit)
             except ValueError as exc:
@@ -448,6 +475,22 @@ class SourceReaderProvider:
                 return self._build_blocked(
                     request=request, reason=str(exc), errors=[str(exc)],
                 )
+            if witness.sha256.lower() != permit.witness_sha256.lower():
+                return self._build_blocked(request=request,
+                    reason=REASON_FIXTURE_HASH_MISMATCH,
+                    errors=[REASON_FIXTURE_HASH_MISMATCH])
+            observed_at = _parse_iso(witness.fetched_at)
+            now = datetime.now(timezone.utc)
+            if (observed_at.tzinfo is None or
+                observed_at.astimezone(timezone.utc) > now or
+                observed_at.astimezone(timezone.utc) < now - timedelta(days=30)):
+                return self._build_blocked(request=request,
+                    reason=REASON_STALE_RETRIEVED_AT,
+                    errors=[REASON_STALE_RETRIEVED_AT])
+            if permit.read_depth not in {"SECTION_TEXT", "ANCHORED_PASSAGE"}:
+                return self._build_blocked(request=request,
+                    reason=REASON_BAD_READ_DEPTH,
+                    errors=[REASON_BAD_READ_DEPTH])
             verification = verify_witness_against_permit(permit, witness)
             if not verification.ok:
                 self.stats.rejections_passage += 1
@@ -493,6 +536,11 @@ class SourceReaderProvider:
     def _acquire(self, permit: Permit) -> WitnessBytes:
         if permit.mode == "FIXTURE":
             return self._fixture(permit, fixtures_dir=self._fixtures_dir)
+        # Safety preflight must live ABOVE the injectable fetcher. A mock,
+        # alternate adapter or future Indago provider cannot skip host ACL.
+        allowed, reason = validate_permit_against_hosts(permit, self._allowed_hosts)
+        if not allowed:
+            raise ValueError(reason or REASON_HOST_NOT_ALLOWED)
         return self._live(permit, allowed_hosts=self._allowed_hosts)
 
     def _build_observed(
@@ -547,6 +595,9 @@ class SourceReaderProvider:
             "retrieval_mode": witness.retrieval_mode,
             "permit_id": permit.permit_id,
             "authorized_by": permit.authorized_by,
+            "witness_class": permit.witness_class,
+            "test_only": bool(self.test_mode),
+            "observed_at_original": witness.fetched_at,
         }
         envelope = {
             "schema": RETURN_SCHEMA,
@@ -581,6 +632,8 @@ class SourceReaderProvider:
             "citation_gate": "NOT_PUBLICATION_READY",
             "author_gate": "PENDING",
             "transport_only": True,
+            "witness_class": permit.witness_class,
+            "test_only": bool(self.test_mode),
             "transport_provider_tag": PROVIDER_TAG,
             "transport_run_id": self.run_id,
         }
@@ -601,9 +654,27 @@ def _read_batch_inputs(
     _v(audit, orders)
     by_order = {o["work_order_id"]: o for o in orders}
     manifest = _json(request_dir / "manifest.json")
+    if manifest.get("schema") != "trm-cite-r1-batch-manifest-v1":
+        raise ValueError("Unknown original R1 batch manifest")
+    if manifest["queue_sha256"] != _sha256(queue_path.read_bytes()):
+        raise ValueError("Z0 queue digest drift")
+    if manifest.get("source_sha256") != audit["source"]["sha256"]:
+        raise ValueError("Original manuscript digest drift")
+    version = (manifest["queue_sha256"] + ":" +
+               manifest["followups_sha256"] + ":" +
+               manifest["protocols_sha256"])
     requests = {}
     for path in sorted(request_dir.glob("*.request.json")):
         req = _json(path)
+        if req.get("schema") != "trm-cite-r1-task-request-v1":
+            raise ValueError("Invalid R1 task request schema")
+        if req.get("correlation_id") != _sha256((version + ":" + req["task_id"]).encode()):
+            raise ValueError(REASON_SPOOFED_CORRELATION)
+        if (req.get("source_sha256") != audit["source"]["sha256"] or
+            any(k not in by_order for k in req.get("work_order_ids", []))):
+            raise ValueError("Original R1 task / Z0 source correlation mismatch")
+        if req["task_id"] in requests:
+            raise ValueError("Duplicate request ID")
         requests[req["task_id"]] = req
     if len(requests) != manifest.get("tasks"):
         raise ValueError("Incomplete request batch for provider run")
@@ -616,6 +687,8 @@ def run_batch(
     permits: dict[str, Permit],
     fixtures_dir: Path | None = None,
     allowed_hosts: frozenset[str] = DEFAULT_ALLOWED_HOSTS,
+    test_mode: bool = False,
+    live_fetcher=acquire_live_witness,
 ) -> dict[str, Any]:
     """Run the provider across an entire request batch.
 
@@ -624,25 +697,48 @@ def run_batch(
     ``audit_path`` or any Z0 artifact.
     """
     work_orders, requests = _read_batch_inputs(audit_path, queue_path, request_dir)
+    prior_summary = output_dir / "provider_summary.json"
+    if prior_summary.exists():
+        prior = _read_json(prior_summary)
+        for task, request in requests.items():
+            saved = _read_json(output_dir / (task + ".return.json"))
+            for field in ("task_id", "case_id", "source_sha256",
+                          "work_order_ids", "correlation_id"):
+                if saved.get(field) != request.get(field):
+                    raise ValueError("Persisted source return has correlation drift: " + field)
+            saved_sha = _sha256((output_dir / (task + ".return.json")).read_bytes())
+            if prior.get("return_digests", {}).get(task) != saved_sha:
+                raise ValueError("Persisted return was modified after completion")
+        if prior.get("tasks") != len(requests):
+            raise ValueError("Persisted provider summary differs from request batch")
+        return prior
     provider = SourceReaderProvider(
         permits=permits, fixtures_dir=fixtures_dir, allowed_hosts=allowed_hosts,
+        test_mode=test_mode, live_fetcher=live_fetcher,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     summary = {"schema": "trm-cite-r1-batch-provider-summary-v1",
                "audit_sha256": None, "queue_sha256": None,
                "tasks": 0, "observed": 0, "blocked": 0,
                "reasons": {}, "run_id": provider.run_id,
-               "stats": provider.stats.to_dict()}
+               "return_digests": {}, "stats": provider.stats.to_dict()}
     audit_data = _read_json(audit_path)
     summary["audit_sha256"] = audit_data["source"]["sha256"]
     summary["queue_sha256"] = _sha256(queue_path.read_bytes())
     for task_id in sorted(requests):
         request = requests[task_id]
-        ret = provider.read_request(request, work_orders)
-        payload = _json_dumps(ret)
         target = output_dir / (task_id + ".return.json")
-        _write_immutable(target, payload)
+        if target.exists():
+            ret = _read_json(target)
+            for field in ("task_id", "case_id", "source_sha256",
+                          "work_order_ids", "correlation_id"):
+                if ret.get(field) != request.get(field):
+                    raise ValueError("Existing immutable return correlation mismatch")
+        else:
+            ret = provider.read_request(request, work_orders)
+            _write_immutable(target, _json_dumps(ret))
         summary["tasks"] += 1
+        summary["return_digests"][task_id] = _sha256(target.read_bytes())
         if ret["outcome"] == "OBSERVED":
             summary["observed"] += 1
         else:
@@ -682,10 +778,9 @@ def main(argv: list[str] | None = None) -> int:
         allowed_hosts=allowed,
     )
     print(json.dumps(summary, sort_keys=True, ensure_ascii=False))
-    # A provider run that produced zero OBSERVED returns and only BLOCKED
-    # returns with the SOURCE_READER_NOT_AVAILABLE class of reasons is
-    # honest transport; a future switch to LIVE mode would change that.
-    return 0
+    # Even a complete technical run with zero readable sources is not
+    # scientific success. Match the batch consumer's science-blocked exit.
+    return 3 if summary["observed"] == 0 else 0
 
 
 if __name__ == "__main__":

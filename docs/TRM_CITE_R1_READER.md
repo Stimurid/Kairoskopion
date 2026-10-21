@@ -1,158 +1,64 @@
-# TRM-CITE-001 R1 source-reader seam (2026-10-21)
+# TRM-CITE-001 R1 reader — provenance correction (2026-10-21)
 
-Status: **SEAM READY; OBSERVED requires operator-issued permits; scientific
-acceptance unchanged**.
+Status: code candidate. Not independently reviewed, scientifically certified, merged or deployed.
 
-The R1 followup -> Z0 -> evidence-return seam now has a producer half:
-an authorized source-reader provider that consumes the immutable
-``*.request.json`` envelopes produced by ``citation_r1_batch.prepare``
-and emits immutable ``*.return.json`` envelopes that the existing batch
-consumer validates.  Provider never opens a URL or file without an
-operator-issued permit; the immutable original manuscript is read-only.
+## Correction of fabricated primary fixtures
+The prior snapshot 033c4a6 placed invented primary text under real Descartes and Springer filenames. Independent reviewer correctly rejected both as fabricated evidence. The files have now been deleted. All source texts generated in unit tests are explicitly fictional temporary files without a real author, publisher, DOI, edition or primary locator.
 
-## Files
+## Witness identity classes
+- SYNTHETIC_TEST: an ephemeral fictional test source. The production provider blocks it. Only a test-mode provider may produce a test-only OBSERVED; the production batch consumer rejects all test-only evidence.
+- MANUAL_WEB_OBSERVED: an operator-owned, dated, SHA-pinned captured source. It can propose evidence of the operator's reading, but does not imply automatic Indago research or independent V1–V5 certification.
+- LIVE_AUTHORIZED_SOURCE_READ: a permitted and allowlisted safe HTTP fetch with pinned expected witness digest and source locator. A transport observation, not scientific claim support.
 
-- `src/kairoskopion/services/cite_r1_permits.py` — permit dataclass, load/save,
-  host-allowlist validation, schema `trm-cite-r1-permit-v1`.
-- `src/kairoskopion/services/cite_r1_reader.py` — `SourceReaderProvider`,
-  `run_batch`, FIXTURE/LIVE fetchers, witness verification, replay ledger.
-- `tests/test_citation_r1_reader.py` — 18 focused tests covering positive
-  OBSERVED + every required negative path.
-- `tests/fixtures/citation_r1_reader/caen_regula_i.txt` — Caen PUC
-  Descartes Regula I facsimile (AT X 360 lines 5–14; phrase
-  "quantumvis differentibus subjectis applicata").
-- `tests/fixtures/citation_r1_reader/springer_bmc_2019.txt` — Springer OA
-  BMC Medical Education 19:113 (2019) abstract placeholder.
+Permit fields include witness_class, witness_sha256, and the original observed_at for cached text. The provider must not stamp today's time onto older fixture bytes. The current reader checks digest equality, observation age, allowed host before native or injected fetcher, reading depth, unique phrase occurrence, and whether the claimed locator label occurs in the witness body. Synthetic test headers are checked for fictional work, edition, and witness IDs.
 
-## Permission model
+Work / Edition / Witness IDs in permits are OPERATOR DECLARATIONS and do not become independently true merely because transport passed. A printed page must be externally proved; finding an arbitrary matching label alone is not page certification. No V1–V5 PASS is generated.
 
-A permit is one operator-authored JSON file under `permits/<work_order_id>.json`
-with the following required fields:
+## R1 batch correlation
+The batch manifest fixes SHA-256 identities of the Z0 queue, followup tasks and manual protocols. The reader independently reconstructs expected correlation IDs and rejects a mutated request. Completed runs replay from persisted return bytes and verify their recorded SHA against the provider summary, without re-fetching and inventing a new timestamp.
 
-```json
-{
-  "schema": "trm-cite-r1-permit-v1",
-  "work_order_id": "wo_…",
-  "provider": "OWNER_AUTHORIZED_PRIMARY_FIXTURE" | "OWNER_AUTHORIZED_LIVE_…",
-  "authorized_by": "OWNER_AUTHORITY_<date>",
-  "mode": "FIXTURE" | "LIVE",
-  "fixture_path": "caen_regula_i.txt" | null,
-  "live_url": null | "https://www.unicaen.fr/puc/sources/…",
-  "work_id": "descartes-regulae-AT-10-360",
-  "edition_id": "AT-X-1964",
-  "witness_id": "puc-normandie-2024",
-  "license": "CC0_TEST_FIXTURE",
-  "expected_locator": "AT X 360 lines 5-14",
-  "expected_passage": "quantumvis differentibus subjectis applicata",
-  "read_depth": "ANCHORED_PASSAGE",
-  "source_kind": "OPEN_PERMITTED_PRIMARY",
-  "access": "READABLE_FULL"
-}
-```
+## Actual owner source
+The original AORUS R1 corpus has thirteen research actions, five manual cases, four shared Z0 work orders, and three unanchored author-source needs. The only source observation in the owner's real transport canary was the manually read University of Caen electronic Regulae text at AT X 360, with SECTION_TEXT depth and unresolved modern-subject interpretation. It produced one observed manual-source return and twelve blocked results. This observation does NOT originate from the deleted fabricated test files.
 
-Without a permit, a Z0 work order returns BLOCKED with
-`PERMIT_NOT_FOUND_FOR_WORK_ORDER`.  Author-source R1-05 tasks (no Z0
-anchor) return BLOCKED with `AUTHOR_SOURCE_NEED_NOT_IN_PROVIDER` until
-the operator issues a separate task-level permit (not provided in this
-slice).
+## Actual capabilities and limits
+The new reader can process permit-authenticated source transport, but a verified native Indago/LitOps primary-text reader remains NOT INTEGRATED, and the three unanchored author-needs remain outside the automatic reader. Indago port discovery provides bibliographic leads and metadata, not automatic fulltext evidence.
 
-## Live-fetch guard-rails
+All source observations remain claim-support proposals with independent V1–V5 and author gate pending. Fully blocked source attempts result in CLI code 3, indicating scientific unavailability, even when transport persisted everything correctly.
 
-LIVE permits are gated by an allowlist of publisher hosts compiled in
-`cite_r1_permits.DEFAULT_ALLOWED_HOSTS`:
+## Acceptance requirements
+Run targeted pytest and complete project QA on this exact checkout; require independent review of real witness provenance, restrictions, SHA and locator, replay, security, five-case relation, and source-to-claim meaning. No main merge, journal submission, manuscript mutation or production deployment without explicit author/owner action.
 
-- `unicaen.fr` / `puc.unicaen.fr` — Presses universitaires de Caen
-  (Descartes Regulae open-access facsimile)
-- `link.springer.com` / `springeropen.com` — Springer / BMC open-access
 
-A LIVE permit whose host is not in the allowlist is rejected before any
-network call; the reader surfaces
-`LIVE_HOST_NOT_IN_ALLOWLIST`.  The fetch uses
-`adapters.http_client.fetch_text_safe` — stdlib `urllib.request`, no
-extra headers, no shell commands, `retry_count=0`, fixed `Accept`
-header.  The provider never constructs a TLS-bypass, login form, or
-session cookie.
+## Operator real-publication transport case, 2026-10-21
 
-## Cross-process correlation
+Open-access Springer Nature paper: Zawacki-Richter, Marín, Bond & Gouverneur,
+"Systematic review of research on artificial intelligence applications in
+higher education – where are the educators?", International Journal of
+Educational Technology in Higher Education 16, article 39 (2019),
+DOI 10.1186/s41239-019-0171-0, publisher URL
+https://link.springer.com/article/10.1186/s41239-019-0171-0 , CC BY 4.0.
 
-Each produced `*.return.json` carries:
+The operator's authorized safe HTTP fetch retrieved actual publisher HTML,
+SHA-256 aa8ae48acf8e7028ddff985261ff9d12db4ac1d558765dd6e5b0a4a35537e8ce.
+A reproducible stdlib HTMLParser visible-text derivation with original source
+retained produced SHA-256
+7bfd3f3c4e290adda7f976075440b479884129ee6e504c5c8567a6512e7fd3d5.
+The Abstract section and the assessment-domain phrase are present exactly
+once in the derived visible text. Both witness and derivation receipt are
+stored in the owner-private AORUS evidence directory, not in this Git branch.
 
-- `task_id`, `case_id`, `step_index` from the request;
-- `source_sha256` from the original manuscript immutable audit;
-- `work_order_ids` exactly as the request recorded them;
-- `correlation_id` from the request envelope (the consumer will refuse
-  any mismatch);
-- per-item `intake_id`, `z0_case_id`, `work_order_id` from the Z0
-  queue;
-- top-level `provider`, `acquisition_authorized`, `read_depth`,
-  `source_kind`, `access`, `license`, `work_id`, `edition_id`,
-  `witness_id`, `locator`, `passage_id`, `byte_sha256`,
-  `retrieved_at`, `citation_mode`, `transport_only`,
-  `transport_provider_tag`, `transport_run_id`.
+A manually source-authorized, SHA-pinned permit for ONLY task
+TRM-CITE-R1-R1-02-1 (Z0 child wo_5c299803f036059ba729) yielded:
+13 tasks / 5 cases / 4 distinct original Z0 children /
+3 unanchored author-source needs; ONE MANUAL_WEB_OBSERVED / SECTION_TEXT
+publisher witness and TWELVE BLOCKED research actions, publication-ready ZERO.
+The neighboring R1-02-2 and R1-02-3 tasks were not promoted merely because
+they share the same child Z0 reference. This was an operator-pinned cached
+public-source read, not an autonomous Indago full-source investigation.
+Nothing in the observed publisher article directly warrants the author's
+strong normative assessment criterion of reconstructing and transferring
+the practice that produced an AI-mediated result.
 
-The provider's batch summary at `provider_summary.json` records the
-audit sha and a per-reason counter.
-
-## Required negative paths (all test-covered)
-
-| Negative | Reason emitted | Test |
-|----------|----------------|------|
-| No permit | `PERMIT_NOT_FOUND_FOR_WORK_ORDER` | `test_no_permit_blocks_with_typed_reason` |
-| Fixture file missing | `FIXTURE_FILE_MISSING` | `test_fixture_file_missing_blocks_with_typed_reason` |
-| Wrong edition / witness | Permit dataclass rejects empty ids; provider records operator-recorded identity | `test_wrong_edition_and_witness_rejected` |
-| Passage not in witness | `WITNESS_PASSAGE_NOT_PRESENT` | `test_passage_not_in_witness_blocks` |
-| Duplicate anchor | `DUPLICATE_PASSAGE_ANCHOR_IN_WITNESS` | `test_duplicate_anchor_blocks` |
-| Stale / future `retrieved_at` | Single-order validator | `test_stale_retrieved_at_via_invalid_datetime_rejected` |
-| Replay (same source_sha + correlation_id) | `DUPLICATE_CORRELATION_REPLAY` | `test_replay_same_correlation_blocks` |
-| Bad read depth | Validator inside `_build_observed` | `test_bad_read_depth_rejected` |
-| Permissions denial | `LIVE_HOST_NOT_IN_ALLOWLIST` | `test_permissions_live_url_not_in_allowlist_blocks` |
-| Spoofed work_order_id | `WORK_ORDER_NOT_IN_Z0_QUEUE` | `test_spoofed_correlation_request_rejected` |
-| Compound request (multi work order) | `COMPOUND_REQUEST_PROVIDER_REJECTS` | `test_compound_request_returns_compound_blocked_not_synthesized` |
-| Author-source need | `AUTHOR_SOURCE_NEED_NOT_IN_PROVIDER` | `test_author_source_need_blocks_without_explicit_task_permit` |
-| Locator mismatch | Provider always uses recorded permit locator | `test_locator_rejects_recorded_locator_mismatch` |
-| Original manuscript touched | Provider only emits returns | `test_provider_does_not_mutate_original_manuscript` |
-
-## QA
-
-`scripts/run_project_qa.py` enforces this worktree's `src` import and
-runs pytest with a unique Windows basetemp.  Local count after this
-slice: **3499 PASS / 8 deselected** (the 18 new tests live in
-`tests/test_citation_r1_reader.py`).
-
-```powershell
-PS> python scripts/run_project_qa.py
-import_origin=...\src\kairoskopion\__init__.py
-3499 passed, 8 deselected in 79.02s (0:01:19)
-```
-
-The provider run is independent of the consumer: it does not require
-the full operator-only input bundle.  The operator-grade handoff from
-AORUS (manuscript SHA
-`5a84d385e7122acb774ab3068fd3688b461d102ccadbef3449a5c0d55540c6fb`,
-`408642a26e…` followup SHA, etc.) is unchanged.  When the operator
-runs the batch on AORUS, this seam replaces the manual source
-descriptor return and re-validates the same witness text via the
-Caen fixture path (`run-batch` mode with `permits/...json` and
-`fixtures/caen_regula_i.txt`).
-
-## Scientific status
-
-The seam is a transport proposal: it does not certify any citation.  V1
-through V5 stay `NOT_CHECKED` in every state file.  Publication
-readiness remains 0 until:
-
-1. R2–R6 (manual review of the operator's five manual protocols +
-   independent scientific review) — owner decision;
-2. the operator records the R1-05 author-source permits (currently
-   BLOCKED with `AUTHOR_SOURCE_NEED_NOT_IN_PROVIDER`) — pending owner
-   confirmation.
-
-## OPEN QUESTIONS
-
-- Owner should decide whether R1-05 author-source permits should be
-  added.  Default answer used here: **no**, so the 3 author-source
-  tasks remain BLOCKED.
-- Owner should confirm whether LIVE mode is appropriate for the
-  authoritative Caen retrieval.  Default answer used here: **FIXTURE
-  only**, because the operator's local Caen facsimile is the cited
-  primary and the LIVE network round-trip is not required.
+The R2/R4 candidate repairs are stored in a PRIVATE file
+R2_R4_SOURCE_REPAIR_CANDIDATES_20261021.json with three alternatives
+and author gate PENDING; no manuscript bytes were altered.
