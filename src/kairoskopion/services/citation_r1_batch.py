@@ -20,7 +20,7 @@ def _sha(data: bytes) -> str:
 
 
 def _lines(path: Path) -> list[dict]:
-    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
     if any(not isinstance(row, dict) for row in rows):
         raise ValueError("Followup rows must be objects")
     return rows
@@ -121,7 +121,7 @@ def blocked(request_dir: Path, out: Path, reason: str = "SOURCE_READER_NOT_AVAIL
 def consume(audit: Path, queue: Path, followups: Path, protocols: Path,
             request_dir: Path, return_dir: Path, out: Path,
             expected_sha: str | None = None) -> dict:
-    rows, _, cases = _inputs(audit, queue, followups, protocols, expected_sha)
+    rows, orders, cases = _inputs(audit, queue, followups, protocols, expected_sha)
     expected = prepare(audit, queue, followups, protocols, request_dir, expected_sha)
     if _json(request_dir / "manifest.json") != expected:
         raise ValueError("Batch manifest mismatch")
@@ -143,16 +143,38 @@ def consume(audit: Path, queue: Path, followups: Path, protocols: Path,
             if not isinstance(evidence, list) or not evidence:
                 raise ValueError("Observed return lacks source evidence")
             for item in evidence:
-                if not isinstance(item, dict) or (item.get("work_order_id") is not None and
-                                                  item["work_order_id"] not in req["work_order_ids"]):
+                if not isinstance(item, dict):
+                    raise ValueError("Evidence item is not an object")
+                order_id = item.get("work_order_id")
+                if order_id is None and len(req["work_order_ids"]) == 1:
+                    order_id = req["work_order_ids"][0]
+                if order_id is None and len(req["work_order_ids"]) > 1:
+                    raise ValueError("Ambiguous Z0 link in compound evidence")
+                if order_id is not None and order_id not in req["work_order_ids"]:
                     raise ValueError("Evidence has wrong Z0 link")
                 if item.get("source_sha256", req["source_sha256"]) != req["source_sha256"]:
                     raise ValueError("Evidence source version drift")
-                probe = {**item, "schema": "trm-cite-r1-return-v1", "outcome": "OBSERVED",
-                         "work_order_id": req["work_order_ids"][0] if req["work_order_ids"] else None,
-                         "case_id": req["case_id"], "intake_id": None,
-                         "source_sha256": req["source_sha256"], "correlation_id": req["correlation_id"]}
-                _validate_return(probe, probe)
+                order = orders.get(order_id) if order_id is not None else None
+                if item.get("intake_id") is not None and (order is None or item["intake_id"] != order["intake_id"]):
+                    raise ValueError("Evidence has wrong original intake")
+                if item.get("z0_case_id") is not None and (order is None or item["z0_case_id"] != order["case_id"]):
+                    raise ValueError("Evidence has wrong original Z0 case")
+                expected_source = {
+                    "work_order_id": order_id,
+                    "case_id": order["case_id"] if order is not None else None,
+                    "intake_id": order["intake_id"] if order is not None else None,
+                    "source_sha256": req["source_sha256"],
+                    "correlation_id": req["correlation_id"],
+                }
+                common = {k: ret.get(k) for k in (
+                    "provider", "acquisition_authorized", "read_depth",
+                    "source_kind", "retrieved_at", "access", "license", "citation_mode"
+                )}
+                common["citation_mode"] = common.get("citation_mode") or "UNKNOWN"
+                probe = {**common, **item, "schema": "trm-cite-r1-return-v1",
+                         "outcome": "OBSERVED", **expected_source}
+                # Never self-check a generated probe: validate against the real Z0 record.
+                _validate_return(expected_source, probe)
         elif (ret.get("outcome") not in ("BLOCKED", "ERROR", "NEGATIVE") or
               not ret.get("reason") or ret.get("read_depth") != "NONE" or
               ret.get("source_evidence")):
@@ -181,7 +203,11 @@ def consume(audit: Path, queue: Path, followups: Path, protocols: Path,
                          (json.dumps(state, ensure_ascii=False, sort_keys=True) + "\n").encode())
     result = {"schema": "trm-cite-r1-batch-result-v1", "tasks": len(rows),
               "cases": len(cases), "blocked": sum(_json(out / (r["task_id"] + ".state.json"))["outcome"] == "BLOCKED" for r in rows),
+              "observed": sum(_json(out / (r["task_id"] + ".state.json"))["outcome"] == "OBSERVED" for r in rows),
               "publication_ready": 0, "source_sha256": expected["source_sha256"],
+              "scientific_status": "NO_EVIDENCE_ALL_BLOCKED" if all(
+                  _json(out / (r["task_id"] + ".state.json"))["outcome"] == "BLOCKED" for r in rows
+              ) else "AWAITING_INDEPENDENT_SCIENTIFIC_REVIEW",
               "manual_comparison": "STRUCTURAL_ONLY_AUTHOR_REVIEW_REQUIRED"}
     _write_immutable(out / "result.json", (json.dumps(result, sort_keys=True) + "\n").encode())
     return result
@@ -215,6 +241,10 @@ def main(argv: list[str] | None = None) -> int:
             result = consume(args.audit, args.queue, args.followups, args.protocols,
                              args.requests, args.returns, args.out, args.expected_manuscript_sha256)
     print(json.dumps(result, sort_keys=True))
+    # Technical transport can succeed even when zero source witnesses were read.
+    # A CLI orchestrator must not interpret complete source loss as scientific success.
+    if args.mode == "consume" and result.get("scientific_status") == "NO_EVIDENCE_ALL_BLOCKED":
+        return 3
     return 0
 
 

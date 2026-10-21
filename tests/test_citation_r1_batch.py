@@ -73,3 +73,100 @@ def test_wrong_correlation_version_drift_and_permission_denial(tmp_path):
     followups.write_text("".join(json.dumps(row) + "\n" for row in rows))
     with pytest.raises(ValueError, match="version drift"):
         prepare(audit, queue, followups, protocols, tmp_path / "drift")
+
+
+def test_owner_utf8_bom_without_mutating_original(tmp_path):
+    audit, queue, followups, protocols, _ = _fixture(tmp_path)
+    original_followups = followups.read_bytes()
+    original_protocols = protocols.read_bytes()
+    followups.write_bytes(bytes([0xEF, 0xBB, 0xBF]) + original_followups)
+    protocols.write_bytes(bytes([0xEF, 0xBB, 0xBF]) + original_protocols)
+    from kairoskopion.services.citation_r1_batch import prepare
+    m = prepare(audit, queue, followups, protocols, tmp_path / "bom_requests")
+    assert m["tasks"] == 13
+    assert followups.read_bytes().startswith(bytes([0xEF, 0xBB, 0xBF]))
+    assert protocols.read_bytes().startswith(bytes([0xEF, 0xBB, 0xBF]))
+
+
+def test_observed_evidence_real_correlation_and_limited_science(tmp_path):
+    from datetime import datetime, timezone
+    from kairoskopion.services.citation_r1_batch import consume, blocked, prepare
+    audit, queue, followups, protocols, _ = _fixture(tmp_path)
+    requests, returns, states = [tmp_path / v for v in ("rq", "ret", "states")]
+    prepare(audit, queue, followups, protocols, requests)
+    blocked(requests, returns)
+    req = json.loads((requests / "r1-task-00.request.json").read_text())
+    assert len(req["work_order_ids"]) == 1
+    order = next(json.loads(l) for l in queue.read_text().splitlines() if
+                 json.loads(l)["work_order_id"] == req["work_order_ids"][0])
+    rp = returns / "r1-task-00.return.json"
+    ret = json.loads(rp.read_text())
+    ret.update({
+        "outcome": "OBSERVED", "reason": None,
+        "provider": "SYNTHETIC_AUTHORIZED_FIXTURE", "acquisition_authorized": True,
+        "read_depth": "ANCHORED_PASSAGE",
+        "source_kind": "SYNTHETIC_PUBLIC_PRIMARY",
+        "access": "READABLE_FULL", "license": "CC0_TEST_FIXTURE",
+        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "source_evidence": [{
+            "work_order_id": req["work_order_ids"][0],
+            "intake_id": order["intake_id"], "z0_case_id": order["case_id"],
+            "source_kind": "SYNTHETIC_PUBLIC_PRIMARY",
+            "read_depth": "ANCHORED_PASSAGE",
+            "access": "READABLE_FULL", "license": "CC0_TEST_FIXTURE",
+            "provider": "SYNTHETIC_AUTHORIZED_FIXTURE",
+            "retrieved_at": datetime.now(timezone.utc).isoformat(),
+            "acquisition_authorized": True,
+            "work_id": "work-fixture", "edition_id": "edition-fixture",
+            "witness_id": "witness-fixture", "locator": "p.1 exact",
+            "passage_id": "passage-fixture", "byte_sha256": "a" * 64
+        }]
+    })
+    rp.write_text(json.dumps(ret))
+    result = consume(audit, queue, followups, protocols, requests, returns, states)
+    assert result["observed"] == 1
+    assert result["blocked"] == 12
+    assert result["publication_ready"] == 0
+    state = json.loads((states / "r1-task-00.state.json").read_text())
+    assert state["citation_gate"] == "NOT_PUBLICATION_READY"
+    assert all(x == "NOT_CHECKED" for x in state["verification"].values())
+
+
+def test_observed_wrong_intake_and_compound_without_order_rejected(tmp_path):
+    from datetime import datetime, timezone
+    from kairoskopion.services.citation_r1_batch import consume, blocked, prepare
+    audit, queue, followups, protocols, _ = _fixture(tmp_path)
+    requests, returns = tmp_path / "rq", tmp_path / "ret"
+    prepare(audit, queue, followups, protocols, requests)
+    blocked(requests, returns)
+    req = json.loads((requests / "r1-task-00.request.json").read_text())
+    rp = returns / "r1-task-00.return.json"
+    ret = json.loads(rp.read_text())
+    ret.update({
+        "outcome": "OBSERVED", "reason": None, "provider": "SYNTHETIC",
+        "acquisition_authorized": True, "read_depth": "ANCHORED_PASSAGE",
+        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "source_kind": "SYNTHETIC_PRIMARY", "access": "READABLE_FULL", "license": "CC0",
+        "source_evidence": [{
+            "work_order_id": req["work_order_ids"][0], "intake_id": "forged",
+            "work_id": "a", "edition_id": "b", "witness_id": "c",
+            "locator": "p1", "passage_id": "p", "byte_sha256": "a"*64
+        }]
+    })
+    rp.write_text(json.dumps(ret))
+    with pytest.raises(ValueError, match="wrong original intake"):
+        consume(audit, queue, followups, protocols, requests, returns, tmp_path / "s1")
+    # The third synthetic task has two distinct source identities; no first-hit success.
+    ret0 = json.loads((returns / "r1-task-02.return.json").read_text())
+    req2 = json.loads((requests / "r1-task-02.request.json").read_text())
+    assert len(req2["work_order_ids"]) == 2
+    ret0.update({
+        "outcome": "OBSERVED", "reason": None, "provider": "SYNTHETIC",
+        "acquisition_authorized": True, "read_depth": "METADATA_ONLY",
+        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "source_kind": "SYNTHETIC_METADATA", "access": "READABLE_FULL", "license": "CC0",
+        "source_evidence": [{"work_id": "a", "edition_id": "b", "witness_id": "c", "locator": "p1"}]
+    })
+    (returns / "r1-task-02.return.json").write_text(json.dumps(ret0))
+    with pytest.raises(ValueError, match="wrong original intake|Ambiguous Z0 link"):
+        consume(audit, queue, followups, protocols, requests, returns, tmp_path / "s2")

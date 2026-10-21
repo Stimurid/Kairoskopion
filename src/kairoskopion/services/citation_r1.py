@@ -24,14 +24,14 @@ def _digest(raw: bytes) -> str:
 
 
 def _json(path: Path) -> dict:
-    value = json.loads(path.read_text(encoding="utf-8"))
+    value = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(value, dict):
         raise ValueError("Expected JSON object")
     return value
 
 
 def _orders(path: Path) -> list[dict]:
-    lines = path.read_text(encoding="utf-8").splitlines()
+    lines = path.read_text(encoding="utf-8-sig").splitlines()
     orders = [json.loads(line) for line in lines if line.strip()]
     ids = [o["work_order_id"] for o in orders]
     if len(ids) != len(set(ids)):
