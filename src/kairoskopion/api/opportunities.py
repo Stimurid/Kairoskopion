@@ -43,7 +43,9 @@ def get_opportunity_portfolio(current_user: User = Depends(get_current_user)):
     """Return evidence-grounded objects, not Indago's unimported W12 totals."""
     user_root = _user_opportunity_root(current_user)
     store = OpportunityGraphStore(user_root)
-    result = build_portfolio(store)
+    result = build_portfolio(
+        store, include_owner_prior=_private_research_read_enabled()
+    )
     # A private staged research corpus is NOT an imported ArticleOpportunity.
     # Never self-certify source policies, full-text reads or author decisions.
     if _private_research_read_enabled():
@@ -65,7 +67,12 @@ def get_opportunity_portfolio(current_user: User = Depends(get_current_user)):
 def get_opportunity_trace(current_user: User = Depends(get_current_user)):
     """Read negative hunt observations and decisions without mutating canon."""
     store = OpportunityGraphStore(_user_opportunity_root(current_user))
-    return {"events": store.replay_events(), "external_submission": "FORBIDDEN"}
+    consumer = store.consumer_snapshot(
+        include_owner_prior=_private_research_read_enabled()
+    )
+    return {"events": consumer["events"],
+            "owner_prior_visibility": consumer["status"],
+            "external_submission": "FORBIDDEN"}
 
 
 @router.get("/research-stage")

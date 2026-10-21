@@ -246,6 +246,7 @@ class OpportunityGraphStore:
     """
 
     def __init__(self, root: str | Path):
+        self.storage_root = Path(root)
         self.root = Path(root) / "kairon_provider" / "opportunity_graph"
         self.records = self.root / "records"
         self.events = self.root / "events"
@@ -383,3 +384,110 @@ class OpportunityGraphStore:
     def replay_events(self) -> list[dict[str, Any]]:
         events = [json.loads(p.read_text(encoding="utf-8")) for p in self.events.glob("*.json")]
         return sorted(events, key=lambda event: (str(event.get("at", "")), str(event["event_id"])))
+
+
+    def consumer_snapshot(self, *, include_owner_prior: bool = False) -> dict[str, Any]:
+        """Bounded read model: raw graph writes are NOT consumer publication.
+
+        Internal source/repair code uses list_records/replay_events for forensic
+        recovery; external consumers MUST use this snapshot. A graph record
+        from a multi-write owner-science import becomes visible only if the
+        pinned receipt, intent, source bytes and graph fingerprint pass a fresh
+        cold readback. Incomplete/unknown imports fail closed. The successful
+        read remains scientific PROVISIONAL / AUTHOR_HOLD, never an ArticleSeed.
+        """
+        records = self.list_records()
+        events = self.replay_events()
+
+        def owner_case(item: dict[str, Any]) -> str | None:
+            tagged = item.get("owner_prior_receipt_case")
+            if tagged:
+                return str(tagged)
+            # Bounded migration safety for historical L3: its immutable
+            # physical IDs remain privately scoped even if a tag is erased.
+            # This is typed protocol identity, not word-based interpretation.
+            identity = str(item.get("event_id") or item.get("id") or "")
+            if identity.startswith("L3-CORPUS-20261020:IMPORTED:"):
+                return "L3-CORPUS-20261020"
+            if (item.get("kind") == "Evidence" and identity.startswith("trm074-l3-ref-")
+                    or item.get("kind") == "HuntTrace"
+                    and identity.startswith("trm074-owner-science-L3-CORPUS-20261020")):
+                return "L3-CORPUS-20261020"
+            return None
+
+        event_cases: dict[str, str] = {
+            str(item["event_id"]): scope
+            for item in events if (scope := owner_case(item)) is not None
+        }
+        # Read-time ancestry closure is linear, even for a long reverse-ordered
+        # chain of events. Old L3 reopen bytes are immutable and untagged.
+        descendants: dict[str, list[str]] = {}
+        for item in events:
+            parent = str(item.get("source_event_id") or "")
+            if parent:
+                descendants.setdefault(parent, []).append(str(item["event_id"]))
+        pending = list(event_cases)
+        cursor = 0
+        ambiguous_ancestry = False
+        while cursor < len(pending):
+            parent = pending[cursor]
+            cursor += 1
+            for child in descendants.get(parent, []):
+                if child not in event_cases:
+                    event_cases[child] = event_cases[parent]
+                    pending.append(child)
+                elif event_cases[child] != event_cases[parent]:
+                    ambiguous_ancestry = True
+        cases = {
+            scope for item in records if (scope := owner_case(item)) is not None
+        } | set(event_cases.values())
+        verified: set[str] = set()
+        verified_event_ids: dict[str, set[str]] = {}
+        if include_owner_prior and cases:
+            # This adapter has one admitted legacy L3 schema. A different case
+            # MUST NOT be treated as verified merely because it supplies a
+            # similarly named receipt or produces records in the same graph.
+            if "L3-CORPUS-20261020" in cases:
+                from ..services.owner_prior_research_bridge import readback_owner_prior_science
+                try:
+                    proof = readback_owner_prior_science(self.storage_root)
+                    if proof.get("verified") is True and proof.get("author_approved") is False:
+                        ids = proof.get("verified_event_ids")
+                        if isinstance(ids, list) and len(ids) == 2 and len(set(ids)) == 2:
+                            verified.add("L3-CORPUS-20261020")
+                            verified_event_ids["L3-CORPUS-20261020"] = set(ids)
+                except (ValueError, OSError, KeyError, TypeError, UnicodeError):
+                    pass  # Fail closed for incomplete, altered or inaccessible material.
+        if ambiguous_ancestry:
+            verified.clear()  # Conflicting lineages are never publishable.
+
+        admitted_records = [
+            item for item in records
+            if owner_case(item) is None or owner_case(item) in verified
+        ]
+        admitted_events = [
+            item for item in events
+            if item["event_id"] not in event_cases or (
+                event_cases[item["event_id"]] in verified
+                and item["event_id"] in verified_event_ids.get(
+                    event_cases[item["event_id"]], set()
+                )
+            )
+        ]
+        if not cases:
+            state = "NO_PRIOR_SCIENCE"
+        elif not include_owner_prior:
+            state = "WITHHELD_BY_POLICY"
+        elif len(verified) != len(cases):
+            state = "INCOMPLETE_OR_UNVERIFIED"
+        else:
+            state = "VERIFIED_PROVISIONAL_AUTHOR_HOLD"
+        return {
+            "status": state,
+            "records": admitted_records,
+            "events": admitted_events,
+            "withheld_record_count": len(records) - len(admitted_records),
+            "withheld_event_count": len(events) - len(admitted_events),
+            "publication_authority": "NONE",
+            "external_send": "DISABLED",
+        }

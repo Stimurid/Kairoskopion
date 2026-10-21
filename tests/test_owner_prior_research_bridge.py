@@ -420,3 +420,154 @@ def test_windows_junction_private_source_refused(tmp_path):
     assert alias.exists()
     with pytest.raises(ValueError, match="symlink/junction"):
         _private_file(alias / "F01_B09.txt")
+
+
+def test_consumer_hides_incomplete_owner_science_and_descendant_reopen(tmp_path, monkeypatch):
+    """A partial graph contains real records but never a complete research return."""
+    source, legacy, storage, _ = _seed_synthetic_owner_science(tmp_path)
+    from kairoskopion.kairon_provider.opportunity_portfolio import build_portfolio
+    graph = OpportunityGraphStore(storage)
+    graph.append_event({
+        "event_id": "independent-public-negative", "kind": "HUNT_RESULT",
+        "subject_id": "unrelated", "source_ref": "public:source",
+        "result": "NOT_FOUND", "intellectual_consequence": "No external hit.",
+        "next_action": "Keep investigating.",
+    })
+    native = graph.append_event
+    def abort_after_reopen(self, event):
+        if event.get("kind") == "FIELD_REOPEN_PROPOSAL":
+            raise RuntimeError("crash before completion receipt")
+        return native(event)
+    monkeypatch.setattr(OpportunityGraphStore, "append_event", abort_after_reopen)
+    with pytest.raises(RuntimeError, match="before completion"):
+        import_owner_prior_science(source, legacy, storage)
+    pending = graph.consumer_snapshot(include_owner_prior=True)
+    assert pending["status"] == "INCOMPLETE_OR_UNVERIFIED"
+    assert len(graph.list_records("Evidence")) == 2
+    assert len(pending["records"]) == 0
+    assert [e["event_id"] for e in pending["events"]] == ["independent-public-negative"]
+    assert [e["eventId"] for e in build_portfolio(graph)["events"]] == ["independent-public-negative"]
+    monkeypatch.setattr(OpportunityGraphStore, "append_event", native)
+    import_owner_prior_science(source, legacy, storage)
+    hidden = graph.consumer_snapshot()
+    assert hidden["status"] == "WITHHELD_BY_POLICY"
+    assert hidden["records"] == []
+    assert [e["event_id"] for e in hidden["events"]] == ["independent-public-negative"]
+    admitted = graph.consumer_snapshot(include_owner_prior=True)
+    assert admitted["status"] == "VERIFIED_PROVISIONAL_AUTHOR_HOLD"
+    assert {r["kind"] for r in admitted["records"]} == {"HuntTrace", "Evidence"}
+    assert len(admitted["records"]) == 3
+    assert len(admitted["events"]) == 3
+    assert len(build_portfolio(graph, include_owner_prior=True)["events"]) == 3
+    assert admitted["publication_authority"] == "NONE"
+    assert admitted["external_send"] == "DISABLED"
+
+
+def test_consumer_fails_closed_on_tampered_receipt_or_source(tmp_path):
+    source, legacy, storage, ownerdir = _seed_synthetic_owner_science(tmp_path)
+    import_owner_prior_science(source, legacy, storage)
+    graph = OpportunityGraphStore(storage)
+    assert len(graph.consumer_snapshot(include_owner_prior=True)["records"]) == 3
+    (ownerdir / "F02_v03.txt").write_text("tampered-owner-source", encoding="utf-8")
+    quarantined = graph.consumer_snapshot(include_owner_prior=True)
+    assert quarantined["status"] == "INCOMPLETE_OR_UNVERIFIED"
+    assert quarantined["records"] == [] and quarantined["events"] == []
+    assert len(graph.list_records("Evidence")) == 2
+
+
+def test_consumer_unknown_prior_schema_case_never_promoted(tmp_path):
+    graph = OpportunityGraphStore(tmp_path)
+    graph.put("Evidence", {
+        "id": "unknown-evidence", "revision": "raw",
+        "source_ref": "other-case", "source_kind": "PUBLISHED_ARTICLE",
+        "read_depth": "INDEX_ONLY", "passage_anchors": [],
+        "owner_prior_receipt_case": "UNKNOWN-LEGACY",
+    })
+    graph.append_event({
+        "event_id": "unknown-event", "kind": "SOURCE_CONTRADICTION",
+        "subject_id": "other-case", "source_ref": "other-case",
+        "result": "CONTRADICTS", "intellectual_consequence": "unresolved",
+        "next_action": "verify", "owner_prior_receipt_case": "UNKNOWN-LEGACY",
+    })
+    result = graph.consumer_snapshot(include_owner_prior=True)
+    assert result["status"] == "INCOMPLETE_OR_UNVERIFIED"
+    assert result["records"] == [] and result["events"] == []
+
+
+def test_unreceipted_grandchild_never_inherits_verified_science(tmp_path):
+    """A valid prior receipt does not bless a later event by mere graph ancestry."""
+    source, legacy, storage, _ = _seed_synthetic_owner_science(tmp_path)
+    import_owner_prior_science(source, legacy, storage)
+    graph = OpportunityGraphStore(storage)
+    original = graph.consumer_snapshot(include_owner_prior=True)
+    assert len(original["events"]) == 2
+    old_receipt = json.loads((
+        storage / "research_stage" / "L3-CORPUS-20261020" /
+        "L3-PRIOR-SCIENCE-IMPORT" / "receipt.json"
+    ).read_text(encoding="utf-8"))
+    graph.append_event({
+        "event_id": "unreviewed-grandchild", "kind": "DISCUSSION_NOTE",
+        "subject_id": "F01_B09", "source_ref": "owner-private:research",
+        "source_event_id": old_receipt["reopen_event_id"],
+    })
+    # The original imported pair remains independently verified. Its later
+    # derivative was not fingerprinted by that completion receipt.
+    assert readback_owner_prior_science(storage)["verified"]
+    current = graph.consumer_snapshot(include_owner_prior=True)
+    assert current["status"] == "VERIFIED_PROVISIONAL_AUTHOR_HOLD"
+    assert len(graph.replay_events()) == 3
+    assert {e["event_id"] for e in current["events"]} == {
+        old_receipt["source_event_id"], old_receipt["reopen_event_id"],
+    }
+
+
+def test_conflicting_prior_science_ancestry_blocks_consumer_projection(tmp_path):
+    source, legacy, storage, _ = _seed_synthetic_owner_science(tmp_path)
+    import_owner_prior_science(source, legacy, storage)
+    graph = OpportunityGraphStore(storage)
+    old_receipt = json.loads((
+        storage / "research_stage" / "L3-CORPUS-20261020" /
+        "L3-PRIOR-SCIENCE-IMPORT" / "receipt.json"
+    ).read_text(encoding="utf-8"))
+    graph.append_event({
+        "event_id": "contradictory-child", "kind": "DISCUSSION_NOTE",
+        "subject_id": "F01_B09", "source_ref": "other:case",
+        "source_event_id": old_receipt["reopen_event_id"],
+        "owner_prior_receipt_case": "OTHER-CASE",
+    })
+    current = graph.consumer_snapshot(include_owner_prior=True)
+    assert current["status"] == "INCOMPLETE_OR_UNVERIFIED"
+    assert current["records"] == []
+    assert current["events"] == []
+
+
+def test_missing_owner_tag_cannot_turn_science_into_public_event(tmp_path):
+    source, legacy, storage, _ = _seed_synthetic_owner_science(tmp_path)
+    import_owner_prior_science(source, legacy, storage)
+    graph = OpportunityGraphStore(storage)
+    for event_path in graph.events.glob("*.json"):
+        obj = json.loads(event_path.read_text(encoding="utf-8"))
+        if obj["kind"] == "SOURCE_CONTRADICTION":
+            obj.pop("owner_prior_receipt_case")
+            _json(event_path, obj)
+            break
+    assert len(graph.replay_events()) == 2
+    guarded = graph.consumer_snapshot(include_owner_prior=True)
+    assert guarded["status"] == "INCOMPLETE_OR_UNVERIFIED"
+    assert guarded["records"] == []
+    assert guarded["events"] == []
+
+
+def test_orphan_reopen_from_deleted_private_source_event_still_quarantined(tmp_path):
+    source, legacy, storage, _ = _seed_synthetic_owner_science(tmp_path)
+    import_owner_prior_science(source, legacy, storage)
+    graph = OpportunityGraphStore(storage)
+    for event_path in graph.events.glob("*.json"):
+        obj = json.loads(event_path.read_text(encoding="utf-8"))
+        if obj["kind"] == "SOURCE_CONTRADICTION":
+            event_path.unlink()
+            break
+    assert len(graph.replay_events()) == 1
+    guarded = graph.consumer_snapshot(include_owner_prior=True)
+    assert guarded["status"] == "INCOMPLETE_OR_UNVERIFIED"
+    assert guarded["events"] == []

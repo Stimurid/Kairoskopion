@@ -222,3 +222,33 @@ def test_three_distinct_mai_route_contracts_do_not_conflate_forms(tmp_path):
     assert "author_decision_pending" in by_seed["MAI-A"]["blockers"]
     assert "coauthor_consent_missing" in by_seed["MAI-F"]["blockers"]
     assert all(row["gateStatus"] != "SENT" for row in output["rows"])
+
+
+def test_trace_endpoint_quarantines_raw_pending_science(tmp_path, monkeypatch):
+    monkeypatch.setenv("KAIROSKOPION_DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("KAIROSKOPION_W12_PRIVATE_STAGE_READ_ENABLED", raising=False)
+    user = User(user_id="user_cccccccccccc", display_name="C")
+    store = OpportunityGraphStore(_user_opportunity_root(user))
+    store.append_event({
+        "event_id": "private-science-pending",
+        "kind": "SOURCE_CONTRADICTION",
+        "subject_id": "private-case", "source_ref": "owner-private:source",
+        "result": "CONTRADICTORY_SOURCE",
+        "intellectual_consequence": "author science not yet certified",
+        "next_action": "verify receipt",
+        "owner_prior_receipt_case": "L3-CORPUS-20261020",
+    })
+    client = TestClient(app)
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        default = client.get("/api/opportunities/trace")
+        assert default.status_code == 200
+        assert default.json()["events"] == []
+        assert default.json()["owner_prior_visibility"] == "WITHHELD_BY_POLICY"
+        monkeypatch.setenv("KAIROSKOPION_W12_PRIVATE_STAGE_READ_ENABLED", "1")
+        privileged = client.get("/api/opportunities/trace")
+        assert privileged.status_code == 200
+        assert privileged.json()["events"] == []
+        assert privileged.json()["owner_prior_visibility"] == "INCOMPLETE_OR_UNVERIFIED"
+    finally:
+        app.dependency_overrides.clear()

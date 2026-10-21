@@ -489,6 +489,7 @@ def readback_owner_prior_science(factory_storage_root: str | Path) -> dict[str, 
     if any(graph.list_records(k) for k in ("World","ArticleSeed","OpportunityRoute")):
         raise ValueError("owner science import cannot self-certify an approved paper")
     return {"verified":True,"receipt_sha256":_sha(data),
+            "verified_event_ids":[receipt["source_event_id"], receipt["reopen_event_id"]],
             "owner_science_status":"PROVISIONAL_NOT_AUTHOR_APPROVED",
             "indexed_published_refs":2,"provisional_objections":1,
             "field_reopen_proposals":1,"w12_equivalent_routes":0,

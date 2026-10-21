@@ -191,3 +191,54 @@ carriers were made available to reviewer.
 
 Do not mark INDEPENDENT_RE_REVIEW=PASS until a distinct second review of
 the repaired SHA. Production and deep field-science gates remain open.
+
+## #64 — consumer-side science visibility gate (2026-10-21)
+
+Implemented in the *existing* opportunity graph, portfolio, authenticated
+trace API, and opportunity-to-Artikl handoff. This protects readers from
+mistaking in-progress multi-record scientific import for completed research.
+
+- Low-level `OpportunityGraphStore.list_records/get/replay_events` remain RAW,
+  recovery/forensic interfaces for internal writers and exact receipt checks.
+  A raw immutable Evidence or FIELD_REOPEN event is not an admitted result.
+- `OpportunityGraphStore.consumer_snapshot(include_owner_prior=...)`
+  is the explicit **read** contract for publication-facing consumers. A
+  graph-only L3 object is withheld by default. Even with operator-authorized
+  private read enabled, it is exposed only after
+  `readback_owner_prior_science` checks the durable `intent.json`,
+  completion `receipt.json`, nine original owner source bytes, existing
+  Factory corpus pins, exact original graph events, and imported graph
+  fingerprint. The returned science remains **PROVISIONAL / AUTHOR_HOLD**.
+- Imported FIELD_REOPEN_PROPOSAL descendants inherit the originating
+  SOURCE_CONTRADICTION's import visibility at read time; pre-existing
+  immutable event content is not rewritten, so prior V02 hashes remain stable.
+- Unknown case/schema, failed/pending receipt, changed bytes or graph events
+  are **INCOMPLETE_OR_UNVERIFIED** and withheld. The consumer view reports
+  withheld counts but does not infer missing academic results.
+- `build_portfolio`, `GET /api/opportunities/trace` and the
+  `prepare_opportunity_execution_handoff` now use that consumer read
+  boundary. The API defaults to withholding private science under the
+  existing operator opt-in flag. The Artikl handoff always withholds
+  owner-prior science (its author approval cannot be inferred from a prior
+  research note). No publisher fulltext, publication action, World or
+  ArticleSeed is synthesized.
+- Latest exact-code targeted AORUS proof: **63 passed, 1 skipped**.
+  This includes pending/recovered science, unknown-schema refusal, missing
+  case tag, deleted source event, unreceipted grandchild, conflicting ancestry,
+  HTTP trace privacy and forged author-event rejection.
+- Broad AORUS suite with short temp root and `-m "not network"` passed
+  **3778 passed, 19 skipped, 8 deselected**. This broader run began before
+  the last provenance-edge refinements; exact HEAD GitHub CI is a separate gate.
+- Independent real owner-private L3 V02 cold readback:
+  private OFF => 0 records / 0 events; privately VERIFIED =>
+  3 graph records / 2 verified scientific events; original imported
+  science receipt SHA256 `58e14de028131b42f0d536618b95e87a1e63c2d554d6bca1bba866df06e11791`
+  unchanged; AUTHOR_HOLD and no external SEND preserved.
+- Prior parent-junction protection commit `7efaaa4` passed GitHub CI
+  [run 39652418031](https://github.com/Stimurid/Kairoskopion/actions/runs/39652418031).
+
+Explicit OPEN: this is a guarded L3 bridge consumer interface, not a universal
+cross-organ ACID transaction. Generic legacy-science schemas, authenticated
+owner-private cross-host ACL admission, timestamp-proven chronological replay,
+and third unrelated owner-authorized corpus remain #64 work. Production
+deployment and journal submission remain forbidden.
