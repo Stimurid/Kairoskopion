@@ -514,11 +514,10 @@ def test_unreceipted_grandchild_never_inherits_verified_science(tmp_path):
     # derivative was not fingerprinted by that completion receipt.
     assert readback_owner_prior_science(storage)["verified"]
     current = graph.consumer_snapshot(include_owner_prior=True)
-    assert current["status"] == "VERIFIED_PROVISIONAL_AUTHOR_HOLD"
+    # An unreceipted descendant quarantines the whole owner-science case.
+    assert current["status"] == "INCOMPLETE_OR_UNVERIFIED"
     assert len(graph.replay_events()) == 3
-    assert {e["event_id"] for e in current["events"]} == {
-        old_receipt["source_event_id"], old_receipt["reopen_event_id"],
-    }
+    assert current["records"] == [] and current["events"] == []
 
 
 def test_conflicting_prior_science_ancestry_blocks_consumer_projection(tmp_path):

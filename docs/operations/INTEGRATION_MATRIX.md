@@ -242,3 +242,56 @@ cross-organ ACID transaction. Generic legacy-science schemas, authenticated
 owner-private cross-host ACL admission, timestamp-proven chronological replay,
 and third unrelated owner-authorized corpus remain #64 work. Production
 deployment and journal submission remain forbidden.
+
+## #64 — independent audit findings and bounded P1 remediation (2026-10-22)
+
+Independent Claude Code read-only review of PR #46 at `b76d7e4`:
+**CHANGES_REQUIRED** (1 P1 / 7 P2; 0 P0). The complete reviewer output
+is preserved owner-private on AORUS at
+`_ops/T3-TALK-20261019/issue64_crossreview_b76d7e4.txt`.
+The reviewer did not access the private manuscript corpus, perform journal
+research or authorize a production merge.
+
+P1 proof: a prefixed but *untagged* Evidence/HuntTrace could appear in the
+consumer as receipt-authenticated while the legacy readback fingerprint,
+which selects only tagged records, never examined it. Attacker needed graph
+write access; nevertheless verified status could falsely imply publisher
+FULL_TEXT proof.
+
+This corrective slice does not rebuild Factory:
+- The existing L3 readback now returns ephemeral content-hash pins for **all
+  three exactly verified records** and the **two exact scientific events**.
+  These pins come from the independent original source/receipt/graph readback,
+  not a guessed suffix or journal name. No historic receipt is rewritten.
+- A consumer snapshot proves its own T0 record/event bytes against the
+  authenticated T1 pins. An inserted, modified, deleted, tag-erased or
+  unreceipted child record/event cannot be promoted using an ID prefix.
+- One unsupported/mixed imported case, ambiguous event ancestry or one
+  unreceipted extra record/event quarantines the entire owner-science
+  projection, retaining only independent ordinary graph rows.
+- Malformed private receipt roots/errors return a safe status and reason
+  category, without source paths or private payloads in the public API.
+  Relative graph-root resolution is fixed when the store is constructed.
+- A legacy science root and target Factory storage cannot coincide or nest:
+  an isolated original source boundary is mandatory.
+- Raw graph stores remain for repair/replay, distinct from consumer admission.
+  All original DOI pointers retain INDEX_ONLY; scientific result remains
+  provisional and author HOLD, never an approved ArticleSeed or SEND.
+
+Measured negative tests: six new adversarial tests **failed first** on the
+reviewed version; after the patch, the combined targeted suite passed
+**69 passed / 1 skipped**. The **exact patched AORUS full regression**
+(`pytest --basetemp C:\\t64p1sha -m 'not network'`) passed
+**3788 passed / 19 skipped / 8 deselected**, exit 0. Real L3 V02 cold
+readback still returns three pinned records, two source-bound events,
+zero unverified approval, with unchanged science receipt SHA256
+`58e14de028131b42f0d536618b95e87a1e63c2d554d6bca1bba866df06e11791`.
+
+REMAINING #64: CPU/IO amplification from fresh SHA validation on each
+operator-enabled HTTP read (P2), authorized filesystem roots with Windows
+reparse/junction behavior (P2), clearer withheld-vs-absent handoff diagnostics
+(P2), generic graph/store service layering (P2), typed cross-case research
+import, chronology with evidence, independent third owner-authorized corpus
+and cross-organ transaction closure. Do not describe this slice as ACID,
+release acceptance, or a universal importer. GitHub CI and independent
+*re-review of the repaired SHA* are separate gates.

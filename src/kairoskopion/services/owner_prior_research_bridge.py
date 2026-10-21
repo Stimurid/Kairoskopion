@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from ..kairon_provider.opportunity_graph import OpportunityGraphStore
+from ..kairon_provider.opportunity_graph import OpportunityGraphStore, _digest
 
 SCHEMA = "TRM074_OWNER_LEGACY_SCIENCE_BRIDGE_RECEIPT_V1"
 SOURCE_SCHEMA = "L3_CORPUS_FACTORY_TRIAL_RECEIPT_V3"
@@ -309,8 +309,11 @@ def import_owner_prior_science(
 ) -> dict[str, Any]:
     """Verify original source body first; then import under exclusive write lock."""
     receipt = Path(receipt_path)
-    legacy = Path(legacy_graph_root)
-    storage = Path(factory_storage_root)
+    legacy = Path(legacy_graph_root).resolve()
+    storage = Path(factory_storage_root).resolve()
+    if (legacy == storage or legacy.is_relative_to(storage)
+            or storage.is_relative_to(legacy)):
+        raise ValueError("owner prior science legacy and Factory storage roots must be isolated")
     verified = _legacy_evidence(receipt, legacy, storage)
     with _exclusive_prior_import(storage, verified["case_id"]):
         return _import_owner_prior_science_unlocked(receipt, legacy, storage, verified)
@@ -488,8 +491,28 @@ def readback_owner_prior_science(factory_storage_root: str | Path) -> dict[str, 
         raise ValueError("imported owner source objection/reopen semantics changed")
     if any(graph.list_records(k) for k in ("World","ArticleSeed","OpportunityRoute")):
         raise ValueError("owner science import cannot self-certify an approved paper")
+    # Readback authenticates exact CONTENT, not merely event IDs or record
+    # identity prefixes. Return ephemeral checked pins to consumer_snapshot,
+    # preserving the immutable historical receipt and its original SHA.
+    record_pins = [
+        {"kind": row["kind"], "id": row["id"],
+         "revision": row["revision"], "content_sha256": _digest(row)}
+        for kind in ("Evidence", "HuntTrace")
+        for row in graph.list_records(kind)
+        if row.get("owner_prior_receipt_case") == receipt["case_id"]
+    ]
+    if (len(record_pins) != 3
+            or sorted(row["kind"] for row in record_pins)
+                != ["Evidence", "Evidence", "HuntTrace"]):
+        raise ValueError("verified science record coverage not exactly pinned")
+    event_pins = [
+        {"event_id": event_id, "content_sha256": _digest(events[event_id])}
+        for event_id in (receipt["source_event_id"], receipt["reopen_event_id"])
+    ]
     return {"verified":True,"receipt_sha256":_sha(data),
             "verified_event_ids":[receipt["source_event_id"], receipt["reopen_event_id"]],
+            "verified_record_pins":record_pins,
+            "verified_event_pins":event_pins,
             "owner_science_status":"PROVISIONAL_NOT_AUTHOR_APPROVED",
             "indexed_published_refs":2,"provisional_objections":1,
             "field_reopen_proposals":1,"w12_equivalent_routes":0,
