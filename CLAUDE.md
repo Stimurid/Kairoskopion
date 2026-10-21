@@ -1,5 +1,10 @@
 # CLAUDE.md — Kairoskopion (Kairon)
 
+TRM-CITE-001 R1 isolated continuation (2026-10-21): see
+`docs/TRM_CITE_R1_RETURN.md`. Return consumer and tests are present, but the
+delegated sandbox could not execute Python or read the owner-only five-case
+inputs. Test count and scientific acceptance are unchanged.
+
 ## What is Kairoskopion
 
 Kairoskopion (short handle: **Kairon**) is an evidence-first publication-positioning system.

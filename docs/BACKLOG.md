@@ -1,5 +1,11 @@
 # Engineering Backlog — Kairoskopion
 
+**TRM-CITE-001 R1 continuation (2026-10-21):** Run the new local consumer on
+the owner-validated 13 work orders after checking the supplied hashes; acquire
+the Luckin and Descartes witnesses through an authorized provider; compare
+all five machine states to manual R1 protocols; run tests and independent
+review. The isolated worktree contains the consumer but no verified live run.
+
 **Last updated:** 2026-06-14 (Mavrinsky golden-run integration pass)
 
 Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.md → PROJECT_STATUS → SPEC_COVERAGE_MATRIX → this BACKLOG, picks the next sprint, implements on a feature branch, updates docs/tests/status, commits, pushes. No manual micromanagement required.
