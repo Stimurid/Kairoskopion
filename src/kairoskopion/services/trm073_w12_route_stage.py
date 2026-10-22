@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 import re
 from urllib.parse import urlsplit
@@ -365,3 +366,153 @@ def readback_w12_research_route(packet_path: Path | str, storage_root: Path | st
     return {"verified": True, "route_id": route_id, "w12_equivalent_held": 1,
             "deep_qualified": 0, "author_approved": 0, "external_send": "DISABLED",
             "receipt_sha256": _sha(_file(receipt_path, 125_000))}
+
+
+
+def stage_w12_candidate_wave(
+    *, case_id: str, storage_root: Path | str,
+    packet_paths: list[Path | str] = (),
+) -> dict[str, Any]:
+    """Batch the *existing* W3 -> W12 admission over a bounded real graph.
+
+    No generated science, no network fetch, no source invention. A passed
+    W3 comparator is only a candidate; W12_HELD requires the full separate
+    original/publisher-policy/opponent/target-thesis packet. Each packet is
+    staged by stage_w12_research_route (unchanged). Failed cells remain HOLD.
+    A distinct immutable outcome report is saved for each replay result.
+    """
+    if not isinstance(case_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{3,100}", case_id):
+        raise ValueError("W12 batch requires exact case identity")
+    root = Path(storage_root)
+    graph = OpportunityGraphStore(root)
+    candidates = [
+        event for event in graph.replay_events()
+        if event.get("kind") == "SCHOLARLY_ROUTE_CHALLENGE"
+        and str(event.get("event_id") or "").startswith(case_id + ":")
+    ]
+    if not 0 < len(candidates) <= 128:
+        raise ValueError("W12 candidate wave must contain 1..128 real W3 routes")
+    w3: dict[str, dict[str, Any]] = {}
+    for event in candidates:
+        ident = event.get("route_candidate_id")
+        if not isinstance(ident, str) or not ident or ident in w3:
+            raise ValueError("duplicate/invalid W3 route candidate identity")
+        if not event.get("journal_id") or not event.get("subject_id"):
+            raise ValueError("W3 route has no exact venue/claim head")
+        w3[ident] = event
+
+    packets: dict[str, tuple[Path, dict[str, Any], str]] = {}
+    pairs: set[tuple[str, str]] = set()
+    if len(packet_paths) > 128:
+        raise ValueError("too many W12 input packets for a bounded wave")
+    for path in packet_paths:
+        path = Path(path)
+        raw = _file(path, MAX_BYTES)
+        item = json.loads(raw.decode("utf-8"))
+        if not isinstance(item, dict) or item.get("schema") != SCHEMA:
+            raise ValueError("unknown W12 research-route packet schema")
+        cid = item.get("route_candidate_id")
+        if item.get("case_id") != case_id or not isinstance(cid, str) or cid not in w3:
+            raise ValueError("W12 packet has no matching case-scoped W3 candidate")
+        if cid in packets:
+            raise ValueError("duplicate W12 packet for the same candidate")
+        pair = (str(item.get("claim_version_id") or ""),
+                str(item.get("journal_id") or ""))
+        if not all(pair) or pair in pairs:
+            raise ValueError("duplicate/unidentified article-claim-version and journal pair")
+        if item.get("journal_id") != w3[cid].get("journal_id"):
+            raise ValueError("W12 packet journal not identical to W3 candidate")
+        if item.get("head_id") != w3[cid].get("subject_id"):
+            raise ValueError("W12 packet head not identical to W3 candidate")
+        pairs.add(pair)
+        packets[cid] = (path, item, _sha(raw))
+
+    output: list[dict[str, Any]] = []
+    admitted_pairs: set[tuple[str, str]] = set()
+    for cid in sorted(w3):
+        w = w3[cid]
+        row: dict[str, Any] = {
+            "route_candidate_id": cid,
+            "journal_id": w["journal_id"], "head_id": w["subject_id"],
+            "w3_event_id": w["event_id"],
+            "w3_opponent_resolved": w.get("opponent_resolved") is True,
+        }
+        if cid not in packets:
+            row["status"] = ("WAITING_W3_OPPONENT" if not row["w3_opponent_resolved"]
+                             else "WAITING_W12_SOURCE_VENUE_PACKET")
+        elif not row["w3_opponent_resolved"]:
+            row["status"] = "WAITING_W3_OPPONENT"
+            row["packet_sha256"] = packets[cid][2]
+        else:
+            path, packet, fingerprint = packets[cid]
+            row["packet_sha256"] = fingerprint
+            row["claim_version_id"] = packet["claim_version_id"]
+            try:
+                staged = stage_w12_research_route(path, root)
+                if staged["readback"].get("verified") is not True:
+                    raise ValueError("W12 readback not verified")
+                pair = (packet["claim_version_id"], packet["journal_id"])
+                if pair in admitted_pairs:
+                    raise ValueError("duplicate qualified article/venue pair")
+                admitted_pairs.add(pair)
+                row["status"] = "W12_EQUIVALENT_HELD"
+                row["w12_route_id"] = staged["readback"]["route_id"]
+                row["w12_receipt_sha256"] = staged["receipt_sha256"]
+            except (ValueError, OSError, KeyError, UnicodeError, TypeError) as exc:
+                row["status"] = "BLOCKED_W12_EVIDENCE_OR_POLICY"
+                row["blocker_code"] = type(exc).__name__.upper()
+                # Kept in owner-private receipt; never checked in with owner
+                # source paths, policy snippets or W12 packet bodies.
+                row["blocker_reason"] = str(exc)[:300]
+        output.append(row)
+
+    counts = {
+        "JOURNALS_DISCOVERED": len({e["journal_id"] for e in w3.values()}),
+        "ROUTES_PROPOSED": len(w3),
+        "W3_PROPOSED": len(w3),
+        "W3_OPPONENT_RESOLVED": sum(e.get("opponent_resolved") is True for e in w3.values()),
+        "W12_PACKETS_SUPPLIED": len(packets),
+        "W12_EQUIVALENT_HELD": len(admitted_pairs),
+        "DEEP_QUALIFIED": 0,
+        "ARTICLE_SEED_CREATED": 0,
+        "AUTHOR_APPROVED": 0,
+        "EXTERNAL_SEND": 0,
+        "SUBMISSION_READY": 0,
+        "W12_HOLD_OR_BLOCKED": len(w3)-len(admitted_pairs),
+        "PENDING_W3_OPPONENT": sum(r["status"] == "WAITING_W3_OPPONENT" for r in output),
+        "PENDING_W12_PACKET": sum(r["status"] == "WAITING_W12_SOURCE_VENUE_PACKET" for r in output),
+        "BLOCKED_EVIDENCE_OR_POLICY": sum(r["status"] == "BLOCKED_W12_EVIDENCE_OR_POLICY" for r in output),
+    }
+    pins = [
+        {"route_candidate_id": cid, "packet_sha256": packets[cid][2]}
+        for cid in sorted(packets)
+    ]
+    report = {
+        "schema": "TRM073_W12_W3_CANDIDATE_WAVE_RECEIPT_V1",
+        "case_id": case_id,
+        "w3_event_set_sha256": _sha(_canonical(
+            sorted(candidates, key=lambda x: x["event_id"]))),
+        "w12_packet_pins": pins,
+        "counts": counts, "routes": output,
+        "author_gate": "HOLD", "world_mutation": False,
+        "external_send": "DISABLED",
+    }
+    body = _canonical(report)
+    digest = _sha(body)
+    dest = root / "research_stage" / case_id / "W12-CANDIDATE-WAVES"
+    dest.mkdir(parents=True, exist_ok=True)
+    target = dest / f"{digest}.json"
+    if target.is_file():
+        if target.read_bytes() != body:
+            raise ValueError("W12 wave immutable receipt readback mismatch")
+    else:
+        temporary = target.with_suffix(".tmp")
+        temporary.write_bytes(body)
+        os.replace(temporary, target)
+    if target.read_bytes() != body:
+        raise ValueError("W12 wave storage failed cold readback")
+    return {
+        "receipt_path": str(target), "receipt_sha256": digest,
+        "counts": counts, "routes": output, "author_gate": "HOLD",
+        "external_send": "DISABLED",
+    }

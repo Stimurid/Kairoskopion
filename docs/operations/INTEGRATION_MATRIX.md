@@ -324,3 +324,54 @@ batch-runner, but that is not 53 scholarly-qualified W12 routes. Its
 science execution frontier is #51. PR46 still has two true
 W12_EQUIVALENT_HELD routes for the T3 case; do not inflate the count
 by importing unqualified MAI batch cards.
+
+## #43 W3 candidate -> W12 batch operator, 2026-10-22
+
+Added a **batch mode to the existing route runner**, not a second research
+engine: `scripts/run_trm073_w12_venue_route.py --wave-case-id CASE
+--storage-root STORAGE --packet W12_PACKET_A --packet W12_PACKET_B ...`.
+The owner submits *already sourced* venue/opponent packets or none;
+the runner scans the persisted W3 `SCHOLARLY_ROUTE_CHALLENGE` event set
+for that case, calls the unmodified `stage_w12_research_route()` for
+each supplied packet and generates a frozen, source-pinned private receipt
+for EVERY W3 candidate (including incomplete/blocked cells).
+
+The result distinguishes `JOURNALS_DISCOVERED`, `ROUTES_PROPOSED`,
+`W3_OPPONENT_RESOLVED`, `W12_EQUIVALENT_HELD`,
+`DEEP_QUALIFIED`, `ARTICLE_SEED_CREATED`, `AUTHOR_APPROVED`,
+`SUBMISSION_READY`, `W12_HOLD_OR_BLOCKED`, and missing-evidence
+subgroups. Admission is still tied to exact W3 head/venue, original
+source/version bytes, real official publisher HTML source anchors, opponent
+DOI, venue-specific RU+EN research theses and author HOLD. A W3 proposal
+alone contributes **zero W12 qualifications**. Duplicate packets,
+unregistered candidates, journal/claim collisions and forged publisher
+bytes cannot increase counters. No documents or journals are sent.
+
+Actual owner-private **T3-TALK-20261019** on AORUS, existing W1/W2/W3/W4
+and two frozen W12 packets, same existing Factory storage:
+- W3 proposed candidate venues: 9 distinct; W3 source opponent resolved 8.
+- W12 equivalent research routes still 2 (A-EPISTEMIC-POSITION and
+  C-CROSS-INDUSTRY); DEEP_QUALIFIED 0, submission READY 0.
+- WAITING_W3_OPPONENT 1: C-PARADOX-TRANSITION.
+- WAITING_W12_SOURCE_VENUE_PACKET 6:
+  A-ASYMMETRY, A-ROLE-UNIT, A-WARRANT,
+  C-INDUSTRIAL-REPRODUCTION, C-RESOURCE-NOVELTY,
+  C-VERTICAL-PRODUCTION.
+- Two independent new Python operator runs (no text passed through chat)
+  returned the exact same SHA256
+  `8c9642ca9d07aa57847157f8b8724e693be834ae7b3eb6b7d9d0cf39cb835456`.
+  Real W12 wave receipts remain in owner-private
+  `_ops/T3-TALK-20261019/factory-W1W2W3W4-W12-two-20261020/research_stage/T3-TALK-20261019/W12-CANDIDATE-WAVES/`,
+  never in public Git. On replay W12 records remain exactly two; no
+  ArticleSeed, World mutation or external sends.
+- Synthetic cold-process + partial failure + no-packet + wrong venue +
+  duplicate + source-tamper tests: 21 W12 route/wave tests passed before
+  scoreboard enrichment; 30 focused including prior review tests passed
+  after enrichment.
+
+This makes the genuine remaining W12 research queue addressable as seven
+independent scientific jobs. Creating the missing publisher-source packets,
+re-resolving the single absent W3 opponent, then re-running the same CLI is
+the actual scientific frontier. It is **not** 80 completed routes,
+not autonomous Indago hunting, not full WhiteCrow review, not a manuscript
+and not production.
