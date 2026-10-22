@@ -411,7 +411,299 @@ def kairon_native_publisher_sources_for_route(
         "editorial_world_qualified":False,
     }
 
-def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: Path | None = None, analysis_root: Path | None = None, science_index_path: Path | None = None, publisher_root: Path | None = None, model_root: Path | None = None, venue_web_root: Path | None = None, venue_policy_root: Path | None = None, venue_native_root: Path | None = None) -> dict[str, Any]:
+def native_scholarly_model_read_for_route(
+    route:dict[str,Any],output:Path,source_sha:str,
+    work_root:Path|None,review_root:Path|None,
+)->dict[str,Any]:
+    """Read back original publisher HTML and every model-cited passage."""
+    empty={"status":"NOT_RUN","count":0,"anchors":0,"detail":"",
+           "scholarly_authority":"HOLD"}
+    if review_root is None:return empty
+    if work_root is None:
+        raise ValueError("scholarly model reading requires original publisher source corpus")
+    rid=route["route_id"]
+    if rid!="MAI-W12-009":
+        return empty  # narrow real-science pilot; do not promote other routes
+    read_receipt=review_root/"native_scholarly_read_receipt.json"
+    if not read_receipt.is_file():
+        raise ValueError("native scholarly model reading receipt not written")
+    result=json.loads(read_receipt.read_text(encoding="utf-8"))
+    if (result.get("schema")!="MAI_ARTIKL_NATIVE_SCHOLARLY_READ_BATCH_v1"
+            or result.get("route_id")!=rid
+            or result.get("source_w12_sha256")!=source_sha
+            or result.get("author_gates_approved")!=0
+            or result.get("world_mutations_applied")!=0
+            or result.get("external_submission_count")!=0
+            or result.get("scientific_novelty_peer_accepted")!=0):
+        raise ValueError("scientific model attempted author/World promotion "+rid)
+    entries=result.get("papers") or []
+    if len(entries)!=3:
+        raise ValueError("three original same-journal works required for current pilot")
+    admitted=[]
+    for rec in entries:
+        doi=rec.get("doi","")
+        root=review_root/"papers"/sha(doi.encode("utf-8"))[:20]
+        proof_file=root/"accepted_challenge.json"
+        source_file=root/"source_input.json"
+        if not proof_file.is_file() or not source_file.is_file():
+            raise ValueError("scientific model missing real published-source proof "+doi)
+        proof=json.loads(proof_file.read_text(encoding="utf-8"))
+        src=json.loads(source_file.read_text(encoding="utf-8"))
+        model=proof.get("verified_review") or {}
+        original=proof.get("model_output") or {}
+        if (proof.get("schema")!="MAI_ARTIKL_NATIVE_PUBLISHER_SCHOLARLY_CHALLENGE_v1"
+                or proof.get("input_key")!=sha((
+                    json.dumps(src,ensure_ascii=False,sort_keys=True,indent=2)+"\n").encode("utf-8"))
+                or proof.get("model_response_sha256")!=sha((
+                    json.dumps(original,ensure_ascii=False,sort_keys=True,indent=2)+"\n").encode("utf-8"))
+                or proof.get("scientific_adjudication")!="PROVISIONAL"
+                or proof.get("independent_human_scholarly_peer_review")!="NOT_DONE"
+                or proof.get("author_decision")!="HOLD"
+                or proof.get("external_send_count")!=0
+                or src.get("source_W12_sha256")!=source_sha
+                or src.get("route_id")!=rid
+                or src.get("doi")!=doi
+                or src.get("source_W12_scientific_claim",{}).get("title_ru")!=route["title_ru"]
+                or src.get("source_W12_scientific_claim",{}).get("abstract_ru")!=route["abstract_ru"]
+                or model.get("doi")!=doi
+                or model.get("route_id")!=rid
+                or model.get("source_read_depth")!="PUBLISHER_HTML_MAIN_BODY_MODEL_READ"
+                or model.get("science_novelty_author_accepted") is not False
+                or model.get("research_novelty_author_accepted") is not False
+                or model.get("journal_send_count")!=0
+                or model.get("author_gate")!="HOLD"
+                or model.get("scientific_stage")!="NATIVE_SAME_JOURNAL_ARGUMENT_CRITIQUE_PROVISIONAL"):
+            raise ValueError("scholarly model report has unsupported authority/source "+doi)
+        url=src["original_publisher_url"]
+        native_path=work_root/"url_capture_cache"/sha(url.encode("utf-8"))[:24]
+        raw=(native_path/"source.bin")
+        visible=(native_path/"visible_text.txt")
+        article=src.get("publisher_readable_article_main_body","")
+        if (not raw.is_file() or not visible.is_file()
+                or sha(raw.read_bytes())!=src.get("original_publisher_html_sha256")
+                or sha(raw.read_bytes())!=model.get("original_pub_html_sha256")
+                or sha(visible.read_text(encoding="utf-8").rstrip("\r\n").encode("utf-8"))!=src.get("original_visible_text_sha256")
+                or not visible.read_text(encoding="utf-8").lstrip().startswith(article)
+                or len(article)<6500
+                or sha(article.encode("utf-8"))!=src.get("publisher_readable_main_body_sha256")
+                or sha(article.encode("utf-8"))!=model.get("article_body_source_sha256")):
+            raise ValueError("published article body changed after model reading "+doi)
+        # Validate the model's provenance and quote offsets against the original text.
+        if (model.get("anchors") is None or len(model["anchors"])<3
+                or len(model["anchors"])!=rec.get("source_anchor_count")
+                or rec.get("status") not in ("CACHED","MODEL_QUOTE_VERIFIED","RECOVERED_QUOTE_REVALIDATED")):
+            raise ValueError("insufficient independent publisher main body citations "+doi)
+        orig_anchors=original.get("anchors") or []
+        for idx,quote in enumerate(model["anchors"]):
+            text=quote.get("exact_quote","")
+            if (not isinstance(text,str) or not 25<=len(text)<=290
+                    or not text in article
+                    or text!=orig_anchors[idx].get("exact_quote")
+                    or quote.get("quote_sha256")!=sha(text.encode("utf-8"))
+                    or quote.get("publisher_main_body_offset")!=article.index(text)
+                    or quote.get("publisher_original_visible_text_sha256")!=src["original_visible_text_sha256"]):
+                raise ValueError("false scientific publisher quote/offset "+doi)
+        dest=output/"native_scholarly"/rid/(sha(doi.encode("utf-8"))[:20]+".json")
+        dest.parent.mkdir(parents=True,exist_ok=True)
+        dest.write_bytes(proof_file.read_bytes())
+        admitted.append({
+            "doi":doi,
+            "title":rec.get("title",""),
+            "source_read_depth":"PUBLISHER_HTML_MAIN_BODY_MODEL_READ",
+            "review_receipt":"native_scholarly/"+rid+"/"+dest.name,
+            "quote_anchors":len(model["anchors"]),
+            "argument_objection":model.get("strongest_source_grounded_objection","")[:380],
+            "science_admission":"PROVISIONAL_REQUIRES_HUMAN",
+        })
+    index=output/"native_scholarly"/rid/"index.json"
+    index.write_text(json.dumps(admitted,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+    return {
+        "status":"QUOTE_ATTESTED_ARTIKL_NATIVE_MACHINE_READING",
+        "count":len(admitted),
+        "anchors":sum(x["quote_anchors"] for x in admitted),
+        "detail":"native_scholarly/"+rid+"/index.json",
+        "scholarly_authority":"HOLD",
+        "independent_review_certified":0,
+    }
+
+def scientific_field_reopen_candidate_for_route(
+    route:dict[str,Any],output:Path,source_sha:str,
+    native_scholarly_root:Path|None,field_root:Path|None
+)->dict[str,Any]:
+    """Artikl's citation-linked cross-paper World return is ALWAYS only proposed."""
+    empty={"status":"NOT_PROPOSED","detail":"","competing_papers":0,
+           "source_anchors":0,"world_mutation_applied":False,
+           "author_decision":"HOLD"}
+    if field_root is None:return empty
+    if native_scholarly_root is None:
+        raise ValueError("field return depends on actual verified scholarly model reading")
+    rid=route["route_id"]
+    if rid!="MAI-W12-009":return empty
+    receipt_file=field_root/"field_reopen_proposal.json"
+    data_file=field_root/"source_input.json"
+    model_file=field_root/"model_output.json"
+    if not (receipt_file.is_file() and data_file.is_file() and model_file.is_file()):
+        raise ValueError("field reopen is missing actual scholarly producer output")
+    raw=receipt_file.read_bytes()
+    receipt=json.loads(raw.decode("utf-8"))
+    content=json.loads(data_file.read_text(encoding="utf-8"))
+    model=json.loads(model_file.read_text(encoding="utf-8"))
+    proposal=receipt.get("verified_proposal") or {}
+    if (receipt.get("schema")!="MAI_ARTIKL_A3A4_NATIVE_FIELD_REOPEN_RECEIPT_v1"
+            or receipt.get("source_input_sha256")!=sha((
+                json.dumps(content,ensure_ascii=False,sort_keys=True,indent=2)+"\n").encode("utf-8"))
+            or receipt.get("original_scholarship_model_output_sha256")!=sha((
+                json.dumps(model,ensure_ascii=False,sort_keys=True,indent=2)+"\n").encode("utf-8"))
+            or receipt.get("author_decision")!="HOLD"
+            or receipt.get("world_mutations")!=0
+            or receipt.get("journal_send_count")!=0
+            or receipt.get("human_scientific_evaluation")!="REQUIRED"
+            or content.get("route_id")!=rid
+            or content.get("source_W12_sha256")!=source_sha
+            or content.get("owner_original_W12_title_ru")!=route["title_ru"]
+            or content.get("owner_original_W12_abstract_ru")!=route["abstract_ru"]
+            or content.get("author_source_mutation_authorized") is not False
+            or proposal.get("schema")!="MAI_ARTIKL_A3A4_NATIVE_FIELD_REOPEN_CANDIDATE_v1"
+            or proposal.get("field_reopen_proposal_kind")!="FIELD_REOPEN_PROPOSAL"
+            or proposal.get("route_id")!=rid
+            or proposal.get("source_W12_sha256")!=source_sha
+            or proposal.get("author_world_change_approved") is not False
+            or proposal.get("author_draft_rewritten") is not False
+            or proposal.get("author_publication_identity_accepted") is not False
+            or proposal.get("journal_venue_policy_certified") is not False
+            or proposal.get("external_send_count")!=0
+            or proposal.get("downstream_gate")!="HUMAN_SCHOLARLY_ADJUDICATION_PENDING"):
+        raise ValueError("field-return source authority/author-gate contradiction")
+    evidence=content.get("three_published_native_paper_evidence") or []
+    if len(evidence)!=3:
+        raise ValueError("field reopen must be triangulated by three real publisher works")
+    allowed={record.get("doi"):record for record in evidence}
+    if len(allowed)!=3 or any(record.get("paper_review_receipt_sha256")!=sha((
+            native_scholarly_root/"papers"/sha(record["doi"].encode("utf-8"))[:20]/"accepted_challenge.json").read_bytes()
+                                     ) for record in evidence):
+        raise ValueError("field reopen depends on altered or missing paper model evidence")
+    paper_anchors={doi:{x["quote_sha256"] for x in source.get("source_anchors",[])}
+                   for doi,source in allowed.items()}
+    backlinks=proposal.get("source_anchor_ids") or []
+    if (not 3<=len(backlinks)<=8
+            or {x.get("doi") for x in backlinks}!=set(allowed)):
+        raise ValueError("World return lacks coverage of three unique DOI sources")
+    for link in backlinks:
+        if link.get("quote_sha256") not in paper_anchors[link["doi"]]:
+            raise ValueError("World return claims a nonexistent published-source anchor")
+        if (link.get("quote_source_type")!="ACTUAL_SAME_JOURNAL_PUBLISHER_MAIN_BODY"
+                or link.get("published_article_original_url")!=allowed[link["doi"]]["article_original_url"]):
+            raise ValueError("World return citation source/role mismatch")
+    target=output/"world_return"/rid/"field_reopen_proposal.json"
+    target.parent.mkdir(parents=True,exist_ok=True)
+    target.write_bytes(raw)
+    return {
+        "status":"NATIVE_THREE_PAPER_FIELD_REOPEN_PROPOSED",
+        "detail":"world_return/"+rid+"/field_reopen_proposal.json",
+        "competing_papers":len(evidence),
+        "source_anchors":len(backlinks),
+        "world_mutation_applied":False,
+        "author_decision":"HOLD",
+        "decision_candidate":proposal.get("decision_candidate",""),
+    }
+
+def native_kairon_graph_world_return_for_route(
+    route:dict[str,Any],output:Path,source_sha:str,
+    field_root:Path|None,graph_root:Path|None,
+)->dict[str,Any]:
+    """Verify actual Kairon graph events, not a duplicate invented graph status."""
+    empty={"status":"NOT_GRAPH_RECORDED","detail":"",
+           "pinned_evidence_count":0,"world_mutations":0,
+           "author_gate":"HOLD"}
+    if graph_root is None:return empty
+    if field_root is None:
+        raise ValueError("native graph events require the cited scientific FieldReopen receipt")
+    rid=route["route_id"]
+    if rid!="MAI-W12-009":return empty
+    return_file=graph_root/"MAI_A_EDUCATION_A3A4_GRAPH_WORLD_RETURN_RECEIPT.json"
+    original_field=field_root/"field_reopen_proposal.json"
+    if not return_file.is_file() or not original_field.is_file():
+        raise ValueError("native source/World graph return receipts not created")
+    raw=return_file.read_bytes()
+    rec=json.loads(raw.decode("utf-8"))
+    pins=rec.get("source_evidence_pins") or []
+    if (rec.get("schema")!="MAI_ARTIKL_A3A4_NATIVE_GRAPH_REOPEN_EVENT_IMPORT_v1"
+            or rec.get("source_route_id")!=rid
+            or rec.get("source_W12_sha256")!=source_sha
+            or rec.get("case_publisher_original_work_count")!=3
+            or rec.get("science_anchor_count",0)<3
+            or rec.get("human_gate")!="AUTHOR_REVIEW_REQUIRED"
+            or rec.get("world_mutations")!=0
+            or rec.get("outbound_submissions")!=0
+            or rec.get("article_seeds_automatically_created")!=0
+            or rec.get("implementation")!="EXISTING_OPPORTUNITY_GRAPH_STORE"
+            or rec.get("source_original_reopen_sha256")!=sha(original_field.read_bytes())
+            or len(pins)!=3
+            or len({x.get("doi") for x in pins})!=3):
+        raise ValueError("graph World-return evidence or owner authority mismatch")
+    graph=graph_root/"kairon_provider"/"opportunity_graph"
+    def path_of(name:Any,kind:str)->Path:
+        token=sha(json.dumps(name,ensure_ascii=False,sort_keys=True,separators=(",",":")).encode("utf-8"))
+        return graph/kind/(token+".json")
+    eid=rec["research_negative_event_id"]
+    pid=rec["research_field_reopen_event_id"]
+    negative_file=path_of(eid,"events")
+    reopen_file=path_of(pid,"events")
+    if not negative_file.is_file() or not reopen_file.is_file():
+        raise ValueError("native OpportunityGraphStore events lost")
+    negative=json.loads(negative_file.read_text(encoding="utf-8"))
+    reopen=json.loads(reopen_file.read_text(encoding="utf-8"))
+    if (negative.get("kind")!="HUNT_RESULT"
+            or negative.get("event_id")!=eid
+            or negative.get("subject_id")!=rid
+            or not str(negative.get("result","")).startswith("REJECT_")
+            or negative.get("author_decision")!="HOLD"
+            or negative.get("world_mutation")!="NONE"
+            or negative.get("external_send")!="DISABLED"
+            or negative.get("source_evidence_pins")!=pins
+            or negative.get("synthesis_receipt_sha256")!=sha(original_field.read_bytes())
+            or reopen.get("kind")!="FIELD_REOPEN_PROPOSAL"
+            or reopen.get("event_id")!=pid
+            or reopen.get("source_event_id")!=eid
+            or reopen.get("subject_id")!=rid
+            or reopen.get("author_gate")!="AUTHOR_REVIEW_REQUIRED"
+            or reopen.get("semantic_mutation")!="NONE"):
+        raise ValueError("existing graph event source or author gate mismatch")
+    for pin in pins:
+        doi=pin["doi"]
+        source_id=pin["id"]
+        rev=pin["revision"]
+        source_file=path_of(["Evidence",source_id,rev],"records")
+        if not source_file.is_file():
+            raise ValueError("graph source evidence missing "+doi)
+        evidence=json.loads(source_file.read_text(encoding="utf-8"))
+        if (evidence.get("kind")!="Evidence"
+                or evidence.get("id")!=source_id
+                or evidence.get("revision")!=rev
+                or evidence.get("source_doi")!=doi
+                or evidence.get("source_ref")!=pin["source_url"]
+                or evidence.get("source_content_sha256")!=pin["sha256"]
+                or evidence.get("read_depth")!="SECTIONS"
+                or evidence.get("qualified_for_article") is not False
+                or evidence.get("author_approved") is not False
+                or evidence.get("author_gate")!="HOLD"
+                or not evidence.get("passage_anchors")):
+            raise ValueError("graph published-source Evidence authority/anchor drift "+doi)
+    dest=output/"graph_events"/rid
+    dest.mkdir(parents=True,exist_ok=True)
+    (dest/"graph_import_receipt.json").write_bytes(raw)
+    (dest/"HUNT_RESULT.json").write_bytes(negative_file.read_bytes())
+    (dest/"FIELD_REOPEN_PROPOSAL.json").write_bytes(reopen_file.read_bytes())
+    return {
+        "status":"EXISTING_KAIRON_GRAPH_EVENTS_SOURCE_ATTESTED",
+        "detail":"graph_events/"+rid+"/graph_import_receipt.json",
+        "event_link":"graph_events/"+rid+"/FIELD_REOPEN_PROPOSAL.json",
+        "pinned_evidence_count":len(pins),
+        "world_mutations":0,
+        "author_gate":"HOLD",
+    }
+
+def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: Path | None = None, analysis_root: Path | None = None, science_index_path: Path | None = None, publisher_root: Path | None = None, model_root: Path | None = None, venue_web_root: Path | None = None, venue_policy_root: Path | None = None, venue_native_root: Path | None = None, native_scholarly_root: Path | None = None, field_reopen_root: Path | None = None, field_graph_root: Path | None = None) -> dict[str, Any]:
     records,source_hash=read_records(source)
     snapshot_bytes=snapshot_path.read_bytes()
     snapshot=json.loads(snapshot_bytes.decode("utf-8-sig"))
@@ -484,6 +776,12 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
             r,output,source_hash,venue_web_root,venue_policy_root)
         native=kairon_native_publisher_sources_for_route(
             r,output,source_hash,venue_native_root)
+        scholarly=native_scholarly_model_read_for_route(
+            r,output,source_hash,venue_native_root,native_scholarly_root)
+        reopen=scientific_field_reopen_candidate_for_route(
+            r,output,source_hash,native_scholarly_root,field_reopen_root)
+        graphreturn=native_kairon_graph_world_return_for_route(
+            r,output,source_hash,field_reopen_root,field_graph_root)
         packet={
             "schema":SCHEMA,"source_jsonl_sha256":source_hash,
             "snapshot_sha256":sha(snapshot_bytes),"outreach_sha256":events_sha,
@@ -495,6 +793,9 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
             "venue_web_evidence":venue,
             "venue_policy_candidates":policy,
             "venue_native_publisher_sources":native,
+            "native_scholarly_model_read":scholarly,
+            "scientific_field_reopen_proposal":reopen,
+            "native_existing_graph_world_return":graphreturn,
             "editorial_status":status,
             "scientific_state":"SOURCE_DRAFT_ONLY",
             "quality_receipts":{},
@@ -552,6 +853,17 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
             "venue_policy_channel_hint":policy["channel_hint"],
             "venue_native_publication_sources":native["count"],
             "venue_native_publication_index":native["detail"],
+            "native_scholarly_read_status":scholarly["status"],
+            "native_scholarly_read_count":scholarly["count"],
+            "native_scholarly_read_anchors":scholarly["anchors"],
+            "native_scholarly_read_detail":scholarly["detail"],
+            "field_reopen_proposal_status":reopen["status"],
+            "field_reopen_proposal_detail":reopen["detail"],
+            "field_reopen_source_anchors":reopen["source_anchors"],
+            "native_graph_field_reopen_status":graphreturn["status"],
+            "native_graph_field_reopen_detail":graphreturn["detail"],
+            "native_graph_field_reopen_event":graphreturn.get("event_link",""),
+            "native_graph_original_evidence_count":graphreturn["pinned_evidence_count"],
             "scientific_status":"PRIOR_ART_INDEXED_ON_HOLD" if science["review_packet"] else "SOURCE_DRAFT_ONLY",
             "packet":f"routes/{r['route_id']}.json",
             "abstract":f"routes/{r['route_id']}.md",
@@ -583,6 +895,14 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
         "venue_policy_cited_claim_count":sum(x["venue_policy_claims"] for x in index),
         "venue_native_publication_source_count":sum(x["venue_native_publication_sources"] for x in index),
         "venue_native_scholarly_full_texts_certified":0,
+        "native_scholarly_model_reads_count":sum(x["native_scholarly_read_count"] for x in index),
+        "native_scholarly_model_read_anchors":sum(x["native_scholarly_read_anchors"] for x in index),
+        "native_scholarly_independent_scholarly_acceptance":0,
+        "scientific_field_reopen_proposal_count":sum(bool(x["field_reopen_proposal_detail"]) for x in index),
+        "scientific_field_reopen_world_mutations":0,
+        "native_kairon_graph_field_reopens":sum(bool(x["native_graph_field_reopen_event"]) for x in index),
+        "native_kairon_graph_original_evidence_count":sum(x["native_graph_original_evidence_count"] for x in index),
+        "native_kairon_graph_author_approvals":0,
         "venue_policies_certified_count":0,
         "ready_for_human_send":0,
         "ready_for_author_rework":0,
@@ -675,6 +995,9 @@ if(item.venue_web_receipt){const v=el("a"," · Кайрон / ответ сай�
 if(item.venue_web_text){const v=el("a"," · Текст сайта ↗");v.href=item.venue_web_text;c.append(v)}
 if(item.venue_policy_detail){const v=el("a"," · Цитаты и требования ↗");v.href=item.venue_policy_detail;c.append(v)}
 if(item.venue_native_publication_index){const z=el("a"," | Native journal works: "+item.venue_native_publication_sources);z.href=item.venue_native_publication_index;c.append(z)}
+if(item.native_scholarly_read_detail){const z=el("a"," | Artikl: исходные аргументы и оппоненты ("+item.native_scholarly_read_count+")");z.href=item.native_scholarly_read_detail;c.append(z)}
+if(item.field_reopen_proposal_detail){const v=el("a"," | Возврат к исходному тезису (научный HOLD)");v.href=item.field_reopen_proposal_detail;c.append(v)}
+if(item.native_graph_field_reopen_event){const v=el("a"," | Kairon Graph: научный возврат ↗");v.href=item.native_graph_field_reopen_event;c.append(v)}
 node.append(c)}
 board.append(node)}
 }
@@ -696,8 +1019,11 @@ def main(argv: list[str] | None=None) -> int:
     parser.add_argument("--venue-web",type=Path)
     parser.add_argument("--venue-policy",type=Path)
     parser.add_argument("--venue-native",type=Path)
+    parser.add_argument("--native-scholarly",type=Path)
+    parser.add_argument("--field-reopen",type=Path)
+    parser.add_argument("--field-graph-root",type=Path)
     args=parser.parse_args(argv)
-    manifest=materialize(args.source,args.snapshot,args.output,args.outreach,args.analysis_root,args.science_index,args.published_sources,args.model_challenges,args.venue_web,args.venue_policy,args.venue_native)
+    manifest=materialize(args.source,args.snapshot,args.output,args.outreach,args.analysis_root,args.science_index,args.published_sources,args.model_challenges,args.venue_web,args.venue_policy,args.venue_native,args.native_scholarly,args.field_reopen,args.field_graph_root)
     print(json.dumps(manifest,ensure_ascii=False,indent=2))
     return 0
 
