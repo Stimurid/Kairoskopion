@@ -24,6 +24,9 @@ from run_mai_claim_challenge import run as run_criticism
 from merge_mai_scholarly_reviews import run as merge_criticism
 from fetch_mai_venue_pages import capture as capture_venues
 from run_mai_kairon_policy_claims import run as run_kairon_policy
+from run_mai_native_scholarly_read import run as run_native_scholarship
+from run_mai_a_education_field_reopen import execute as run_scientific_field_reopen
+from publish_mai_a3a4_native_graph_reopen import import_held_return as emit_existing_graph_return
 
 SCHEMA="MAI_W12_RESEARCH_OPERATOR_ONE_COMMAND_v1"
 
@@ -147,6 +150,9 @@ def run_workflow(
     venue_root:Path|None=None,replay_venues:bool=False,
     venue_policy_root:Path|None=None,policy_provider:str="claude",
     venue_native_root:Path|None=None,
+    native_scholarly_root:Path|None=None,author_book_source:Path|None=None,
+    field_reopen_root:Path|None=None,
+    existing_opportunity_graph_root:Path|None=None,
 )->dict[str,Any]:
     source=load(packets/"manifest.json")
     if source.get("schema")!="MAI_W12_BATCH_OUTPUT_MANIFEST_v1" or source.get("records")!=53:
@@ -201,6 +207,36 @@ def run_workflow(
                 or native_data.get("journal_send_count")!=0
                 or native_data.get("read_depth_certified_scholarly_full_text")!=0):
             raise ValueError("publisher native work source cannot promote article science or authority")
+    deep_model=None
+    if native_scholarly_root is not None:
+        if venue_native_root is None or author_book_source is None:
+            raise ValueError("original publisher works and authenticated author book required for scholarly model reading")
+        deep_model=run_native_scholarship(packets,venue_native_root,author_book_source,
+                                         native_scholarly_root,provider="claude",timeout=timeout,limit=3)
+        if deep_model.get("machine_source_grounded_papers_reviewed")!=3:
+            raise ValueError("source-quote verified authorial challenge not completed on three real works")
+    reopen_data=None
+    if field_reopen_root is not None:
+        if native_scholarly_root is None or venue_native_root is None or author_book_source is None:
+            raise ValueError("source-anchored field reopen requires original scholarly reads and owner context")
+        reopen_data=run_scientific_field_reopen(packets,venue_native_root,author_book_source,
+                                               native_scholarly_root,field_reopen_root)
+        if (reopen_data.get("source_articles")!=3
+                or reopen_data.get("proposal",{}).get("author_world_change_approved") is not False
+                or reopen_data.get("proposal",{}).get("external_send_count")!=0):
+            raise ValueError("scientific World-return proposal cannot mutate owner authority")
+    graph_data=None
+    if existing_opportunity_graph_root is not None:
+        if (field_reopen_root is None or native_scholarly_root is None
+                or venue_native_root is None or author_book_source is None):
+            raise ValueError("existing graph events require real source-validated three-work scientific return")
+        graph_data=emit_existing_graph_return(packets,venue_native_root,author_book_source,
+                                              native_scholarly_root,field_reopen_root,
+                                              existing_opportunity_graph_root)
+        if (graph_data.get("case_publisher_original_work_count")!=3
+                or graph_data.get("world_mutations")!=0
+                or graph_data.get("outbound_submissions")!=0):
+            raise ValueError("native Kairon graph failed to preserve author control")
     board_state="NOT_REQUESTED"
     board_manifest_sha=None
     if board_repo is not None:
@@ -221,6 +257,10 @@ def run_workflow(
         if venue_root is not None:args.extend(["--venue-web",str(venue_root)])
         if venue_policy_root is not None:args.extend(["--venue-policy",str(venue_policy_root)])
         if venue_native_root is not None:args.extend(["--venue-native",str(venue_native_root)])
+        if native_scholarly_root is not None:args.extend(["--native-scholarly",str(native_scholarly_root)])
+        if field_reopen_root is not None:args.extend(["--field-reopen",str(field_reopen_root)])
+        if existing_opportunity_graph_root is not None:
+            args.extend(["--field-graph-root",str(existing_opportunity_graph_root)])
         env=os.environ.copy()
         env["PYTHONPATH"]=str(board_repo/"src")
         proc=subprocess.run(args,cwd=str(board_repo),env=env,
@@ -246,6 +286,17 @@ def run_workflow(
         if native_data is not None and (board_meta.get("venue_native_publication_source_count")!=native_data["input_candidate_count"]
                 or board_meta.get("venue_native_scholarly_full_texts_certified")!=0):
             raise ValueError("board misclassified native publisher source as full read")
+        if deep_model is not None and (board_meta.get("native_scholarly_model_reads_count")!=3
+                or board_meta.get("native_scholarly_model_read_anchors")!=deep_model["quoted_argument_anchors"]
+                or board_meta.get("native_scholarly_independent_scholarly_acceptance")!=0):
+            raise ValueError("board misreported actual source-quoted scientific reading")
+        if reopen_data is not None and (board_meta.get("scientific_field_reopen_proposal_count")!=1
+                or board_meta.get("scientific_field_reopen_world_mutations")!=0):
+            raise ValueError("board cannot auto-adopt scientific field reopen proposal")
+        if graph_data is not None and (board_meta.get("native_kairon_graph_field_reopens")!=1
+                or board_meta.get("native_kairon_graph_original_evidence_count")!=3
+                or board_meta.get("native_kairon_graph_author_approvals")!=0):
+            raise ValueError("board lost real source-bound existing OpportunityGraphStore events")
         board_manifest_sha=hashlib.sha256((board_root/"manifest.json").read_bytes()).hexdigest()
         board_state="UPDATED_FROM_VERIFIED_SOURCE_REVIEW_RECORDS"
     report={
@@ -272,6 +323,15 @@ def run_workflow(
         "kairon_policy_source_quotes":policy_data["route_evidence_claim_count"] if policy_data else 0,
         "kairon_policy_model_calls_this_invocation":policy_data["total_model_calls_this_run"] if policy_data else 0,
         "kairon_native_venue_source_count":native_data["input_candidate_count"] if native_data else 0,
+        "artikl_native_publisher_scholarly_reviews":deep_model["machine_source_grounded_papers_reviewed"] if deep_model else 0,
+        "artikl_native_article_quote_anchors":deep_model["quoted_argument_anchors"] if deep_model else 0,
+        "artikl_scholarly_model_calls_this_invocation":deep_model["new_model_calls"] if deep_model else 0,
+        "artikl_a3a4_field_reopen_proposals":1 if reopen_data else 0,
+        "artikl_a3a4_field_reopen_model_calls_this_invocation":reopen_data["model_calls"] if reopen_data else 0,
+        "artikl_a3a4_field_reopen_author_approved":0,
+        "existing_kairon_graph_real_source_reopens":1 if graph_data else 0,
+        "existing_kairon_graph_pinned_original_evidence":graph_data["case_publisher_original_work_count"] if graph_data else 0,
+        "existing_kairon_graph_author_approved":0,
         "kairon_venue_policies_certified":0,
         "publisher_fulltexts_certified":0,"author_gates_ready":0,"external_submission_actions":0,
         "quality_claim":"PROVISIONAL_DATABASE_ABSTRACT_SCHOLARLY_CHALLENGE",
@@ -302,6 +362,10 @@ def main()->int:
     p.add_argument("--reuse-venues",action="store_true")
     p.add_argument("--venue-policy-root",type=Path)
     p.add_argument("--venue-native-root",type=Path)
+    p.add_argument("--native-scholarly-root",type=Path)
+    p.add_argument("--author-book-source",type=Path)
+    p.add_argument("--field-reopen-root",type=Path)
+    p.add_argument("--opportunity-graph-root",type=Path)
     p.add_argument("--venue-policy-provider",choices=["claude","codex","auto"],default="claude")
     a=p.parse_args()
     result=run_workflow(a.packets,a.prior_index,a.published,a.model_output,
@@ -313,7 +377,10 @@ def main()->int:
         outreach_events=a.outreach_events,diagnostics=a.existing_diagnostics,
         venue_root=a.venue_web,replay_venues=a.reuse_venues,
         venue_policy_root=a.venue_policy_root,policy_provider=a.venue_policy_provider,
-        venue_native_root=a.venue_native_root)
+        venue_native_root=a.venue_native_root,
+        native_scholarly_root=a.native_scholarly_root,author_book_source=a.author_book_source,
+        field_reopen_root=a.field_reopen_root,
+        existing_opportunity_graph_root=a.opportunity_graph_root)
     print(json.dumps(result,ensure_ascii=False,indent=2))
     return 0 if not result["pending_route_ids"] else 2
 
