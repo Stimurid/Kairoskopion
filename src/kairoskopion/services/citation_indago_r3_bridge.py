@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .citation_indago_witness_check import WitnessRefusal, attest_passages
 from .citation_r1 import _orders, _validate_inputs
 from .citation_repair_r2_r6 import load_prior_states, plan_repair
 
@@ -146,8 +147,13 @@ class BridgeResult:
 
 
 def consume_evidence_return(audit_path: Path, queue_path: Path,
-                            evidence: dict[str, Any], ledger_dir: Path) -> BridgeResult:
-    """Validate, persist, and convert one EvidenceReturn into R1 witness state."""
+                            evidence: dict[str, Any], ledger_dir: Path,
+                            *, witness_path: Path | None = None) -> BridgeResult:
+    """Bind a return to Z0, then independently attest *actual witness bytes*.
+
+    Without operator-provided witness bytes a provider-returned quote is merely
+    a CANDIDATE, never real R1 anchored evidence or a reason to skip Indago.
+    """
     _, order, case = _load_bound(audit_path, queue_path, evidence)
     outcome = evidence.get("outcome")
     if outcome not in OUTCOMES:
@@ -166,26 +172,37 @@ def consume_evidence_return(audit_path: Path, queue_path: Path,
     if outcome in {"NEGATIVE_HUNT", "PROVIDER_FAILURE"} and not (negatives or errors):
         raise IndagoBridgeRefusal("Negative/failure lacks evidence", "INVALID_SCHEMA")
 
+    attestation: dict[str, Any] = {
+        "status": "NOT_APPLICABLE", "bytes_verified": False,
+        "locator_verified": False, "uniqueness_verified": False,
+    }
+    if outcome == "MATCHED":
+        try:
+            attestation = attest_passages(source, passages, witness_path)
+        except WitnessRefusal as exc:
+            raise IndagoBridgeRefusal(str(exc), exc.code) from exc
     unique = [p for p in passages if p["passage_occurrences"] == 1]
-    if outcome == "MATCHED" and len(unique) > 1:
-        bridge_status = "ANCHOR_AMBIGUOUS"
-        r1_outcome = "NEGATIVE"
-    elif outcome == "MATCHED" and len(unique) == 1 and len(passages) == 1:
-        bridge_status = "ANCHORED"
-        r1_outcome = "OBSERVED"
-    elif outcome == "MATCHED":
-        bridge_status = "ANCHOR_AMBIGUOUS"
-        r1_outcome = "NEGATIVE"
+    if outcome == "MATCHED":
+        if len(passages) != 1 or not unique or attestation["status"] == "ANCHOR_AMBIGUOUS":
+            bridge_status, r1_outcome = "ANCHOR_AMBIGUOUS", "NEGATIVE"
+        elif attestation["status"] == "VERIFIED_UNIQUE":
+            bridge_status, r1_outcome = "ANCHORED", "OBSERVED"
+        else:
+            # The provider can claim a locator, hash and unique passage.
+            # None is scientific evidence until our own local file confirms it.
+            bridge_status, r1_outcome = "WITNESS_UNVERIFIED", "UNVERIFIED"
     elif outcome == "PROVIDER_FAILURE":
-        bridge_status = "PROVIDER_FAILURE_RECORDED"
-        r1_outcome = "ERROR"
+        bridge_status, r1_outcome = "PROVIDER_FAILURE_RECORDED", "ERROR"
     else:
-        bridge_status = "NEGATIVE_EVIDENCE_RECORDED"
-        r1_outcome = "NEGATIVE"
+        bridge_status, r1_outcome = "NEGATIVE_EVIDENCE_RECORDED", "NEGATIVE"
 
     identity = {
         "return_id": evidence["return_id"], "case_id": evidence["case_id"],
-        "work_order_id": evidence["work_order_id"], "source": source,
+        "intake_id": evidence["intake_id"],
+        "manuscript_sha256": evidence["manuscript_sha256"],
+        "work_order_id": evidence["work_order_id"],
+        "provider": evidence["provider"], "recorded_at": evidence["recorded_at"],
+        "source": source,
         "outcome": outcome, "passages": passages,
         "negative_evidence": negatives, "errors": errors,
     }
@@ -198,6 +215,11 @@ def consume_evidence_return(audit_path: Path, queue_path: Path,
             raise IndagoBridgeRefusal("return_id reused with different evidence",
                                       "REPLAY_ID_CONFLICT")
         state = _read_object(ledger_dir / prior["state_file"])
+        if (attestation.get("bytes_verified") and
+                state.get("witness_attestation", {}).get("status")
+                != attestation.get("status")):
+            raise IndagoBridgeRefusal("Cannot silently promote an old unverified return",
+                                      "REPLAY_ATTESTATION_CHANGED")
         replay = dict(prior, replay_status="IDEMPOTENT_REPLAY")
         return BridgeResult(replay, state, True)
 
@@ -225,6 +247,12 @@ def consume_evidence_return(audit_path: Path, queue_path: Path,
         "outcome": r1_outcome, "bridge_status": bridge_status,
         "verification": {f"V{i}": "NOT_CHECKED" for i in range(1, 6)},
         "source_evidence": source_evidence, "negative_evidence": carried_negative,
+        "reported_passages": [
+            {"passage_id": p["passage_id"], "locator": p["locator"],
+             "text_sha256": p["text_sha256"], "status": "PROVIDER_REPORTED"}
+            for p in passages
+        ] if bridge_status == "WITNESS_UNVERIFIED" else [],
+        "witness_attestation": attestation,
         "errors": errors, "provider": evidence["provider"],
         "retrieved_at": evidence["recorded_at"], "citation_gate": "NOT_PUBLICATION_READY",
         "author_gate": "PENDING", "source_to_claim_relation": "NOT_CHECKED",
@@ -237,6 +265,7 @@ def consume_evidence_return(audit_path: Path, queue_path: Path,
         "work_order_id": order["work_order_id"], "bridge_status": bridge_status,
         "replay_status": "RECORDED", "state_file": state_name,
         "provider_execution": "OPEN_NOT_DEMONSTRATED",
+        "witness_attestation": attestation,
         "scientific_certification": False,
     }
     # Exclusive creation avoids silently overwriting any evidence ledger.
@@ -251,15 +280,19 @@ def consume_evidence_return(audit_path: Path, queue_path: Path,
 
 
 def consume_file(audit_path: Path, queue_path: Path, return_path: Path,
-                 ledger_dir: Path) -> BridgeResult:
+                 ledger_dir: Path,
+                 *, witness_path: Path | None = None) -> BridgeResult:
     return consume_evidence_return(audit_path, queue_path,
-                                   _read_object(return_path), ledger_dir)
+                                   _read_object(return_path), ledger_dir,
+                                   witness_path=witness_path)
 
 
 def consume_and_plan(audit_path: Path, queue_path: Path, return_path: Path,
                      ledger_dir: Path, plan_dir: Path,
-                     manuscript_path: Path) -> dict[str, Any]:
-    result = consume_file(audit_path, queue_path, return_path, ledger_dir)
+                     manuscript_path: Path,
+                     *, witness_path: Path | None = None) -> dict[str, Any]:
+    result = consume_file(audit_path, queue_path, return_path, ledger_dir,
+                          witness_path=witness_path)
     bundle = plan_repair(audit_path, plan_dir, result.state["case_id"], manuscript_path,
                          prior_states=load_prior_states(
                              [ledger_dir / result.receipt["state_file"]]),
@@ -273,9 +306,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--queue", type=Path, required=True)
     parser.add_argument("--return-file", type=Path, required=True)
     parser.add_argument("--ledger", type=Path, required=True)
+    parser.add_argument("--witness-path", type=Path, default=None,
+                        help="Operator-held original PDF/TXT/MD; required for ANCHORED")
     args = parser.parse_args(argv)
     try:
-        result = consume_file(args.audit, args.queue, args.return_file, args.ledger)
+        result = consume_file(args.audit, args.queue, args.return_file, args.ledger,
+                              witness_path=args.witness_path)
     except IndagoBridgeRefusal as exc:
         print(json.dumps({"status": "REFUSED", "code": exc.code, "error": str(exc)}))
         return 2
