@@ -1474,3 +1474,94 @@ def test_missing_original_after_apply_returns_typed_refusal(tmp_path):
     with pytest.raises(repair.RepairRefusal) as caught:
         repair.post_patch_check(copied, proposal, applied)
     assert caught.value.code == "ORIGINAL_MISSING_AFTER_APPLY"
+
+
+def test_real_r1_consumer_source_evidence_shape_does_not_trigger_rehunt(tmp_path):
+    """R1 serializes anchors in source_evidence[], not source_identity.
+
+    A genuine unique passage is recognized for planning; V1-V5 remain
+    independently unverified. No synthetic witness becomes scientific PASS.
+    """
+    draft = _draft(tmp_path)
+    audit, queue, orders, case = _z0(tmp_path, draft)
+    state = _prior_state(tmp_path, case, outcome="OBSERVED",
+                         read_depth="ANCHORED_PASSAGE", negatives=())
+    state.pop("source_identity", None)
+    state["source_evidence"] = [{
+        "work_id": "FICTIONAL_WORK_A",
+        "edition_id": "FICTIONAL_EDITION_1",
+        "witness_id": "SHA256_FICTIONAL_WITNESS",
+        "read_depth": "ANCHORED_PASSAGE",
+        "passage_id": "passage:fictional_unique_1",
+        "passage_occurrences": 1,
+        "locator_present": True,
+        "locator": "[PDF_PAGE_INDEX_1]",
+        "source_provenance": "OWNER_CORPUS",
+    }]
+    (tmp_path / f"{case['case_id']}.state.json").write_text(
+        json.dumps(state), encoding="utf-8")
+    bundle = repair.plan_repair(
+        audit, tmp_path / "out", case["case_id"], draft,
+        prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
+    assert bundle["r3_reentry"] is None
+    assert "IDENTITY_AND_PASSAGE_PROPOSED" in {
+        item["evidence_label"] for item in bundle["r4_candidates"]}
+    assert _candidate(bundle, "REMOVE_UNSUPPORTED_CITATION")["applicable"] is False
+    prior = bundle["work_edition_witness_provenance"]["carried_from_prior_states"][0]
+    assert prior["identity"]["witness_id"] == "SHA256_FICTIONAL_WITNESS"
+    assert prior["witnesses"][0]["source_provenance"] == "OWNER_CORPUS"
+    assert set(bundle["verification"].values()) == {"NOT_CHECKED"}
+    assert bundle["citation_gate"] == "NOT_PUBLICATION_READY"
+
+
+def test_actual_r1_invalid_anchor_id_does_not_shortcut_research(tmp_path):
+    draft = _draft(tmp_path)
+    audit, queue, orders, case = _z0(tmp_path, draft)
+    state = _prior_state(tmp_path, case, outcome="OBSERVED",
+                         read_depth="ANCHORED_PASSAGE", negatives=())
+    state.pop("source_identity", None)
+    state["source_evidence"] = [{
+        "witness_id": "FICTIONAL_WITNESS",
+        "read_depth": "ANCHORED_PASSAGE",
+        "passage_id": "passage:anchor_missing",
+        "passage_occurrences": 1,
+        "locator_present": True,
+    }]
+    (tmp_path / f"{case['case_id']}.state.json").write_text(
+        json.dumps(state), encoding="utf-8")
+    bundle = repair.plan_repair(
+        audit, tmp_path / "out", case["case_id"], draft,
+        prior_states=repair.load_prior_states([tmp_path]), queue_orders=orders)
+    assert bundle["r3_reentry"] is not None
+    assert "IDENTITY_ONLY_PROPOSED" in {
+        item["evidence_label"] for item in bundle["r4_candidates"]}
+    assert bundle["citation_gate"] == "NOT_PUBLICATION_READY"
+
+
+def test_real_r1_incomplete_passage_proof_requires_reentry(tmp_path):
+    """A real R1 record may not self-certify an anchor with missing proof."""
+    draft = _draft(tmp_path)
+    audit, queue, orders, case = _z0(tmp_path, draft)
+    state = _prior_state(tmp_path, case, outcome="OBSERVED",
+                         read_depth="ANCHORED_PASSAGE", negatives=())
+    state.pop("source_identity", None)
+    source_evidence = {
+        "witness_id": "FICTIONAL_WITNESS",
+        "read_depth": "ANCHORED_PASSAGE",
+        "passage_id": "passage:fictional",
+        "passage_occurrences": 1,
+        "locator_present": True,
+    }
+    for removed in ("passage_id", "passage_occurrences", "locator_present"):
+        invalid = dict(source_evidence)
+        invalid.pop(removed)
+        state["source_evidence"] = [invalid]
+        (tmp_path / f"{case['case_id']}.state.json").write_text(
+            json.dumps(state), encoding="utf-8")
+        location = tmp_path / ("out_" + removed)
+        bundle = repair.plan_repair(
+            audit, location, case["case_id"], draft,
+            prior_states=repair.load_prior_states([tmp_path]),
+            queue_orders=orders)
+        assert bundle["r3_reentry"] is not None, removed
+        assert _candidate(bundle,"REMOVE_UNSUPPORTED_CITATION")["applicable"] is False

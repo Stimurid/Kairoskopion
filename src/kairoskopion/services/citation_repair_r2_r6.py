@@ -460,11 +460,56 @@ def _desired_support(kind: str, origin_type: str) -> str:
     return ("WORK_EDITION_WITNESS_IDENTITY_PLUS_A_PASSAGE_THAT_ENTAILS_THE_CLAIM")
 
 
+def _witness_descriptors(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Read old R2 descriptors and genuine R1 source_evidence[] records."""
+    result: list[dict[str, Any]] = []
+    legacy = state.get("source_identity")
+    if isinstance(legacy, dict):
+        result.append(legacy)
+    for item in state.get("source_evidence") or ():
+        if isinstance(item, dict):
+            result.append(item)
+    return result
+
+
+def _observed_anchored(state: dict[str, Any]) -> bool:
+    """Evidence of a real unique passage, NOT source-to-claim V1–V5 PASS."""
+    if state.get("outcome") != "OBSERVED":
+        return False
+    for witness in _witness_descriptors(state):
+        if witness.get("read_depth") not in ANCHORED_READ_DEPTHS:
+            continue
+        # A real R1 source_evidence[] entry is structurally stricter than
+        # the historical operator-authored source_identity descriptor.
+        # No paper is considered anchored if its actual R1 passage id,
+        # occurrence count, or locator attestation is absent.
+        if witness in (state.get("source_evidence") or ()):
+            pid = witness.get("passage_id")
+            if not isinstance(pid, str) or not pid.startswith("passage:"):
+                continue
+            if pid == "passage:anchor_missing":
+                continue
+            if witness.get("passage_occurrences") != 1:
+                continue
+            if witness.get("locator_present") is not True:
+                continue
+        else:
+            if witness.get("passage_id") in (
+                "passage:anchor_missing", "anchor_missing"):
+                continue
+            if ("passage_occurrences" in witness
+                    and witness["passage_occurrences"] != 1):
+                continue
+            if witness.get("locator_present") is False:
+                continue
+        return True
+    return False
+
+
 def evidence_label(state: dict[str, Any]) -> str:
     outcome = state.get("outcome")
     if outcome == "OBSERVED":
-        depth = (state.get("source_identity") or {}).get("read_depth")
-        return ("IDENTITY_AND_PASSAGE_PROPOSED" if depth in ANCHORED_READ_DEPTHS
+        return ("IDENTITY_AND_PASSAGE_PROPOSED" if _observed_anchored(state)
                 else "IDENTITY_ONLY_PROPOSED")
     if outcome == "NEGATIVE":
         return "NEGATIVE_EVIDENCE_ON_RECORD"
@@ -586,9 +631,9 @@ def reconstruct_intent(audit: dict[str, Any], case_id: str,
 def plan_reentry(intent: IntentReconstruction, states: list[dict[str, Any]],
                  queue: list[dict[str, Any]]) -> ResearchReentry | None:
     """R3: emit a bounded reentry only when no carried evidence can answer R2."""
-    if any(s.get("outcome") == "OBSERVED"
-           and (s.get("source_identity") or {}).get("read_depth")
-           in ANCHORED_READ_DEPTHS for s in states):
+    if any(_observed_anchored(s) for s in states):
+        # The file is already observed; do not dispatch a duplicate hunt.
+        # Semantic V4 and publisher identity may still remain NOT_CHECKED.
         return None
     negatives = sorted({str(x) for s in states
                         for x in (s.get("negative_evidence") or [])})
@@ -680,21 +725,20 @@ def build_candidates(intent: IntentReconstruction,
     source does not carry the claim; zero evidence yields ABSTAIN only.
     """
     has_observed = any(s.get("outcome") == "OBSERVED" for s in states)
-    has_anchored = any(
-        s.get("outcome") == "OBSERVED"
-        and (s.get("source_identity") or {}).get("read_depth")
-        in ANCHORED_READ_DEPTHS for s in states)
+    has_anchored = any(_observed_anchored(s) for s in states)
     # Failed access (BLOCKED/ERROR) is epistemically unknown, not negative
     # evidence; a mere OBSERVED transport is not a scientific mismatch.
     # R1 must explicitly identify a readable witness and judge the specific
     # claim to be unsupported before any machine deletion is proposed.
     consulted_mismatch = any(
         s.get("outcome") in ("NEGATIVE", "OBSERVED")
-        and (s.get("source_identity") or {}).get("read_depth")
-        in {"SECTION_TEXT", "ANCHORED_PASSAGE", "FULL_TEXT"}
-        and bool((s.get("source_identity") or {}).get("witness_id"))
         and s.get("source_to_claim_relation") == "DOES_NOT_SUPPORT_CLAIM"
         and bool(s.get("negative_evidence"))
+        and any(
+            w.get("read_depth") in {"SECTION_TEXT", "ANCHORED_PASSAGE", "FULL_TEXT"}
+            and bool(w.get("witness_id"))
+            for w in _witness_descriptors(s)
+        )
         for s in states)
     # An anchored passage on record still VETOS machine deletion.
     defect_evidenced = (not has_anchored) and consulted_mismatch
@@ -984,9 +1028,18 @@ def plan_repair(audit_path: Path, output_dir: Path, case_id: str,
                     "task_id": state.get("task_id"),
                     "outcome": state.get("outcome"),
                     "identity": {key: value for key, value
-                                 in (state.get("source_identity") or {}).items()
+                                 in (_witness_descriptors(state)[0]
+                                     if _witness_descriptors(state) else {}).items()
                                  if key in ("work_id", "edition_id",
                                             "witness_id", "passage_id")},
+                    "witnesses": [
+                        {key: value for key, value in witness.items()
+                         if key in ("work_id", "edition_id", "witness_id",
+                                    "passage_id", "read_depth",
+                                    "source_provenance", "ingest_sha256",
+                                    "locator")}
+                        for witness in _witness_descriptors(state)
+                    ],
                 }
                 for state in linked
             ],
