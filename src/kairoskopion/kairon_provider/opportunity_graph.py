@@ -411,11 +411,13 @@ class OpportunityGraphStore:
         # intentionally bounded until a generic importer is accepted.
         l3 = "L3-CORPUS-20261020"
 
-        def owner_case(item: dict[str, Any]) -> str | None:
+        def owner_case(item: dict[str, Any], *, is_event: bool) -> str | None:
             tag = item.get("owner_prior_receipt_case")
             if tag:
                 return str(tag)
-            identity = str(item.get("event_id") or item.get("id") or "")
+            # Record IDs and event IDs occupy different namespaces. A record
+            # carrying an unrelated event_id must never shadow its record id.
+            identity = str(item.get("event_id" if is_event else "id") or "")
             if identity.startswith(l3 + ":IMPORTED:"):
                 return l3
             if (
@@ -430,7 +432,7 @@ class OpportunityGraphStore:
 
         event_cases: dict[str, str] = {
             str(item["event_id"]): case
-            for item in events if (case := owner_case(item)) is not None
+            for item in events if (case := owner_case(item, is_event=True)) is not None
         }
         children: dict[str, list[str]] = {}
         for item in events:
@@ -450,10 +452,10 @@ class OpportunityGraphStore:
                 elif event_cases[child] != event_cases[parent]:
                     ambiguous_ancestry = True
 
-        scoped_records = [item for item in records if owner_case(item) is not None]
-        scoped_events = [item for item in events if item["event_id"] in event_cases]
+        scoped_records = [item for item in records if owner_case(item, is_event=False) is not None]
+        scoped_events = [item for item in events if str(item["event_id"]) in event_cases]
         cases = {
-            owner_case(item) for item in scoped_records
+            owner_case(item, is_event=False) for item in scoped_records
         } | set(event_cases.values())
         verified = False
         reason: str | None = None
@@ -513,11 +515,11 @@ class OpportunityGraphStore:
         # verified projection. Unrelated ordinary graph rows remain readable.
         admitted_records = [
             item for item in records
-            if owner_case(item) is None or verified
+            if owner_case(item, is_event=False) is None or verified
         ]
         admitted_events = [
             item for item in events
-            if item["event_id"] not in event_cases or verified
+            if str(item["event_id"]) not in event_cases or verified
         ]
         return {
             "status": status, "status_reason": reason,

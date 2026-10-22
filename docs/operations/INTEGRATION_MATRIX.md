@@ -295,3 +295,32 @@ import, chronology with evidence, independent third owner-authorized corpus
 and cross-organ transaction closure. Do not describe this slice as ACID,
 release acceptance, or a universal importer. GitHub CI and independent
 *re-review of the repaired SHA* are separate gates.
+
+## #64 second independent read-only audit / identity fix (2026-10-22)
+
+Claude Code re-reviewed exact `224dec1` and returned CHANGES_REQUIRED:
+two class/identity bugs, not a retraction of the verified earlier fixes.
+A record with an injected `event_id` previously shadowed its own `id` in
+the *consumer-scoping* function, and a numeric event ID was converted to
+string for the quarantine index but not on lookup. Both could evade a
+consumer read filter.
+
+The remedy is confined to `OpportunityGraphStore.consumer_snapshot`:
+`owner_case(item, is_event=...)` selects the correct identity namespace,
+and event scope membership uses the same normalized string representation
+as the index. Three new adversarial tests first failed against `224dec1`;
+after this patch the complete focused graph/portfolio/bridge/handoff
+selection passed 72 tests (1 Windows symlink test skipped).
+
+Real AORUS L3 V02 performance measurement (five reads each, sample mean,
+not a load test): ordinary private-disabled read 1.1 ms; cryptographically
+verified owner science consumer read 17.3 ms; owner-source readback alone
+15.1 ms. A speculative cross-request hash cache is **not implemented**:
+it adds cache-staleness risk for a local 15 ms source operation. Revisit
+only with a measured operator load or large-corpus benchmark.
+
+The separate MAI PR #50 already provides a 53-route deterministic
+batch-runner, but that is not 53 scholarly-qualified W12 routes. Its
+science execution frontier is #51. PR46 still has two true
+W12_EQUIVALENT_HELD routes for the T3 case; do not inflate the count
+by importing unqualified MAI batch cards.

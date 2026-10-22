@@ -104,3 +104,45 @@ def test_legacy_and_factory_root_must_not_overlap(tmp_path):
     source, legacy, storage, _ = _seed_synthetic_owner_science(tmp_path)
     with pytest.raises(ValueError, match="root.*isolated"):
         import_owner_prior_science(source, legacy, legacy)
+
+
+
+@pytest.mark.parametrize("kind,prefix", [
+    ("Evidence", "trm074-l3-ref-FORGED"),
+    ("HuntTrace", "trm074-owner-science-L3-CORPUS-20261020-forged"),
+])
+def test_event_id_shadow_on_record_cannot_escape_private_scope(tmp_path, kind, prefix):
+    source, legacy, storage, _ = _seed_synthetic_owner_science(tmp_path)
+    import_owner_prior_science(source, legacy, storage)
+    graph = OpportunityGraphStore(storage)
+    forged = {
+        "id": prefix, "revision": "r1", "event_id": "public-looking-id",
+        "source_ref": "doi:10.0000/forged",
+        "author_approved": True, "full_text_certified": True,
+        "read_depth": "FULL_TEXT", "source_kind": "PUBLISHED_ARTICLE",
+        "passage_anchors": [{"kind": "FAKE"}],
+    }
+    graph.put(kind, forged)
+    public = graph.consumer_snapshot(include_owner_prior=False)
+    assert public["status"] == "WITHHELD_BY_POLICY"
+    assert all(x.get("id") != prefix for x in public["records"])
+    admitted = graph.consumer_snapshot(include_owner_prior=True)
+    assert admitted["status"] == "INCOMPLETE_OR_UNVERIFIED"
+    assert admitted["records"] == [] and admitted["events"] == []
+
+
+def test_integer_event_id_with_private_tag_never_leaks_to_public(tmp_path):
+    graph = OpportunityGraphStore(tmp_path)
+    graph.append_event({
+        "event_id": 5, "kind": "SOURCE_CONTRADICTION",
+        "subject_id": "owner", "source_ref": "owner:private",
+        "owner_prior_receipt_case": "L3-CORPUS-20261020",
+        "result": "CONTRADICTS", "intellectual_consequence": "research hold",
+        "next_action": "review",
+    })
+    public = graph.consumer_snapshot(include_owner_prior=False)
+    assert public["events"] == []
+    assert public["status"] == "WITHHELD_BY_POLICY"
+    restricted = graph.consumer_snapshot(include_owner_prior=True)
+    assert restricted["events"] == []
+    assert restricted["status"] == "INCOMPLETE_OR_UNVERIFIED"
