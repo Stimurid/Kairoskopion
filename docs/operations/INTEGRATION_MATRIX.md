@@ -375,3 +375,69 @@ re-resolving the single absent W3 opponent, then re-running the same CLI is
 the actual scientific frontier. It is **not** 80 completed routes,
 not autonomous Indago hunting, not full WhiteCrow review, not a manuscript
 and not production.
+
+## #43 / TRM074: W5 native Springer/JIE C04 scholarly route (2026-10-22)
+
+AORUS owner-private cold-source runner now executes the existing Factory
+with **W1 → W2 → two independent W3-discovery waves → W4 → three W12
+publisher/source-admitted held routes → LitOps → WhiteCrow** on one new
+isolated workspace. No second publication engine was constructed.
+
+New pair (distinct source problem + journal, not an old venue synonym):
+- C04 v0.4 MFTI original source (original versioned case manifest; exact
+  line-11 source quotation SHA verified); proposed claim version
+  `C04-v0.4-L11-industrial-reproduction-vs-firm-agility-v0`.
+- `Journal of Innovation and Entrepreneurship`, publisher Springer Nature,
+  official `link.springer.com/journal/13731/aims-and-scope` and
+  `/submission-guidelines` native HTML captured and SHA-pinned.
+- Journal-native research opponent: Rastogi & Pandita (2025),
+  "Driving entrepreneurial success: navigating AI-driven transformation
+  through workforce agility and sustainability",
+  DOI `10.1186/s13731-025-00554-0`. Original Springer article HTML captured
+  independently, exact passage unique-anchor verified. Relevant methods:
+  cross-sectional, purposive qualitative interviews (n=27), limited
+  generalization; selective sections examined, NOT certified exhaustive
+  reading of scholarly full text.
+- Scientific contrast held for Artikl/author: firm-level AI-driven dynamic
+  capabilities/workforce agility versus transferable, reproducible
+  cross-organizational industrial functions/new division of labor.
+  Negative test: if no independent second-firm transfer/persistence exists,
+  the claimed extra industrial level collapses to firm-level adaptation.
+- The new W3 packet remained reference-level and not author-approved.
+  The existing W12 gateway independently checked source identity/version,
+  publisher bytes, DOI opponent, distinct journal ecology, exact anchors,
+  RU+EN target-specific hypotheses, empirical falsifier, author/rights HOLD.
+  It created one new `W12_EQUIVALENT_HELD` HuntTrace, no ArticleSeed.
+
+Actual one-command executable owner-private operator:
+`_ops/T3-TALK-20261019/TRM074_FACTORY_W1_W5_W12_THREE_ONECMD_20261022.ps1`
+(private source and research packets remain outside public Git).
+It executed twice on fresh AORUS workspace:
+- Sources 34; W3 proposed **10** across **2 independent W3 wave receipts**;
+  W12_EQUIVALENT_HELD **3** (two inherited, one new); WhiteCrow context
+  packs 3; 7 other candidates remain held/blocked, 0 deep-qualified,
+  0 author-admitted ArticleSeed, 0 submission-ready, 0 SEND.
+- Factory receipt SHA256:
+  `0db8f0f6e02434ddd50462a849775b5978eafb1c313d149b9034b24fb2e0b6ea`
+  was identical in both separate process runs. Cold second run:
+  0 new SourceSnapshot and 0 new WhiteCrow contexts.
+- Independent W12 wave checksum remains
+  `7a51e02334c56ed92c998f3bafb8cde5ef2d25557e49938459d267f315ca2160`,
+  10 proposed, 3 held W12, 7 research blockers.
+- No production mutation, World write, journal send, automatic author approval.
+
+Corrected `corpus_factory_entry.py` previous first-W3-only tally:
+multiwave counters now sum durable `research_wave_receipts` for
+`PACKET_SCHEMA_W3`. A synthetic two-W3 test verifies counts 3+1=4 and
+reopens 2+1=3 without changing existing single-wave return semantics.
+
+Remaining parity gap: the *researcher* still assembled new W5 article/venue
+evidence into an owner-private packet using available publisher captures;
+the existing Factory reproduced, checked, and held the result but does not
+yet itself autonomously discover scholarly opponents or write conceptual
+arguments. Direct publisher acquisition with native Python from this host
+returns HTTP 403 for Oxford/Elsevier/Taylor & Francis even using a browser
+User-Agent, also confirmed on Lenovo/Mac; Springer Nature was readable
+through the existing capture adapter with three independent successful
+HTML receipts. Missing publisher bytes must remain HOLD, never be
+upgraded from search snippets. This frontier belongs to #43/#51.

@@ -307,3 +307,38 @@ def test_w12_future_route_schema_is_not_silently_inferred(tmp_path):
             manifest, target, venue_route_packet_paths=[route],
         )
     assert not target.exists()
+
+
+
+def test_multi_w3_wave_counts_all_scientific_returns_and_routes(tmp_path):
+    """Two distinct W3 waves must not disappear behind the first W3 receipt."""
+    manifest, storage, _ = new_unrelated_case(tmp_path)
+    _, w3first = _multiwave_packets(tmp_path)
+    second = json.loads(w3first.read_text(encoding="utf-8"))
+    second["wave_id"] = "W3-SYNTH-SECOND"
+    route = dict(second["route_candidates"][0])
+    route["route_candidate_id"] = "SECOND-W3-SOURCE-BOUND-ROUTE"
+    route["journal_name"] = "Journal of Synthetic Capabilities"
+    route["opponent_id"] = "W3-SECOND-OPPONENT"
+    second["route_candidates"] = [route]
+    work = dict(second["work_refs"][0])
+    work["id"] = route["opponent_id"]
+    second["work_refs"] = [work]
+    second["official_policies"] = []
+    second_file = tmp_path / "W3-second-wave.json"
+    second_file.write_text(json.dumps(second, ensure_ascii=False), encoding="utf-8")
+    first = execute_factory_source_stage(
+        manifest, storage, research_packet_paths=[w3first, second_file]
+    )
+    repeated = execute_factory_source_stage(
+        manifest, storage, research_packet_paths=[w3first, second_file]
+    )
+    assert first["research_wave_count"] == 2
+    assert first["w3_proposed_unqualified_routes"] == 4
+    assert first["w3_proposals"] == 3
+    assert first["receipt_sha256"] == repeated["receipt_sha256"]
+    assert repeated["new_source_snapshots"] == 0
+    receipt = json.loads(Path(first["receipt_path"]).read_text(encoding="utf-8"))
+    assert sum(r["counts"].get("proposed_routes", 0) for r in receipt["research_wave_receipts"]) == 4
+    assert receipt["article_seed_created"] == 0
+    assert receipt["external_send"] == "DISABLED"

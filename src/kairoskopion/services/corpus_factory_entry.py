@@ -318,8 +318,16 @@ def execute_factory_source_stage(
         ]),
         "w1_return_proposals": w1["count"] if w1 else 0,
         "w2_return_proposals": (w2.get("counts", {}).get("field_reopen_proposals", 0) if w2 else 0),
-        "w3_return_proposals": (w3.get("counts", {}).get("field_reopen_proposals", 0) if w3 else 0),
-        "w3_proposed_unqualified_routes": (w3.get("counts", {}).get("proposed_routes", 0) if w3 else 0),
+        # Several independent W3 scholarly waves can share a single case.
+        # Count their durable receipts, not only the first W3 packet.
+        "w3_return_proposals": sum(
+            int(x.get("counts", {}).get("field_reopen_proposals", 0))
+            for x in by_schema.get(PACKET_SCHEMA_W3, [])
+        ),
+        "w3_proposed_unqualified_routes": sum(
+            int(x.get("counts", {}).get("proposed_routes", 0))
+            for x in by_schema.get(PACKET_SCHEMA_W3, [])
+        ),
         "w4_scientific_challenges": (w4.get("counts", {}).get("scientific_challenges", 0) if w4 else 0),
         "w4_rejected_comparators": (w4.get("counts", {}).get("rejected_comparator_trails", 0) if w4 else 0),
         "w4_field_reopen_proposals": (w4.get("counts", {}).get("field_reopen_proposals", 0) if w4 else 0),
