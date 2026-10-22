@@ -1,0 +1,39 @@
+{
+  "schema": "TRM_G5_REPO_NONFULLTEXT_EVIDENCE_PACK_v01",
+  "private_fulltext_copied_to_git": false,
+  "owner_manuscript_duplicated_to_git": false,
+  "witness_pdf_bytes_private_only": true,
+  "previous_untracked_v2_verified": "833e63565b8eeb4f57192f7c67edcd9b9d6fd1fc7e7bcc7716344f34ef46ad6a",
+  "tracked_entries": [
+    {
+      "repo_path": "benchmarks/_operator_notes/trm_g5_operator_20261022/article_pages_v3.jsonl",
+      "sha256": "34c02c3572c0232732125a47c69df48eccaae439225fb287d8e82fa734f6add1",
+      "bytes": 90377
+    },
+    {
+      "repo_path": "benchmarks/_operator_notes/trm_g5_operator_20261022/primary_pdf_witnesses.jsonl",
+      "sha256": "fd9ebbda91a44011f7afb9e83b7a0201ee92f284844fd99f1e77f68cdcb06906",
+      "bytes": 41356
+    },
+    {
+      "repo_path": "benchmarks/_operator_notes/trm_g5_operator_20261022/indago_analog_backlog.jsonl",
+      "sha256": "eb54ab97d6be33439f91745d02e5556aebec8f4c6ded7cb6916b7576e39f8b27",
+      "bytes": 9433
+    },
+    {
+      "repo_path": "benchmarks/_operator_notes/trm_g5_operator_20261022/verification_receipt.json",
+      "sha256": "8b5591b8a1246a68e741d8637fe9c622e31357e4c33006b78293de142eb50330",
+      "bytes": 1807
+    },
+    {
+      "repo_path": "docs/TRM_G5_OPERATOR_SOURCE_PACK_AND_FRONTIER_20261022.md",
+      "sha256": "07f9cb4306830dcc517aa019782040a8a664205838558831d8eded06d25e2ba4",
+      "bytes": 6379
+    },
+    {
+      "repo_path": "benchmarks/_operator_notes/trm_g5_operator_20261022/g4v2_currentness_summary.md",
+      "sha256": "e263852a85eadfcfa0bf8a624c654282f46fdd9aab70cf36d4a67661c4d6dd7f",
+      "bytes": 3439
+    }
+  ]
+}
