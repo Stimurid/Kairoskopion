@@ -1735,6 +1735,37 @@ def cmd_cite_intake(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_cite_repair(args: argparse.Namespace) -> int:
+    """R2-R6 citation repair. Plans by default; never writes the original."""
+    from pathlib import Path
+    from .services.citation_repair_r2_r6 import main as repair_main
+
+    forwarded: list[str] = [args.repair_mode]
+    for flag, value in (
+        ("--audit", "audit"), ("--case", "case"),
+        ("--manuscript", "manuscript"), ("--out", "out"),
+        ("--proposal", "proposal"), ("--receipt", "receipt"),
+        ("--copy", "copy"), ("--apply-receipt", "apply_receipt"),
+        ("--original-snapshot", "original_snapshot"),
+        ("--restored", "restored"), ("--queue", "queue"),
+        ("--candidate-text", "candidate_text"),
+        ("--operator-note", "operator_note"),
+        ("--expected-manuscript-sha256", "expected_manuscript_sha256"),
+        ("--author-key-file", "author_key_file"),
+    ):
+        supplied = getattr(args, value, None)
+        if supplied:
+            forwarded.extend([flag, str(supplied)])
+    for prior in (getattr(args, "prior_state", None) or []):
+        forwarded.extend(["--prior-state", str(Path(prior))])
+
+    # NOTE: there is deliberately no --allow-synthetic-test here. The synthetic
+    # decision sandbox is a Python-API keyword only, so no shell user can widen
+    # it; see services/citation_repair_r2_r6.validate_decision_receipt.
+
+    return repair_main(forwarded)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="kairoskopion",
@@ -1760,6 +1791,31 @@ def main(argv: list[str] | None = None) -> int:
     )
     z0_parser.add_argument("--manuscript", required=True, help="Local .md/.txt/.docx/.pdf or structured .json")
     z0_parser.add_argument("--output-dir", required=True, help="Immutable local evidence directory")
+
+    repair_parser = sub.add_parser(
+        "cite-repair",
+        help="R2-R6: plan citation repairs; default action is read-only planning",
+    )
+    repair_parser.add_argument(
+        "repair_mode", nargs="?", default="plan",
+        choices=["plan", "apply", "check", "undo"],
+        help="plan (default, read-only) | apply to a fresh copy | R6 readback | undo")
+    repair_parser.add_argument("--audit")
+    repair_parser.add_argument("--case")
+    repair_parser.add_argument("--manuscript")
+    repair_parser.add_argument("--out")
+    repair_parser.add_argument("--proposal")
+    repair_parser.add_argument("--receipt", help="Author-issued decision receipt")
+    repair_parser.add_argument("--copy")
+    repair_parser.add_argument("--apply-receipt")
+    repair_parser.add_argument("--original-snapshot")
+    repair_parser.add_argument("--restored")
+    repair_parser.add_argument("--queue")
+    repair_parser.add_argument("--candidate-text")
+    repair_parser.add_argument("--operator-note")
+    repair_parser.add_argument("--expected-manuscript-sha256")
+    repair_parser.add_argument("--author-key-file")
+    repair_parser.add_argument("--prior-state", action="append", default=[])
 
     sub.add_parser("status", help="Show environment status")
 
@@ -2157,6 +2213,7 @@ def main(argv: list[str] | None = None) -> int:
         "run-verification-gate": cmd_run_verification_gate,
         "export-review-packet": cmd_export_review_packet,
         "cite-intake": cmd_cite_intake,
+        "cite-repair": cmd_cite_repair,
     }
 
     handler = commands.get(args.command)
