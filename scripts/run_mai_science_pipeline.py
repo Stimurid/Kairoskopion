@@ -23,6 +23,7 @@ from fetch_mai_prior_art import execute as get_prior_art, stable as provider_sta
 from run_mai_claim_challenge import run as run_criticism
 from merge_mai_scholarly_reviews import run as merge_criticism
 from fetch_mai_venue_pages import capture as capture_venues
+from run_mai_kairon_policy_claims import run as run_kairon_policy
 
 SCHEMA="MAI_W12_RESEARCH_OPERATOR_ONE_COMMAND_v1"
 
@@ -144,6 +145,8 @@ def run_workflow(
     native_w12:Path|None=None, native_w12_snapshot:Path|None=None,
     outreach_events:Path|None=None, diagnostics:Path|None=None,
     venue_root:Path|None=None,replay_venues:bool=False,
+    venue_policy_root:Path|None=None,policy_provider:str="claude",
+    venue_native_root:Path|None=None,
 )->dict[str,Any]:
     source=load(packets/"manifest.json")
     if source.get("schema")!="MAI_W12_BATCH_OUTPUT_MANIFEST_v1" or source.get("records")!=53:
@@ -183,6 +186,21 @@ def run_workflow(
             if venue_data.get("routes_requested")!=53:
                 raise RuntimeError("Kairon web source run incomplete")
             venue_phase="EXECUTED_OR_REPLAYED_OFFICIAL_URL_HTML_CAPTURE"
+    policy_data=None
+    if venue_policy_root is not None:
+        if venue_root is None:
+            raise ValueError("Kairon policy interpretation needs a real web source capture")
+        policy_data=run_kairon_policy(packets,venue_root,venue_policy_root,limit=53,provider=policy_provider,timeout=timeout)
+        if policy_data.get("missing_routes"):
+            raise ValueError("Incomplete policy candidate source coverage: "+str(policy_data["missing_routes"]))
+    native_data=None
+    if venue_native_root is not None:
+        native_data=load(venue_native_root/"native_work_batch_receipt.json")
+        if (native_data.get("schema")!="MAI_KAIRON_NATIVE_PUBLISHER_WORK_BATCH_v1"
+                or native_data.get("source_W12_sha256")!=source["source_jsonl_sha256"]
+                or native_data.get("journal_send_count")!=0
+                or native_data.get("read_depth_certified_scholarly_full_text")!=0):
+            raise ValueError("publisher native work source cannot promote article science or authority")
     board_state="NOT_REQUESTED"
     board_manifest_sha=None
     if board_repo is not None:
@@ -201,6 +219,8 @@ def run_workflow(
         if outreach_events:args.extend(["--outreach",str(outreach_events)])
         if diagnostics:args.extend(["--analysis-root",str(diagnostics)])
         if venue_root is not None:args.extend(["--venue-web",str(venue_root)])
+        if venue_policy_root is not None:args.extend(["--venue-policy",str(venue_policy_root)])
+        if venue_native_root is not None:args.extend(["--venue-native",str(venue_native_root)])
         env=os.environ.copy()
         env["PYTHONPATH"]=str(board_repo/"src")
         proc=subprocess.run(args,cwd=str(board_repo),env=env,
@@ -219,6 +239,13 @@ def run_workflow(
         if venue_data is not None and (board_meta.get("venue_pages_acquired_count")!=53
                 or board_meta.get("venue_policies_certified_count")!=0):
             raise ValueError("board misrepresented actual Kairon web evidence")
+        if policy_data is not None and (board_meta.get("venue_policy_candidate_count")!=53
+                or board_meta.get("venue_policy_cited_claim_count")!=policy_data["route_evidence_claim_count"]
+                or board_meta.get("venue_policies_certified_count")!=0):
+            raise ValueError("Kairoskopion board dropped provisional venue-policy evidence")
+        if native_data is not None and (board_meta.get("venue_native_publication_source_count")!=native_data["input_candidate_count"]
+                or board_meta.get("venue_native_scholarly_full_texts_certified")!=0):
+            raise ValueError("board misclassified native publisher source as full read")
         board_manifest_sha=hashlib.sha256((board_root/"manifest.json").read_bytes()).hexdigest()
         board_state="UPDATED_FROM_VERIFIED_SOURCE_REVIEW_RECORDS"
     report={
@@ -241,6 +268,10 @@ def run_workflow(
         "kairon_venue_capture_phase":venue_phase,
         "kairon_pages_acquired_count":venue_data["routes_requested"] if venue_data else 0,
         "kairon_route_statuses":venue_data["routes_by_http_status"] if venue_data else {},
+        "kairon_policy_candidate_routes":policy_data["route_policy_citations_validated"] if policy_data else 0,
+        "kairon_policy_source_quotes":policy_data["route_evidence_claim_count"] if policy_data else 0,
+        "kairon_policy_model_calls_this_invocation":policy_data["total_model_calls_this_run"] if policy_data else 0,
+        "kairon_native_venue_source_count":native_data["input_candidate_count"] if native_data else 0,
         "kairon_venue_policies_certified":0,
         "publisher_fulltexts_certified":0,"author_gates_ready":0,"external_submission_actions":0,
         "quality_claim":"PROVISIONAL_DATABASE_ABSTRACT_SCHOLARLY_CHALLENGE",
@@ -269,6 +300,9 @@ def main()->int:
     p.add_argument("--existing-diagnostics",type=Path)
     p.add_argument("--venue-web",type=Path)
     p.add_argument("--reuse-venues",action="store_true")
+    p.add_argument("--venue-policy-root",type=Path)
+    p.add_argument("--venue-native-root",type=Path)
+    p.add_argument("--venue-policy-provider",choices=["claude","codex","auto"],default="claude")
     a=p.parse_args()
     result=run_workflow(a.packets,a.prior_index,a.published,a.model_output,
         a.merged_output,existing_model_roots=a.existing_model_root,
@@ -277,7 +311,9 @@ def main()->int:
         board_repo=a.board_repo,board_root=a.board_output,
         native_w12=a.w12_rows,native_w12_snapshot=a.w12_native_snapshot,
         outreach_events=a.outreach_events,diagnostics=a.existing_diagnostics,
-        venue_root=a.venue_web,replay_venues=a.reuse_venues)
+        venue_root=a.venue_web,replay_venues=a.reuse_venues,
+        venue_policy_root=a.venue_policy_root,policy_provider=a.venue_policy_provider,
+        venue_native_root=a.venue_native_root)
     print(json.dumps(result,ensure_ascii=False,indent=2))
     return 0 if not result["pending_route_ids"] else 2
 
