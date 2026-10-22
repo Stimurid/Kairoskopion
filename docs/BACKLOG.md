@@ -966,6 +966,7 @@ ship without its acceptance test passing.
 
 ## Later (only when explicitly requested)
 
+- **TRM-CITE-UI-001 — Google Docs side-by-side citation source panel**: explicit owner backlog request; design/feasibility/MVP acceptance in `docs/TRM_CITE_GOOGLE_DOCS_SIDECAR_BACKLOG_20261022.md`. Do not start UI work until citation core and venue/portfolio proof is retained.
 - Telegram intake bot
 - Web UI
 - Reviewer simulation (controlled, labeled)
