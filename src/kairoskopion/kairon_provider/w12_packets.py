@@ -258,7 +258,160 @@ def venue_web_source_for_route(route: dict[str, Any], output: Path, source_sha: 
         "receipt_sha256":sha(raw),
     }
 
-def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: Path | None = None, analysis_root: Path | None = None, science_index_path: Path | None = None, publisher_root: Path | None = None, model_root: Path | None = None, venue_web_root: Path | None = None) -> dict[str, Any]:
+def kairon_policy_candidates_for_route(
+    route: dict[str, Any], output: Path, source_sha: str,
+    venue_source_root: Path | None,
+    venue_policy_root: Path | None,
+) -> dict[str, Any]:
+    """Copy *provisional* source-anchored model claims. Never approve a venue policy."""
+    empty={"status":"NOT_ANALYZED","claims":0,"detail":"","route_type":"UNKNOWN",
+           "deadline_hint":"","channel_hint":"","currentness":"NOT_VERIFIED"}
+    if venue_policy_root is None:return empty
+    rid=route["route_id"]
+    if venue_source_root is None:
+        raise ValueError("venue policy model depends on separately captured actual publisher HTML")
+    srcfile=venue_source_root/"routes"/(rid+".json")
+    policy=venue_policy_root/"routes"/(rid+".json")
+    if not policy.is_file():return empty
+    if not srcfile.is_file():
+        raise ValueError("policy claim has no independent web receipt "+rid)
+    raw=policy.read_bytes()
+    item=json.loads(raw.decode("utf-8"))
+    pub=json.loads(srcfile.read_text(encoding="utf-8"))
+    web=pub.get("web_source") or {}
+    if (item.get("schema")!="MAI_KAIRON_QUOTE_ANCHORED_POLICY_CANDIDATE_v1"
+            or item.get("route_id")!=rid
+            or item.get("source_W12_sha256")!=source_sha
+            or item.get("captured_web_receipt_sha256")!=sha((
+                json.dumps(pub,ensure_ascii=False,sort_keys=True,indent=2)+"\n").encode("utf-8"))
+            or item.get("web_source_state")!=web.get("status")
+            or item.get("official_publisher_policy_accepted") is not False
+            or item.get("web_page_currentness_accepted") is not False
+            or item.get("human_author_gate")!="HOLD"
+            or item.get("journal_send_count")!=0):
+        raise ValueError("policy candidate attempts authority promotion "+rid)
+    status=item.get("status")
+    if status=="SOURCE_WEB_READ_BLOCKED":
+        if item.get("cited_claims") or web.get("status")=="FETCHED_TEXT":
+            raise ValueError("blocked policy source cannot cite publisher text "+rid)
+        claims=[]
+    elif status=="QUOTED_POLICY_CANDIDATES_PROVISIONAL":
+        if web.get("status")!="FETCHED_TEXT":
+            raise ValueError("policy claim needs publisher text not blocked source "+rid)
+        if not item.get("model_operation_input_digest"):
+            raise ValueError("policy claim has no model operation digest "+rid)
+        candidates=[
+            f for f in (venue_policy_root/"chunks").glob("*/accepted.json")
+            if (sha(f.read_bytes())==item.get("model_operation_receipt_sha256")
+                and json.loads(f.read_text(encoding="utf-8")).get("input_digest")==item["model_operation_input_digest"])
+        ]
+        if len(candidates)!=1:
+            raise ValueError("policy claim model operation missing or duplicated "+rid)
+        proof=json.loads(candidates[0].read_text(encoding="utf-8"))
+        if (sha(candidates[0].read_bytes())!=item.get("model_operation_receipt_sha256")
+                or proof.get("schema")!="MAI_KAIRON_POLICY_OPERATION_RECEIPT_v1"
+                or proof.get("all_policy_authority_gates")!="HOLD"
+                or proof.get("external_submission_count")!=0
+                or proof.get("human_author_gate")!="HOLD"):
+            raise ValueError("unattested policy model operation "+rid)
+        cited=[v for v in proof.get("verified_policy_claims",[]) if v.get("route_id")==rid]
+        if (len(cited)!=1 or cited[0].get("cited_claims")!=item.get("cited_claims")
+                or cited[0].get("route_type_candidate")!=item.get("route_type_candidate")):
+            raise ValueError("policy citations disagree with producer evidence "+rid)
+        text_file=venue_source_root/"url_capture_cache"/sha(route["official_url"].encode("utf-8"))[:24]/"visible_text.txt"
+        if not text_file.is_file():raise ValueError("source web text is missing "+rid)
+        txt=text_file.read_text(encoding="utf-8").rstrip("\r\n")
+        if sha(txt.encode("utf-8"))!=web.get("visible_text_sha256"):
+            raise ValueError("source web text was altered after policy extraction "+rid)
+        claims=item.get("cited_claims") or []
+        for claim in claims:
+            exact=claim.get("exact_quote","")
+            if (exact not in txt or
+                    claim.get("passage_id")!=rid+"#"+sha(exact.encode("utf-8"))[:16] or
+                    claim.get("quote_offset")!=txt.find(exact)):
+                raise ValueError("policy evidence quote or byte anchor drift "+rid)
+    else:
+        raise ValueError("unknown policy candidate stage "+rid)
+    target=output/"policies"/(rid+".json")
+    target.parent.mkdir(parents=True,exist_ok=True)
+    target.write_bytes(raw)
+    hints={kind:next((c["value"] for c in claims if c["kind"]==kind),"") for kind in (
+        "ABSTRACT_DEADLINE","MANUSCRIPT_DEADLINE","ABSTRACT_CHANNEL","MANUSCRIPT_CHANNEL")}
+    return {
+        "status":status,"claims":len(claims),
+        "detail":"policies/"+rid+".json",
+        "route_type":item.get("route_type_candidate","UNKNOWN"),
+        "deadline_hint":hints["ABSTRACT_DEADLINE"] or hints["MANUSCRIPT_DEADLINE"],
+        "channel_hint":hints["ABSTRACT_CHANNEL"] or hints["MANUSCRIPT_CHANNEL"],
+        "currentness":"NOT_VERIFIED",
+        "receipt_sha256":sha(raw),
+        "authority_gate":"HOLD",
+    }
+
+def kairon_native_publisher_sources_for_route(
+    route:dict[str,Any],output:Path,source_sha:str,native_root:Path|None
+)->dict[str,Any]:
+    if native_root is None:return {"count":0,"detail":"","native_metadata_matches":0}
+    rid=route["route_id"]
+    rows=[]
+    for path in sorted((native_root/"routes"/rid).glob("*.json")):
+        record=json.loads(path.read_text(encoding="utf-8"))
+        doi=record.get("DOI","")
+        provider_file=(native_root/"doi_provider_cache"/sha(doi.encode("utf-8"))[:20]/"crossref.json")
+        publisher_root=(native_root/"url_capture_cache"/sha(record.get("original_publisher_url","").encode("utf-8"))[:24])
+        capture_file=publisher_root/"capture.json"
+        if (record.get("schema")!="MAI_KAIRON_NATIVE_PUBLISHER_WORK_SOURCE_v1"
+                or record.get("route_id")!=rid
+                or record.get("source_W12_sha256")!=source_sha
+                or record.get("W12_venue")!=route["journal"]
+                or record.get("W12_meaning_version")!=route["variant"]
+                or record.get("crossref_DOI_identity_match") is not True
+                or record.get("is_native_in_target_journal_by_Crossref") is not True
+                or record.get("publisher_host_observed_same") is not True
+                or record.get("genre_peer_research_verified") is not False
+                or record.get("research_claims_evaluated") is not False
+                or record.get("venue_current_policy_verified") is not False
+                or record.get("artikl_author_decision")!="HOLD"
+                or record.get("journal_submission_actions")!=0
+                or record.get("read_depth")!="PUBLISHER_VISIBLE_HTML_TEXT_CAPTURED_NOT_SCHOLARLY_FULL_READ"
+                or not provider_file.is_file() or not capture_file.is_file()):
+            raise ValueError("Kairon native publication record cannot promote source to approved research "+rid)
+        provider=json.loads(provider_file.read_text(encoding="utf-8"))
+        pub=json.loads(capture_file.read_text(encoding="utf-8"))
+        if (record.get("crossref_source_receipt_sha256")!=sha((
+                  json.dumps({k:v for k,v in provider.items() if k!="from_cache"},
+                             ensure_ascii=False,sort_keys=True,indent=2)+"\n").encode("utf-8"))
+                or provider.get("parsed",{}).get("doi_identity_match") is not True
+                or provider.get("parsed",{}).get("venue")!=route["journal"]
+                or provider.get("requested_doi")!=doi
+                or pub.get("raw_sha256")!=record.get("publisher_html_raw_sha256")
+                or pub.get("status")!="FETCHED_TEXT"):
+            raise ValueError("Kairon venue-native paper metadata/source receipt mismatch "+rid)
+        original=publisher_root/"source.bin"
+        if not original.is_file() or sha(original.read_bytes())!=record["publisher_html_raw_sha256"]:
+            raise ValueError("Kairon publisher original HTML byte digest missing "+rid)
+        copy=output/"venue_native"/rid/path.name
+        copy.parent.mkdir(parents=True,exist_ok=True)
+        copy.write_bytes(path.read_bytes())
+        rows.append({
+            "doi":doi,"title":record["title"],
+            "publication_url":record["original_publisher_url"],
+            "evidence_record":"venue_native/"+rid+"/"+path.name,
+            "read_depth":record["read_depth"],
+            "publisher_html_raw_sha256":record["publisher_html_raw_sha256"],
+        })
+    if not rows:return {"count":0,"detail":"","native_metadata_matches":0}
+    index=output/"venue_native"/rid/"index.json"
+    index.write_text(json.dumps(rows,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+    return {
+        "count":len(rows),
+        "detail":"venue_native/"+rid+"/index.json",
+        "native_metadata_matches":len(rows),
+        "scholarly_full_texts_accepted":0,
+        "editorial_world_qualified":False,
+    }
+
+def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: Path | None = None, analysis_root: Path | None = None, science_index_path: Path | None = None, publisher_root: Path | None = None, model_root: Path | None = None, venue_web_root: Path | None = None, venue_policy_root: Path | None = None, venue_native_root: Path | None = None) -> dict[str, Any]:
     records,source_hash=read_records(source)
     snapshot_bytes=snapshot_path.read_bytes()
     snapshot=json.loads(snapshot_bytes.decode("utf-8-sig"))
@@ -327,6 +480,10 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
         published,model=publication_evidence_for_route(
             r,output,source_hash,publisher_root,model_root)
         venue=venue_web_source_for_route(r,output,source_hash,venue_web_root)
+        policy=kairon_policy_candidates_for_route(
+            r,output,source_hash,venue_web_root,venue_policy_root)
+        native=kairon_native_publisher_sources_for_route(
+            r,output,source_hash,venue_native_root)
         packet={
             "schema":SCHEMA,"source_jsonl_sha256":source_hash,
             "snapshot_sha256":sha(snapshot_bytes),"outreach_sha256":events_sha,
@@ -336,6 +493,8 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
             "published_source_evidence":published,
             "model_scientific_critique":model,
             "venue_web_evidence":venue,
+            "venue_policy_candidates":policy,
+            "venue_native_publisher_sources":native,
             "editorial_status":status,
             "scientific_state":"SOURCE_DRAFT_ONLY",
             "quality_receipts":{},
@@ -385,6 +544,14 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
             "venue_web_receipt":venue["receipt"],
             "venue_web_text":venue["text"],
             "venue_http_status":venue["http_status"],
+            "venue_policy_claims":policy["claims"],
+            "venue_policy_status":policy["status"],
+            "venue_policy_detail":policy["detail"],
+            "venue_policy_route_candidate":policy["route_type"],
+            "venue_policy_deadline_hint":policy["deadline_hint"],
+            "venue_policy_channel_hint":policy["channel_hint"],
+            "venue_native_publication_sources":native["count"],
+            "venue_native_publication_index":native["detail"],
             "scientific_status":"PRIOR_ART_INDEXED_ON_HOLD" if science["review_packet"] else "SOURCE_DRAFT_ONLY",
             "packet":f"routes/{r['route_id']}.json",
             "abstract":f"routes/{r['route_id']}.md",
@@ -412,6 +579,10 @@ def materialize(source: Path, snapshot_path: Path, output: Path, outreach_path: 
         "venue_pages_acquired_count":sum(bool(x["venue_web_receipt"]) for x in index),
         "venue_web_text_readable_count":sum(bool(x["venue_web_text"]) for x in index),
         "venue_web_blocked_count":sum(x["venue_web_status"]=="HTTP_REJECTED" for x in index),
+        "venue_policy_candidate_count":sum(bool(x["venue_policy_detail"]) for x in index),
+        "venue_policy_cited_claim_count":sum(x["venue_policy_claims"] for x in index),
+        "venue_native_publication_source_count":sum(x["venue_native_publication_sources"] for x in index),
+        "venue_native_scholarly_full_texts_certified":0,
         "venue_policies_certified_count":0,
         "ready_for_human_send":0,
         "ready_for_author_rework":0,
@@ -493,12 +664,17 @@ c.append(el("div","Индаго: "+item.science_index_status+" · научные
 c.append(el("div","Научные базы: "+item.published_abstracts+" аннотаций; "+item.published_status,"meta"));
 c.append(el("div","Критика: "+item.model_critique_status+" · авторский допуск ЗАКРЫТ","meta"));
 c.append(el("div","Кайрон / веб-страница: "+item.venue_web_status+" · правила журнала НЕ ПОДТВЕРЖДЕНЫ","meta"));
+c.append(el("div","Требования из страницы: "+item.venue_policy_claims+" цитат · "+item.venue_policy_route_candidate+" · КВАЛИФИКАЦИЯ HOLD","meta"));
+if(item.venue_policy_deadline_hint){c.append(el("div","Срок из цитаты: "+item.venue_policy_deadline_hint+" (ещё не утверждён)","meta"))}
+if(item.venue_policy_channel_hint){c.append(el("div","Канал из цитаты: "+item.venue_policy_channel_hint+" (ещё не утверждён)","meta"))}
 const a=el("a","Исходный пакет ↗");a.href=item.packet;
 c.append(a);if(item.science_packet){const v=el("a"," · Научные возражения Индаго W69 ↗");v.href=item.science_packet;c.append(v)}
 if(item.published_packet){const v=el("a"," · Crossref/OpenAlex ↗");v.href=item.published_packet;c.append(v)}
 if(item.model_critique_packet){const v=el("a"," · Критика ↗");v.href=item.model_critique_packet;c.append(v)}
 if(item.venue_web_receipt){const v=el("a"," · Кайрон / ответ сайта ↗");v.href=item.venue_web_receipt;c.append(v)}
 if(item.venue_web_text){const v=el("a"," · Текст сайта ↗");v.href=item.venue_web_text;c.append(v)}
+if(item.venue_policy_detail){const v=el("a"," · Цитаты и требования ↗");v.href=item.venue_policy_detail;c.append(v)}
+if(item.venue_native_publication_index){const z=el("a"," | Native journal works: "+item.venue_native_publication_sources);z.href=item.venue_native_publication_index;c.append(z)}
 node.append(c)}
 board.append(node)}
 }
@@ -518,8 +694,10 @@ def main(argv: list[str] | None=None) -> int:
     parser.add_argument("--published-sources",type=Path)
     parser.add_argument("--model-challenges",type=Path)
     parser.add_argument("--venue-web",type=Path)
+    parser.add_argument("--venue-policy",type=Path)
+    parser.add_argument("--venue-native",type=Path)
     args=parser.parse_args(argv)
-    manifest=materialize(args.source,args.snapshot,args.output,args.outreach,args.analysis_root,args.science_index,args.published_sources,args.model_challenges,args.venue_web)
+    manifest=materialize(args.source,args.snapshot,args.output,args.outreach,args.analysis_root,args.science_index,args.published_sources,args.model_challenges,args.venue_web,args.venue_policy,args.venue_native)
     print(json.dumps(manifest,ensure_ascii=False,indent=2))
     return 0
 
