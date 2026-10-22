@@ -1,0 +1,39 @@
+{
+  "schema": "TRM_G6_SCIENCE_REPO_SOURCE_MANIFEST_V01",
+  "original_input_files": [
+    {
+      "file": "G6_OPERATOR_3_RESEARCH_MODELS.json",
+      "sha256": "bb9f1d599037f1ed8e150d1c7ce49e32ac710f1e079d4633b8859bbe241262a8"
+    },
+    {
+      "file": "G6_OPERATOR_15_TRAJECTORY_TARGET_SCREEN.jsonl",
+      "sha256": "564e875b89c538f3e2fd64d5e5c40f8394190a2e2d49679ad5ee3ef5663a26a3"
+    },
+    {
+      "file": "G6_OPERATOR_P1_P2_P3_AND_VENUE_REPORT.md",
+      "sha256": "17e0ad931e1bffc66588bd222a5faae3410219ee19fa2923a971876a165954fe"
+    }
+  ],
+  "models": 3,
+  "scientific_provisional_target_pairs": 15,
+  "qualified_pairs": 0,
+  "author_approved": 0,
+  "source_fulltexts_copied_to_git": false,
+  "outputs": [
+    {
+      "path": "data/article_models/trm_g6_three_research_20261023.json",
+      "sha256": "0ce44baabcb6c5db2d10b7cd9d1f50f864feeb562201192cc66309603aafd020",
+      "bytes": 17205
+    },
+    {
+      "path": "data/venue_evidence_packs/trm_g6_15_pair_prequalification_20261023.jsonl",
+      "sha256": "51182454f31d6574440198ad8a7da013e741cf88a6e55ff927243422e85c1ae4",
+      "bytes": 43030
+    },
+    {
+      "path": "docs/TRM_G6_P1_P2_P3_SOURCE_BOUND_ARTICLE_PORTFOLIO_20261023.md",
+      "sha256": "a54f4017154437a3b1a3032296240ed800bd9d24a5b656d6dad92f237fb0413a",
+      "bytes": 24593
+    }
+  ]
+}
