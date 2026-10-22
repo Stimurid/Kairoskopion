@@ -181,3 +181,20 @@ def test_absent_frozen_target_package_blocks_even_fully_grounded_route(tmp_path)
     result = handoff(store, pins, None)
     assert result["status"] == "BLOCKED"
     assert "frozen_target_world_package_missing" in result["blockers"]
+
+
+def test_pending_owner_science_cannot_forge_author_event(tmp_path):
+    store, pins, package = graph(tmp_path, record_author=False)
+    store.append_event({
+        "event_id": "author:select:e1", "kind": "AUTHOR_DECISION",
+        "actor_role": "AUTHOR", "author_ref": "author:owner",
+        "subject_id": "op-e-1", "opportunity_revision": "r1",
+        "route_id": "route-e", "route_revision": "r1",
+        "variant_id": "variant-e", "variant_revision": "r1",
+        "decision": "ACCEPT", "source_ref": "owner-private:pending",
+        "owner_prior_receipt_case": "L3-CORPUS-20261020",
+    })
+    assert len(store.replay_events()) == 1
+    result = handoff(store, pins, package)
+    assert "author_selection_event_missing" in result["blockers"]
+    assert result["external_submission"] == "FORBIDDEN"

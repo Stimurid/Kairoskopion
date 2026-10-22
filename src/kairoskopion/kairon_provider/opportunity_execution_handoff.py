@@ -36,6 +36,10 @@ def prepare_opportunity_execution_handoff(
     signature or automatic authorization for external submission. All successful
     output is a candidate for further Artikl and author review only.
     """
+    # Handoff never treats imported provisional owner science as approval.
+    consumer = store.consumer_snapshot(include_owner_prior=False)
+    consumer_records = consumer["records"]
+    consumer_events = consumer["events"]
     blockers: list[str] = []
     found: dict[str, dict[str, Any]] = {}
     normalized_pins: dict[str, dict[str, str]] = {}
@@ -51,7 +55,9 @@ def prepare_opportunity_execution_handoff(
             blockers.append(f"incomplete_pin:{role}")
             continue
         normalized_pins[role] = {"id": ident, "revision": rev}
-        obj = store.get(kind, ident, rev)
+        obj = next((row for row in consumer_records
+                    if row["kind"] == kind and row["id"] == ident
+                    and row["revision"] == rev), None)
         if obj is None:
             blockers.append(f"unknown_pinned_record:{role}")
         else:
@@ -86,7 +92,9 @@ def prepare_opportunity_execution_handoff(
     # An evidence id may have several revisions. Without exact revision in the
     # selected route/world, a second revision blocks rather than becoming latest.
     evidence_versions: dict[str, list[dict[str, Any]]] = {}
-    for item in store.list_records("Evidence"):
+    for item in consumer_records:
+        if item["kind"] != "Evidence":
+            continue
         evidence_versions.setdefault(item["id"], []).append(item)
     required_evidence: set[str] = set()
     if route:
@@ -120,7 +128,7 @@ def prepare_opportunity_execution_handoff(
         blockers.append("author_selection_event_missing")
     else:
         events = [
-            item for item in store.replay_events()
+            item for item in consumer_events
             if item["event_id"] == author_selection_event_id
         ]
         if len(events) == 1:

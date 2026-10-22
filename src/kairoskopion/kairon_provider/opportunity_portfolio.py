@@ -40,13 +40,16 @@ def _events_for_display(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def build_portfolio(store: OpportunityGraphStore) -> dict[str, Any]:
+def build_portfolio(
+    store: OpportunityGraphStore, *, include_owner_prior: bool = False,
+) -> dict[str, Any]:
     """Project only durable objects, without treating W12 advertised counts as rows.
 
     Every record revision stays visible. A route with no unambiguous target world
     shows blockers, never silently borrows an unrelated journal snapshot.
     """
-    all_records = store.list_records()
+    consumer = store.consumer_snapshot(include_owner_prior=include_owner_prior)
+    all_records = consumer["records"]
     grouped: dict[str, list[dict[str, Any]]] = {}
     for record in all_records:
         grouped.setdefault(record["kind"], []).append(record)
@@ -154,5 +157,6 @@ def build_portfolio(store: OpportunityGraphStore) -> dict[str, Any]:
         "variantCount": _unique_count(grouped.get("TargetVariant", [])),
         "distinctVenueCount": _unique_count(grouped.get("Journal", [])),
         "rows": rows,
-        "events": _events_for_display(store.replay_events()),
+        "events": _events_for_display(consumer["events"]),
+        "ownerPriorScienceVisibility": consumer["status"],
     }

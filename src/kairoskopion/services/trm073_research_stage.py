@@ -23,6 +23,7 @@ from .trm073_w1_source_binding import (
 
 PACKET_SCHEMA = "TRM073_W2_SCIENCE_VENUE_RETURN_INPUT_V1"
 PACKET_SCHEMA_W3 = "TRM073_W3_A_C_SEED_STAGE_V1"
+PACKET_SCHEMA_W4 = "TRM073_W4_SCHOLARLY_SOURCE_RETURN_INPUT_V1"
 RECEIPT_SCHEMA = "TRM073_W2_RESEARCH_STAGE_RECEIPT_V1"
 RECEIPT_SCHEMA_W3 = "TRM073_W3_DISCOVERY_STAGE_RECEIPT_V1"
 
@@ -848,9 +849,16 @@ def _stage_w3_packet(packet: dict[str, Any], raw: bytes, storage: Path) -> dict[
     return _finish_stage(storage, case_id, wave_id, receipt)
 
 
+def _stage_w4_packet(packet: dict[str, Any], raw: bytes, storage: Path) -> dict[str, Any]:
+    """Admit source-anchored W4 objections via existing W3 DOI and Kairon graph."""
+    from .trm073_w4_science_return import stage_w4_science_packet
+    return stage_w4_science_packet(packet, raw, storage)
+
+
 _PACKET_STAGERS: dict[str, Callable[[dict[str, Any], bytes, Path], dict[str, Any]]] = {
     PACKET_SCHEMA: _stage_w2_packet,
     PACKET_SCHEMA_W3: _stage_w3_packet,
+    PACKET_SCHEMA_W4: _stage_w4_packet,
 }
 
 
@@ -1155,6 +1163,9 @@ def readback_research_stage(storage_root: str | Path, case_id: str, wave_id: str
         readback = _readback_w2(storage, case_id, wave_id, receipt, receipt_raw)
     elif schema == RECEIPT_SCHEMA_W3:
         readback = _readback_w3(storage, case_id, wave_id, receipt, receipt_raw)
+    elif schema == "TRM073_W4_SCHOLARLY_SOURCE_RETURN_RECEIPT_V1":
+        from .trm073_w4_science_return import readback_w4
+        readback = readback_w4(storage, case_id, wave_id, receipt, receipt_raw)
     else:
         raise ValueError("research-stage receipt schema mismatch")
     path = run_dir / "readback.json"

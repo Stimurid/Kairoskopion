@@ -246,7 +246,8 @@ class OpportunityGraphStore:
     """
 
     def __init__(self, root: str | Path):
-        self.root = Path(root) / "kairon_provider" / "opportunity_graph"
+        self.storage_root = Path(root).resolve()
+        self.root = self.storage_root / "kairon_provider" / "opportunity_graph"
         self.records = self.root / "records"
         self.events = self.root / "events"
         self.records.mkdir(parents=True, exist_ok=True)
@@ -254,15 +255,36 @@ class OpportunityGraphStore:
 
     @staticmethod
     def _write_once(path: Path, obj: dict[str, Any]) -> dict[str, Any]:
-        if path.exists():
-            existing = json.loads(path.read_text(encoding="utf-8"))
-            if _canonical(existing) != _canonical(obj):
-                raise ValueError("same immutable identity used with different content")
-            return existing
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
-        tmp.replace(path)
-        return obj
+        """Publish immutable identity by atomic create-if-absent, never replace.
+
+        os.replace() permits two concurrent processes to silently overwrite an
+        immutable (kind,id,revision) or event_id with different content.
+        os.link() is an atomic no-clobber create on the local filesystem;
+        an existing identity MUST be read back and compared instead.
+        """
+        import os
+        import tempfile
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(
+            prefix=path.name + ".", suffix=".pending", dir=path.parent,
+        )
+        tmp = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as out:
+                out.write(json.dumps(obj, ensure_ascii=False, indent=2))
+                out.flush()
+                os.fsync(out.fileno())
+            try:
+                os.link(tmp, path)
+            except FileExistsError:
+                existing = json.loads(path.read_text(encoding="utf-8"))
+                if _canonical(existing) != _canonical(obj):
+                    raise ValueError("same immutable identity used with different content")
+                return existing
+            return obj
+        finally:
+            tmp.unlink(missing_ok=True)
 
     def put(self, kind: str, record: dict[str, Any]) -> dict[str, Any]:
         value = validate_record(kind, record)
@@ -362,3 +384,147 @@ class OpportunityGraphStore:
     def replay_events(self) -> list[dict[str, Any]]:
         events = [json.loads(p.read_text(encoding="utf-8")) for p in self.events.glob("*.json")]
         return sorted(events, key=lambda event: (str(event.get("at", "")), str(event["event_id"])))
+
+
+    def consumer_snapshot(self, *, include_owner_prior: bool = False) -> dict[str, Any]:
+        """Receipt-pinned read model over the raw, immutable graph.
+
+        Raw list_records/replay_events are repair/forensic interfaces.
+        Published read models quarantine EVERY prior-science object if ANY
+        case, record or scientific event fails precise per-byte admission.
+        An accepted L3 return is still only PROVISIONAL under author HOLD.
+        """
+        try:
+            records = self.list_records()
+            events = self.replay_events()
+        except Exception:
+            return {
+                "status": "INCOMPLETE_OR_UNVERIFIED",
+                "status_reason": "RAW_GRAPH_UNREADABLE",
+                "records": [], "events": [],
+                "withheld_record_count": None, "withheld_event_count": None,
+                "publication_authority": "NONE", "external_send": "DISABLED",
+            }
+
+        # Physical ID namespace is part of the historical L3 schema, never a
+        # heuristic for subject/semantic classification. The namespace is
+        # intentionally bounded until a generic importer is accepted.
+        l3 = "L3-CORPUS-20261020"
+
+        def owner_case(item: dict[str, Any], *, is_event: bool) -> str | None:
+            tag = item.get("owner_prior_receipt_case")
+            if tag:
+                return str(tag)
+            # Record IDs and event IDs occupy different namespaces. A record
+            # carrying an unrelated event_id must never shadow its record id.
+            identity = str(item.get("event_id" if is_event else "id") or "")
+            if identity.startswith(l3 + ":IMPORTED:"):
+                return l3
+            if (
+                (item.get("kind") == "Evidence" and
+                 identity.startswith("trm074-l3-ref-"))
+                or
+                (item.get("kind") == "HuntTrace" and
+                 identity.startswith("trm074-owner-science-" + l3))
+            ):
+                return l3
+            return None
+
+        event_cases: dict[str, str] = {
+            str(item["event_id"]): case
+            for item in events if (case := owner_case(item, is_event=True)) is not None
+        }
+        children: dict[str, list[str]] = {}
+        for item in events:
+            predecessor = str(item.get("source_event_id") or "")
+            if predecessor:
+                children.setdefault(predecessor, []).append(str(item["event_id"]))
+        queue = list(event_cases)
+        index = 0
+        ambiguous_ancestry = False
+        while index < len(queue):
+            parent = queue[index]
+            index += 1
+            for child in children.get(parent, []):
+                if child not in event_cases:
+                    event_cases[child] = event_cases[parent]
+                    queue.append(child)
+                elif event_cases[child] != event_cases[parent]:
+                    ambiguous_ancestry = True
+
+        scoped_records = [item for item in records if owner_case(item, is_event=False) is not None]
+        scoped_events = [item for item in events if str(item["event_id"]) in event_cases]
+        cases = {
+            owner_case(item, is_event=False) for item in scoped_records
+        } | set(event_cases.values())
+        verified = False
+        reason: str | None = None
+
+        if not cases:
+            status = "NO_PRIOR_SCIENCE"
+        elif not include_owner_prior:
+            status = "WITHHELD_BY_POLICY"
+            reason = "PRIVATE_SCIENCE_READ_DISABLED"
+        elif cases != {l3} or ambiguous_ancestry:
+            status = "INCOMPLETE_OR_UNVERIFIED"
+            reason = "UNSUPPORTED_OR_MIXED_PROVENANCE"
+        else:
+            try:
+                # Exact original receipt, source bytes and graph fingerprint.
+                # No stale authentication cache: every permitted cold read is
+                # checked against current owner-private bytes.
+                from ..services.owner_prior_research_bridge import readback_owner_prior_science
+                proof = readback_owner_prior_science(self.storage_root)
+                if proof.get("verified") is not True or proof.get("author_approved") is not False:
+                    raise ValueError("unverified owner science return")
+                record_pins = {
+                    (x["kind"], x["id"], x["revision"]): x["content_sha256"]
+                    for x in proof["verified_record_pins"]
+                }
+                event_pins = {
+                    x["event_id"]: x["content_sha256"]
+                    for x in proof["verified_event_pins"]
+                }
+                if (len(record_pins) != 3 or len(event_pins) != 2
+                        or len(scoped_records) != len(record_pins)
+                        or len(scoped_events) != len(event_pins)):
+                    raise ValueError("record/event coverage mismatches receipt")
+                # T0 snapshot bytes must be exactly the same as T1 verified
+                # receipt bytes, even if a concurrent writer changes disk
+                # between the two reads. ID or prefix alone is never proof.
+                for item in scoped_records:
+                    key = (item["kind"], item["id"], item["revision"])
+                    if record_pins.get(key) != _digest(item):
+                        raise ValueError("record content not authenticated")
+                for item in scoped_events:
+                    if event_pins.get(item["event_id"]) != _digest(item):
+                        raise ValueError("event content not authenticated")
+                verified = True
+                reason = "AUTHOR_HOLD_RECEIPT_VERIFIED"
+            except Exception as exc:
+                # No path or owner-body leakage through public API. Corrupt
+                # JSON roots also raise AttributeError/IndexError, not just
+                # ValueError; all readback failures quarantine the case.
+                reason = "READBACK_" + type(exc).__name__.upper()
+            status = (
+                "VERIFIED_PROVISIONAL_AUTHOR_HOLD"
+                if verified else "INCOMPLETE_OR_UNVERIFIED"
+            )
+
+        # Unknown, incomplete and forged owner science is never mixed into a
+        # verified projection. Unrelated ordinary graph rows remain readable.
+        admitted_records = [
+            item for item in records
+            if owner_case(item, is_event=False) is None or verified
+        ]
+        admitted_events = [
+            item for item in events
+            if str(item["event_id"]) not in event_cases or verified
+        ]
+        return {
+            "status": status, "status_reason": reason,
+            "records": admitted_records, "events": admitted_events,
+            "withheld_record_count": len(records) - len(admitted_records),
+            "withheld_event_count": len(events) - len(admitted_events),
+            "publication_authority": "NONE", "external_send": "DISABLED",
+        }
