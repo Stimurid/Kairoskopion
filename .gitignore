@@ -83,3 +83,11 @@ private_inputs/
 ui/node_modules/
 ui/dist/
 ui/data/
+
+# Local pytest scratch directories (including managed-sandbox basetemps).
+.pytest_cache/
+pytest-cache-files-*/
+.test-tmp*/
+test-tmp-root/
+tests/tmp_*pytest*/
+tests/tmp_bridge_*/

@@ -1,6 +1,6 @@
 """Tests that fixtures load and pass spec §158 acceptance criteria."""
 
-from .fixtures import (
+from tests.fixtures import (
     sample_article_model,
     sample_fit_assessment_preliminary,
     sample_manuscript_model,

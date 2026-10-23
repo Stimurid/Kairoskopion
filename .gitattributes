@@ -1,0 +1,11 @@
+# TRM G5/G6 owner-evidence byte pins: preserve original CRLF byte streams
+benchmarks/_operator_notes/trm_g5_operator_20261022/article_pages_v3.jsonl -text whitespace=cr-at-eol
+benchmarks/_operator_notes/trm_g5_operator_20261022/g4v2_currentness_summary.md -text whitespace=cr-at-eol
+benchmarks/_operator_notes/trm_g5_operator_20261022/indago_analog_backlog.jsonl -text whitespace=cr-at-eol
+benchmarks/_operator_notes/trm_g5_operator_20261022/primary_pdf_witnesses.jsonl -text whitespace=cr-at-eol
+benchmarks/_operator_notes/trm_g5_operator_20261022/verification_receipt.json -text whitespace=cr-at-eol
+data/article_models/trm_g6_three_research_20261023.json -text whitespace=cr-at-eol
+data/venue_evidence_packs/g5_operator_official_20261022.jsonl -text whitespace=cr-at-eol
+data/venue_evidence_packs/trm_g6_15_pair_prequalification_20261023.jsonl -text whitespace=cr-at-eol
+docs/TRM_G5_OPERATOR_SOURCE_PACK_AND_FRONTIER_20261022.md -text whitespace=cr-at-eol
+docs/TRM_G6_P1_P2_P3_SOURCE_BOUND_ARTICLE_PORTFOLIO_20261023.md -text whitespace=cr-at-eol

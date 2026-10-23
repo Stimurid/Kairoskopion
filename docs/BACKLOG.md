@@ -1,5 +1,12 @@
 # Engineering Backlog — Kairoskopion
 
+**TRM-CITE-001 R1 continuation (2026-10-21):** Run the task batch on the
+owner's 13 private followups after checking the supplied hashes and compare
+the expected 13/4/3/5 counts. Acquire Luckin and Descartes witnesses only
+through an authorized provider, then independently review V1–V5 and the five
+manual protocols. Run pytest and Hub QA. The isolated worktree has no verified
+live run.
+
 **Last updated:** 2026-06-14 (Mavrinsky golden-run integration pass)
 
 Each sprint package is a self-contained autonomous unit. An agent reads CLAUDE.md → PROJECT_STATUS → SPEC_COVERAGE_MATRIX → this BACKLOG, picks the next sprint, implements on a feature branch, updates docs/tests/status, commits, pushes. No manual micromanagement required.
@@ -959,6 +966,9 @@ ship without its acceptance test passing.
 
 ## Later (only when explicitly requested)
 
+- **TRM-CITE-UI-001 — Google Docs side-by-side citation source panel**: explicit owner backlog request; design/feasibility/MVP acceptance in `docs/TRM_CITE_GOOGLE_DOCS_SIDECAR_BACKLOG_20261022.md`. Do not start UI work until citation core and venue/portfolio proof is retained.
+- **TRM-G5-INDAGO-ANALOGS-20261022**: eight grounded article/venue analogs for later fulltext/collision work, stored as `benchmarks/_operator_notes/trm_g5_operator_20261022/indago_analog_backlog.jsonl`; sources range from three primary PDF selected-page reads to five Logos 36(4) title-only warnings. Backlog recorded locally, **not yet queued in live Indago**; reuse prior hunts first, do not re-research the G4 corpus.
+- **TRM-G5-L3-MISSING-20261022**: actual fulltext target-world sampling still needed for LOGOS (esp. 36(4) Passages), Voprosy Filosofii, and Digital Scholar; currently only FJ/EPN have 12 extracted PDFs; read `docs/TRM_G5_OPERATOR_SOURCE_PACK_AND_FRONTIER_20261022.md` and validate `tests/test_trm_g5_source_evidence_pack.py` before elevating any article-target pair.
 - Telegram intake bot
 - Web UI
 - Reviewer simulation (controlled, labeled)
