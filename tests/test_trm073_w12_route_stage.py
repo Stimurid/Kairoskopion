@@ -293,3 +293,81 @@ def test_fails_if_external_send_enabled(tmp_path):
     with pytest.raises(ValueError,match="publication and World changes not authorized"):
         stage_w12_research_route(path,stage)
     assert OpportunityGraphStore(stage).list_records("HuntTrace")==[]
+
+
+def test_w12_head02_B_source_admits_held_research_without_new_article_seed(tmp_path):
+    """B cognitive-source original may qualify after real source+W3 bindings."""
+    packet, path, stage, src, _caps, _manifest = fixture_route(tmp_path)
+    original = (
+        "B Cognitive machine of the company\n"
+        "A locally validated result becomes organizational knowledge only "
+        "when an identifiable institutional uptake procedure supplies a "
+        "warrant for future collective action and responsible revision.\n"
+    )
+    src.write_text(original, encoding="utf-8")
+    digest = _sha(src.read_bytes())
+    original_id = "drive:SYNTH-B-COGNITIVE"
+    packet.update({
+        "head_id": "HEAD-02",
+        "route_candidate_id": "B-UPTAKE-SYNTH",
+        "claim_version_id": "B24-v0-uptake-W12-synthetic",
+    })
+    packet["original_source"] = {
+        "source_id": original_id,
+        "source_version": "v24-concepts",
+        "path": str(src),
+        "sha256": digest,
+        "anchor_line": 2,
+        "anchor_quote": original.splitlines()[1],
+    }
+    path.write_text(json.dumps(packet,ensure_ascii=False),encoding="utf-8")
+    ledger_path = stage/"talk_corpora"/"CASE-SYNTH"/"case_ledger.json"
+    ledger=json.loads(ledger_path.read_text(encoding="utf-8"))
+    ledger["source_snapshots"].append({
+        "source_id": original_id,
+        "version": "v24-concepts",
+        "key": "B_BASELINE",
+        "family": "B",
+        "content_sha256": digest,
+        "author_state": "USER_ACCEPTED_CONCEPTS_ONLY",
+    })
+    ledger_path.write_text(json.dumps(ledger),encoding="utf-8")
+    graph=OpportunityGraphStore(stage)
+    graph.put("Evidence",{
+        "id":"synthetic-b-verified-original",
+        "revision":"one",
+        "source_ref":original_id,
+        "source_kind":"SOURCE_SCRIPT",
+        "read_depth":"SECTIONS",
+        "passage_anchors":[],
+    })
+    graph.append_event({
+        "event_id":"CASE-SYNTH:W3:route:B-UPTAKE-SYNTH",
+        "kind":"SCHOLARLY_ROUTE_CHALLENGE",
+        "route_candidate_id":"B-UPTAKE-SYNTH",
+        "subject_id":"HEAD-02",
+        "journal_id":packet["journal_id"],
+        "source_ref":"doi:"+packet["opponent_doi"],
+        "opponent_resolved":True,
+        "w12_equivalent":False,
+    })
+    graph.append_event({
+        "event_id":"CASE-SYNTH:W3:HEAD-02:DISCOVERY-RETURN",
+        "kind":"SOURCE_CONTRADICTION",
+        "subject_id":"HEAD-02",
+        "source_ref":original_id,
+        "original_source_binding":{
+            "source_id":original_id,
+            "version":"v24-concepts",
+            "content_sha256":digest,
+            "binding_verification":"VERIFIED_BYTES",
+        },
+    })
+    one=stage_w12_research_route(path,stage)
+    two=readback_w12_research_route(path,stage)
+    assert one["counts"]["W12_EQUIVALENT_HELD"]==1
+    assert two["verified"] is True
+    assert one["readback"]["verified"] is True
+    assert graph.list_records("ArticleSeed")==[]
+    assert graph.list_records("OpportunityRoute")==[]
+    assert graph.list_records("World")==[]
