@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 MANIFEST_SCHEMA = "TRM074_COLD_CASE_V1"
-W3_HEADS = frozenset({"HEAD-01", "HEAD-03"})
+W3_HEADS = frozenset({"HEAD-01", "HEAD-02", "HEAD-03"})
 
 
 def enrich_packet_from_env(packet: dict[str, Any]) -> dict[str, Any]:
@@ -63,7 +63,7 @@ def resolve_head_bindings(
     packet: dict[str, Any],
     manifest: dict[str, Any] | None,
 ) -> dict[str, dict[str, Any]]:
-    """Map HEAD-01 / HEAD-03 to manifest source rows when packet supplies bindings."""
+    """Map all three T3 talk heads to manifest source rows when packet supplies bindings."""
     bindings_in = packet.get("original_head_sources") or []
     if not bindings_in:
         return {}
@@ -76,7 +76,7 @@ def resolve_head_bindings(
             raise ValueError("original_head_sources entries must be objects")
         head_id = str(row.get("head_id") or "").strip()
         if head_id not in W3_HEADS:
-            raise ValueError("original_head_sources head_id must be HEAD-01 or HEAD-03")
+            raise ValueError("original_head_sources head_id must be HEAD-01, HEAD-02 or HEAD-03")
         family = str(row.get("source_family") or "").strip()
         key = str(row.get("source_key") or "").strip()
         if not family or not key:

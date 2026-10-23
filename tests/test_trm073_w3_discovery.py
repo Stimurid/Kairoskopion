@@ -216,8 +216,8 @@ def test_w3_manifest_rejects_expected_sha_mismatch(tmp_path):
 
 def test_w3_rejects_invalid_head_id(tmp_path):
     payload = _synthetic_w3_packet()
-    payload["route_candidates"][0]["head_id"] = "HEAD-02"
-    with pytest.raises(ValueError, match="HEAD-01 or HEAD-03"):
+    payload["route_candidates"][0]["head_id"] = "HEAD-99"
+    with pytest.raises(ValueError, match="HEAD-01, HEAD-02 or HEAD-03"):
         stage_research_packet(_write_packet(tmp_path, payload), tmp_path / "stage")
 
 
@@ -556,3 +556,75 @@ def test_owner_w3_cli_cold_process_when_packet_present(tmp_path):
         capture_output=True,
     )
     assert json.loads(cold.stdout) == first
+
+
+def test_w3_b_head02_pins_exact_user_accepted_concepts_and_survives_readback(tmp_path):
+    """B is a source-valid HEAD in discovery, not just an orphaned W2 fragment."""
+    source_path = tmp_path / "b_baseline_v24.txt"
+    source_path.write_text(
+        "A company does not turn every locally validated observation into "
+        "organizational knowledge automatically. A procedure of uptake and "
+        "institutional warrant must be separately identifiable.\n",
+        encoding="utf-8",
+    )
+    digest = hashlib.sha256(source_path.read_bytes()).hexdigest().upper()
+    manifest_path = tmp_path / "case-b-manifest.json"
+    manifest_path.write_text(json.dumps({
+        "schema": "TRM074_COLD_CASE_V1",
+        "case_id": "CASE-W3-B",
+        "publication_send": "DISALLOWED",
+        "sources": [{
+            "family": "B",
+            "key": "B_BASELINE",
+            "source_id": "drive:test-b-baseline",
+            "kind": "USER_ACCEPTED_CONCEPTS_ONLY",
+            "version": "v24-concepts",
+            "author_state": "USER_ACCEPTED_CONCEPTS_ONLY",
+            "local_path": str(source_path),
+        }],
+    }), encoding="utf-8")
+    packet = _synthetic_w3_packet()
+    packet["case_id"] = "CASE-W3-B"
+    packet["wave_id"] = "W3-B-HEAD02"
+    packet["work_refs"] = packet["work_refs"][:1]
+    packet["route_candidates"] = [{
+        **packet["route_candidates"][0],
+        "route_candidate_id": "B-COGNITIVE-UPTAKE",
+        "head_id": "HEAD-02",
+        "journal_name": "Organization Knowledge Test Journal",
+    }]
+    packet["w1_source_manifest_path"] = str(manifest_path)
+    packet["original_head_sources"] = [{
+        "head_id": "HEAD-02",
+        "source_family": "B",
+        "source_key": "B_BASELINE",
+        "expected_source_id": "drive:test-b-baseline",
+        "expected_version": "v24-concepts",
+        "expected_content_sha256": digest,
+        "research_method": "SOURCE_GROUNDED_EPISTEMOLOGICAL_COMPARISON",
+    }]
+    storage = tmp_path / "factory"
+    result = stage_research_packet(_write_packet(tmp_path, packet), storage)
+    receipt = json.loads(Path(result["receipt_path"]).read_text(encoding="utf-8"))
+    assert receipt["counts"]["scholarly_route_challenges"] == 1
+    assert receipt["counts"]["field_reopen_proposals"] == 1
+    assert receipt["counts"]["w12_equivalent_routes"] == 0
+    assert receipt["counts"]["article_seeds_created"] == 0
+    original = receipt["head_source_bindings"]["HEAD-02"]
+    assert original["source_id"] == "drive:test-b-baseline"
+    assert original["content_sha256"] == digest
+    assert original["binding_verification"] == "VERIFIED_BYTES"
+    events = OpportunityGraphStore(storage).replay_events()
+    assert any(x.get("kind") == "SOURCE_CONTRADICTION"
+               and x.get("subject_id") == "HEAD-02"
+               and x.get("original_source_binding", {}).get("binding_verification")
+                   == "VERIFIED_BYTES" for x in events)
+    assert any(x.get("route_candidate_id") == "B-COGNITIVE-UPTAKE"
+               and x.get("subject_id") == "HEAD-02" for x in events)
+    assert OpportunityGraphStore(storage).list_records("ArticleSeed") == []
+    readback_research_stage(storage, "CASE-W3-B", "W3-B-HEAD02")
+
+    # Recovery cannot keep passing when the original B document's bytes change.
+    source_path.write_text("changed, no longer the certified source", encoding="utf-8")
+    with pytest.raises(ValueError, match="readback|source bytes|expected_content_sha256"):
+        readback_research_stage(storage, "CASE-W3-B", "W3-B-HEAD02")

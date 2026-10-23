@@ -54,7 +54,7 @@ W3_GENRE_KIND = {
     "TARGET_ARTICLE": ("PUBLISHED_ARTICLE", "TARGET_ARTICLE"),
 }
 
-W3_HEADS = frozenset({"HEAD-01", "HEAD-03"})
+W3_HEADS = frozenset({"HEAD-01", "HEAD-02", "HEAD-03"})
 
 W3_NON_FULLTEXT_DEPTHS = frozenset({
     "ABSTRACT_ONLY",
@@ -210,7 +210,7 @@ def _validate_w3_packet(packet: dict[str, Any]) -> None:
     for route in routes:
         head_id = _required(route.get("head_id"), "route head_id")
         if head_id not in W3_HEADS:
-            raise ValueError("route head_id must be HEAD-01 or HEAD-03")
+            raise ValueError("route head_id must be HEAD-01, HEAD-02 or HEAD-03")
         _required(route.get("journal_name"), "route journal_name")
         _required(route.get("opponent_id"), "route opponent_id")
         if route.get("route_status") != "DISCOVERED_PREQUALIFICATION":

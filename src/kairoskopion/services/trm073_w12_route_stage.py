@@ -176,21 +176,45 @@ def _validate(packet: dict[str, Any], graph: OpportunityGraphStore) -> dict[str,
     if len(graph_events) != 1:
         raise ValueError("route candidate is not uniquely staged by existing W3")
     event = graph_events[0]
+    # Multiple research waves can legitimately bind the same immutable talk
+    # source. Require the original-source certificate belonging to THIS W3
+    # route's wave, not a globally unique certificate for the entire head.
+    w3_event_id = str(event.get("event_id") or "")
+    route_suffix = f":route:{route_id}"
+    if not w3_event_id.endswith(route_suffix):
+        raise ValueError("W3 route event lacks exact research-wave provenance")
+    origin_event_id = (
+        w3_event_id[:-len(route_suffix)]
+        + f":{packet['head_id']}:DISCOVERY-RETURN"
+    )
     head_refs = [
         x for x in graph.replay_events()
         if x.get("kind") == "SOURCE_CONTRADICTION"
         and x.get("subject_id") == packet["head_id"]
         and isinstance(x.get("original_source_binding"), dict)
     ]
+    own_wave = [x for x in head_refs if x.get("event_id") == origin_event_id]
+    if len(own_wave) > 1:
+        raise ValueError("conflicting W3 own-wave source certificates")
+    # Legacy W3 packets did not emit a source event for every new route:
+    # they inherited the already byte-verified common source binding from the
+    # original discovery wave. Preserve those accepted routes; newly supplied
+    # wave-specific certificates take precedence and must not be overridden
+    # by a different wave's certificate when malformed.
+    source_refs = own_wave if own_wave else head_refs
     certified = [
-        x["original_source_binding"] for x in head_refs
+        x["original_source_binding"] for x in source_refs
         if x["original_source_binding"].get("source_id") == source["source_id"]
         and x["original_source_binding"].get("version") == source["source_version"]
         and str(x["original_source_binding"].get("content_sha256") or "").lower()
             == evidence["source_sha256"]
         and x["original_source_binding"].get("binding_verification") == "VERIFIED_BYTES"
     ]
-    if len(certified) != 1:
+    certified_origins = {
+        (c["source_id"], c["version"], str(c["content_sha256"]).lower())
+        for c in certified
+    }
+    if len(certified_origins) != 1:
         raise ValueError("prior W3 original versioned source byte binding not verified")
     if event.get("opponent_resolved") is not True:
         raise ValueError("W3 research opponent not resolved")

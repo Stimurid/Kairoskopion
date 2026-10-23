@@ -293,3 +293,162 @@ def test_fails_if_external_send_enabled(tmp_path):
     with pytest.raises(ValueError,match="publication and World changes not authorized"):
         stage_w12_research_route(path,stage)
     assert OpportunityGraphStore(stage).list_records("HuntTrace")==[]
+
+
+def test_w12_head02_B_source_admits_held_research_without_new_article_seed(tmp_path):
+    """B cognitive-source original may qualify after real source+W3 bindings."""
+    packet, path, stage, src, _caps, _manifest = fixture_route(tmp_path)
+    original = (
+        "B Cognitive machine of the company\n"
+        "A locally validated result becomes organizational knowledge only "
+        "when an identifiable institutional uptake procedure supplies a "
+        "warrant for future collective action and responsible revision.\n"
+    )
+    src.write_text(original, encoding="utf-8")
+    digest = _sha(src.read_bytes())
+    original_id = "drive:SYNTH-B-COGNITIVE"
+    packet.update({
+        "head_id": "HEAD-02",
+        "route_candidate_id": "B-UPTAKE-SYNTH",
+        "claim_version_id": "B24-v0-uptake-W12-synthetic",
+    })
+    packet["original_source"] = {
+        "source_id": original_id,
+        "source_version": "v24-concepts",
+        "path": str(src),
+        "sha256": digest,
+        "anchor_line": 2,
+        "anchor_quote": original.splitlines()[1],
+    }
+    path.write_text(json.dumps(packet,ensure_ascii=False),encoding="utf-8")
+    ledger_path = stage/"talk_corpora"/"CASE-SYNTH"/"case_ledger.json"
+    ledger=json.loads(ledger_path.read_text(encoding="utf-8"))
+    ledger["source_snapshots"].append({
+        "source_id": original_id,
+        "version": "v24-concepts",
+        "key": "B_BASELINE",
+        "family": "B",
+        "content_sha256": digest,
+        "author_state": "USER_ACCEPTED_CONCEPTS_ONLY",
+    })
+    ledger_path.write_text(json.dumps(ledger),encoding="utf-8")
+    graph=OpportunityGraphStore(stage)
+    graph.put("Evidence",{
+        "id":"synthetic-b-verified-original",
+        "revision":"one",
+        "source_ref":original_id,
+        "source_kind":"SOURCE_SCRIPT",
+        "read_depth":"SECTIONS",
+        "passage_anchors":[],
+    })
+    graph.append_event({
+        "event_id":"CASE-SYNTH:W3:route:B-UPTAKE-SYNTH",
+        "kind":"SCHOLARLY_ROUTE_CHALLENGE",
+        "route_candidate_id":"B-UPTAKE-SYNTH",
+        "subject_id":"HEAD-02",
+        "journal_id":packet["journal_id"],
+        "source_ref":"doi:"+packet["opponent_doi"],
+        "opponent_resolved":True,
+        "w12_equivalent":False,
+    })
+    graph.append_event({
+        "event_id":"CASE-SYNTH:W3:HEAD-02:DISCOVERY-RETURN",
+        "kind":"SOURCE_CONTRADICTION",
+        "subject_id":"HEAD-02",
+        "source_ref":original_id,
+        "original_source_binding":{
+            "source_id":original_id,
+            "version":"v24-concepts",
+            "content_sha256":digest,
+            "binding_verification":"VERIFIED_BYTES",
+        },
+    })
+    one=stage_w12_research_route(path,stage)
+    two=readback_w12_research_route(path,stage)
+    assert one["counts"]["W12_EQUIVALENT_HELD"]==1
+    assert two["verified"] is True
+    assert one["readback"]["verified"] is True
+    assert graph.list_records("ArticleSeed")==[]
+    assert graph.list_records("OpportunityRoute")==[]
+    assert graph.list_records("World")==[]
+
+
+def test_same_original_source_can_be_certified_by_multiple_w3_waves(tmp_path):
+    """A second valid W3 wave is not a source-origin identity collision."""
+    packet, path, stage, src, _caps, _manifest = fixture_route(tmp_path)
+    graph = OpportunityGraphStore(stage)
+    graph.append_event({
+        "event_id": "CASE-SYNTH:W3-SECOND:HEAD-03:DISCOVERY-RETURN",
+        "kind": "SOURCE_CONTRADICTION",
+        "subject_id": "HEAD-03",
+        "source_ref": "drive:SYNTH-C04",
+        "original_source_binding": {
+            "source_id": "drive:SYNTH-C04",
+            "version": "v0.4",
+            "content_sha256": _sha(src.read_bytes()),
+            "binding_verification": "VERIFIED_BYTES",
+        },
+    })
+    result = stage_w12_research_route(path, stage)
+    assert result["counts"]["W12_EQUIVALENT_HELD"] == 1
+    assert readback_w12_research_route(path, stage)["verified"] is True
+    assert not graph.list_records("ArticleSeed")
+
+
+def test_w12_cannot_borrow_source_certificate_from_another_w3_wave(tmp_path):
+    """A valid certificate for one route does not certify an unrelated wave."""
+    packet, path, stage, src, _caps, _manifest = fixture_route(tmp_path)
+    graph = OpportunityGraphStore(stage)
+    packet["route_candidate_id"] = "C-TEST-UNBOUND-SECOND-WAVE"
+    packet["claim_version_id"] = "C04-v0.4-other-wave-unbound"
+    graph.append_event({
+        "event_id": "CASE-SYNTH:W3-SECOND:route:C-TEST-UNBOUND-SECOND-WAVE",
+        "kind": "SCHOLARLY_ROUTE_CHALLENGE",
+        "route_candidate_id": packet["route_candidate_id"],
+        "subject_id": "HEAD-03",
+        "journal_id": packet["journal_id"],
+        "source_ref": "doi:10.1007/synth",
+        "opponent_resolved": True,
+        "w12_equivalent": False,
+    })
+    # An explicit own-wave conflicting certificate must NOT borrow the
+    # old, valid canonical original-source certificate.
+    graph.append_event({
+        "event_id": "CASE-SYNTH:W3-SECOND:HEAD-03:DISCOVERY-RETURN",
+        "kind": "SOURCE_CONTRADICTION",
+        "subject_id": "HEAD-03",
+        "source_ref": "drive:SYNTH-C04",
+        "original_source_binding": {
+            "source_id": "drive:SYNTH-C04",
+            "version": "v0.4",
+            "content_sha256": "0" * 64,
+            "binding_verification": "VERIFIED_BYTES",
+        },
+    })
+    path.write_text(json.dumps(packet), encoding="utf-8")
+    with pytest.raises(ValueError, match="prior W3 original versioned source byte binding not verified"):
+        stage_w12_research_route(path, stage)
+    assert not graph.list_records("HuntTrace")
+
+
+def test_legacy_w3_route_without_own_wave_certificate_uses_exact_canonical_origin(tmp_path):
+    """Older qualified journal waves share a byte-pinned source certificate."""
+    packet, path, stage, src, _caps, _manifest = fixture_route(tmp_path)
+    graph = OpportunityGraphStore(stage)
+    packet["route_candidate_id"] = "C-TEST-LEGACY-ALTERNATIVE"
+    packet["claim_version_id"] = "C04-v0.4-legacy-shared-source"
+    graph.append_event({
+        "event_id": "CASE-SYNTH:W3-LEGACY:route:C-TEST-LEGACY-ALTERNATIVE",
+        "kind": "SCHOLARLY_ROUTE_CHALLENGE",
+        "route_candidate_id": packet["route_candidate_id"],
+        "subject_id": "HEAD-03",
+        "journal_id": packet["journal_id"],
+        "source_ref": "doi:10.1007/synth",
+        "opponent_resolved": True,
+        "w12_equivalent": False,
+    })
+    path.write_text(json.dumps(packet), encoding="utf-8")
+    stage_result = stage_w12_research_route(path, stage)
+    assert stage_result["counts"]["W12_EQUIVALENT_HELD"] == 1
+    assert readback_w12_research_route(path, stage)["verified"] is True
+    assert graph.list_records("ArticleSeed") == []
