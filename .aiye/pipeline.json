@@ -1,0 +1,29 @@
+{
+  "tests": [
+    {
+      "name": "trm073-w2-w3-science-return",
+      "argv": [
+        "python",
+        "-m",
+        "pytest",
+        "tests/test_trm073_research_stage.py",
+        "tests/test_trm073_w3_discovery.py",
+        "tests/test_opportunity_graph.py",
+        "tests/test_target_world_catalog.py",
+        "tests/test_trm074_research_stage_handoff.py",
+        "tests/test_trm074_talk_corpus_intake.py",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "--basetemp",
+        ".pytest_tmp_trm073_hub",
+        "--maxfail=1"
+      ],
+      "cwd": ".",
+      "timeout": 250,
+      "env": {
+        "PYTHONPATH": "src"
+      }
+    }
+  ]
+}

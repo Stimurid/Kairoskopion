@@ -3,10 +3,11 @@ import type { CaseSummary, CaseDetail } from './types/domain';
 import { api, getToken, clearToken, type AuthUser } from './api/client';
 import { CaseWorkspace } from './components/CaseWorkspace';
 import { AgentMap } from './components/AgentMap';
+import { OpportunityWorkspace } from './components/OpportunityWorkspace';
 import { AuthGate } from './components/AuthGate';
 import './styles/cockpit.css';
 
-type AppView = 'cases' | 'agents';
+type AppView = 'cases' | 'agents' | 'opportunities';
 
 export default function App() {
   const [cases, setCases] = useState<CaseSummary[]>([]);
@@ -176,6 +177,12 @@ export default function App() {
           >
             Система / Агенты
           </button>
+          <button
+            className={`top-bar-link ${appView === 'opportunities' ? 'top-bar-link--active' : ''}`}
+            onClick={() => setAppView('opportunities')}
+          >
+            Возможности
+          </button>
         </nav>
         <div className="top-bar-user">
           <span
@@ -208,6 +215,7 @@ export default function App() {
 
       <div className="app-body">
         {appView === 'agents' && <AgentMap />}
+        {appView === 'opportunities' && <OpportunityWorkspace />}
 
         {appView === 'cases' && (
           <>

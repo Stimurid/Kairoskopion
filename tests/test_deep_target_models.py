@@ -66,6 +66,26 @@ def _pattern_response():
     }
 
 
+def _chunk_response():
+    return {
+        "section_structure_observations": ["Argument section visible"],
+        "intro_moves": [],
+        "method_moves": ["conceptual reconstruction"],
+        "argument_moves": ["distinction", "objection"],
+        "conclusion_moves": [],
+        "theory_presence": ["philosophy of technology"],
+        "empirical_presence_observations": [],
+        "citation_features": {"observed_roles": ["positioning"]},
+        "novelty_moves": ["bounded reframing"],
+        "evidence_anchors": [
+            {"locator": "chunk:fixture", "observation": "local argument move"}
+        ],
+        "unknowns": [],
+        "warnings": [],
+        "confidence": "medium",
+    }
+
+
 def _semantic_patterns(n):
     rows = []
     for i in range(n):
@@ -74,6 +94,7 @@ def _semantic_patterns(n):
             "published_corpus_id": "deepcorpus:test",
             "article_source_id": f"src:{i}",
             "semantic_status": "llm_grounded_fulltext",
+            "prompt_family_version": "published_article_pattern_v1:1.0.0",
             "content_hash": f"content-hash-{i}",
             "argument_moves": ["problem", "claim"],
             "theory_presence": ["technology studies"],
@@ -305,7 +326,7 @@ def test_duplicate_extracted_body_counts_once(tmp_path):
     )
 
 
-def test_oversize_text_is_not_counted_as_semantically_read(tmp_path):
+def test_oversize_text_is_chunked_with_complete_coverage(tmp_path):
     article = tmp_path / "large.txt"
     article.write_text("A" * 5000, encoding="utf-8")
     manifest = CorpusArtifactManifest(
@@ -322,12 +343,84 @@ def test_oversize_text_is_not_counted_as_semantically_read(tmp_path):
     result = build_published_article_patterns(
         target_id="venue-1",
         manifest=manifest,
-        provider=QueueProvider([]),
+        provider=QueueProvider([
+            _chunk_response(), _chunk_response(), _chunk_response(),
+            _chunk_response(), _chunk_response(), _pattern_response(),
+        ]),
+        max_chars=1000,
+    )
+    assert result["modeled"] == 1
+    assert result["complete_fulltexts_seen"] == 1
+    assert result["failures"] == []
+    pattern = result["patterns"][0]
+    assert pattern["semantic_status"] == "llm_grounded_fulltext_chunked"
+    assert pattern["chunking"]["complete_coverage"] is True
+    assert pattern["chunking"]["chunk_count"] == 5
+    assert sum(pattern["chunking"]["chunk_char_lengths"]) == 5000
+
+
+def test_chunked_pattern_identity_binds_segmentation_but_remains_stable(tmp_path):
+    article = tmp_path / "segmented.txt"
+    article.write_text("A" * 5000, encoding="utf-8")
+    manifest = CorpusArtifactManifest(
+        target_id="venue-1",
+        selection_strategy="fixture",
+        artifacts=[CorpusArtifact(
+            source_ref="src:segmented",
+            local_ref=str(article),
+            acquisition_state="validated_artifact",
+        )],
+    )
+
+    def build(max_chars, chunk_count):
+        return build_published_article_patterns(
+            target_id="venue-1",
+            manifest=manifest,
+            provider=QueueProvider(
+                [_chunk_response()] * chunk_count + [_pattern_response()]
+            ),
+            max_chars=max_chars,
+        )["patterns"][0]
+
+    first = build(1000, 5)
+    repeated = build(1000, 5)
+    differently_segmented = build(900, 6)
+    assert (
+        first["published_article_pattern_id"]
+        == repeated["published_article_pattern_id"]
+    )
+    assert (
+        first["published_article_pattern_id"]
+        != differently_segmented["published_article_pattern_id"]
+    )
+    assert (
+        first["chunking"]["chunk_char_ranges"]
+        != differently_segmented["chunking"]["chunk_char_ranges"]
+    )
+
+
+def test_chunk_failure_fails_closed_without_partial_pattern(tmp_path):
+    article = tmp_path / "large-fail.txt"
+    article.write_text("B" * 5000, encoding="utf-8")
+    manifest = CorpusArtifactManifest(
+        target_id="venue-1",
+        selection_strategy="fixture",
+        artifacts=[CorpusArtifact(
+            source_ref="src:large-fail",
+            local_ref=str(article),
+            acquisition_state="validated_artifact",
+        )],
+    )
+    result = build_published_article_patterns(
+        target_id="venue-1",
+        manifest=manifest,
+        provider=QueueProvider([_chunk_response()]),
         max_chars=1000,
     )
     assert result["modeled"] == 0
     assert result["complete_fulltexts_seen"] == 1
-    assert result["failures"][0]["status"] == "input_too_large_requires_chunking"
+    assert result["failures"][0]["status"] == "chunk_semantic_parse_failed"
+    assert result["failures"][0]["chunk_index"] == 2
 
 
 def test_nine_semantic_fulltexts_do_not_close_hs016_target_gate():
@@ -373,6 +466,120 @@ def test_ten_fulltexts_with_two_real_archetypes_can_close_target_gate():
     assert model["deep_model_gate"]["status"] == "READY"
     assert len(model["archetypes"]) == 2
     assert model["published_article_corpus"]["corpus_size"] == 10
+
+
+def test_chunked_status_without_coverage_cannot_close_deep_target_gate():
+    patterns = _semantic_patterns(10)
+    patterns[0]["semantic_status"] = "llm_grounded_fulltext_chunked"
+    model = aggregate_deep_target_model(
+        target_id="venue-1",
+        pattern_result={
+            "published_corpus_id": "deepcorpus:test",
+            "patterns": patterns,
+            "failures": [],
+        },
+        selection_strategy="recent_articles",
+        bias_notes=["recent sample"],
+        editor_profiles=[_meaningful_editor()],
+        provider=QueueProvider([
+            _genre_response(patterns),
+            _citation_response(patterns),
+        ]),
+        min_fulltexts=10,
+    )
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert model["deep_model_gate"]["requirements"][
+        "all_patterns_fulltext_grounded"
+    ]["pass"] is True
+
+
+def test_model_prompt_provenance_for_one_pass_only_is_backwards_compatible():
+    patterns = _semantic_patterns(10)
+    model = aggregate_deep_target_model(
+        target_id="venue-1",
+        pattern_result={
+            "published_corpus_id": "deepcorpus:test",
+            "patterns": patterns,
+            "failures": [],
+        },
+        selection_strategy="recent_articles",
+        bias_notes=[],
+        editor_profiles=[_meaningful_editor()],
+        provider=QueueProvider([
+            _genre_response(patterns),
+            _citation_response(patterns),
+        ]),
+        min_fulltexts=10,
+    )
+    assert model["prompt_versions"]["published_article_pattern"] == (
+        "published_article_pattern_v1:1.0.0"
+    )
+
+
+def test_model_prompt_provenance_for_chunked_only_lists_mapper_and_reducer():
+    patterns = _semantic_patterns(10)
+    for pattern in patterns:
+        pattern["semantic_status"] = "llm_grounded_fulltext_chunked"
+        pattern["prompt_family_version"] = (
+            "published_article_pattern_reduce_v1:1.0.0"
+        )
+        pattern["chunking"] = {
+            "mapper_prompt_family": "published_article_pattern_chunk_v1:1.0.0",
+            "reducer_prompt_family": "published_article_pattern_reduce_v1:1.0.0",
+        }
+    model = aggregate_deep_target_model(
+        target_id="venue-1",
+        pattern_result={
+            "published_corpus_id": "deepcorpus:test",
+            "patterns": patterns,
+            "failures": [],
+        },
+        selection_strategy="recent_articles",
+        bias_notes=[],
+        editor_profiles=[_meaningful_editor()],
+        provider=QueueProvider([
+            _genre_response(patterns),
+            _citation_response(patterns),
+        ]),
+        min_fulltexts=10,
+    )
+    assert model["prompt_versions"]["published_article_pattern"] == [
+        "published_article_pattern_chunk_v1:1.0.0",
+        "published_article_pattern_reduce_v1:1.0.0",
+    ]
+
+
+def test_model_prompt_provenance_for_mixed_families_is_deterministic():
+    patterns = _semantic_patterns(10)
+    patterns[0]["semantic_status"] = "llm_grounded_fulltext_chunked"
+    patterns[0]["prompt_family_version"] = (
+        "published_article_pattern_reduce_v1:1.0.0"
+    )
+    patterns[0]["chunking"] = {
+        "mapper_prompt_family": "published_article_pattern_chunk_v1:1.0.0",
+        "reducer_prompt_family": "published_article_pattern_reduce_v1:1.0.0",
+    }
+    model = aggregate_deep_target_model(
+        target_id="venue-1",
+        pattern_result={
+            "published_corpus_id": "deepcorpus:test",
+            "patterns": patterns,
+            "failures": [],
+        },
+        selection_strategy="recent_articles",
+        bias_notes=[],
+        editor_profiles=[_meaningful_editor()],
+        provider=QueueProvider([
+            _genre_response(patterns),
+            _citation_response(patterns),
+        ]),
+        min_fulltexts=10,
+    )
+    assert model["prompt_versions"]["published_article_pattern"] == [
+        "published_article_pattern_chunk_v1:1.0.0",
+        "published_article_pattern_reduce_v1:1.0.0",
+        "published_article_pattern_v1:1.0.0",
+    ]
 
 
 def test_duplicate_pattern_hashes_fail_deep_target_gate():
@@ -499,3 +706,391 @@ def test_article_simulation_refuses_blocked_deep_model():
     )
     assert result["status"] == "BLOCKED"
     assert result["blockers"] == ["deep_target_model_not_ready"]
+
+
+def _aggregate_with_genre(patterns, genre_response):
+    return aggregate_deep_target_model(
+        target_id="venue-1",
+        pattern_result={
+            "published_corpus_id": "deepcorpus:test",
+            "patterns": patterns,
+            "failures": [],
+        },
+        selection_strategy="recent_articles",
+        bias_notes=["recent sample"],
+        editor_profiles=[_meaningful_editor()],
+        provider=QueueProvider([
+            genre_response,
+            _citation_response(patterns),
+        ]),
+        min_fulltexts=10,
+    )
+
+
+def test_duplicate_archetype_id_and_identical_members_fail_closed():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["archetypes"][1] = dict(genre["archetypes"][0])
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    blockers = model["deep_model_gate"]["blockers"]
+    assert "archetype_id:duplicate:arch_conceptual" in blockers
+    assert any(item.startswith("archetype_membership:duplicate:") for item in blockers)
+
+
+def test_different_archetype_ids_cannot_mask_same_members_and_signature():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    duplicate = dict(genre["archetypes"][0])
+    duplicate["archetype_id"] = "arch_renamed_only"
+    genre["archetypes"][1] = duplicate
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    blockers = model["deep_model_gate"]["blockers"]
+    assert any(item.startswith("archetype_membership:duplicate:") for item in blockers)
+
+
+def test_zero_countermodels_fail_hs016_gate():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["countermodels"] = []
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert "countermodels_required" in model["deep_model_gate"]["blockers"]
+    requirement = model["deep_model_gate"]["requirements"][
+        "countermodel_evidence"
+    ]
+    assert requirement["actual"] == 0
+    assert requirement["pass"] is False
+
+
+def test_countermodel_unknown_member_fails_closed():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["countermodels"][0]["member_pattern_ids"] = ["papat_ghost"]
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert (
+        "countermodel[0]:unknown_members:papat_ghost"
+        in model["deep_model_gate"]["blockers"]
+    )
+
+
+def test_partial_archetype_coverage_is_reported_and_fails_closed():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["archetypes"][0]["member_pattern_ids"] = ["papat_0"]
+    genre["archetypes"][1]["member_pattern_ids"] = ["papat_0"]
+    genre["countermodels"][0]["member_pattern_ids"] = ["papat_9"]
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert "corpus_membership_coverage" in model["deep_model_gate"]["blockers"]
+    coverage = model["deep_model_gate"]["requirements"][
+        "corpus_membership_coverage"
+    ]
+    assert coverage["actual"] == 2
+    assert coverage["coverage_ratio"] == 0.2
+    assert coverage["missing_pattern_ids"] == [
+        f"papat_{i}" for i in range(1, 9)
+    ]
+
+
+def test_blank_archetype_ids_fail_closed():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    for archetype in genre["archetypes"]:
+        archetype["archetype_id"] = "   "
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    blockers = model["deep_model_gate"]["blockers"]
+    assert "archetype[0]:blank_archetype_id" in blockers
+    assert "archetype[1]:blank_archetype_id" in blockers
+
+
+def test_countermodel_requires_a_real_nonblank_contrast():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["countermodels"][0]["contrast"] = "   "
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert (
+        "countermodel[0]:blank_contrast"
+        in model["deep_model_gate"]["blockers"]
+    )
+
+
+def test_countermodel_cannot_relabel_an_archetype_membership():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["countermodels"][0]["member_pattern_ids"] = list(
+        genre["archetypes"][0]["member_pattern_ids"]
+    )
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert (
+        "countermodel[0]:same_members_as_archetype:arch_conceptual"
+        in model["deep_model_gate"]["blockers"]
+    )
+
+
+def test_archetype_requires_a_nonempty_semantic_signature():
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    archetype = genre["archetypes"][0]
+    archetype["defining_moves"] = []
+    archetype["structure_signature"] = []
+    archetype["method_signature"] = ""
+    archetype["theory_signature"] = []
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    assert (
+        "archetype[0]:empty_semantic_signature"
+        in model["deep_model_gate"]["blockers"]
+    )
+
+
+def test_blank_or_duplicate_pattern_ids_fail_closed():
+    patterns = _semantic_patterns(10)
+    patterns[8]["published_article_pattern_id"] = ""
+    patterns[9]["published_article_pattern_id"] = "papat_0"
+    genre = _genre_response(patterns)
+    model = _aggregate_with_genre(patterns, genre)
+
+    assert model["deep_model_gate"]["status"] == "BLOCKED"
+    requirement = model["deep_model_gate"]["requirements"][
+        "pattern_ids_nonblank_unique"
+    ]
+    assert requirement["missing_ids"] == 1
+    assert requirement["duplicate_ids"] == 1
+    assert "pattern_ids_nonblank_unique" in model["deep_model_gate"]["blockers"]
+
+def _covered_chunked_patterns():
+    patterns = _semantic_patterns(10)
+    for pattern in patterns:
+        pattern.update(
+            semantic_status="llm_grounded_fulltext_chunked",
+            source_text_chars=160_000,
+            prompt_family_version="published_article_pattern_reduce_v1:1.0.0",
+            chunking={
+                "complete_coverage": True,
+                "chunk_count": 2,
+                "chunk_char_ranges": [[0, 80_000], [80_000, 160_000]],
+                "chunk_char_lengths": [80_000, 80_000],
+                "mapper_prompt_family": "published_article_pattern_chunk_v1:1.0.0",
+                "reducer_prompt_family": "published_article_pattern_reduce_v1:1.0.0",
+            },
+        )
+    return patterns
+
+
+def test_runtime_only_chunk_diagnostics_do_not_change_model_digest():
+    from copy import deepcopy
+    patterns = _covered_chunked_patterns()
+    first = _aggregate_with_genre(patterns, _genre_response(patterns))
+    changed = deepcopy(patterns)
+    for row in changed:
+        row["chunking"]["chunk_attempts"] = [
+            {"model": "different-runtime", "latency_ms": 123,
+             "content_hash_prefix": "different", "fallback_reason": "retry"}
+        ]
+    second = _aggregate_with_genre(changed, _genre_response(changed))
+    assert first["deep_model_gate"]["status"] == "READY"
+    assert first["content_digest"] == second["content_digest"]
+    assert first["deep_target_model_id"] == second["deep_target_model_id"]
+    changed[0]["argument_moves"].append("new semantic observation")
+    third = _aggregate_with_genre(changed, _genre_response(changed))
+    assert first["content_digest"] != third["content_digest"]
+
+
+def test_hostile_chunk_coverage_and_provenance_fail_closed():
+    from copy import deepcopy
+    changes = [
+        ("chunk_count", 3), ("chunk_count", True),
+        ("complete_coverage", False), ("complete_coverage", "true"),
+        ("chunk_char_ranges", [[1, 80000], [80000, 160000]]),
+        ("chunk_char_ranges", [[0, 80000], [80001, 160000]]),
+        ("chunk_char_ranges", [[0, 80000], [79999, 160000]]),
+        ("chunk_char_ranges", [[0, 80000], [80000, 159999]]),
+        ("chunk_char_ranges", [[80000, 160000], [0, 80000]]),
+        ("chunk_char_ranges", [[0, 80000], [80000, 80000]]),
+        ("chunk_char_ranges", [[0, "80000"], [80000, 160000]]),
+        ("chunk_char_ranges", None), ("chunk_char_lengths", [80000, 1]),
+        ("mapper_prompt_family", ""), ("reducer_prompt_family", "no-version"),
+    ]
+    for field, value in changes:
+        patterns = deepcopy(_covered_chunked_patterns())
+        patterns[0]["chunking"][field] = value
+        model = _aggregate_with_genre(patterns, _genre_response(patterns))
+        assert model["deep_model_gate"]["status"] == "BLOCKED", (field, value)
+        assert "pattern_evidence_contract" in model["deep_model_gate"]["blockers"]
+    for field in ("chunking", "source_text_chars", "prompt_family_version"):
+        patterns = _covered_chunked_patterns()
+        del patterns[0][field]
+        model = _aggregate_with_genre(patterns, _genre_response(patterns))
+        assert model["deep_model_gate"]["status"] == "BLOCKED", field
+
+
+def test_blank_provenance_is_not_masked_by_other_cards():
+    patterns = _semantic_patterns(10)
+    patterns[0]["prompt_family_version"] = " "
+    model = _aggregate_with_genre(patterns, _genre_response(patterns))
+    assert "pattern[0]:prompt_provenance_invalid" in model["deep_model_gate"]["blockers"]
+
+
+def test_legacy_single_pass_and_mixed_provenance_remain_supported():
+    patterns = _semantic_patterns(10)
+    for row in patterns:
+        del row["prompt_family_version"]
+    assert _aggregate_with_genre(patterns, _genre_response(patterns))[
+        "deep_model_gate"
+    ]["status"] == "READY"
+    patterns[0] = _covered_chunked_patterns()[0]
+    model = _aggregate_with_genre(patterns, _genre_response(patterns))
+    assert model["deep_model_gate"]["status"] == "READY"
+    assert "published_article_pattern_v1:1.0.0" in model[
+        "prompt_versions"
+    ]["published_article_pattern"]
+
+
+def test_duplicate_countermodels_fail_closed():
+    from copy import deepcopy
+    patterns = _semantic_patterns(10)
+    genre = _genre_response(patterns)
+    genre["countermodels"].append(deepcopy(genre["countermodels"][0]))
+    model = _aggregate_with_genre(patterns, genre)
+    assert "countermodel[1]:duplicate_evidence_signature" in model[
+        "deep_model_gate"
+    ]["blockers"]
+
+
+def test_body_budget_blocks_before_any_provider_call():
+    from kairoskopion.kairon_provider import deep_target_models as deep
+    for chars, limit, expected in [
+        (deep.MAX_BODY_CHARS + 1, deep.MAX_BODY_CHARS + 1,
+         "body_char_budget_exceeded"),
+        (65000, 1000, "body_chunk_budget_exceeded"),
+        (1000, 0, "invalid_semantic_chunk_limit"),
+        (1000, True, "invalid_semantic_chunk_limit"),
+    ]:
+        class NeverProvider:
+            calls = 0
+            def complete(self, *args, **kwargs):
+                self.calls += 1
+                raise AssertionError("budget must block provider")
+        provider = NeverProvider()
+        semantic, failure = deep._run_complete_article_semantics(
+            provider=provider, target_id="test", source_ref="test",
+            title="", text="A" * chars, structural={}, max_chars=limit,
+        )
+        assert semantic is None
+        assert failure["status"] == expected
+        assert provider.calls == 0
+
+
+def test_ten_pt_scale_chunked_articles_pass_integrated_contract(tmp_path):
+    # Offline structural fixture, never frozen-corpus semantic acceptance.
+    artifacts = []
+    responses = []
+    for i in range(10):
+        path = tmp_path / f"article-{i}.txt"
+        path.write_text(str(i) * 160_000, encoding="utf-8")
+        artifacts.append(CorpusArtifact(
+            source_ref=f"source:{i}", local_ref=str(path),
+            acquisition_state="validated_artifact",
+        ))
+        responses.extend([_chunk_response(), _chunk_response(), _pattern_response()])
+    provider = QueueProvider(responses)
+    result = build_published_article_patterns(
+        target_id="venue-1",
+        manifest=CorpusArtifactManifest(
+            target_id="venue-1", selection_strategy="fixture", artifacts=artifacts,
+        ),
+        provider=provider,
+    )
+    assert result["modeled"] == 10
+    assert result["failures"] == []
+    assert provider.responses == []
+    model = _aggregate_with_genre(result["patterns"], _genre_response(result["patterns"]))
+    assert model["deep_model_gate"]["status"] == "READY"
+
+
+def test_failed_attempts_consume_total_corpus_budget(tmp_path, monkeypatch):
+    from kairoskopion.kairon_provider import deep_target_models as deep
+    monkeypatch.setattr(deep, "MAX_CORPUS_CHUNKS", 2)
+    artifacts = []
+    for i in range(3):
+        path = tmp_path / f"{i}.txt"
+        path.write_text(str(i) * 6000, encoding="utf-8")
+        artifacts.append(CorpusArtifact(
+            source_ref=f"source:{i}", local_ref=str(path),
+            acquisition_state="validated_artifact",
+        ))
+    calls = []
+    def failed(**kwargs):
+        calls.append(kwargs["source_ref"])
+        return None, {"status": "semantic_parse_failed"}
+    monkeypatch.setattr(deep, "_run_complete_article_semantics", failed)
+    result = deep.build_published_article_patterns(
+        target_id="venue-1", provider=object(),
+        manifest=CorpusArtifactManifest(
+            target_id="venue-1", selection_strategy="fixture", artifacts=artifacts,
+        ),
+    )
+    assert len(calls) == 2
+    assert result["failures"][-1]["status"] == "corpus_semantic_budget_exceeded"
+
+
+def test_actual_paragraph_chunk_fanout_is_bounded(monkeypatch):
+    from kairoskopion.kairon_provider import deep_target_models as deep
+    monkeypatch.setattr(deep, "MAX_BODY_CHUNKS", 2)
+    text = ("A" * 549 + "\n") * 3 + "B" * 350
+    assert len(text) == 2000
+    assert len(deep._split_complete_text(text, 1000)) > 2
+    class NeverProvider:
+        calls = 0
+        def complete(self, *args, **kwargs):
+            self.calls += 1
+            raise AssertionError("must not call")
+    provider = NeverProvider()
+    semantic, failure = deep._run_complete_article_semantics(
+        provider=provider, target_id="test", source_ref="test",
+        title="", text=text, structural={}, max_chars=1000,
+    )
+    assert semantic is None
+    assert failure["status"] == "body_chunk_budget_exceeded"
+    assert provider.calls == 0
+
+
+def test_corpus_character_budget_blocks_next_body(tmp_path, monkeypatch):
+    from kairoskopion.kairon_provider import deep_target_models as deep
+    monkeypatch.setattr(deep, "MAX_CORPUS_CHARS", 6000)
+    artifacts = []
+    for i in range(2):
+        path = tmp_path / f"{i}.txt"
+        path.write_text(str(i) * 6000, encoding="utf-8")
+        artifacts.append(CorpusArtifact(
+            source_ref=f"source:{i}", local_ref=str(path),
+            acquisition_state="validated_artifact",
+        ))
+    calls = []
+    def failed(**kwargs):
+        calls.append(kwargs["source_ref"])
+        return None, {"status": "semantic_parse_failed"}
+    monkeypatch.setattr(deep, "_run_complete_article_semantics", failed)
+    result = deep.build_published_article_patterns(
+        target_id="venue-1", provider=object(),
+        manifest=CorpusArtifactManifest(
+            target_id="venue-1", selection_strategy="fixture", artifacts=artifacts,
+        ),
+    )
+    assert len(calls) == 1
+    assert result["failures"][-1]["status"] == "corpus_semantic_budget_exceeded"
