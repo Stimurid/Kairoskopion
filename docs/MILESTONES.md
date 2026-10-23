@@ -1,5 +1,8 @@
 # Milestones — Kairoskopion
 
+**TRM-CITE-001 R1:** batch bridge code candidate as of 2026-10-21; operator
+source, test, Hub, and scientific acceptance are pending (see `docs/TRM_CITE_R1_RETURN.md`).
+
 **Last updated:** 2026-06-09
 
 ---

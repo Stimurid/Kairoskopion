@@ -1,4 +1,6 @@
 {
+  "version": 1,
+  "test_command": "python scripts/run_project_qa.py",
   "tests": [
     {
       "name": "trm073-w2-w3-science-return",

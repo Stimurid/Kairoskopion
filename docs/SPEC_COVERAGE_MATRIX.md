@@ -1,5 +1,9 @@
 # Spec Coverage Matrix — Kairoskopion
 
+**TRM-CITE-001 R1 (2026-10-21): Partial / unverified.** Z0 and followup
+task transports exist; actual provider access, the 13-task replay, test execution,
+Hub QA, and independent source review remain unverified in this sandbox.
+
 **Last updated:** 2026-06-14
 **Spec source:** `docs/KAIRON_TECHNICAL_SPEC_FOR_CLAUDE_v0_1.md` (10 waves, 12665 lines)
 **Implementation:** `src/kairoskopion/` + `tests/`
