@@ -176,9 +176,21 @@ def _validate(packet: dict[str, Any], graph: OpportunityGraphStore) -> dict[str,
     if len(graph_events) != 1:
         raise ValueError("route candidate is not uniquely staged by existing W3")
     event = graph_events[0]
+    # Multiple research waves can legitimately bind the same immutable talk
+    # source. Require the original-source certificate belonging to THIS W3
+    # route's wave, not a globally unique certificate for the entire head.
+    w3_event_id = str(event.get("event_id") or "")
+    route_suffix = f":route:{route_id}"
+    if not w3_event_id.endswith(route_suffix):
+        raise ValueError("W3 route event lacks exact research-wave provenance")
+    origin_event_id = (
+        w3_event_id[:-len(route_suffix)]
+        + f":{packet['head_id']}:DISCOVERY-RETURN"
+    )
     head_refs = [
         x for x in graph.replay_events()
         if x.get("kind") == "SOURCE_CONTRADICTION"
+        and x.get("event_id") == origin_event_id
         and x.get("subject_id") == packet["head_id"]
         and isinstance(x.get("original_source_binding"), dict)
     ]

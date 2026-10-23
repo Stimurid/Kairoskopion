@@ -371,3 +371,47 @@ def test_w12_head02_B_source_admits_held_research_without_new_article_seed(tmp_p
     assert graph.list_records("ArticleSeed")==[]
     assert graph.list_records("OpportunityRoute")==[]
     assert graph.list_records("World")==[]
+
+
+def test_same_original_source_can_be_certified_by_multiple_w3_waves(tmp_path):
+    """A second valid W3 wave is not a source-origin identity collision."""
+    packet, path, stage, src, _caps, _manifest = fixture_route(tmp_path)
+    graph = OpportunityGraphStore(stage)
+    graph.append_event({
+        "event_id": "CASE-SYNTH:W3-SECOND:HEAD-03:DISCOVERY-RETURN",
+        "kind": "SOURCE_CONTRADICTION",
+        "subject_id": "HEAD-03",
+        "source_ref": "drive:SYNTH-C04",
+        "original_source_binding": {
+            "source_id": "drive:SYNTH-C04",
+            "version": "v0.4",
+            "content_sha256": _sha(src.read_bytes()),
+            "binding_verification": "VERIFIED_BYTES",
+        },
+    })
+    result = stage_w12_research_route(path, stage)
+    assert result["counts"]["W12_EQUIVALENT_HELD"] == 1
+    assert readback_w12_research_route(path, stage)["verified"] is True
+    assert not graph.list_records("ArticleSeed")
+
+
+def test_w12_cannot_borrow_source_certificate_from_another_w3_wave(tmp_path):
+    """A valid certificate for one route does not certify an unrelated wave."""
+    packet, path, stage, src, _caps, _manifest = fixture_route(tmp_path)
+    graph = OpportunityGraphStore(stage)
+    packet["route_candidate_id"] = "C-TEST-UNBOUND-SECOND-WAVE"
+    packet["claim_version_id"] = "C04-v0.4-other-wave-unbound"
+    graph.append_event({
+        "event_id": "CASE-SYNTH:W3-SECOND:route:C-TEST-UNBOUND-SECOND-WAVE",
+        "kind": "SCHOLARLY_ROUTE_CHALLENGE",
+        "route_candidate_id": packet["route_candidate_id"],
+        "subject_id": "HEAD-03",
+        "journal_id": packet["journal_id"],
+        "source_ref": "doi:10.1007/synth",
+        "opponent_resolved": True,
+        "w12_equivalent": False,
+    })
+    path.write_text(json.dumps(packet), encoding="utf-8")
+    with pytest.raises(ValueError, match="prior W3 original versioned source byte binding not verified"):
+        stage_w12_research_route(path, stage)
+    assert not graph.list_records("HuntTrace")
