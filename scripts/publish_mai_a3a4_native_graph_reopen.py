@@ -13,8 +13,14 @@ import json
 from typing import Any
 
 from kairoskopion.kairon_provider.opportunity_graph import OpportunityGraphStore
-from fetch_mai_venue_pages import load,sha,stable,write
-from run_mai_a_education_field_reopen import build_input,validate_synthesis
+if __package__:
+    from .fetch_mai_venue_pages import load,sha,stable,write
+else:
+    from fetch_mai_venue_pages import load,sha,stable,write
+if __package__:
+    from .run_mai_a_education_field_reopen import build_input,validate_synthesis
+else:
+    from run_mai_a_education_field_reopen import build_input,validate_synthesis
 
 SCHEMA="MAI_ARTIKL_A3A4_NATIVE_GRAPH_REOPEN_EVENT_IMPORT_v1"
 

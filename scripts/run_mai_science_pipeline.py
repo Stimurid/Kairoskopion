@@ -19,14 +19,38 @@ import sys
 from typing import Any
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from fetch_mai_prior_art import execute as get_prior_art, stable as provider_stable, normalize_doi
-from run_mai_claim_challenge import run as run_criticism
-from merge_mai_scholarly_reviews import run as merge_criticism
-from fetch_mai_venue_pages import capture as capture_venues
-from run_mai_kairon_policy_claims import run as run_kairon_policy
-from run_mai_native_scholarly_read import run as run_native_scholarship
-from run_mai_a_education_field_reopen import execute as run_scientific_field_reopen
-from publish_mai_a3a4_native_graph_reopen import import_held_return as emit_existing_graph_return
+if __package__:
+    from .fetch_mai_prior_art import execute as get_prior_art, stable as provider_stable, normalize_doi
+else:
+    from fetch_mai_prior_art import execute as get_prior_art, stable as provider_stable, normalize_doi
+if __package__:
+    from .run_mai_claim_challenge import run as run_criticism
+else:
+    from run_mai_claim_challenge import run as run_criticism
+if __package__:
+    from .merge_mai_scholarly_reviews import run as merge_criticism
+else:
+    from merge_mai_scholarly_reviews import run as merge_criticism
+if __package__:
+    from .fetch_mai_venue_pages import capture as capture_venues
+else:
+    from fetch_mai_venue_pages import capture as capture_venues
+if __package__:
+    from .run_mai_kairon_policy_claims import run as run_kairon_policy
+else:
+    from run_mai_kairon_policy_claims import run as run_kairon_policy
+if __package__:
+    from .run_mai_native_scholarly_read import run as run_native_scholarship
+else:
+    from run_mai_native_scholarly_read import run as run_native_scholarship
+if __package__:
+    from .run_mai_a_education_field_reopen import execute as run_scientific_field_reopen
+else:
+    from run_mai_a_education_field_reopen import execute as run_scientific_field_reopen
+if __package__:
+    from .publish_mai_a3a4_native_graph_reopen import import_held_return as emit_existing_graph_return
+else:
+    from publish_mai_a3a4_native_graph_reopen import import_held_return as emit_existing_graph_return
 
 SCHEMA="MAI_W12_RESEARCH_OPERATOR_ONE_COMMAND_v1"
 

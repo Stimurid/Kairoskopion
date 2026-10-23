@@ -19,7 +19,10 @@ import subprocess
 import sys
 from typing import Any
 
-from fetch_mai_venue_pages import load,sha,stable,write
+if __package__:
+    from .fetch_mai_venue_pages import load,sha,stable,write
+else:
+    from fetch_mai_venue_pages import load,sha,stable,write
 
 SCHEMA="MAI_KAIRON_QUOTE_ANCHORED_POLICY_CANDIDATE_v1"
 CLAIMS=(

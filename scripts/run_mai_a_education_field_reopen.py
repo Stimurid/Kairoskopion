@@ -15,8 +15,14 @@ import json
 import subprocess
 from typing import Any
 
-from fetch_mai_venue_pages import load,sha,stable,write
-from run_mai_native_scholarly_read import paper_inputs,validate
+if __package__:
+    from .fetch_mai_venue_pages import load,sha,stable,write
+else:
+    from fetch_mai_venue_pages import load,sha,stable,write
+if __package__:
+    from .run_mai_native_scholarly_read import paper_inputs,validate
+else:
+    from run_mai_native_scholarly_read import paper_inputs,validate
 
 SCHEMA="MAI_ARTIKL_A3A4_NATIVE_FIELD_REOPEN_CANDIDATE_v1"
 FIELDS=(

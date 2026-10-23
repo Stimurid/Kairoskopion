@@ -15,9 +15,18 @@ from pathlib import Path
 from urllib.parse import urlparse
 from typing import Any
 
-from fetch_mai_prior_art import query,normalize_doi
-from fetch_mai_venue_pages import obtain
-from run_mai_kairon_policy_claims import load,sha,stable,write
+if __package__:
+    from .fetch_mai_prior_art import query,normalize_doi
+else:
+    from fetch_mai_prior_art import query,normalize_doi
+if __package__:
+    from .fetch_mai_venue_pages import obtain
+else:
+    from fetch_mai_venue_pages import obtain
+if __package__:
+    from .run_mai_kairon_policy_claims import load,sha,stable,write
+else:
+    from run_mai_kairon_policy_claims import load,sha,stable,write
 
 SCHEMA="MAI_KAIRON_NATIVE_PUBLISHER_WORK_SOURCE_v1"
 

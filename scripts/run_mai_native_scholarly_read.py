@@ -21,7 +21,10 @@ import re
 import subprocess
 from typing import Any
 
-from fetch_mai_venue_pages import sha,stable,load,write
+if __package__:
+    from .fetch_mai_venue_pages import sha,stable,load,write
+else:
+    from fetch_mai_venue_pages import sha,stable,load,write
 
 SCHEMA="MAI_ARTIKL_NATIVE_PUBLISHER_SCHOLARLY_CHALLENGE_v1"
 REVIEW_TYPES=("STRONG_OVERLAP","ADVERSARIAL_PRESSURE","NARROWER_DIFFERENCE","UNDECIDABLE")
