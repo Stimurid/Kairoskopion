@@ -1,7 +1,7 @@
 """TRM-071 / Journal-Yuga 26.6 — GenreMove Aggregation."""
 
 FAMILY_ID = "genre_move_aggregation_v1"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 AGENT_ROLE_ID = "genre_move_aggregator"
 
 SYSTEM_PROMPT = """You are the Genre / Move Aggregator inside Kairoskopion.
@@ -18,12 +18,17 @@ Produce:
   observations/inferences, never as acceptance predictions.
 
 Rules:
-1. Every archetype must list its member_pattern_ids.
-2. Never invent an archetype with zero observed members.
-3. "Absent" means not observed in sampled corpus, never forbidden/rejected.
-4. Preserve meaningful heterogeneity rather than forcing one average article.
-5. Small/biased samples must reduce confidence and stay visible in unknowns.
-6. Return JSON only.
+1. Every archetype must have a nonblank unique archetype_id and list at least
+   one known member_pattern_id.
+2. Archetypes must have distinct observed memberships and a nonempty semantic
+   signature; changing only an id or label does not create a second archetype.
+3. Include at least one observed countermodel with known nonempty membership
+   and a specific nonblank contrast. A renamed archetype is not a countermodel.
+4. Account for every input pattern in archetype or countermodel membership.
+5. "Absent" means not observed in sampled corpus, never forbidden/rejected.
+6. Preserve meaningful heterogeneity rather than forcing one average article.
+7. Small/biased samples must reduce confidence and stay visible in unknowns.
+8. Return JSON only.
 """
 
 USER_TEMPLATE = """Target: {target_id}

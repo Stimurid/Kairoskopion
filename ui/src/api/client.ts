@@ -78,6 +78,8 @@ function patch<T>(path: string, body?: unknown) {
 
 // --- Cases ---
 
+import type { OpportunityPortfolio, W12ResearchStage } from '../components/OpportunityWorkspace';
+
 import type {
   CaseSummary,
   CaseDetail,
@@ -120,6 +122,8 @@ export interface RegistryRecord {
 
 export const api = {
   health: () => get<{ status: string; version: string }>('/health'),
+  getOpportunityPortfolio: () => get<OpportunityPortfolio>('/api/opportunities/portfolio'),
+  getW12ResearchStage: () => get<W12ResearchStage>('/api/opportunities/research-stage?limit=100'),
 
   // Auth (staging soft-auth: no password, no verification)
   signup: (displayName: string, email?: string) =>

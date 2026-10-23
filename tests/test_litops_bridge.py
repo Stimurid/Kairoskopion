@@ -334,9 +334,21 @@ class TestWriteExport:
                 assert rec.get("bridge_version") == "kairoskopion-litops-v1"
 
     def test_no_litops_import_required(self):
-        """Bridge must not import litops as a dependency."""
+        """Pure export imports without the optional live LitOps package.
+
+        The authenticated source-to-WhiteCrow path deliberately uses a
+        FUNCTION-LOCAL LitOps import. A global textual substring check
+        would incorrectly prohibit that real, lazily invoked capability.
+        """
+        import ast
         import kairoskopion.integrations.litops_bridge as mod
         source = Path(mod.__file__).read_text(encoding="utf-8")
-        # Should not import from litops package
-        assert "import litops" not in source
-        assert "from litops" not in source
+        tree = ast.parse(source)
+        top_level = [node for node in tree.body
+                     if isinstance(node, (ast.Import, ast.ImportFrom))]
+        assert not any(
+            any(alias.name == "litops" or alias.name.startswith("litops.")
+                for alias in node.names) if isinstance(node, ast.Import)
+            else (node.module or "").split(".", 1)[0] == "litops"
+            for node in top_level
+        ), "pure LitOps export must have no mandatory module-scope LitOps import"

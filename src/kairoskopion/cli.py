@@ -868,11 +868,12 @@ def cmd_build_venue_evidence_pack(args: argparse.Namespace) -> int:
 # Agent / workflow CLI commands (Agentic Contour v0.1)
 # ---------------------------------------------------------------------------
 
-def _safe_print(text: str) -> None:
+def _safe_print(text: str, *, file=None) -> None:
     """Print text safely on Windows consoles (cp1251/cp1252)."""
-    sys.stdout.buffer.write(text.encode("utf-8", errors="replace"))
-    sys.stdout.buffer.write(b"\n")
-    sys.stdout.buffer.flush()
+    stream = file if file is not None else sys.stdout
+    stream.buffer.write(text.encode("utf-8", errors="replace"))
+    stream.buffer.write(b"\n")
+    stream.buffer.flush()
 
 
 def _print_json(data: dict) -> None:
@@ -1696,6 +1697,242 @@ def cmd_export_review_packet(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# Trimurti batch scheduler CLI commands (HEAD-TRIMURTI / MAI-BATCH-AUTO-20261020)
+# ---------------------------------------------------------------------------
+
+
+def cmd_trimurti_build(args: argparse.Namespace) -> int:
+    """Build a Trimurti batch plan from a W12 source (real or fixture)."""
+    from .kairon_provider import (
+        SOURCE_KIND_FIXTURE,
+        SOURCE_KIND_REAL,
+        TrimurtiBatchSpec,
+        TrimurtiPlanStore,
+        build_fixture_w12,
+        build_trimurti_plan,
+        discover_w12_source,
+        load_w12,
+        plan_summary,
+    )
+
+    root = _resolve_storage_root(args)
+    spec = TrimurtiBatchSpec(
+        batch_id=args.batch_id,
+        concurrency_limit=max(1, int(args.concurrency_limit)),
+        author_rework_enabled=bool(args.author_rework),
+    )
+
+    source_path = getattr(args, "source", None)
+    use_fixture = bool(getattr(args, "use_fixture", False))
+
+    if use_fixture:
+        records, import_receipt = build_fixture_w12()
+        source_kind = SOURCE_KIND_FIXTURE
+    else:
+        if not source_path:
+            probe = discover_w12_source()
+            _safe_print(f"W12 discovery: {probe.source_kind}")
+            _safe_print(f"  permission_failure: {probe.permission_failure}")
+            if probe.source_kind != SOURCE_KIND_REAL:
+                _safe_print(
+                    "ERROR: no authorized W12 source available. Either set "
+                    "MAI_W12_AUTHORIZED_PATH or pass --use-fixture.",
+                    file=sys.stderr,
+                )
+                return 2
+            source_path = probe.source_path
+        records, import_receipt = load_w12(source_path, source_kind=SOURCE_KIND_REAL)
+        source_kind = SOURCE_KIND_REAL
+        if import_receipt.source_kind != SOURCE_KIND_REAL:
+            _safe_print(f"ERROR: {import_receipt.permission_failure}", file=sys.stderr)
+            return 3
+
+    plan = build_trimurti_plan(batch_id=args.batch_id, w12_records=records, spec=spec)
+    store = TrimurtiPlanStore(root)
+    store.put(plan)
+
+    _safe_print("--- Trimurti plan built ---")
+    _safe_print(f"Batch ID:           {plan.batch_id}")
+    _safe_print(f"Storage root:       {root.resolve()}")
+    _safe_print(f"W12 source kind:    {source_kind}")
+    _safe_print(f"W12 source path:    {import_receipt.source_path or '(fixture)'}")
+    _safe_print(f"W12 source sha256:  {import_receipt.source_full_sha256}")
+    _safe_print(f"W12 records:        {import_receipt.records_count}")
+    _safe_print(f"W12 seed families:  {import_receipt.seed_family_count}")
+    _safe_print(f"W12 meaning vers:   {import_receipt.meaning_version_count}")
+    if import_receipt.shape_warnings:
+        _safe_print("Shape warnings:")
+        for warning in import_receipt.shape_warnings:
+            _safe_print(f"  ! {warning}")
+    summary = plan_summary(plan)
+    _safe_print(
+        f"Plan status:        {plan.status} "
+        f"(routes={summary['route_count']}, refusal_codes="
+        f"{sum(summary['by_refusal_code'].values())})"
+    )
+    if summary["by_refusal_code"]:
+        for code, count in sorted(summary["by_refusal_code"].items()):
+            _safe_print(f"  refusal: {code} x{count}")
+    return 0
+
+
+def cmd_trimurti_run(args: argparse.Namespace) -> int:
+    """Advance a Trimurti batch through a phase checkpoint slice."""
+    from .kairon_provider import (
+        TrimurtiPlanStore,
+        advance_phase,
+        build_run_receipt,
+        claim_routes,
+        plan_summary,
+    )
+
+    root = _resolve_storage_root(args)
+    store = TrimurtiPlanStore(root)
+    plan = store.get(args.batch_id)
+    if plan is None:
+        _safe_print(f"ERROR: batch not found: {args.batch_id}", file=sys.stderr)
+        return 4
+
+    phase = args.phase
+    status = args.status
+    route_id = getattr(args, "route_id", None)
+    limit = getattr(args, "limit", None)
+    evidence_refs = list(getattr(args, "evidence_ref", None) or [])
+
+    if route_id is None and phase == "source_evidence" and status == "completed":
+        claimed = claim_routes(plan, limit=limit)
+        _safe_print(f"Claimed {len(claimed)} pending routes for source_evidence")
+        for route in claimed:
+            try:
+                advance_phase(
+                    plan,
+                    route_id=route.route_id,
+                    phase=phase,
+                    status=status,
+                    notes=[f"batch:{plan.batch_id}"],
+                    evidence_refs=evidence_refs,
+                )
+            except (KeyError, ValueError) as exc:
+                route.hold_failures = list(
+                    dict.fromkeys([*route.hold_failures, f"{type(exc).__name__}: {exc}"])
+                )
+                route.status = "hold"
+    else:
+        targets = [r for r in plan.routes if r.status != "ready_for_author_rework"]
+        if route_id:
+            targets = [r for r in targets if r.route_id == route_id]
+            if not targets:
+                _safe_print(
+                    f"ERROR: route not found or already terminal: {route_id}",
+                    file=sys.stderr,
+                )
+                return 5
+        if limit is not None:
+            targets = targets[: max(0, limit)]
+        for route in targets:
+            try:
+                advance_phase(
+                    plan,
+                    route_id=route.route_id,
+                    phase=phase,
+                    status=status,
+                    notes=[f"batch:{plan.batch_id}"],
+                    evidence_refs=evidence_refs,
+                )
+            except (KeyError, ValueError) as exc:
+                route.hold_failures = list(
+                    dict.fromkeys([*route.hold_failures, f"{type(exc).__name__}: {exc}"])
+                )
+                route.status = "hold"
+
+    store.put(plan)
+    receipt = build_run_receipt(plan)
+    summary = plan_summary(plan)
+    _safe_print("--- Trimurti run ---")
+    _safe_print(f"Batch:              {plan.batch_id}")
+    _safe_print(f"Phase/status:       {phase}/{status}")
+    _safe_print(f"Routes advanced:    {len(receipt.route_event_hashes)}")
+    _safe_print(f"Plan status:        {plan.status}")
+    _safe_print(f"Ready for rework:   {summary['ready_for_author_rework']}")
+    _safe_print(f"Hold:               {summary['hold_count']}")
+    _safe_print(f"Failed:             {summary['failed_count']}")
+    _safe_print(f"Run receipt id:     {receipt.run_id}")
+    return 0
+
+
+def cmd_trimurti_status(args: argparse.Namespace) -> int:
+    """Inspect a Trimurti batch plan state."""
+    from .kairon_provider import TrimurtiPlanStore, plan_summary
+
+    root = _resolve_storage_root(args)
+    store = TrimurtiPlanStore(root)
+    plan = store.get(args.batch_id)
+    if plan is None:
+        _safe_print(f"ERROR: batch not found: {args.batch_id}", file=sys.stderr)
+        return 6
+    summary = plan_summary(plan)
+    output = getattr(args, "output", None)
+    if output:
+        Path(output).parent.mkdir(parents=True, exist_ok=True)
+        Path(output).write_text(
+            json.dumps({"summary": summary, "plan": plan.to_dict()}, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        _safe_print(f"Wrote plan snapshot to {output}")
+        return 0
+    _safe_print(f"Batch:              {plan.batch_id}")
+    _safe_print(f"Status:             {plan.status}")
+    _safe_print(f"Routes:             {summary['route_count']}")
+    _safe_print(f"Ready for rework:   {summary['ready_for_author_rework']}")
+    _safe_print(f"Hold:               {summary['hold_count']}")
+    _safe_print(f"Failed:             {summary['failed_count']}")
+    _safe_print(f"By status:")
+    for status, count in sorted(summary["by_status"].items()):
+        _safe_print(f"  {status}: {count}")
+    _safe_print("By phase:")
+    for phase, count in sorted(summary["by_phase"].items()):
+        _safe_print(f"  {phase}: {count}")
+    if summary["by_refusal_code"]:
+        _safe_print("Refusal codes:")
+        for code, count in sorted(summary["by_refusal_code"].items()):
+            _safe_print(f"  {code}: {count}")
+    return 0
+
+
+def cmd_trimurti_export_packet(args: argparse.Namespace) -> int:
+    """Export one route's editorial packet for human review."""
+    from .kairon_provider import TrimurtiPlanStore
+
+    root = _resolve_storage_root(args)
+    store = TrimurtiPlanStore(root)
+    plan = store.get(args.batch_id)
+    if plan is None:
+        _safe_print(f"ERROR: batch not found: {args.batch_id}", file=sys.stderr)
+        return 7
+    target = None
+    for route in plan.routes:
+        if route.route_id == args.route_id:
+            target = route
+            break
+    if target is None:
+        _safe_print(
+            f"ERROR: route_id not in batch: {args.route_id}", file=sys.stderr
+        )
+        return 8
+    out_path = Path(args.output)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps(target.to_dict(), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    _safe_print(f"Wrote editorial packet: {out_path}")
+    _safe_print(f"  route_id: {target.route_id}")
+    _safe_print(f"  status:   {target.status}")
+    _safe_print(f"  phase:    {target.current_phase}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="kairoskopion",
@@ -2067,6 +2304,92 @@ def main(argv: list[str] | None = None) -> int:
         help="Output directory for review packet files",
     )
 
+    # --- Trimurti batch scheduler CLI commands (HEAD-TRIMURTI / MAI-BATCH-AUTO-20261020) ---
+    trimurti_build_parser = sub.add_parser(
+        "trimurti-build",
+        help="Build a Trimurti batch plan from a W12 source (real or fixture)",
+    )
+    trimurti_build_parser.add_argument(
+        "--batch-id", required=True,
+        help="Batch identifier (must be stable across cold restarts)",
+    )
+    trimurti_build_parser.add_argument(
+        "--source", default=None,
+        help="Path to authorized W12 source bytes (real bytes)",
+    )
+    trimurti_build_parser.add_argument(
+        "--use-fixture", action="store_true", default=False,
+        help="Use the deterministic fixture (labelled FIXTURE_NOT_REAL_DATA)",
+    )
+    trimurti_build_parser.add_argument(
+        "--concurrency-limit", type=int, default=4,
+        help="Concurrency limit per scheduler worker (default: 4)",
+    )
+    trimurti_build_parser.add_argument(
+        "--author-rework", action="store_true", default=False,
+        help="Explicitly enable author rework mode (separate from pre-author gate)",
+    )
+
+    trimurti_run_parser = sub.add_parser(
+        "trimurti-run",
+        help="Advance a Trimurti batch through a phase checkpoint slice",
+    )
+    trimurti_run_parser.add_argument("--batch-id", required=True)
+    trimurti_run_parser.add_argument(
+        "--phase", required=True,
+        choices=[
+            "source_evidence",
+            "scholarly_challenge",
+            "venue_qualification",
+            "route_policy",
+            "target_variant",
+            "editorial_packet",
+            "qa",
+            "ready_for_author_rework",
+        ],
+        help="Phase checkpoint to advance",
+    )
+    trimurti_run_parser.add_argument(
+        "--status", required=True,
+        choices=["completed", "hold", "failed"],
+        help="Checkpoint status to record",
+    )
+    trimurti_run_parser.add_argument(
+        "--route-id", default=None,
+        help="Advance a single route (default: advance all eligible routes)",
+    )
+    trimurti_run_parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Maximum number of routes to advance in this slice",
+    )
+    trimurti_run_parser.add_argument(
+        "--evidence-ref", action="append", default=None,
+        help=(
+            "Operation receipt reference for a completed checkpoint "
+            "(repeatable). A 'completed' status with no --evidence-ref "
+            "is rejected or routed to hold — a note string alone is "
+            "never accepted as proof of a real operation."
+        ),
+    )
+
+    trimurti_status_parser = sub.add_parser(
+        "trimurti-status",
+        help="Inspect a Trimurti batch plan state",
+    )
+    trimurti_status_parser.add_argument("--batch-id", required=True)
+    trimurti_status_parser.add_argument(
+        "--output", default=None,
+        help="Write full plan JSON to this path (default: stdout summary)",
+    )
+
+    trimurti_export_parser = sub.add_parser(
+        "trimurti-export-packet",
+        help="Export one route's editorial packet for human review",
+    )
+    trimurti_export_parser.add_argument("--batch-id", required=True)
+    trimurti_export_parser.add_argument("--route-id", required=True)
+    trimurti_export_parser.add_argument("--output", required=True)
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -2109,6 +2432,10 @@ def main(argv: list[str] | None = None) -> int:
         "list-acquisition-tasks": cmd_list_acquisition_tasks,
         "run-verification-gate": cmd_run_verification_gate,
         "export-review-packet": cmd_export_review_packet,
+        "trimurti-build": cmd_trimurti_build,
+        "trimurti-run": cmd_trimurti_run,
+        "trimurti-status": cmd_trimurti_status,
+        "trimurti-export-packet": cmd_trimurti_export_packet,
     }
 
     handler = commands.get(args.command)

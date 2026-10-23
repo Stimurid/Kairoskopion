@@ -13,6 +13,7 @@ No LLM calls. No network. Pure deterministic mapping.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -293,3 +294,294 @@ def write_litops_export(
         written[registry_name] = path
 
     return written
+
+
+# ---------------------------------------------------------------------------
+# TRM-074: source-corpus handoff to the INSTALLED LitOps -> WhiteCrow surface.
+# This is a provenance-only route, separate from manuscript/venue exports.
+# ---------------------------------------------------------------------------
+
+
+def build_talk_corpus_litops_staging_pack(
+    storage_root: Path | str, case_id: str = "T3-TALK-20261019",
+) -> dict[str, Any]:
+    """Map an admitted talk corpus into real LitOps Source + context_pack types.
+
+    Source IDs identify *captures*, not document titles: changed content gets
+    another ID; canonical Drive document identity remains in provenance fields.
+    Neither a context_pack nor WhiteCrow import is an authoritative ArticleSeed.
+    """
+    from hashlib import sha256
+    from ..registry import read_all
+
+    root = Path(storage_root)
+    case_path = root / "talk_corpora" / case_id / "case_ledger.json"
+    research_path = root / "talk_corpora" / case_id / "research_stage_handoff.json"
+    if not case_path.is_file() or not research_path.is_file():
+        raise ValueError("corpus and Kairon research handoff required")
+    raw = case_path.read_bytes()
+    digest = sha256(raw).hexdigest()
+    ledger = json.loads(raw.decode("utf-8"))
+    research = json.loads(research_path.read_text(encoding="utf-8"))
+    if ledger.get("case_id") != case_id or research.get("case_id") != case_id:
+        raise ValueError("corpus/research case identity mismatch")
+    if research.get("source_ledger_sha256") != digest:
+        raise ValueError("research handoff not bound to current corpus ledger")
+    if ledger.get("publication_send") != "DISALLOWED":
+        raise ValueError("external sends prohibited for source context")
+    if any(x.get("article_seed_created") or x.get("author_approved")
+           for x in ledger.get("held_article_seed_envelopes", [])):
+        raise ValueError("unreviewed ArticleSeed promoted upstream")
+
+    snapshots = ledger.get("source_snapshots") or []
+    if not snapshots:
+        raise ValueError("corpus source snapshots absent")
+    persisted = read_all("source_snapshots", base_dir=root / "registries")
+    known = {
+        (x.get("source_id"), x.get("content_hash"))
+        for x in persisted if x.get("extraction_status") == "extracted"
+    }
+    canonical_ids: set[str] = set()
+    ids_by_family: dict[str, list[str]] = {}
+    lit_sources: list[dict[str, Any]] = []
+    for entry in sorted(snapshots, key=lambda x: x["key"]):
+        source_id = entry["source_id"]
+        sha = entry["content_sha256"]
+        is_w12_sheet = False
+        sheet = re.fullmatch(
+            r"w12-sheet:([A-Za-z0-9_-]{20,}):(A(\d+):M\3):MAI-20261020",
+            source_id,
+        )
+        if sheet:
+            expected_url = (
+                "https://docs.google.com/spreadsheets/d/" + sheet.group(1)
+                + "/edit#range=" + sheet.group(2)
+            )
+            is_w12_sheet = (
+                entry.get("source_url") == expected_url
+                and entry.get("kind") == "RESEARCH_SYNTHESIS"
+                and entry.get("read_coverage") == "RESEARCH_SYNTHESIS_TEXT_ONLY"
+                and entry.get("author_state") == "RESEARCH_RETURN_NOT_AUTHOR_APPROVAL"
+                and entry.get("scope") == "W12_SECONDARY_RESEARCH_SYNTHESIS_ONLY"
+            )
+            if not is_w12_sheet:
+                raise ValueError("W12 derived sheet source has incompatible provenance/URL/read-depth/rights")
+        if not (source_id.startswith("drive:") or is_w12_sheet) or len(sha) != 64:
+            raise ValueError("unpinned source identity or content digest")
+        if (source_id, sha[:16]) not in known:
+            raise ValueError(f"source not admitted by existing intake registry: {entry['key']}")
+        if source_id in canonical_ids:
+            raise ValueError("same Drive document duplicated in corpus snapshot")
+        canonical_ids.add(source_id)
+        if entry["extraction_status"] != "extracted":
+            raise ValueError("source extracted status unverified")
+        capture_id = "src-trm074-" + sha256(
+            (source_id + "|" + sha).encode("utf-8")
+        ).hexdigest()[:22]
+        family = entry["family"]
+        ids_by_family.setdefault(family, []).append(capture_id)
+        textual_genre = (
+            "chat_log" if entry["kind"] == "CHAT_LOG"
+            else "transcript" if "TRANSCRIPT" in entry["kind"]
+            else "deep_research_report" if entry["kind"] == "RESEARCH_SYNTHESIS"
+            else "lecture" if entry["kind"] == "SPEECH_SCRIPT"
+            else "project_log"
+        )
+        lit_sources.append({
+            "source_id": capture_id,
+            "original_filename": entry["key"] + ".txt",
+            "canonical_filename": "",
+            "remote_path": "",
+            "source_channel": "kairoskopion_owner_private_capture",
+            "source_media_type": "text/plain",
+            "status": "raw_registered",
+            "language": "ru",
+            "threads": [case_id, family],
+            "topics": [],
+            "tags": ["trm074", "source-provenance-only"] + (["w12-secondary-sheet-not-author-original"] if is_w12_sheet else []),
+            "body_type": "txt",
+            "origin": "mixed" if (family == "CROSS" or is_w12_sheet) else "user_prior_work",
+            "capture_mode": "manual_upload",
+            "content_genre": textual_genre,
+            "work_roles": ["source_material", "needs_review"],
+            "processing_state": "text_extracted",
+            "source_document_id": source_id,
+            "source_document_url": entry["source_url"],
+            "source_authority_kind": "W12_GOOGLE_SHEET_DERIVED" if is_w12_sheet else "GOOGLE_DOC_OR_EXISTING_CAPTURE",
+            "source_capture_sha256": sha,
+            "source_version_label": entry["version"],
+            "source_author_state": entry["author_state"],
+            "source_read_coverage": entry["read_coverage"],
+            "source_kind": entry["kind"],
+            "source_title_collision_safe": True,
+            "semantic_acceptance": "NOT_ASSESSED",
+            "external_send": "DISABLED",
+        })
+    families = sorted(f for f in ids_by_family if f != "CROSS")
+    if not families:
+        raise ValueError("no independently attributed talk families")
+    context_ids = sorted(ids_by_family.get("CROSS", []))
+    lit_artifacts: list[dict[str, Any]] = []
+    for family in families:
+        aid = "art-trm074-context-" + sha256(
+            (case_id + "|" + digest + "|" + family).encode("utf-8")
+        ).hexdigest()[:22]
+        own_ids = sorted(ids_by_family[family])
+        lit_artifacts.append({
+            "artifact_id": aid,
+            "title": f"{case_id} / {family} / pinned source context — SCIENCE HOLD",
+            "artifact_type": "context_pack",
+            "stage": "candidate",
+            "status": "HOLD_SOURCE_PROVENANCE_ONLY",
+            "source_ids": sorted(set(own_ids + context_ids)),
+            "family_source_ids": own_ids,
+            "cross_context_source_ids": context_ids,
+            "segment_ids": [],
+            "threads": [case_id, family],
+            "topics": [],
+            "reportable": False,
+            "field_ready": False,
+            "whitecrow_candidate": False,
+            "publication_trajectories": [],
+            "manuscript_status": "NOT_CREATED",
+            "organ_run_id": "",
+            "notes": "Source-only context; not an ArticleSeed, field acceptance, or manuscript.",
+            "case_id": case_id,
+            "family": family,
+            "source_ledger_sha256": digest,
+            "world_ref": ledger.get("world_ref"),
+            "semantic_mutation": "NONE",
+            "author_approved": False,
+            "external_send": "DISABLED",
+        })
+    return {
+        "schema": "TRM074_TO_INSTALLED_LITOPS_CONTEXT_PACK_V1",
+        "case_id": case_id,
+        "source_ledger_sha256": digest,
+        "source_records": lit_sources,
+        "artifact_records": lit_artifacts,
+        "status": "SOURCE_ONLY_NO_WHITE_CROW_SCIENCE_ACCEPTANCE",
+        "external_send": "DISABLED",
+    }
+
+
+def admit_talk_context_into_installed_litops(
+    storage_root: Path | str, litops_root: Path | str,
+    case_id: str = "T3-TALK-20261019",
+) -> dict[str, Any]:
+    """Invoke actual LitOps registries and read-only WhiteCrow importer.
+
+    Must be called in an isolated, owner-authorized LITOPS_ROOT with installed
+    LitOps and WhiteCrow Python packages. No raw source copy is performed.
+    """
+    import os
+    from hashlib import sha256
+    from litops.config import get_root
+    from litops import registry as litops_registry
+    from whitecrow.litops_import import build_import_pack
+    from whitecrow.first_workset import build_workset
+
+    target = Path(litops_root).resolve()
+    if not os.environ.get("LITOPS_SKIP_DOTENV"):
+        raise ValueError("LITOPS_SKIP_DOTENV required for isolated source stage")
+    if target != get_root().resolve():
+        raise ValueError("actual LitOps registry root does not match requested isolated target")
+    # On a clean LitOps root, legacy registry._jsonl_path chooses 10_REGISTRY
+    # until 05_REGISTRY_EXPORT exists, whereas WhiteCrow reads only the latter.
+    # Ensure the canonical v0.3 registry and non-destructively recover an
+    # isolated preflight attempt that used the legacy fallback.
+    canonical = target / "05_REGISTRY_EXPORT"
+    if not canonical.exists():
+        from shutil import copy2
+        canonical.mkdir(parents=True, exist_ok=True)
+        legacy = target / "10_REGISTRY"
+        for filename in ("sources.jsonl", "artifacts.jsonl"):
+            if (legacy / filename).is_file():
+                copy2(legacy / filename, canonical / filename)
+    packet = build_talk_corpus_litops_staging_pack(storage_root, case_id)
+    old_sources = {r["source_id"]: r for r in litops_registry.read_sources()}
+    old_artifacts = {r["artifact_id"]: r for r in litops_registry.read_artifacts()
+                     if r.get("artifact_id")}
+    new_sources = new_artifacts = 0
+    def _persist(rows: list[dict[str, Any]], old: dict[str, dict[str, Any]],
+                 id_key: str, append) -> int:
+        inserted = 0
+        for record in rows:
+            rid = record[id_key]
+            found = old.get(rid)
+            if found is not None:
+                if not all(found.get(key) == val for key, val in record.items()):
+                    raise ValueError(f"immutable LitOps {id_key} collision: {rid}")
+                continue
+            append(record)
+            old[rid] = record
+            inserted += 1
+        return inserted
+
+    new_sources = _persist(
+        packet["source_records"], old_sources, "source_id",
+        litops_registry.append_source,
+    )
+    new_artifacts = _persist(
+        packet["artifact_records"], old_artifacts, "artifact_id",
+        litops_registry.append_artifact,
+    )
+    import_index = build_import_pack(target)
+    refs = {r.litops_artifact_id: r for r in import_index.artifacts}
+    expected_ids = {r["artifact_id"] for r in packet["artifact_records"]}
+    blocked = {
+        r.litops_artifact_id: r.blocked_reason for r in import_index.blocked
+        if r.litops_artifact_id in expected_ids
+    }
+    if blocked or not expected_ids.issubset(refs):
+        raise ValueError("WhiteCrow rejected or missed staged context packs: " + str(blocked))
+    if any(refs[ident].seed_kind != "context_pack_seed" for ident in expected_ids):
+        raise ValueError("WhiteCrow type projection altered context-only intent")
+    if any(
+        refs[ident].provenance.organ_run_id
+        or refs[ident].manuscript_status != "NOT_CREATED"
+        for ident in expected_ids
+    ):
+        raise ValueError("WhiteCrow imported an unwarranted organ run/manuscript")
+    workset = build_workset(import_index, max_context_packs=len(expected_ids))
+    workset_ids = {r["litops_artifact_id"] for r in workset.context_packs}
+    if workset_ids != expected_ids or workset.is_manuscript:
+        raise ValueError("WhiteCrow first workset did not preserve source-only contexts")
+    if workset.primary_anchor_artifact_id or workset.w23_seed.get("available"):
+        raise ValueError("isolated talk workset cannot claim W23 certification")
+    receipt = {
+        "schema": "TRM074_LITOPS_WHITE_CROW_READBACK_V1",
+        "case_id": case_id,
+        "source_ledger_sha256": packet["source_ledger_sha256"],
+        "litops_sources_total": len(packet["source_records"]),
+
+        "litops_contexts_total": len(packet["artifact_records"]),
+
+        "whitecrow_imported_context_ids": sorted(expected_ids),
+        "whitecrow_blocked_contexts": blocked,
+        "whitecrow_import_warnings": import_index.import_warnings,
+        "whitecrow_first_workset_context_ids": sorted(workset_ids),
+        "whitecrow_first_workset_manuscript": workset.is_manuscript,
+        "whitecrow_w23_certification_available": bool(workset.w23_seed.get("available")),
+        "whitecrow_status": "CONTEXT_ONLY_SCIENCE_AND_AUTHOR_GATE_HOLD",
+        "litops_real_registry": str(target / "05_REGISTRY_EXPORT"),
+        "article_seed_created": False,
+        "world_mutated": False,
+        "external_send": "DISABLED",
+    }
+    output = Path(storage_root) / "talk_corpora" / case_id / "litops_whitecrow_stage.json"
+    encoded = (json.dumps(receipt, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.with_suffix(".tmp").write_bytes(encoded)
+    output.with_suffix(".tmp").replace(output)
+    return {
+        "receipt_path": str(output),
+        "sha256": sha256(encoded).hexdigest(),
+        "source_records": len(packet["source_records"]),
+        "context_packs": len(packet["artifact_records"]),
+        "new_sources": new_sources,
+        "new_context_packs": new_artifacts,
+        "whitecrow_imported": len(expected_ids),
+        "article_seed_created": 0,
+        "external_send": "DISABLED",
+    }
