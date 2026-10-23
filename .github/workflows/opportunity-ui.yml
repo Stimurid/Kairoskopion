@@ -1,0 +1,33 @@
+name: Opportunity UI verification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ui/**'
+      - '.github/workflows/opportunity-ui.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install locked UI dependencies
+        run: npm ci
+        working-directory: ui
+      - name: Verify TypeScript and production bundle
+        run: npm run build
+        working-directory: ui
+      - name: Verify new opportunity UI lint
+        # Legacy repo-wide lint currently fails in unrelated components;
+        # do not alter those components in this bounded opportunity slice.
+        run: npx eslint src/components/OpportunityWorkspace.tsx
+        working-directory: ui

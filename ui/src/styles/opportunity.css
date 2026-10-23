@@ -1,0 +1,94 @@
+.opportunity-workspace {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: clamp(20px, 3vw, 36px);
+  color: var(--text-primary, #e8ebf0);
+  background: var(--bg-primary, #121820);
+  font-size: 14px;
+}
+
+.opp-header { max-width: 950px; margin-bottom: 24px; }
+.opp-header h2 { margin: 5px 0 8px; font-size: clamp(22px, 2vw, 30px); letter-spacing: -0.02em; }
+.opp-header p { margin: 0; line-height: 1.6; opacity: 0.86; }
+.opp-eyebrow { letter-spacing: 0.13em; text-transform: uppercase; font-size: 10px; font-weight: 700; opacity: 0.65; }
+
+.opp-import-warning {
+  max-width: 1060px;
+  padding: 15px 20px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 10px;
+}
+.opp-import-warning strong { font-size: 14px; }
+.opp-import-warning p { margin: 8px 0 0; line-height: 1.5; opacity: 0.81; }
+.opp-import-state { font-weight: 600; }
+.opp-import-state span { font-weight: 400; opacity: 0.75; }
+
+.opp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 25px 0 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.opp-tab {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 11px 14px;
+  color: inherit;
+  opacity: 0.68;
+  cursor: pointer;
+  font: inherit;
+}
+.opp-tab:hover, .opp-tab:focus-visible { opacity: 1; }
+.opp-tab--active { opacity: 1; border-color: currentColor; font-weight: 700; }
+
+.opp-section { max-width: 1300px; min-width: 0; }
+.opp-section h3 { font-size: 17px; font-weight: 650; margin: 0 0 15px; }
+.opp-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.opp-summary > div {
+  padding: 19px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+.opp-summary strong { display: block; font-size: 28px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.opp-summary span { display: block; font-size: 12px; margin-top: 8px; opacity: 0.75; }
+.opp-small { font-size: 12px; opacity: 0.7; line-height: 1.6; }
+.opp-empty { padding: 28px 0; line-height: 1.6; opacity: 0.75; max-width: 700px; }
+
+.opp-filters { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
+.opp-filters label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; opacity: 0.9; }
+.opp-filters input, .opp-filters select {
+  width: min(100%, 360px);
+  min-width: 220px;
+  border-radius: 7px;
+  padding: 10px;
+  font: inherit;
+  color: inherit;
+  background: #1b2734;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.opp-table-scroll { overflow-x: auto; }
+.opp-table { border-collapse: collapse; width: 100%; min-width: 850px; text-align: left; }
+.opp-table th { padding: 13px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.055em; opacity: 0.72; border-bottom: 1px solid rgba(255, 255, 255, 0.2); }
+.opp-table td { padding: 14px 12px; vertical-align: top; border-bottom: 1px solid rgba(255, 255, 255, 0.09); line-height: 1.45; }
+.opp-table td small { display: block; margin-top: 6px; opacity: 0.65; }
+.opp-row-link { background: transparent; color: #b4d6ff; border: 0; padding: 0; cursor: pointer; font: inherit; text-align: left; }
+.opp-row-link:hover { text-decoration: underline; }
+.opp-empty-cell { text-align: center; padding: 35px !important; opacity: 0.72; }
+
+.opp-venue-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+.opp-venue-card, .opp-lineage { border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; padding: 20px; }
+.opp-venue-card h4, .opp-lineage h4 { margin: 0 0 10px; font-size: 15px; }
+.opp-venue-card p, .opp-lineage p { line-height: 1.5; opacity: 0.9; }
+.opp-venue-card ul { padding-left: 17px; line-height: 1.7; }
+
+@media (max-width: 700px) {
+  .opportunity-workspace { padding: 16px; }
+  .opp-filters, .opp-filters label, .opp-filters input, .opp-filters select { width: 100%; min-width: 0; }
+  .opp-tabs { gap: 0; }
+  .opp-tab { padding: 9px 10px; font-size: 12px; }
+}
