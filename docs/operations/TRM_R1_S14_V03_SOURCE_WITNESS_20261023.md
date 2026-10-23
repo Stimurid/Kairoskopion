@@ -24,3 +24,9 @@ On AORUS, private dir `C:\AI\llm\aiye-executor\worktrees\jx-c53d909725e8\private
 
 ## Next
 Read actual independent scientific review; correct v0.3 source/claim errors; decide whether S14 remains article candidate or only a commentary; if viable, next venue fit / further primary work. Restore a fully autonomous source-staged Hub author/reviewer runner rather than interpreting an operator pass as autonomous.
+
+## Same-day subsequent correction (latest)
+- Ninth anchored row C09 added: Chubarov/Appolonova 2022 printed p.102 / source PDF p.106 describes drones without their own goals, directly following their machine-becoming argument on printed p.101 / PDF p.105. This is a *TEXT-ATTESTED TENSION*, NOT A FORMAL CONTRADICTION. Draft v0.3 §8.5 added this interpretation. Digital evidence was replayed independently against the source bytes again: `SOURCE_WITNESSES_EXACT_PAGES_VERIFIED claim_rows 9 sources 2`.
+- Operator science packet copied to durable local run directory `C:\AI\llm\aiye-executor\runs\TRM_CHUBAROV_AI_ETHICS_20_20261021\R1D_S14_FACTORY_20261023` (17 files, originals/ledgers/code/receipt); it is no longer dependent on a janitor-prunable worktree.
+- Earlier Hub author-only retry did *not* execute source audit and reviewer was cancelled. Operator witness verification outside Hub has limited acceptance; full factory NOT PASSED.
+- Direct read-only Codex CLI review attempted but not confirmed and encountered sandbox inability to execute PyMuPDF; do not claim acceptance. A narrower independent Claude textual-passage review on durable derived source extracts has been initiated; judge only its actual returned output, never self-certify.
