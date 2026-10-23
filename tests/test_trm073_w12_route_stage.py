@@ -411,7 +411,44 @@ def test_w12_cannot_borrow_source_certificate_from_another_w3_wave(tmp_path):
         "opponent_resolved": True,
         "w12_equivalent": False,
     })
+    # An explicit own-wave conflicting certificate must NOT borrow the
+    # old, valid canonical original-source certificate.
+    graph.append_event({
+        "event_id": "CASE-SYNTH:W3-SECOND:HEAD-03:DISCOVERY-RETURN",
+        "kind": "SOURCE_CONTRADICTION",
+        "subject_id": "HEAD-03",
+        "source_ref": "drive:SYNTH-C04",
+        "original_source_binding": {
+            "source_id": "drive:SYNTH-C04",
+            "version": "v0.4",
+            "content_sha256": "0" * 64,
+            "binding_verification": "VERIFIED_BYTES",
+        },
+    })
     path.write_text(json.dumps(packet), encoding="utf-8")
     with pytest.raises(ValueError, match="prior W3 original versioned source byte binding not verified"):
         stage_w12_research_route(path, stage)
     assert not graph.list_records("HuntTrace")
+
+
+def test_legacy_w3_route_without_own_wave_certificate_uses_exact_canonical_origin(tmp_path):
+    """Older qualified journal waves share a byte-pinned source certificate."""
+    packet, path, stage, src, _caps, _manifest = fixture_route(tmp_path)
+    graph = OpportunityGraphStore(stage)
+    packet["route_candidate_id"] = "C-TEST-LEGACY-ALTERNATIVE"
+    packet["claim_version_id"] = "C04-v0.4-legacy-shared-source"
+    graph.append_event({
+        "event_id": "CASE-SYNTH:W3-LEGACY:route:C-TEST-LEGACY-ALTERNATIVE",
+        "kind": "SCHOLARLY_ROUTE_CHALLENGE",
+        "route_candidate_id": packet["route_candidate_id"],
+        "subject_id": "HEAD-03",
+        "journal_id": packet["journal_id"],
+        "source_ref": "doi:10.1007/synth",
+        "opponent_resolved": True,
+        "w12_equivalent": False,
+    })
+    path.write_text(json.dumps(packet), encoding="utf-8")
+    stage_result = stage_w12_research_route(path, stage)
+    assert stage_result["counts"]["W12_EQUIVALENT_HELD"] == 1
+    assert readback_w12_research_route(path, stage)["verified"] is True
+    assert graph.list_records("ArticleSeed") == []
