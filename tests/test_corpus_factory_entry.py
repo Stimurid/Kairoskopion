@@ -342,3 +342,49 @@ def test_multi_w3_wave_counts_all_scientific_returns_and_routes(tmp_path):
     assert sum(r["counts"].get("proposed_routes", 0) for r in receipt["research_wave_receipts"]) == 4
     assert receipt["article_seed_created"] == 0
     assert receipt["external_send"] == "DISABLED"
+
+
+def test_portfolio_factory_accepts_nine_distinct_research_waves_and_cold_replays(tmp_path):
+    """Previous 8-wave smoke cap blocked 17/80 portfolio with 18 actual waves."""
+    manifest, storage, _ = new_unrelated_case(tmp_path)
+    _w2, w3first = _multiwave_packets(tmp_path)
+    foundation = json.loads(w3first.read_text(encoding="utf-8"))
+    packets = []
+    for n in range(9):
+        wave = json.loads(json.dumps(foundation))
+        wave["wave_id"] = f"PORTFOLIO-W3-{n:02d}"
+        route = dict(wave["route_candidates"][0])
+        route["route_candidate_id"] = f"PORTFOLIO-ARTICLE-VENUE-{n:02d}"
+        route["journal_name"] = f"Independent Synthetic Research Venue {n:02d}"
+        route["opponent_id"] = f"DOI-RESEARCH-OPPONENT-{n:02d}"
+        wave["route_candidates"] = [route]
+        work = dict(wave["work_refs"][0])
+        work["id"] = route["opponent_id"]
+        wave["work_refs"] = [work]
+        wave["official_policies"] = []
+        source = tmp_path / f"portfolio-wave-{n:02d}.json"
+        source.write_text(json.dumps(wave, ensure_ascii=False), encoding="utf-8")
+        packets.append(source)
+    first = execute_factory_source_stage(manifest, storage, research_packet_paths=packets)
+    repeat = execute_factory_source_stage(manifest, storage, research_packet_paths=packets)
+    assert first["research_wave_count"] == 9
+    assert first["w3_proposed_unqualified_routes"] == 9
+    assert first["w12_equivalent_routes_held"] == 0
+    assert first["article_seed_created"] == 0
+    assert first["external_send"] == "DISABLED"
+    assert repeat["new_source_snapshots"] == 0
+    assert first["receipt_sha256"] == repeat["receipt_sha256"]
+    receipt = json.loads(Path(first["receipt_path"]).read_text(encoding="utf-8"))
+    assert len(receipt["research_packet_pins"]) == 9
+    assert len(receipt["research_wave_receipts"]) == 9
+    assert not OpportunityGraphStore(storage).list_records("ArticleSeed")
+
+
+def test_portfolio_factory_rejects_over_128_waves_before_source_mutation(tmp_path):
+    from kairoskopion.services.corpus_factory_entry import MAX_RESEARCH_WAVES_PER_BATCH
+    assert MAX_RESEARCH_WAVES_PER_BATCH == 128
+    manifest, storage, _ = new_unrelated_case(tmp_path)
+    paths = [tmp_path / f"not-needed-{i:03d}.json" for i in range(129)]
+    with pytest.raises(ValueError, match="research-wave count exceeds bounded operator stage"):
+        execute_factory_source_stage(manifest, storage, research_packet_paths=paths)
+    assert not storage.exists()

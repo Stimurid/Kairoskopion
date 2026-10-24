@@ -23,6 +23,11 @@ from .trm073_research_stage import (
     stage_research_packet,
 )
 
+# Publication portfolios can carry >80 source-bound journal opportunities
+# plus W1/W2/W3 scientific return waves. Keep a finite batch limit, but do
+# not cap an 80-route research factory at the original eight-wave smoke test.
+MAX_RESEARCH_WAVES_PER_BATCH = 128
+
 
 def _digest(data: bytes) -> str:
     return sha256(data).hexdigest()
@@ -127,7 +132,7 @@ def execute_factory_source_stage(
         ([Path(research_packet_path)] if research_packet_path is not None else [])
         + [Path(x) for x in (research_packet_paths or [])]
     )
-    if len(research_paths) > 8:
+    if len(research_paths) > MAX_RESEARCH_WAVES_PER_BATCH:
         raise ValueError("research-wave count exceeds bounded operator stage")
     research_pins: list[dict[str, str]] = []
     wave_ids: set[str] = set()
