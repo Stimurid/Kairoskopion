@@ -4,7 +4,7 @@ Date: 2026-10-24. S11 is ACTIVE PROVISIONAL, not scientifically certified.
 Working S11 original draft (c.17.9k chars): https://docs.google.com/document/d/1ukvqN8W4E6gePE3BD4Bl2Z_T2s6PPGfWSS8EXwhGsxI/edit
 New hostile predecessor matrix with six source records, explicit H0/H1 and falsifiers: https://docs.google.com/document/d/1jdoKndVlX3QuYW_GYhP-Lh3qijvRyfDp-f-nXbhA7nQ/edit
 S14 after independent scientific FAIL: COMMENTARY_DONOR, not a live journal manuscript. S14 decision: https://docs.google.com/document/d/10irKuexgee_jhdQjSMBZBYeL09i9kQBzYp8qcNO5UQA/edit
-R1 owner-accepted release goal: https://docs.google.com/document/d/1e62rTE51R3iLZthYyjdYAb7foh6VLfrVI7z7HaCYU0/edit
+R1 owner-accepted release goal: https://docs.google.com/document/d/1e62rTE51R3iLZthYyjdYyAb7foh6VLfrVI7z7HaCYU0/edit
 
 ## Current scholarly risk
 Nearest neighbours already develop design-time AI contestability (Alfrink et al.), institutional complaint (Ahmed), relational ethics (Birhane), epistemic extractivism (Landstrom), consent under adaptive AI and autonomy-protecting institutions (Steinberg), and programmed complaint/data ownership (Chubarov 2017). None of those categories can be claimed as invented by S11. Provisional H1: does an affected person have authority to prevent the *objection itself* becoming additional material for learning/classification, including downstream incorporation? H0: this is a combination of the predecessors and is not unique. A real demonstrable trace and direct original passages are needed.
