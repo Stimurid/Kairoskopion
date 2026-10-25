@@ -111,12 +111,16 @@ def _validate_source_id(source: dict[str, Any]) -> None:
         expected_doc = "https://docs.google.com/document/d/" + docid + "/"
         expected_file = "https://drive.google.com/file/d/" + docid + "/view"
         mime = source.get("source_mime")
-        binary_file = mime in {
+        # Drive-hosted plain-text transcripts are files, not native Docs.
+        # Preserve their real provider ID and exact /file/d/{id}/view URL;
+        # never invent a /document/d/ alias to bypass LitOps identity gates.
+        drive_stored_file = mime in {
+            "text/plain",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         }
         if not (url.startswith(expected_doc)
-                or (binary_file and url == expected_file)):
+                or (drive_stored_file and url == expected_file)):
             raise ValueError(f"source identity/url mismatch: {source['key']}")
     elif not source_id or not url.startswith("https://"):
         raise ValueError(f"unverified source identity: {source['key']}")
