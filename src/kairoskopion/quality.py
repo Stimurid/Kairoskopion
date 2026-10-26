@@ -8,6 +8,7 @@ from typing import Any
 from .enums import QualityGateStatus
 from .ids import quality_gate_id
 from .schema import _DictMixin, _field, _list, _now
+from .services.scientific_evidence_consistency import audit_empirical_claim
 
 
 @dc.dataclass
@@ -247,6 +248,58 @@ def evaluate_protected_core_gate(
     return gate
 
 
+
+def evaluate_scientific_evidence_consistency_gate(
+    *,
+    packet_bytes: bytes | None = None,
+    expected_packet_sha256: str | None = None,
+    source_bytes: bytes | None = None,
+    expected_source_sha256: str | None = None,
+    oracle_bytes: bytes | None = None,
+    expected_oracle_sha256: str | None = None,
+    model_response_bytes: bytes | None = None,
+) -> QualityGateResult:
+    """Native fail-closed gate for a versioned empirical scientific claim.
+
+    Trust is anchored by independent, caller-provided source/oracle/packet
+    SHA256 pins. This checks structured statements, not free-text reasoning,
+    scientific novelty or human consent. FULL + true independent gold is the
+    only pass status that can ever count toward a claim's technical warrant.
+    """
+    gate = QualityGateResult(gate_name="scientific_evidence_consistency")
+    try:
+        audit = audit_empirical_claim(
+            packet_bytes=packet_bytes,
+            expected_packet_sha256=expected_packet_sha256,
+            source_bytes=source_bytes,
+            expected_source_sha256=expected_source_sha256,
+            oracle_bytes=oracle_bytes,
+            expected_oracle_sha256=expected_oracle_sha256,
+            model_response_bytes=model_response_bytes,
+        )
+    except (TypeError, ValueError, KeyError):
+        audit = {"status": "BLOCKED", "issues": ["INVALID_SCIENCE_GATE_INPUT"]}
+    outcome = audit["status"]
+    if outcome == "STRUCTURED_EVIDENCE_PASSED":
+        gate.status = QualityGateStatus.PASSED.value
+        gate.recommendation = (
+            "Structured source warrant passed; independent scientific and "
+            "author/coauthor review still required"
+        )
+        gate.required_user_decisions = ["Author/coauthor scholarly review and consent"]
+    elif outcome == "INSUFFICIENT_EVIDENCE":
+        gate.status = QualityGateStatus.PASSED_WITH_WARNINGS.value
+        gate.missing_sources = ["Independent per-class evidence and criterion history"]
+        gate.warnings = ["Correct abstention; NOT an admitted scientific claim"]
+        gate.recommendation = "Request complete evidence before claim promotion"
+    else:
+        gate.status = QualityGateStatus.FAILED_BLOCKING.value
+        gate.blocking_issues = audit.get("issues") or ["SCIENTIFIC_CLAIM_NOT_WARRANTED"]
+        gate.unsupported_claims = list(gate.blocking_issues)
+        gate.recommendation = "Scientific claim blocked by independent evidence"
+    return gate
+
+
 def evaluate_submission_gate(
     *,
     has_fresh_guidelines: bool = False,
@@ -254,6 +307,10 @@ def evaluate_submission_gate(
     has_files_list: bool = False,
     has_statements: bool = False,
     blocking_risks_resolved: bool = False,
+    has_empirical_claim: bool = False,
+    empirical_evidence: dict[str, Any] | None = None,
+    author_decision: str = "HOLD",
+    coauthor_consent_verified: bool = False,
 ) -> QualityGateResult:
     """Evaluate the submission-pack readiness gate (spec §30.3)."""
     gate = QualityGateResult(gate_name="submission_pack")
@@ -270,6 +327,17 @@ def evaluate_submission_gate(
         warnings.append("Required statements not present")
     if not blocking_risks_resolved:
         issues.append("Blocking risks unresolved")
+
+    # Native publication gate: empirical claims never self-certify via an LLM.
+    # Even a technically valid source warrant cannot synthesize author consent.
+    if has_empirical_claim or empirical_evidence is not None:
+        proof = empirical_evidence if isinstance(empirical_evidence, dict) else {}
+        science = evaluate_scientific_evidence_consistency_gate(**proof)
+        if science.status != QualityGateStatus.PASSED.value:
+            issues.append("Empirical scientific claim lacks a full independent warrant")
+            issues.extend("Science: " + x for x in science.blocking_issues)
+        if author_decision != "ACCEPT" or not coauthor_consent_verified:
+            issues.append("Author/coauthor acceptance of empirical claim not verified")
 
     if issues:
         gate.status = QualityGateStatus.FAILED_BLOCKING.value
