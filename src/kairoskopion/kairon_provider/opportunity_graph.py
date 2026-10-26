@@ -35,9 +35,12 @@ _SEED_NON_ADMITTED = frozenset({
     "REJECTED",
 })
 _SEED_CLAIMED_AUTHORITY_FIELDS = (
-    "author_approved", "coauthor_consent_verified",
+    "author_approved",
     "empirical_claim_admitted", "scientific_evidence_admitted",
 )
+# Legacy coauthor_consent_verified is a source-scoped assertion used only by
+# the bounded opportunity-to-review handoff; it is not permission for a
+# manuscript, authoritative ArticleSeed admission, or external submission.
 REOPEN_LEVELS = frozenset({"L0", "L1", "L2", "L3", "L4", "L5"})
 _NEGATIVE_MARKERS = (
     "REJECT", "NOT_FOUND", "BLOCK", "STALE", "CONTRADICT",
