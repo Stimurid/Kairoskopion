@@ -284,7 +284,7 @@ def evaluate_scientific_evidence_consistency_gate(
         gate.status = QualityGateStatus.PASSED.value
         gate.recommendation = (
             "Structured source warrant passed; independent scientific and "
-            "author/coauthor review still required"
+            "author/coauthor review and consent still required"
         )
         gate.required_user_decisions = ["Author/coauthor scholarly review and consent"]
     elif outcome == "INSUFFICIENT_EVIDENCE":
