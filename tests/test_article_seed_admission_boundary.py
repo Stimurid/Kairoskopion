@@ -36,7 +36,6 @@ def test_graph_cannot_admit_article_seed_by_status(tmp_path, status):
     {"author_decision": "ACCEPT"},
     {"publication_authority": "APPROVED"},
     {"author_approved": True},
-    {"coauthor_consent_verified": True},
     {"empirical_claim_admitted": True},
     {"scientific_evidence_admitted": True},
     {"send_status": "SENT"},
@@ -54,3 +53,13 @@ def test_self_declared_author_or_science_rights_are_rejected(tmp_path, patch):
 def test_unapproved_research_states_retained(tmp_path, status):
     graph = OpportunityGraphStore(tmp_path)
     assert graph.put("ArticleSeed", seed(admission_status=status))["admission_status"] == status
+
+def test_legacy_coauthor_flag_never_becomes_article_admission(tmp_path):
+    graph = OpportunityGraphStore(tmp_path)
+    record = graph.put("ArticleSeed", seed(coauthor_consent_verified=True))
+    assert record.get("admission_status", "LEGACY_UNVERIFIED") == "LEGACY_UNVERIFIED"
+    with pytest.raises(ValueError, match="admission requires trusted"):
+        graph.put("ArticleSeed", seed(
+            revision="r3", coauthor_consent_verified=True,
+            admission_status="AUTHOR_APPROVED",
+        ))
