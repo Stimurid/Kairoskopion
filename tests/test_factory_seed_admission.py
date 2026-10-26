@@ -33,6 +33,7 @@ def signed(case, seed, revision, packet_sha, role, key):
 
 def prepared(tmp_path):
     factory, _, _ = factory_fixture(tmp_path / "factory")
+    (tmp_path / "p3h").mkdir()
     p3h, _, _ = p3h_fixture(tmp_path / "p3h")
     b = bundle(valid=True)
     actual = (tmp_path / "p3h" / "evaldrift_P3" / "sonar_UCI_original.csv").read_bytes()
