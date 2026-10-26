@@ -25,6 +25,22 @@ ROUTE_TYPES = frozenset({
     "POLICY_UNVERIFIED",
 })
 AUTHOR_DECISIONS = frozenset({"HOLD", "ACCEPT", "REJECT"})
+# This graph is a research/opportunity store, NOT the Artikl/Factory authority
+# that can admit an ArticleSeed as a scientific or author-approved publication
+# object. Older seeds without an admission_status remain legacy unverified.
+# In particular, a model/caller cannot grant itself ACCEPT or scientific
+# authority by writing an arbitrary field into an immutable graph record.
+_SEED_NON_ADMITTED = frozenset({
+    "LEGACY_UNVERIFIED", "PROPOSED", "RESEARCH_HOLD", "AUTHOR_HOLD",
+    "REJECTED",
+})
+_SEED_CLAIMED_AUTHORITY_FIELDS = (
+    "author_approved",
+    "empirical_claim_admitted", "scientific_evidence_admitted",
+)
+# Legacy coauthor_consent_verified is a source-scoped assertion used only by
+# the bounded opportunity-to-review handoff; it is not permission for a
+# manuscript, authoritative ArticleSeed admission, or external submission.
 REOPEN_LEVELS = frozenset({"L0", "L1", "L2", "L3", "L4", "L5"})
 _NEGATIVE_MARKERS = (
     "REJECT", "NOT_FOUND", "BLOCK", "STALE", "CONTRADICT",
@@ -99,6 +115,26 @@ def validate_record(kind: str, record: dict[str, Any]) -> dict[str, Any]:
         _required(record.get("author_authority"), "author_authority")
         if not isinstance(record.get("protected_core", []), list):
             raise ValueError("protected_core must be a list")
+        # An ArticleSeed can be recorded here for research, criticism and
+        # version lineage, but this graph MUST NOT be an admission backdoor.
+        # Trusted LitOps/Factory source/oracle pins, independent science check,
+        # and author/coauthor consent are external, separately verified gates.
+        # Until that owner-managed promotion entrypoint exists, fail closed.
+        admission = record.get("admission_status", "LEGACY_UNVERIFIED")
+        if admission not in _SEED_NON_ADMITTED:
+            raise ValueError(
+                "ArticleSeed admission requires trusted Factory/LitOps "
+                "scientific evidence and author/coauthor authority; "
+                "opportunity graph is research-only"
+            )
+        if record.get("author_decision", "HOLD") not in {"HOLD", "REJECT"}:
+            raise ValueError("ArticleSeed author ACCEPT cannot be self-declared")
+        if record.get("publication_authority", "NONE") not in {"NONE", "HOLD"}:
+            raise ValueError("ArticleSeed publication authority cannot be self-declared")
+        if record.get("send_status", "NOT_SENT") != "NOT_SENT":
+            raise ValueError("ArticleSeed graph cannot declare external submission")
+        if any(record.get(name) not in (None, False) for name in _SEED_CLAIMED_AUTHORITY_FIELDS):
+            raise ValueError("ArticleSeed scientific or author consent cannot be self-certified")
     elif kind == "ArticleOpportunity":
         _required(record.get("seed_id"), "seed_id")
         _required(record.get("scholarly_problem"), "scholarly_problem")
