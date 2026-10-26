@@ -390,3 +390,45 @@ def test_large_delta_reports_omission_and_blocks_false_complete_diff(tmp_path):
     assert diff["blocks_emitted"] == 12
     assert diff["omitted_blocks"] == diff["total_change_blocks"] - 12
     assert diff["coverage"] == "FIRST_12_BLOCKS"
+
+
+def test_drive_hosted_txt_transcript_keeps_real_id_into_litops(tmp_path):
+    """A raw Drive TXT must not be disguised as a native Google Doc."""
+    from kairoskopion.services.talk_corpus_research_bridge import (
+        export_talk_research_evidence,
+    )
+    from kairoskopion.integrations.litops_bridge import (
+        build_talk_corpus_litops_staging_pack,
+    )
+    manifest, storage, case = fixture_case(tmp_path)
+    transcript = case["sources"][2]
+    assert transcript["kind"] == "SOURCE_TRANSCRIPT"
+    transcript["source_mime"] = "text/plain"
+    transcript["source_url"] = "https://drive.google.com/file/d/A003/view"
+    _save(manifest, case)
+    first = run_case(manifest, storage)
+    assert first["source_count"] == 10
+    export_talk_research_evidence(storage, "T3-SYNTHETIC")
+    pack = build_talk_corpus_litops_staging_pack(storage, "T3-SYNTHETIC")
+    assert any(s["source_document_id"] == "drive:A003" and
+               s["source_read_coverage"] == "FULL_FETCHED_TEXT_ONLY"
+               for s in pack["source_records"])
+    assert run_case(manifest, storage)["new_source_snapshots"] == 0
+
+
+@pytest.mark.parametrize("mime, url", [
+    (None, "https://drive.google.com/file/d/A003/view"),
+    ("application/pdf", "https://drive.google.com/file/d/A003/view"),
+    ("text/plain", "https://drive.google.com/file/d/OTHER/view"),
+    ("text/plain", "https://drive.google.com/file/d/A003/view?evil=1"),
+    ("text/plain", "http://drive.google.com/file/d/A003/view"),
+])
+def test_drive_raw_txt_identity_rejects_wrong_mime_or_url(tmp_path, mime, url):
+    manifest, storage, case = fixture_case(tmp_path)
+    transcript = case["sources"][2]
+    if mime is not None:
+        transcript["source_mime"] = mime
+    transcript["source_url"] = url
+    _save(manifest, case)
+    with pytest.raises(ValueError, match="source identity/url mismatch"):
+        run_case(manifest, storage)
