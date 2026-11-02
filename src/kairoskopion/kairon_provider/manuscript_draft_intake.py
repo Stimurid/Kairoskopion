@@ -24,7 +24,8 @@ def _required(data: dict, name: str, expected_type: type) -> object:
     return value
 
 
-def ingest(*, manifest_path: Path, input_root: Path, output_root: Path) -> dict:
+def ingest(*, manifest_path: Path, input_root: Path, output_root: Path,
+           trusted_source_sha256: str, trusted_science_sha256: str) -> dict:
     """Every replay re-reads all three bound artifacts before accepting a receipt.
 
     The input root is a private case workspace, not the public source repository.
@@ -59,6 +60,14 @@ def ingest(*, manifest_path: Path, input_root: Path, output_root: Path) -> dict:
     source = read_bound(input_root, objects["source"])
     science = read_bound(input_root, objects["science"])
     draft = read_bound(input_root, objects["draft"])
+    # These operator-pinned digests are supplied separately from the producer's manifest.
+    # A matching model-authored manifest never constitutes source authority.
+    for label, expected, actual in (("source", trusted_source_sha256, sha256(source)),
+                                    ("science", trusted_science_sha256, sha256(science))):
+        if not isinstance(expected, str) or len(expected) != 64 or any(ch not in "0123456789abcdef" for ch in expected):
+            raise EvidenceBlocked("trusted_" + label + "_sha256_invalid")
+        if expected != actual:
+            raise EvidenceBlocked("trusted_" + label + "_sha256_mismatch")
     if len(source) < 500 or len(science) < 500 or len(draft) < 4000:
         raise EvidenceBlocked("source_science_or_draft_too_small")
     try:
@@ -119,10 +128,16 @@ def main() -> int:
     ap.add_argument("--manifest", type=Path, required=True)
     ap.add_argument("--input-root", type=Path, required=True)
     ap.add_argument("--output-root", type=Path, required=True)
+    ap.add_argument("--trusted-source-sha256", required=True,
+                    help="Expected SHA from external authoritative source registry, not this manifest")
+    ap.add_argument("--trusted-science-sha256", required=True,
+                    help="Expected SHA from independently pinned scientific registry")
     args = ap.parse_args()
     try:
         result = ingest(manifest_path=args.manifest, input_root=args.input_root,
-                        output_root=args.output_root)
+                        output_root=args.output_root,
+                        trusted_source_sha256=args.trusted_source_sha256,
+                        trusted_science_sha256=args.trusted_science_sha256)
         print(json.dumps(result, sort_keys=True, ensure_ascii=False))
         return 0
     except (EvidenceBlocked, ValueError, OSError, TypeError, KeyError) as exc:

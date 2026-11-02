@@ -14,7 +14,7 @@ The gap established on 2026-11-03: W1/W2/WhiteCrow→W3/W12 currently produces j
 
 ## Local operator
 
-Create a private `input-root` containing actual bound copies of source, scientific packet, and UTF-8 draft. The manifest (below) is also kept private and carries relative paths plus exact SHA-256 hashes. The `source_original_sha256` must match the **original author's bytes**, not a modified export. The agent/producer should be identified with an execution receipt, not just the assistant's summary.
+Create a private `input-root` containing actual bound copies of source, scientific packet, and UTF-8 draft. The manifest (below) is also kept private and carries relative paths plus exact SHA-256 hashes. The `source_original_sha256` must match the **original author's bytes**, not a modified export. **The operator MUST supply two independently trusted SHA-256 digests from outside the producer-authored manifest**, using the pinned original source registry and the scientific Git revision; merely self-certifying a manifest is insufficient. The agent/producer should be identified with an execution receipt, not just the assistant's summary.
 
 ```json
 {
@@ -40,13 +40,13 @@ Create a private `input-root` containing actual bound copies of source, scientif
 Run from repository root (with `PYTHONPATH=src`):
 
 ```bash
-python -m kairoskopion.kairon_provider.manuscript_draft_intake --manifest /private/manifest.json --input-root /private/input --output-root /private/receipts
+python -m kairoskopion.kairon_provider.manuscript_draft_intake --manifest /private/manifest.json --input-root /private/input --output-root /private/receipts --trusted-source-sha256 "$AUTHORITATIVE_ORIGINAL_SHA" --trusted-science-sha256 "$AUTHENTICATED_SCIENCE_SHA"
 ```
 
 On success: status `DRAFT_CAPTURED_AUTHOR_REVIEW_REQUIRED`, pinned source/science/draft SHA, observed draft bytes/word count, `new_w12_routes=0`. **Not full-text scientific QA**. On any stale/tampered source or changed immutable prior receipt, the operator blocks. Production/remote deploy remains forbidden until separate approval.
 
 ## Technical acceptance evidence, 2026-11-03
 
-Tests: `tests/test_manuscript_draft_intake.py` + existing `tests/test_publication_runner.py`: 86 passed on authorized AORUS. This is code-only acceptance. Evidence from a specific C04 draft, cross-process cold replay, D14/D21/D27 independent review, actual model worker scheduling and publication-Factory end-to-end sequencing are separately required. Do not inflate W12 or ArticleSeed.
+Tests: `tests/test_manuscript_draft_intake.py` + existing `tests/test_publication_runner.py`: 88 passed on authorized AORUS, including two malicious self-certified source/science replacement cases. This is code-only acceptance. Real C04 draft intake and repeated SHA-stable receipt were independently exercised on AORUS; D14/D21/D27 independent manuscript review, actual model worker scheduling by the Factory controller and publication-Factory end-to-end sequencing are separately required. Do not inflate W12 or ArticleSeed.
 
 Related: Kairoskopion #43, #51 and publication operator PR #46/#76. Files derived from private C04 must NOT be committed to public Kairoskopion.
