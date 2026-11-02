@@ -41,3 +41,7 @@ A real AORUS case M106 is admissible only after (a) exactly three actual model s
 Stop conditions: native scholar evidence unproven, reviewer `REVISION_REQUIRED`, stalled/broken model call, source/manifest drift, tamper, or explicit author HOLD. Do not create new ArticleSeed/W12 merely by writing an article; do not merge/deploy automatically.
 
 Related: Kairoskopion #43/#51/#77 and draft PR #84; scientific Git M101–M105.
+
+## Host-level durability and process restrictions
+
+The real worker implementation resolves the Windows `codex.cmd` executable explicitly (PowerShell may otherwise choose `codex.ps1` and a Python child process may return WinError 2). Only a fixed application command is executed; neither manifest nor model output constructs shell commands. Provider stdout and stderr are retained as **private** SHA-bound sidecars on new staging runs, including failure diagnostics where the provider exits. They must not be committed to public engineering Git. The output root uses an atomic single-writer lock; an unexpected crash that leaves it in place requires operator inspection and explicit lock removal, not unattended stale-lease theft. A stage with unreceipted output is an ORPHAN, never silently accepted as a success. These mechanical checks do not replace scientific source depth, independent author/editor authority, or the pending native Indago adapter.

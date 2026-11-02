@@ -208,13 +208,24 @@ def codex_worker(stage: str, prompt: str, output: Path, cwd: Path, timeout_secon
         errors="replace", cwd=cwd, timeout=timeout_seconds, check=False,
         env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
     )
+    # Model stdout/stderr may contain private source excerpts. Retain ONLY in
+    # the owner-private run root, never in the public engineering repository.
+    stdout_log=output.with_name(stage+".stdout.log")
+    stderr_log=output.with_name(stage+".stderr.log")
+    for log,data in ((stdout_log,cp.stdout.encode("utf-8")),
+                     (stderr_log,cp.stderr.encode("utf-8"))):
+        if log.exists() and log.read_bytes()!=data:
+            raise EvidenceBlocked("existing_private_provider_log_conflict_"+stage)
+        if not log.exists():
+            atomic_write(log,data)
     if cp.returncode:
         raise EvidenceBlocked("worker_failed_" + stage + "_exit_" + str(cp.returncode))
     if not output.is_file():
         raise EvidenceBlocked("worker_no_file_" + stage)
     return {"model_cli": "codex", "command": ["codex","exec","-C","[repo]","--sandbox","read-only","-o","[output]","-"],
             "exit_code": cp.returncode, "stderr_sha256": sha256(cp.stderr.encode("utf-8")),
-            "stdout_sha256": sha256(cp.stdout.encode("utf-8"))}
+            "stdout_sha256": sha256(cp.stdout.encode("utf-8")),
+            "stderr_log":stderr_log.name,"stdout_log":stdout_log.name}
 
 
 def _run_cycle_inner(*, manifest_path: Path, input_root: Path, output_root: Path,
@@ -259,6 +270,12 @@ def _run_cycle_inner(*, manifest_path: Path, input_root: Path, output_root: Path
             valid = _validate_stage(stage, path, trusted)
             if old["validation"] != valid:
                 raise EvidenceBlocked("previous_worker_validation_changed_" + stage)
+            for stream in ("stdout", "stderr"):
+                logname=old["producer"].get(stream+"_log", "")
+                if logname:
+                    log=root/logname
+                    if log.parent!=root or not log.is_file() or sha256(log.read_bytes())!=old["producer"][stream+"_sha256"]:
+                        raise EvidenceBlocked("previous_private_provider_log_tampered_"+stage+"_"+stream)
         else:
             if path.exists():
                 raise EvidenceBlocked("orphan_unverified_worker_output_" + stage)
