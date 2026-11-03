@@ -109,3 +109,52 @@ current ARTIKL rc9 semantic D14/D24 → D25 operation evidence, bounded
 reviewer-objection → native research retry (not just a HOLD), historical
 decision-ledger guards, cross-root deterministic source-stage receipts (#77),
 another host cold replay, and at least 10 distinct MAI routes (#51).
+
+
+## F235/F236: real current Indago + native WhiteCrow D24 (2026-11-03)
+
+The native Indago port previously fetched five Drive authorities serially with a
+single ninety-second global authority budget. Large, legitimate
+`candidate_queue` and `hunt_ledger` bodies were sometimes fetched after
+the budget was already depleted. A strictly bounded parallel live reader is
+now committed as an isolated review candidate in
+`Stimurid/aorus-ecosystem` branch
+`fix/indago-parallel-live-authority-20261103` at
+`ef57b281e2433038cc37b1ae0d23b573f63205bc`.
+The actual AORUS native plan read all five documents as LIVE_VERIFIED,
+using the original metadata/SHA checks, in 17.37 seconds; no model calls.
+The port remained subject to the original agent-isolation policy and cannot
+promote a cached mirror to LIVE.
+
+With `whitecrow_native_required=true`, the existing native controller
+also loads and executes **WhiteCrow's actual pinned FieldCore D24 functions**
+from the independently specified local git commit and module SHA. It calls
+`build_disciplinary_positioning_report` followed by
+`build_research_handoff`; the result is a typed
+`ACADEMIC_RESEARCH_REQUEST` with a stable `research_request_id` and
+`dispatch_event_id`. Inputs are exact original/draft/reviewer SHA, original
+Indago native receipt, and real unresolved independent reviewer findings.
+The result is *unambiguous*: insufficient primary-source reading is
+`BLOCKED_ON_DUE_DILIGENCE`, so the available semantic operations are only
+`FIXATION/CHECK`. The new request is `READY_FOR_RESEARCH` in the
+scholarly sense but **not dispatched** through Indago. The original M108
+hunt occurred before this request was constructed, so it must NEVER be
+falsely claimed as the request's EvidenceReturn. The D24 stage is
+deterministic code, not an independent WhiteCrow model literature review.
+
+The stage is included in the SAME native `manuscript_cycle_runner` when
+explicitly selected; otherwise the historical native stage remains
+backward-compatible. Exact native WhiteCrow code SHA, Git HEAD and cleanliness
+are verified before execution, and each report/request/receipt is immutable.
+Native Artikl's compact research-return prompt records the D24 request SHA
+and pending dispatch status. D14/D15/D24/D25 do not allow manuscript GO
+from unverified metadata.
+
+F4 remains OPEN: no one-shot native WhiteCrow→Indago ResearchRequest dispatch
+and corresponding source-passage-acquiring EvidenceReturn has yet completed
+with matching request/dispatch identity, no WhiteCrow *semantic
+requalification* of newly returned full sources, no canonical Artikl D25
+revision/reviewer cycle, and no automatic follow-up after critique. The next
+edge is a real admission-safe ADD-006 host pickup with original exact request
+lineage, bounded source acquisition and WhiteCrow qualification. Do not
+relabel historical M108 receipts as satisfying this new request.

@@ -22,6 +22,7 @@ from typing import Callable
 from .publication_runner import EvidenceBlocked, atomic_write, sha256
 from .indago_native_bridge import preflight as native_indago_plan
 from .indago_evidence_intake import import_hunt
+from .native_whitecrow_stage import qualify as whitecrow_d24_qualify
 
 SCHEMA="trimurti-native-organ-source-cycle-v1"
 RESULT_SCHEMA="trimurti-native-organ-cycle-state-v1"
@@ -84,6 +85,12 @@ def preflight_inputs(*,manifest:Path,original:Path,draft:Path,review:Path,
         raise EvidenceBlocked("new_hunt_must_not_inherit_historical_id")
     if _readjson(review).get("author_gate") not in {"HOLD",None}:
         raise EvidenceBlocked("previous_review_promoted_outside_authority")
+    if m.get("whitecrow_native_required") is True:
+        q=m.get("whitecrow_question")
+        if not isinstance(q,str) or not 35<=len(q.strip())<=1200:
+            raise EvidenceBlocked("whitecrow_exact_question_in_manifest_required")
+    elif m.get("whitecrow_native_required") not in (None,False):
+        raise EvidenceBlocked("whitecrow_native_flag_invalid")
     # Check authoritative local organ body bytes, but never self-certify that
     # an LLM actually read them. Native agent transcript is evaluated separately.
     source_root=artikl_source_root.resolve(strict=True)
@@ -202,6 +209,9 @@ def _artikl_prompt(*,m:dict,source_sha:str,draft_sha:str,review_sha:str,
       f"original source SHA {source_sha}; candidate SHA {draft_sha}; "
       f"independent reviewer SHA {review_sha}. "
       f"Native Indago real previous hunt {evidence['native_hunt_id']}, "
+      f"WhiteCrow D24 PENDING new request SHA {need.get('whitecrow_request_sha256','NOT_INVOKED')}, "
+      f"dispatch status {need.get('whitecrow_dispatch_status','NOT_INVOKED')}; "
+      "Older M108 hunt cannot be EvidenceReturn for this new request. "
       f"status {evidence['native_status']}, calls {evidence['counts']['provider_calls']}, "
       f"new full evidence {evidence['counts']['new_verified']}. "
       "Its files are in existing owner-local INDAGO_STATE. "
@@ -283,7 +293,9 @@ def run(*,manifest_path:Path,original:Path,draft:Path,review:Path,
         port_root:Path,hunts_root:Path,artikl_workspace:Path,
         output_root:Path,trusted_source_sha:str,trusted_draft_sha:str,
         trusted_review_sha:str,run_hunt:Callable|None=None,
-        run_artikl:Callable|None=None)->dict:
+        run_artikl:Callable|None=None,whitecrow_root:Path|None=None,
+        trusted_whitecrow_commit:str|None=None,
+        trusted_whitecrow_module_sha:str|None=None)->dict:
     m,docs=preflight_inputs(manifest=manifest_path,original=original,draft=draft,
         review=review,trusted_source_sha=trusted_source_sha,
         trusted_draft_sha=trusted_draft_sha,
@@ -342,6 +354,21 @@ def run(*,manifest_path:Path,original:Path,draft:Path,review:Path,
                       else "INDEPENDENT_D14_D15_D24_REVIEW_REQUIRED",
               "whitecrow_runtime":"NOT_INVOKED_IN_THIS_CYCLE",
               "author_gate":"HOLD","manuscript_go":False,"send":False,"new_w12_routes":0}
+        whitecrow=None
+        if m.get("whitecrow_native_required") is True:
+            if whitecrow_root is None or not trusted_whitecrow_commit or not trusted_whitecrow_module_sha:
+                raise EvidenceBlocked("trusted_real_whitecrow_runtime_not_configured")
+            whitecrow=whitecrow_d24_qualify(
+                whitecrow_root=whitecrow_root,
+                trusted_git_commit=trusted_whitecrow_commit,
+                trusted_module_sha=trusted_whitecrow_module_sha,
+                review_file=review,trusted_review_sha=trusted_review_sha,
+                original_sha=trusted_source_sha,draft_sha=trusted_draft_sha,
+                native_evidence=evidence,question=m["whitecrow_question"],
+                output_root=root/"whitecrow-d24")
+            need["whitecrow_request_sha256"]=whitecrow["request_sha256"]
+            need["whitecrow_dispatch_status"]="NOT_DISPATCHED_FROM_THIS_RUN"
+            need["whitecrow_runtime"]=whitecrow["runtime"]
         _emit(root/"research-need.json",need)
         response,aprovenance=_native_artikl(m=m,evidence=evidence,need=need,
             root=root,artikl_workspace=artikl_workspace,
@@ -360,7 +387,9 @@ def run(*,manifest_path:Path,original:Path,draft:Path,review:Path,
              "f3_artikl_reentry_self_report":response.get("cold_reentry"),
              "f3_artikl_reply_sha256":sha256((root/"artikl-native.stdout.json").read_bytes()),
              "f4_closed_loop":"NOT_PASSED_CONSISTENT_HOLD_NO_AUTONOMOUS_REWRITE",
-             "whitecrow_native":"NOT_INVOKED",
+             "whitecrow_native":whitecrow["runtime"] if whitecrow else "NOT_INVOKED",
+             "whitecrow_d24_request":whitecrow,
+             "whitecrow_new_request_not_yet_dispatched":whitecrow is not None,
              "source_original_sha256":trusted_source_sha,
              "draft_sha256":trusted_draft_sha,"prior_review_sha256":trusted_review_sha,
              "reviewer_response":"RESEARCH_NEED_NOT_MANUSCRIPT_REVIEW",
@@ -386,6 +415,9 @@ def main(argv:list[str]|None=None)->int:
         p.add_argument("--"+key,required=True,type=Path)
     for key in ("source","draft","review"):
         p.add_argument("--trusted-"+key+"-sha256",required=True)
+    p.add_argument("--whitecrow-root",type=Path,default=None)
+    p.add_argument("--trusted-whitecrow-commit",default=None)
+    p.add_argument("--trusted-whitecrow-module-sha256",default=None)
     a=p.parse_args(argv)
     try:
         result=run(manifest_path=a.manifest,original=a.original,draft=a.draft,
@@ -394,7 +426,10 @@ def main(argv:list[str]|None=None)->int:
                    output_root=a.output_root,
                    trusted_source_sha=a.trusted_source_sha256,
                    trusted_draft_sha=a.trusted_draft_sha256,
-                   trusted_review_sha=a.trusted_review_sha256)
+                   trusted_review_sha=a.trusted_review_sha256,
+                   whitecrow_root=a.whitecrow_root,
+                   trusted_whitecrow_commit=a.trusted_whitecrow_commit,
+                   trusted_whitecrow_module_sha=a.trusted_whitecrow_module_sha256)
     except (EvidenceBlocked,OSError,ValueError,KeyError,subprocess.TimeoutExpired) as e:
         print(json.dumps({"status":"BLOCKED_NATIVE_FACTORY","reason":str(e)[:250],
                           "author_gate":"HOLD","send":False,"new_w12_routes":0}))
