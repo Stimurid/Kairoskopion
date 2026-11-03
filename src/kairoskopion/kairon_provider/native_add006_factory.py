@@ -65,7 +65,7 @@ def _model_inner(stdout:bytes)->tuple[dict,dict]:
         raise EvidenceBlocked("native_artikl_reply_not_typed_json") from e
     return inner,data
 
-def _assert_science_choice(inner:dict,request:dict,evidence_sha:str,report_sha:str)->str:
+def _assert_science_choice(inner:dict,request:dict,evidence_sha:str,report_sha:str,*,revision_eligible:bool=False)->str:
     if inner.get("schema")!="trimurti-artikl-f240-research-vs-revision-decision-v1":
         raise EvidenceBlocked("native_artikl_response_schema_invalid")
     if inner.get("agent_id")!="artikl" or inner.get("organ_not_actor") is not True or inner.get("current_release")!="ARTIKL 1.0.0-rc9":
@@ -76,9 +76,14 @@ def _assert_science_choice(inner:dict,request:dict,evidence_sha:str,report_sha:s
         or inner.get("world_mutation") is not False or inner.get("d25_manuscript_go") is not False
         or inner.get("source_novelty_accepted") is not False):
         raise EvidenceBlocked("native_artikl_illegal_scientific_promotion")
-    if inner.get("revision_allowed_now") is not False:
-        raise EvidenceBlocked("native_artikl_unreviewed_revision_not_allowed")
-    if inner.get("decision") not in {"MORE_RESEARCH","HOLD_BLOCKED"}:
+    choice=inner.get("decision")
+    if choice == "REVISION_CANDIDATE":
+        if not revision_eligible or inner.get("revision_allowed_now") is not True:
+            raise EvidenceBlocked("native_artikl_unverified_revision_cannot_be_authorized")
+    elif choice in ("MORE_RESEARCH","HOLD_BLOCKED"):
+        if inner.get("revision_allowed_now") is not False:
+            raise EvidenceBlocked("native_artikl_unreviewed_revision_not_allowed")
+    else:
         raise EvidenceBlocked("native_artikl_unqualified_decision")
     if not isinstance(inner.get("next_research_questions"),list) or not inner.get("reason"):
         raise EvidenceBlocked("native_artikl_research_need_missing")
@@ -86,7 +91,8 @@ def _assert_science_choice(inner:dict,request:dict,evidence_sha:str,report_sha:s
 
 def _native_artikl(*,root:Path,source:Path,report_path:Path,
                    report_sha:str,evidence_sha:str,request:dict,
-                   imported_response:Path|None,imported_response_sha:str|None)->tuple[dict,dict]:
+                   imported_response:Path|None,imported_response_sha:str|None,
+                   revision_eligible:bool=False)->tuple[dict,dict]:
     stdout=root/"native_artikl_stdout.json"
     if imported_response is not None:
         body=_pin(imported_response,imported_response_sha or "")
@@ -102,15 +108,19 @@ def _native_artikl(*,root:Path,source:Path,report_path:Path,
           "Read FULL current SOURCE_ARTIKL entry/release/base/gateway/livecore/capability "
           "and source-bound report "+str(report_path)+" (SHA "+report_sha+"). "
           "Native evidence SHA "+evidence_sha+". This is scientific triage, NOT a "
-          "request to rewrite C04 or publish. Unless verified primary fulltexts "
-          "are present, D15/D24 imply MORE_RESEARCH and author HOLD. "
-          "DO NOT change files, send messages, or launch another hunt. "
+          "request to rewrite C04 or publish. Inspect report fully before deciding. "
+          "You decide MORE_RESEARCH, HOLD_BLOCKED, or REVISION_CANDIDATE only if "
+          "D24 has adequate independently source-anchored original fulltext and "
+          "the independent D15/author-decision gates qualify it. "
+          "Operator-verifiable revision_eligible="+str(revision_eligible)+". "
+          "Without it: revision_allowed_now=false. No autonomous additional "
+          "research requests, file writes, messages, or journal SEND. "
           "Return ONLY JSON with keys schema:trimurti-artikl-f240-research-vs-revision-decision-v1, "
           "agent_id:artikl, organ_not_actor:true, current_release:ARTIKL 1.0.0-rc9, "
           "canonical_read:FULL_RC9|PARTIAL|BLOCKED, whitecrow_report_sha256:"+report_sha+
           ", real_indago_evidence_sha256:"+evidence_sha+
-          ", decision:MORE_RESEARCH|HOLD_BLOCKED, reason:string, next_research_questions:array,"
-          "next_source_requirements:array, revision_allowed_now:false, d25_manuscript_go:false, "
+          ", decision:MORE_RESEARCH|HOLD_BLOCKED|REVISION_CANDIDATE, reason:string, next_research_questions:array,"
+          "next_source_requirements:array, revision_allowed_now:boolean, d25_manuscript_go:false, "
           "source_novelty_accepted:false, author_gate:HOLD, send:false, world_mutation:false."
         )
         f=root/"artikl_message.txt"
@@ -132,7 +142,8 @@ def _native_artikl(*,root:Path,source:Path,report_path:Path,
             raise EvidenceBlocked("native_artikl_exit_"+str(cp.returncode))
         attestation="NEW_REGISTERED_ARTIKL_GATEWAY_INVOCATION"
     inner,outer=_model_inner(stdout.read_bytes())
-    choice=_assert_science_choice(inner,request,evidence_sha,report_sha)
+    choice=_assert_science_choice(inner,request,evidence_sha,report_sha,
+                                   revision_eligible=revision_eligible)
     meta=(outer.get("result") or {}).get("meta") or {}
     evidence={"agent":"artikl","gateway_status":outer.get("status"),
         "gateway_run_id":outer.get("runId"),
@@ -147,7 +158,8 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
         port_root:Path,indago_state_root:Path,whitecrow_root:Path,
         trusted_wc_commit:str,trusted_wc_module_sha:str,
         output_root:Path,imported_artikl_response:Path|None=None,
-        imported_artikl_response_sha:str|None=None)->dict:
+        imported_artikl_response_sha:str|None=None,
+        cycle_contract_path:Path|None=None,expected_cycle_contract_sha:str|None=None)->dict:
     manifest=_read(input_manifest)
     if (manifest.get("schema")!=SCHEMA or manifest.get("case_id")!="T3-TALK-20261019"
         or manifest.get("author_gate")!="HOLD" or manifest.get("send") is not False
@@ -161,6 +173,24 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
         or req.get("research_request_id")!=manifest.get("research_request_id")
         or req.get("dispatch_event_id")!=manifest.get("dispatch_event_id")):
         raise EvidenceBlocked("manifest_wrong_d24_request")
+    contract=None
+    if req["research_request_id"].startswith("T3-F241-"):
+        if cycle_contract_path is None or not expected_cycle_contract_sha:
+            raise EvidenceBlocked("finite_f241_cycle_contract_mandatory")
+        _pin(cycle_contract_path,expected_cycle_contract_sha)
+        contract=_read(cycle_contract_path)
+        caps=contract.get("limits") or {}
+        if (contract.get("schema")!="T3_F241_FINITE_C04_EXECUTION_CONTRACT_V1"
+            or contract.get("new_research_request_id")!=req["research_request_id"]
+            or contract.get("new_dispatch_event_id")!=req["dispatch_event_id"]
+            or manifest.get("cycle_contract_sha256")!=expected_cycle_contract_sha
+            or caps.get("new_scientific_request_count")!=1
+            or caps.get("native_indago_hunt_count")!=1
+            or caps.get("maximum_indago_waves")!=2
+            or caps.get("maximum_total_provider_calls")!=8
+            or caps.get("extra_recursive_hunts")!=0
+            or caps.get("external_sends")!=0):
+            raise EvidenceBlocked("f241_cycle_lifecycle_scope_invalid")
     # Host's claim key is immutable SHA(dispatch event). Same ID always
     # resolves to the same native claim regardless of rerun nonce.
     key=hashlib.sha256(req["dispatch_event_id"].encode("utf-8")).hexdigest()[:32]
@@ -225,6 +255,15 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
         raw=_read(ev)
         if raw.get("research_request_id")!=req["research_request_id"] or raw.get("dispatch_event_id")!=req["dispatch_event_id"]:
             raise EvidenceBlocked("native_indago_foreign_dispatch_return")
+        if contract:
+            calls=raw.get("provider_calls")
+            if type(calls) is not int or calls>contract["limits"]["maximum_total_provider_calls"]:
+                raise EvidenceBlocked("f241_native_provider_budget_exceeded")
+            if raw.get("task_label")!="TRIMURTI_F241_C04_FINITE":
+                raise EvidenceBlocked("f241_unexpected_native_task")
+            sessions=(raw.get("hunt") or {}).get("session_ids") or []
+            if len(sessions)>contract["limits"]["maximum_indago_waves"]:
+                raise EvidenceBlocked("f241_native_wave_budget_exceeded")
         esha=sha256(ev.read_bytes())
         csha=sha256(claim.read_bytes())
         lsha=sha256(ledger.read_bytes())
@@ -243,10 +282,19 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
             choice,agent=_native_artikl(root=root,source=ev,report_path=report,
                  report_sha=wc["whitecrow_report_sha256"],evidence_sha=esha,request=req,
                  imported_response=imported_artikl_response,
-                 imported_response_sha=imported_artikl_response_sha)
-            status="MORE_RESEARCH_AUTHOR_HOLD" if choice["decision"]=="MORE_RESEARCH" else "HOLD_BLOCKED"
+                 imported_response_sha=imported_artikl_response_sha,
+                 revision_eligible=bool(
+                    wc.get("independent_primary_read_verified") is True
+                    and wc.get("scientific_source_depth_gate")=="PASS"))
+            if contract:
+                # Even a scientific revision proposal does not imply a written,
+                # independently reviewed manuscript or author approval.
+                status="HOLD_INSUFFICIENT_EVIDENCE" if choice["decision"] in (
+                    "MORE_RESEARCH","REVISION_CANDIDATE") else "HOLD_TECHNICAL_BLOCKER"
+            else:
+                status="MORE_RESEARCH_AUTHOR_HOLD" if choice["decision"]=="MORE_RESEARCH" else "HOLD_BLOCKED"
         else:
-            choice=None;agent=None;status="NATIVE_HUNT_BLOCKED_AUTHOR_HOLD"
+            choice=None;agent=None;status="HOLD_TECHNICAL_BLOCKER" if contract else "NATIVE_HUNT_BLOCKED_AUTHOR_HOLD"
         state={"schema":RECEIPT,"status":status,"case_id":manifest["case_id"],
              "research_request_id":req["research_request_id"],"dispatch_event_id":req["dispatch_event_id"],
              "native_indago_hunt_id":(raw.get("hunt") or {}).get("hunt_id"),
@@ -259,6 +307,8 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
              "artikl_native":agent,"f4_full_manuscript_closed_loop":"NOT_PASSED",
              "independently_verified_full_primary":False,
              "scientific_novelty_accepted":False,"d25_manuscript_go":False,
+             "bounded_cycle_contract_sha256":expected_cycle_contract_sha if contract else None,
+             "subsequent_research_requests_authorized":0,
              "author_gate":"HOLD","send":False,"world_mutation":False,
              "new_w12_routes":0,"production_deployed":False}
         _emit(final,state)
@@ -266,7 +316,184 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
     finally:
         lock.unlink(missing_ok=True)
 
+def prepare_finite_followup(*,contract_path:Path,expected_contract_sha:str,
+        previous_merged_path:Path,expected_previous_merged_sha:str,
+        previous_artikl_stdout:Path,expected_previous_artikl_sha:str,
+        source_file:Path,draft_file:Path,review_file:Path,
+        whitecrow_root:Path,trusted_wc_commit:str,trusted_wc_module_sha:str,
+        output_root:Path)->dict:
+    """F241 one allowed request derived from actual prior Artikl/D24 evidence.
+
+    The canonical WhiteCrow report decides what remains open. Its three typed
+    needs are then *routed* with the three source-bound Artikl search lanes;
+    no new reviewer, source claim, study, or recursive request is invented.
+    """
+    from .native_whitecrow_stage import _validate_source, WHITE_CROW_SOURCE
+    import copy
+    import importlib
+    contract=_read(contract_path)
+    if (contract.get("schema")!="T3_F241_FINITE_C04_EXECUTION_CONTRACT_V1"
+        or contract.get("status")!="OWNER_SCOPED_PREFLIGHT_NO_DISPATCH"
+        or contract.get("new_research_request_id") is None
+        or contract.get("semantic_action_mode")!="CRITIQUE"
+        or contract.get("author_gate")!="HOLD"
+        or contract.get("send") is not False
+        or contract.get("world_mutation") is not False):
+        raise EvidenceBlocked("finite_f241_owner_contract_invalid")
+    _pin(contract_path,expected_contract_sha)
+    caps=contract.get("limits") or {}
+    for key,wanted in (("new_scientific_request_count",1),
+                       ("native_indago_hunt_count",1),
+                       ("maximum_indago_waves",2),
+                       ("maximum_seed_provider_calls",6),
+                       ("maximum_model_requested_provider_calls",2),
+                       ("maximum_total_provider_calls",8),
+                       ("extra_recursive_hunts",0),
+                       ("new_git_branches",0),("new_github_issues",0),
+                       ("external_sends",0),("world_mutations",0)):
+        if type(caps.get(key)) is not int or caps[key]!=wanted:
+            raise EvidenceBlocked("f241_budget_contract_mismatch:"+key)
+    for path,key in ((source_file,"source_original_sha256"),
+                     (draft_file,"manuscript_baseline_sha256"),
+                     (review_file,"independent_review_sha256")):
+        _pin(path,contract[key])
+    merged=json.loads(_pin(previous_merged_path,expected_previous_merged_sha).decode("utf-8-sig"))
+    if (merged.get("research_evidence_return") or {}).get("research_run_id")!=contract["completed_parent_run_id"]:
+        raise EvidenceBlocked("prior_native_research_return_not_bound_to_contract")
+    model_body=_pin(previous_artikl_stdout,expected_previous_artikl_sha)
+    previous_decision,outer=_model_inner(model_body)
+    if (previous_decision.get("decision")!="MORE_RESEARCH"
+        or previous_decision.get("revision_allowed_now") is not False
+        or previous_decision.get("real_indago_evidence_sha256")!=contract["completed_parent_evidence_sha256"]
+        or previous_decision.get("author_gate")!="HOLD" or previous_decision.get("send") is not False):
+        raise EvidenceBlocked("prior_artikl_did_not_authorize_bounded_research")
+    pinned=_validate_source(whitecrow_root,trusted_wc_commit,trusted_wc_module_sha)
+    wcpath=str(whitecrow_root.resolve())
+    if wcpath not in sys.path:sys.path.insert(0,wcpath)
+    wc=importlib.import_module("fieldcore.academic_due_diligence")
+    if Path(wc.__file__).resolve()!=(whitecrow_root.resolve()/WHITE_CROW_SOURCE).resolve():
+        raise EvidenceBlocked("whitecrow_pinned_code_not_imported")
+    lanes=contract.get("search_lanes") or []
+    if len(lanes)!=3 or len({x.get("code") for x in lanes})!=3:
+        raise EvidenceBlocked("requires_exactly_three_distinct_science_lanes")
+    for lane in lanes:
+        q=lane.get("query","")
+        if (not isinstance(q,str) or not 8<=len(q)<=150 or
+            any(ch in q for ch in ("\r","\n",":",";","|","->"))):
+            raise EvidenceBlocked("unsafe_scientific_search_lane")
+    # Retain old negative and source traces, but do not carry old open need
+    # records as new executions. D24 recreates THREE current source deficits.
+    payload=copy.deepcopy(merged)
+    payload["open_research_needs"]=[]
+    report=wc.build_disciplinary_positioning_report(
+        payload,semantic_action_mode="CRITIQUE",
+        trigger_ref="F240:"+contract["completed_parent_evidence_sha256"])
+    needs=report.get("open_research_needs") or []
+    if (report.get("research_readiness")!="BLOCKED_ON_DUE_DILIGENCE"
+        or len(needs)!=3 or report.get("coverage_status")=="HIGH"):
+        raise EvidenceBlocked("not_the_expected_three_D24_research_deficits")
+    routing=copy.deepcopy(report)
+    for need,lane in zip(routing["open_research_needs"],lanes):
+        need["question_or_gap"]="SEARCH_QUERY: "+lane["query"]
+        need["required_evidence_or_action"]=(
+            lane["scientific_gap"]+
+            "; read original primary scholarly bodies with verified source bytes,"
+            " exact passage/page anchors and a bounded negative result if absent")
+        need["provenance"]=[{"source":"PREVIOUS_NATIVE_ARTIKL_DECISION",
+            "source_sha256":expected_previous_artikl_sha,
+            "parent_request_id":contract["original_request_id"],
+            "lane":lane["code"]}]
+        need["priority"]="BLOCKING"
+    request_prefix=contract["new_research_request_id"].removesuffix(":research-request")
+    request=wc.build_research_handoff(routing,request_id=request_prefix)
+    if (request.get("research_request_id")!=contract["new_research_request_id"]
+        or request.get("dispatch_event_id")!=contract["new_dispatch_event_id"]
+        or request.get("semantic_action_mode")!="CRITIQUE"
+        or len(request.get("research_needs") or [])!=3):
+        raise EvidenceBlocked("new_canonical_D24_request_identity_wrong")
+    transport=wc.render_indago_direct_hunt_task(
+        request,task_label="TRIMURTI_F241_C04_FINITE")
+    if len(__import__("re").findall(r"(?m)^- SEARCH_QUERY: (.{8,150}) -> ",transport))!=3:
+        raise EvidenceBlocked("source_bound_three_research_queries_lost")
+    output_root.mkdir(parents=True,exist_ok=True)
+    report_sha=_emit(output_root/"due_diligence_report.json",report)
+    request_sha=_emit(output_root/"research_request_pending.json",request)
+    transport_bytes=(transport.rstrip("\n")+"\n").encode("utf-8")
+    _save(output_root/"indago_one_shot_task_PENDING.txt",transport_bytes)
+    transport_sha=sha256(transport_bytes)
+    stage={
+       "schema":"trimurti-whitecrow-d24-native-stage-v1",
+       "runtime":"REAL_WHITE_CROW_FIELDCORE_D24_CODE_INVOKED",
+       "canonical_code_source":pinned,
+       "request_sha256":request_sha,"report_sha256":report_sha,
+       "research_request_id":request["research_request_id"],
+       "dispatch_event_id":request["dispatch_event_id"],
+       "direct_hunt_transport_sha256":transport_sha,
+       "dispatch_status":"NOT_DISPATCHED_FROM_THIS_RUN",
+       "source_original_sha256":contract["source_original_sha256"],
+       "draft_sha256":contract["manuscript_baseline_sha256"],
+       "independent_review_sha256":contract["independent_review_sha256"],
+       "parent_evidence_sha256":contract["completed_parent_evidence_sha256"],
+       "parent_artikl_sha256":expected_previous_artikl_sha,
+       "cycle_contract_sha256":expected_contract_sha,
+       "search_lanes":[x["code"] for x in lanes],
+       "count_new_research_requests_authorized":1,
+       "max_hunts":1,"max_waves":2,"max_provider_calls":8,
+       "new_w12_routes":0,"author_gate":"HOLD","send":False,
+       "world_mutation":False}
+    stage_sha=_emit(output_root/"whitecrow_stage_receipt.json",stage)
+    manifest={
+       "schema":SCHEMA,"case_id":contract["case_id"],
+       "research_request_id":request["research_request_id"],
+       "dispatch_event_id":request["dispatch_event_id"],
+       "cycle_contract_sha256":expected_contract_sha,
+       "author_gate":"HOLD","send":False,"world_mutation":False,
+    }
+    manifest_sha=_emit(output_root/"input_manifest.json",manifest)
+    return {"status":"F241_SINGLE_D24_REQUEST_PREPARED_NOT_DISPATCHED",
+            "research_request_id":request["research_request_id"],
+            "dispatch_event_id":request["dispatch_event_id"],
+            "contract_sha256":expected_contract_sha,
+            "transport_sha256":transport_sha,"request_sha256":request_sha,
+            "stage_sha256":stage_sha,"baseline_sha256":report_sha,
+            "manifest_sha256":manifest_sha,
+            "native_hunts_launched":0,"additional_request_created":False,
+            "science":"HOLD","send":False}
+
+def _prepare_cli(argv:list[str])->int:
+    p=argparse.ArgumentParser(prog="manuscript_cycle_runner add006 prepare")
+    for k in ("contract","previous-merged","previous-artikl-stdout",
+              "source-file","draft-file","review-file","whitecrow-root","out"):
+        p.add_argument("--"+k,type=Path,required=True)
+    for k in ("expected-contract-sha","expected-previous-merged-sha",
+              "expected-previous-artikl-sha","trusted-whitecrow-commit",
+              "trusted-whitecrow-module-sha"):
+        p.add_argument("--"+k,required=True)
+    a=p.parse_args(argv)
+    try:
+        result=prepare_finite_followup(
+            contract_path=a.contract,expected_contract_sha=a.expected_contract_sha,
+            previous_merged_path=a.previous_merged,
+            expected_previous_merged_sha=a.expected_previous_merged_sha,
+            previous_artikl_stdout=a.previous_artikl_stdout,
+            expected_previous_artikl_sha=a.expected_previous_artikl_sha,
+            source_file=a.source_file,draft_file=a.draft_file,
+            review_file=a.review_file,whitecrow_root=a.whitecrow_root,
+            trusted_wc_commit=a.trusted_whitecrow_commit,
+            trusted_wc_module_sha=a.trusted_whitecrow_module_sha,
+            output_root=a.out)
+    except (ValueError,OSError,KeyError,EvidenceBlocked) as e:
+        print(json.dumps({"status":"HOLD_TECHNICAL_BLOCKER","reason":str(e)[:250],
+                          "author_gate":"HOLD","send":False}))
+        return 2
+    print(json.dumps(result,ensure_ascii=False))
+    return 0
+
+
 def main(argv:list[str]|None=None)->int:
+    argv=list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0]=="prepare":
+        return _prepare_cli(argv[1:])
     p=argparse.ArgumentParser(prog="manuscript_cycle_runner add006")
     for key in ["manifest","request","transport","stage-receipt","baseline","port-root","indago-state-root","whitecrow-root","output-root"]:
         p.add_argument("--"+key,type=Path,required=True)
@@ -275,6 +502,8 @@ def main(argv:list[str]|None=None)->int:
         p.add_argument("--"+key,required=True)
     p.add_argument("--imported-artikl-response",type=Path)
     p.add_argument("--imported-artikl-response-sha")
+    p.add_argument("--cycle-contract",type=Path)
+    p.add_argument("--expected-cycle-contract-sha")
     a=p.parse_args(argv)
     try:
         result=run(input_manifest=a.manifest,request_path=a.request,transport_path=a.transport,
@@ -287,7 +516,9 @@ def main(argv:list[str]|None=None)->int:
             whitecrow_root=a.whitecrow_root,trusted_wc_commit=a.trusted_whitecrow_commit,
             trusted_wc_module_sha=a.trusted_whitecrow_module_sha,output_root=a.output_root,
             imported_artikl_response=a.imported_artikl_response,
-            imported_artikl_response_sha=a.imported_artikl_response_sha)
+            imported_artikl_response_sha=a.imported_artikl_response_sha,
+            cycle_contract_path=a.cycle_contract,
+            expected_cycle_contract_sha=a.expected_cycle_contract_sha)
     except (OSError,ValueError,KeyError,EvidenceBlocked,subprocess.TimeoutExpired) as e:
         print(json.dumps({"status":"BLOCKED_NATIVE_ADD006","reason":str(e)[:250],
                          "author_gate":"HOLD","send":False,"world_mutation":False}))

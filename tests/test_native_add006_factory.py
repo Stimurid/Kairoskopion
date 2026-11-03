@@ -122,3 +122,44 @@ def test_one_new_dispatch_runs_native_once_then_cold_replay(tmp_path,monkeypatch
     rp.write_text('{"mutated":true}',encoding="utf8")
     with pytest.raises(EvidenceBlocked,match="whitecrow_report_replay_tampered"):
         f.run(**kw)
+
+def test_scientific_revision_decision_requires_verified_whitecrow():
+    x=valid_reply();x["decision"]="REVISION_CANDIDATE";x["revision_allowed_now"]=True
+    with pytest.raises(EvidenceBlocked,match="unverified_revision"):
+        f._assert_science_choice(x,{},"b"*64,SHA)
+    assert f._assert_science_choice(x,{},"b"*64,SHA,revision_eligible=True)=="REVISION_CANDIDATE"
+
+def test_actual_f241_prepare_exact_sources_bounded_single_request(tmp_path):
+    ops=Path(r"C:/projects/trimurti/_ops/T3-TALK-20261019")
+    science=Path(r"C:/projects/trimurti-t3-articles")
+    source=ops/"private_sources/C_v04_16dAYSIhubAVUmx7Hp5ZXxrf2E_A2v5F3jRAnsUEMM2Y.txt"
+    draft=science/"forms/W12-C-GUARMEAS-JIBE-CRESTI/revisions/M1_v0_5_ru_author_hold.md"
+    review=science/"runs/T3-M1/M116_independent_fulltext_v05_review.json"
+    kwargs=dict(
+        contract_path=ops/"F241_execution_contract.json",
+        expected_contract_sha="dcd4da42833caf48d74e553f3493326294120d96b93c1ce7a3b163989ee0bb19",
+        previous_merged_path=ops/"F240_WHITECROW_ADD006_RETURN_V2/whitecrow_merged_evidence.json",
+        expected_previous_merged_sha="3f7804cc8e2ea160b4f75c9ecc82c33da07ba352432f3cd6a9ddd0cb64a49a3b",
+        previous_artikl_stdout=ops/"F240_ARTIKL_AFTER_ADD006.stdout.json",
+        expected_previous_artikl_sha="6febc544ed25a692d2662cc6971379308a2381d28826c2fa9d497ca9683cf4b1",
+        source_file=source,draft_file=draft,review_file=review,
+        whitecrow_root=Path(r"C:/projects/whitecrow-antonova-direct-20261019"),
+        trusted_wc_commit="0bd96d098a65c2f6063d682e4f9e3e97c8034227",
+        trusted_wc_module_sha="265216755b06926414ff09ad38f1c79de531345a5d93b397cd7468141a0401af",
+        output_root=tmp_path/"prepared")
+    first=f.prepare_finite_followup(**kwargs)
+    assert first["status"]=="F241_SINGLE_D24_REQUEST_PREPARED_NOT_DISPATCHED"
+    assert first["native_hunts_launched"]==0
+    request=json.loads((tmp_path/"prepared/research_request_pending.json").read_text(encoding="utf-8"))
+    report=json.loads((tmp_path/"prepared/due_diligence_report.json").read_text(encoding="utf-8"))
+    assert len(request["research_needs"])==3
+    assert len(report["open_research_needs"])==3
+    assert request["semantic_action_mode"]=="CRITIQUE"
+    assert request["research_run_id"] is None
+    task=(tmp_path/"prepared/indago_one_shot_task_PENDING.txt").read_text(encoding="utf8")
+    assert task.count("- SEARCH_QUERY: ")==3
+    assert "hackernews" not in task.lower()
+    assert first==f.prepare_finite_followup(**kwargs)
+    kw=dict(kwargs,expected_previous_artikl_sha="0"*64)
+    with pytest.raises(EvidenceBlocked,match="trusted source pin mismatch"):
+        f.prepare_finite_followup(**kw)
