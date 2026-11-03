@@ -157,6 +157,22 @@ def _native_artikl(*,root:Path,source:Path,report_path:Path,
         "invocation_class":attestation,"choice":choice,"model_self_attested_canon_read":inner.get("canonical_read")}
     return inner,evidence
 
+def _terminal_science_gate(*,finite:bool,whitecrow_status:str,choice:str)->str:
+    """Source-depth HOLD is scientific insufficiency, not a failed runtime.
+
+    A native Artikl HOLD_BLOCKED may mean no D15 primary-claim admission
+    despite a successful registered model invocation. Treat only actual
+    missing scientific prerequisites as insufficient evidence. Never
+    rewrite a historical immutable receipt when fixing categorization.
+    """
+    if not finite:
+        return "MORE_RESEARCH_AUTHOR_HOLD" if choice=="MORE_RESEARCH" else "HOLD_BLOCKED"
+    if whitecrow_status=="REQUALIFIED_RESEARCH_MORE_D15_HOLD" and choice in {
+         "MORE_RESEARCH","HOLD_BLOCKED","REVISION_CANDIDATE"}:
+        return "HOLD_INSUFFICIENT_EVIDENCE"
+    return "HOLD_TECHNICAL_BLOCKER"
+
+
 def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
         stage_receipt:Path,baseline_path:Path,
         trusted_request_sha:str,trusted_transport_sha:str,
@@ -295,13 +311,11 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
                  revision_eligible=bool(
                     wc.get("independent_primary_read_verified") is True
                     and wc.get("scientific_source_depth_gate")=="PASS"))
-            if contract:
-                # Even a scientific revision proposal does not imply a written,
-                # independently reviewed manuscript or author approval.
-                status="HOLD_INSUFFICIENT_EVIDENCE" if choice["decision"] in (
-                    "MORE_RESEARCH","REVISION_CANDIDATE") else "HOLD_TECHNICAL_BLOCKER"
-            else:
-                status="MORE_RESEARCH_AUTHOR_HOLD" if choice["decision"]=="MORE_RESEARCH" else "HOLD_BLOCKED"
+            # Even a proposed revision is not a written/reviewed manuscript.
+            # Source-depth D15 HOLD + an actual Artikl HOLD_BLOCKED is scientific
+            # insufficiency, not an agent runtime error.
+            status=_terminal_science_gate(finite=contract is not None,
+                    whitecrow_status=wc.get("status") or "",choice=choice["decision"])
         else:
             choice=None;agent=None;status="HOLD_TECHNICAL_BLOCKER" if contract else "NATIVE_HUNT_BLOCKED_AUTHOR_HOLD"
         state={"schema":RECEIPT,"status":status,"case_id":manifest["case_id"],

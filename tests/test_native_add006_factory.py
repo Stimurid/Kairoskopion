@@ -163,3 +163,14 @@ def test_actual_f241_prepare_exact_sources_bounded_single_request(tmp_path):
     kw=dict(kwargs,expected_previous_artikl_sha="0"*64)
     with pytest.raises(EvidenceBlocked,match="trusted source pin mismatch"):
         f.prepare_finite_followup(**kw)
+
+def test_actual_artikl_evidence_hold_is_not_misreported_technical_failure():
+    assert f._terminal_science_gate(
+        finite=True,whitecrow_status="REQUALIFIED_RESEARCH_MORE_D15_HOLD",
+        choice="HOLD_BLOCKED")=="HOLD_INSUFFICIENT_EVIDENCE"
+    assert f._terminal_science_gate(
+        finite=True,whitecrow_status="REQUALIFIED_RESEARCH_MORE_D15_HOLD",
+        choice="MORE_RESEARCH")=="HOLD_INSUFFICIENT_EVIDENCE"
+    assert f._terminal_science_gate(
+        finite=True,whitecrow_status="NATIVE_HUNT_BLOCKED_NOT_A_SCIENCE_RETURN",
+        choice="HOLD_BLOCKED")=="HOLD_TECHNICAL_BLOCKER"
