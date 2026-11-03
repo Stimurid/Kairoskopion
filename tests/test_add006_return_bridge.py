@@ -108,3 +108,20 @@ def test_original_request_to_whitecrow_real_code(tmp_path):
     assert hold["status"]=="NATIVE_HUNT_BLOCKED_NOT_A_SCIENCE_RETURN"
     assert hold["whitecrow_admission"]=="NOT_ADMITTED_HUNT_BLOCKED"
     assert not (tmp_path/"blocked-out/whitecrow_d24_after_add006.json").exists()
+
+def test_f241_two_complete_original_pdfs_are_byte_and_page_bound_but_not_novelty():
+    from kairoskopion.kairon_provider.add006_return_bridge import _verify_bounded_source_carriers
+    p=Path(r"C:/projects/trimurti/_ops/T3-TALK-20261019/F241_ONE_BOUNDED_CYCLE/source_carrier_packet.json")
+    if not p.exists():
+        pytest.skip("owner-private F241 original fulltext acquisition not present here")
+    correct=sha(p.read_bytes())
+    assert correct=="9528844ac82456dc1945ea271c38fd5d35cb58b371be59a8ce1b786cd2f88e04"
+    r=_verify_bounded_source_carriers(
+        p,correct,"dcd4da42833caf48d74e553f3493326294120d96b93c1ce7a3b163989ee0bb19")
+    assert r["full_primary_bytes_extracted_count"]==2
+    assert r["independent_source_semantic_read_accepted"] is False
+    assert {x["doi"] for x in r["source_originals_verified"]}=={
+        "10.1111/jems.12492","10.3386/w23180"}
+    assert all(x["verified_page_anchors_count"]==8 for x in r["source_originals_verified"])
+    with pytest.raises(EvidenceBlocked,match="source_carrier_packet_unpinned_or_mutated"):
+        _verify_bounded_source_carriers(p,"0"*64,None)

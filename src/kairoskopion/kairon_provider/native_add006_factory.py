@@ -104,9 +104,15 @@ def _native_artikl(*,root:Path,source:Path,report_path:Path,
         exe=shutil.which("openclaw.cmd") or shutil.which("openclaw")
         if not exe:raise EvidenceBlocked("openclaw_registered_artikl_missing")
         prompt=(
-          "TRIMURTI F240 CURRENT ARTIKL organ, registered OpenClaw agent artikl. "
+          "TRIMURTI CURRENT ARTIKL organ, registered OpenClaw agent artikl. "
           "Read FULL current SOURCE_ARTIKL entry/release/base/gateway/livecore/capability "
           "and source-bound report "+str(report_path)+" (SHA "+report_sha+"). "
+          "If source_reliability_currentness includes F241_OWNER_PRIVATE_PDF_FULL_BYTE_AND_PAGE_EXTRACTION, "
+          "open the two listed private full-text paths and read substantive original-method and "
+          "source-competitor passages across each article; verify original PDF/section/page "
+          "support. Distinguish all-pages machine extraction from your own source reading. "
+          "Report which source claims and objections remain unverified; do not call an abstract "
+          "full-text evidence. Cross-check C04 author v0.5 and M116 if available. "
           "Native evidence SHA "+evidence_sha+". This is scientific triage, NOT a "
           "request to rewrite C04 or publish. Inspect report fully before deciding. "
           "You decide MORE_RESEARCH, HOLD_BLOCKED, or REVISION_CANDIDATE only if "
@@ -159,7 +165,8 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
         trusted_wc_commit:str,trusted_wc_module_sha:str,
         output_root:Path,imported_artikl_response:Path|None=None,
         imported_artikl_response_sha:str|None=None,
-        cycle_contract_path:Path|None=None,expected_cycle_contract_sha:str|None=None)->dict:
+        cycle_contract_path:Path|None=None,expected_cycle_contract_sha:str|None=None,
+        source_carrier_packet:Path|None=None,expected_source_carrier_sha:str|None=None)->dict:
     manifest=_read(input_manifest)
     if (manifest.get("schema")!=SCHEMA or manifest.get("case_id")!="T3-TALK-20261019"
         or manifest.get("author_gate")!="HOLD" or manifest.get("send") is not False
@@ -276,7 +283,9 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
             stage_receipt_path=stage_receipt,expected_stage_receipt_sha=trusted_stage_sha,
             native_claim_path=claim,expected_native_claim_sha=csha,
             native_ledger_path=ledger,expected_native_ledger_sha=lsha,
-            output_root=root/"whitecrow")
+            output_root=root/"whitecrow",source_carrier_packet=source_carrier_packet,
+            expected_source_carrier_sha=expected_source_carrier_sha,
+            expected_cycle_contract_sha=expected_cycle_contract_sha)
         report=root/"whitecrow"/"whitecrow_d24_after_add006.json"
         if wc["status"]=="REQUALIFIED_RESEARCH_MORE_D15_HOLD" and report.is_file():
             choice,agent=_native_artikl(root=root,source=ev,report_path=report,
@@ -303,6 +312,7 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
              "original_native_hunt_reused":reused,"real_evidence_sha256":esha,
              "claim_sha256":csha,"runtime_ledger_sha256":lsha,
              "whitecrow_return":wc,
+             "source_carrier_packet_sha256":expected_source_carrier_sha if source_carrier_packet else None,
              "artikl_research_decision":choice["decision"] if choice else None,
              "artikl_native":agent,"f4_full_manuscript_closed_loop":"NOT_PASSED",
              "independently_verified_full_primary":False,
@@ -504,6 +514,8 @@ def main(argv:list[str]|None=None)->int:
     p.add_argument("--imported-artikl-response-sha")
     p.add_argument("--cycle-contract",type=Path)
     p.add_argument("--expected-cycle-contract-sha")
+    p.add_argument("--source-carrier-packet",type=Path)
+    p.add_argument("--expected-source-carrier-sha")
     a=p.parse_args(argv)
     try:
         result=run(input_manifest=a.manifest,request_path=a.request,transport_path=a.transport,
@@ -518,7 +530,9 @@ def main(argv:list[str]|None=None)->int:
             imported_artikl_response=a.imported_artikl_response,
             imported_artikl_response_sha=a.imported_artikl_response_sha,
             cycle_contract_path=a.cycle_contract,
-            expected_cycle_contract_sha=a.expected_cycle_contract_sha)
+            expected_cycle_contract_sha=a.expected_cycle_contract_sha,
+            source_carrier_packet=a.source_carrier_packet,
+            expected_source_carrier_sha=a.expected_source_carrier_sha)
     except (OSError,ValueError,KeyError,EvidenceBlocked,subprocess.TimeoutExpired) as e:
         print(json.dumps({"status":"BLOCKED_NATIVE_ADD006","reason":str(e)[:250],
                          "author_gate":"HOLD","send":False,"world_mutation":False}))
