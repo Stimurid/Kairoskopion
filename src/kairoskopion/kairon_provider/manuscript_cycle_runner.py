@@ -12,6 +12,7 @@ import os
 import shutil
 from pathlib import Path
 import subprocess
+import sys
 from typing import Callable
 
 from .publication_runner import EvidenceBlocked, atomic_write, read_bound, sha256
@@ -366,6 +367,11 @@ def run_cycle(**kwargs) -> dict:
 
 
 def main() -> int:
+    # Same existing Factory operator, now with explicitly scoped native-organ lane.
+    # Preserve the historical Codex fallback CLI without changing its semantics.
+    if len(sys.argv)>1 and sys.argv[1]=="native":
+        from .native_factory_cycle import main as native_main
+        return native_main(sys.argv[2:])
     p=argparse.ArgumentParser()
     for arg in ("manifest","input-root","output-root","scientific-repo"):
         p.add_argument("--"+arg,required=True,type=Path)

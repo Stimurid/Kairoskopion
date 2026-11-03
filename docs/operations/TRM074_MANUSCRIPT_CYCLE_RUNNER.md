@@ -45,3 +45,67 @@ Related: Kairoskopion #43/#51/#77 and draft PR #84; scientific Git M101–M105.
 ## Host-level durability and process restrictions
 
 The real worker implementation resolves the Windows `codex.cmd` executable explicitly (PowerShell may otherwise choose `codex.ps1` and a Python child process may return WinError 2). Only a fixed application command is executed; neither manifest nor model output constructs shell commands. Provider stdout and stderr are retained as **private** SHA-bound sidecars on new staging runs, including failure diagnostics where the provider exits. They must not be committed to public engineering Git. The output root uses an atomic single-writer lock; an unexpected crash that leaves it in place requires operator inspection and explicit lock removal, not unattended stale-lease theft. A stage with unreceipted output is an ORPHAN, never silently accepted as a success. These mechanical checks do not replace scientific source depth, independent author/editor authority, or the pending native Indago adapter.
+
+
+## F2→F3: native organ source-return lane (2026-11-03, staging)
+
+The same existing CLI now accepts an explicit `native` subcommand. Unlike the
+legacy Codex-science/writer/reviewer loop, this path invokes actual
+`indago_port` source-authority preflight, verifies all immutable files in a
+native Indago hunt, and consults the **registered OpenClaw `artikl` agent**
+through the actual Gateway. It never calls a generic Codex process as a
+stand-in for a native actor.
+
+The manifest is a source-bound case/task/route and explicitly sets exactly one
+mode: `REUSE_VERIFIED_NATIVE_HUNT` with an exact prior hunt ID (no new provider
+calls) or `EXECUTE_BOUNDED_NATIVE_HUNT` (the port itself executes one real
+wave, no `--force`/offline bypass). All three
+independently trusted SHA-256 pins for the original author source, current
+manuscript and prior independent review are **CLI arguments, not accepted from
+the model-authored manifest**. Local ARTIKL rc9 source carrier files are also
+byte-SHA read back in the owner-private workspace; the real native agent may
+report a cold read but a self-report alone is **not** scientific authority.
+
+Example (PowerShell, from the existing Kairoskopion feature checkout):
+
+```powershell
+$env:PYTHONPATH = "./src"
+python -m kairoskopion.kairon_provider.manuscript_cycle_runner native `
+  --manifest "<private-native-manifest>" `
+  --original "<owner-source>" --draft "<exact-author-HOLD-v0.5>" `
+  --review "<M116-independent-review>" `
+  --port-root "C:/projects/aorus-ecosystem/services/indago-port" `
+  --hunts-root "C:/Users/Homee/.openclaw/hestia-body/INDAGO_STATE/hunts" `
+  --artikl-workspace "C:/Users/Homee/.openclaw/hestia-body/CHILD_WORKSPACES/artikl" `
+  --output-root "<owner-private-run-root>" `
+  --trusted-source-sha256 "<external-original-registry-pin>" `
+  --trusted-draft-sha256 "<external-draft-git-pin>" `
+  --trusted-review-sha256 "<external-review-git-pin>"
+```
+
+The source-return is *not* a promotion. A prior Indago result with Crossref
+and OpenAlex metadata but zero native full-primary reads causes an automatic
+`SOURCE_DEPTH_HOLD`. No author approval, W12 increment or journal send.
+Artikl's D14/D15/D24/D25 can return a bounded, origin-pinned
+`research_need` in a read-only turn, but this is not yet automated D25
+execution and does **not** mean that WhiteCrow executed, the full manuscript
+was rewritten, or reviewer objections looped back into a second Indago
+research wave. The result intentionally marks `f4_closed_loop=NOT_PASSED`
+until those native stages and one genuine post-review retry are implemented
+and independently verified.
+
+A restage uses exactly the same manifest digest, pinned original and prior
+review; the native Artikl response is an immutable owner-private stdout file
+and a SHA-bound receipt. On cold replay the agent model is **not recalled**.
+If the process crashes after invoking a native hunt or after writing an
+unreceipted agent reply, it blocks for explicit operator triage rather than
+inventing a completed model or repeating provider calls. The native port
+itself is currently a shared/dirty AORUS working tree; no production merge,
+OpenClaw global policy edit or operational rollout is claimed.
+
+Remaining engineering gates: real WhiteCrow source challenge inside the same
+controller, verified full-primary scholarly read to repair D15 deficits,
+current ARTIKL rc9 semantic D14/D24 → D25 operation evidence, bounded
+reviewer-objection → native research retry (not just a HOLD), historical
+decision-ledger guards, cross-root deterministic source-stage receipts (#77),
+another host cold replay, and at least 10 distinct MAI routes (#51).
