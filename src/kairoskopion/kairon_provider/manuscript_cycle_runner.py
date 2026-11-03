@@ -375,6 +375,9 @@ def main() -> int:
     if len(sys.argv)>1 and sys.argv[1]=="add006":
         from .native_add006_factory import main as add006_main
         return add006_main(sys.argv[2:])
+    if len(sys.argv)>1 and sys.argv[1]=="editorial":
+        from .native_editorial_cycle import main as editorial_main
+        return editorial_main(sys.argv[2:])
     p=argparse.ArgumentParser()
     for arg in ("manifest","input-root","output-root","scientific-repo"):
         p.add_argument("--"+arg,required=True,type=Path)

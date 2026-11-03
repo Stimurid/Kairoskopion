@@ -288,3 +288,18 @@ Acceptance tests cover both a partial-WhiteCrow `REVISION_CANDIDATE`
 and a `MORE_RESEARCH` outcome via the same native Factory coordinator,
 the actual generated Artikl prompt (no external `revision_eligible`),
 and a retained block only on premature D25/release claims.
+
+
+## M117 / one existing Factory entrypoint: Artikl decision → working manuscript → independent critique
+
+The existing \`python -m kairoskopion.kairon_provider.manuscript_cycle_runner editorial\` subcommand (same Kairoskopion PR #84) consumes the exact owner-private source C04 + currently held v0.5 + actual M116 independent critique + existing M115 science + F241 WhiteCrow report under an immutable SHA-bound manifest. It **does not dispatch Indago, create a new ResearchRequest, or call WhiteCrow as an editorial permission authority**.
+
+- **One native registered \`artikl\` decision:** \`REVISION_CANDIDATE | MORE_RESEARCH | PARK\`. Source-depth information may inform arguments but cannot veto an exploratory manuscript. If the result is \`MORE_RESEARCH\` or \`PARK\`, it ends there with a recorded disposition; no manuscript is fabricated.
+- **If Artikl chooses writing:** one separate registered native \`artikl\` invocation must write a complete UTF-8 manuscript to owner-private staging. Check real file size, minimum full-length word count, section structure and source hash. Never mistake a gateway acknowledgment or an outline for a complete manuscript.
+- **Existing Factory intake:** \`manuscript_draft_intake.ingest\` receives the real new manuscript + exact original and provisional science packet. It preserves author HOLD, no SEND or automatic novelty certification.
+- **Independent reader:** one read-only Codex process reviews the actual new SHA-pinned complete text against the full previous v0.5 and M116; exact reviewer line quotes are checked against the candidate bytes. This remains independent model review, **not** an external peer review or D25 publication approval.
+- **Cold repeat:** a completed and unchanged state replays with zero further Artikl/Codex/Indago calls. An interrupted unreceipted model invocation is not silently repeated. No extra article identity or venue route is fabricated.
+- Canonical D27 remains *candidate*; M116 protected conceptual nuclei and the M110 editorial preflight are inherited as provisional constraints, not misreported as universally accepted by the author.
+- This subcommand is a first concrete editor/writer/reviewer bridge in a real case. It does NOT alone prove the full unrelated-corpus/80-route Trimurti acceptance in owner issue #43.
+
+The actual 4 November 2026 first live case is owner-private at \`C:/projects/trimurti/_ops/T3-TALK-20261019/M117_FACTORY_NATIVE_EDITORIAL_20261104\`. Its manifest must be generated from the real source files, never from a text-only guess. A real first run and external original->version->review Git receipt are required before changing this section's status from \`CANDIDATE\` to \`REAL_CYCLE_PASS\`.
