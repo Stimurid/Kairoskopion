@@ -570,3 +570,8 @@ The L3 source+research one-command, two-process real V02 pilot is retained
 privately, including a full frozen SHA readback. It is a PROVISIONAL
 SCIENCE NOTE with DOI INDEX_ONLY pointers and AUTHOR_HOLD, not a live
 scientific search, full publisher reading, manuscript acceptance or send.
+
+
+## Owner directive 2026-11-03: all scientific intermediate steps in linked GitHub commits
+
+The binding observability contract for future Factory work is [FACTORY_GITHUB_EVIDENCE_TRACE_CONTRACT_20261103.md](FACTORY_GITHUB_EVIDENCE_TRACE_CONTRACT_20261103.md). Every research wave and scientific decision must retain the full event index and allowed source evidence, with clickable **immutable remote commit** links, exact read depth, claim/span/delta, failed/negative steps and verified GitHub readback. Existing runs are not retroactively declared compliant. Runtime adapter, tests and remote readback acceptance remain OPEN until demonstrated; local Git, a status document or unit-test PASS alone is not compliance.
