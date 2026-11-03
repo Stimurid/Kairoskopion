@@ -65,7 +65,7 @@ def _model_inner(stdout:bytes)->tuple[dict,dict]:
         raise EvidenceBlocked("native_artikl_reply_not_typed_json") from e
     return inner,data
 
-def _assert_science_choice(inner:dict,request:dict,evidence_sha:str,report_sha:str,*,revision_eligible:bool=False)->str:
+def _assert_science_choice(inner:dict,request:dict,evidence_sha:str,report_sha:str)->str:
     if inner.get("schema")!="trimurti-artikl-f240-research-vs-revision-decision-v1":
         raise EvidenceBlocked("native_artikl_response_schema_invalid")
     if inner.get("agent_id")!="artikl" or inner.get("organ_not_actor") is not True or inner.get("current_release")!="ARTIKL 1.0.0-rc9":
@@ -78,8 +78,10 @@ def _assert_science_choice(inner:dict,request:dict,evidence_sha:str,report_sha:s
         raise EvidenceBlocked("native_artikl_illegal_scientific_promotion")
     choice=inner.get("decision")
     if choice == "REVISION_CANDIDATE":
-        if not revision_eligible or inner.get("revision_allowed_now") is not True:
-            raise EvidenceBlocked("native_artikl_unverified_revision_cannot_be_authorized")
+        # A working revision is an editorial action, not publication approval.
+        # An evidence weakness belongs in the candidate assessment, not here.
+        if inner.get("revision_allowed_now") is not True:
+            raise EvidenceBlocked("native_artikl_revision_choice_inconsistent")
     elif choice in ("MORE_RESEARCH","HOLD_BLOCKED"):
         if inner.get("revision_allowed_now") is not False:
             raise EvidenceBlocked("native_artikl_unreviewed_revision_not_allowed")
@@ -91,8 +93,7 @@ def _assert_science_choice(inner:dict,request:dict,evidence_sha:str,report_sha:s
 
 def _native_artikl(*,root:Path,source:Path,report_path:Path,
                    report_sha:str,evidence_sha:str,request:dict,
-                   imported_response:Path|None,imported_response_sha:str|None,
-                   revision_eligible:bool=False)->tuple[dict,dict]:
+                   imported_response:Path|None,imported_response_sha:str|None)->tuple[dict,dict]:
     stdout=root/"native_artikl_stdout.json"
     if imported_response is not None:
         body=_pin(imported_response,imported_response_sha or "")
@@ -115,11 +116,13 @@ def _native_artikl(*,root:Path,source:Path,report_path:Path,
           "full-text evidence. Cross-check C04 author v0.5 and M116 if available. "
           "Native evidence SHA "+evidence_sha+". This is scientific triage, NOT a "
           "request to rewrite C04 or publish. Inspect report fully before deciding. "
-          "You decide MORE_RESEARCH, HOLD_BLOCKED, or REVISION_CANDIDATE only if "
-          "D24 has adequate independently source-anchored original fulltext and "
-          "the independent D15/author-decision gates qualify it. "
-          "Operator-verifiable revision_eligible="+str(revision_eligible)+". "
-          "Without it: revision_allowed_now=false. No autonomous additional "
+          "Independently decide MORE_RESEARCH, HOLD_BLOCKED, or REVISION_CANDIDATE. "
+          "D24 and D15 provide source evaluations, never permission to improve a draft. "
+          "A working REVISION_CANDIDATE is permitted even with unresolved source gaps: "
+          "keep disputed assertions clearly tentative and preserve strong hypotheses. "
+          "For REVISION_CANDIDATE set revision_allowed_now=true; otherwise false. "
+          "Only publication or author acceptance needs its separate authorization. "
+          "No autonomous additional "
           "research requests, file writes, messages, or journal SEND. "
           "Return ONLY JSON with keys schema:trimurti-artikl-f240-research-vs-revision-decision-v1, "
           "agent_id:artikl, organ_not_actor:true, current_release:ARTIKL 1.0.0-rc9, "
@@ -148,8 +151,7 @@ def _native_artikl(*,root:Path,source:Path,report_path:Path,
             raise EvidenceBlocked("native_artikl_exit_"+str(cp.returncode))
         attestation="NEW_REGISTERED_ARTIKL_GATEWAY_INVOCATION"
     inner,outer=_model_inner(stdout.read_bytes())
-    choice=_assert_science_choice(inner,request,evidence_sha,report_sha,
-                                   revision_eligible=revision_eligible)
+    choice=_assert_science_choice(inner,request,evidence_sha,report_sha)
     meta=(outer.get("result") or {}).get("meta") or {}
     evidence={"agent":"artikl","gateway_status":outer.get("status"),
         "gateway_run_id":outer.get("runId"),
@@ -165,11 +167,12 @@ def _terminal_science_gate(*,finite:bool,whitecrow_status:str,choice:str)->str:
     missing scientific prerequisites as insufficient evidence. Never
     rewrite a historical immutable receipt when fixing categorization.
     """
+    if choice=="REVISION_CANDIDATE":
+        return "EDITORIAL_WORKING_REVISION_PROPOSED_NOT_YET_WRITTEN"
     if not finite:
         return "MORE_RESEARCH_AUTHOR_HOLD" if choice=="MORE_RESEARCH" else "HOLD_BLOCKED"
-    if whitecrow_status=="REQUALIFIED_RESEARCH_MORE_D15_HOLD" and choice in {
-         "MORE_RESEARCH","HOLD_BLOCKED","REVISION_CANDIDATE"}:
-        return "HOLD_INSUFFICIENT_EVIDENCE"
+    if whitecrow_status in {"REQUALIFIED_RESEARCH_MORE_D15_HOLD", "REQUALIFIED_RESEARCH_STATUS_REPORTED"}:
+        return "MORE_RESEARCH_RECOMMENDED_AUTHOR_HOLD" if choice=="MORE_RESEARCH" else "EDITORIAL_HOLD_CHOSEN"
     return "HOLD_TECHNICAL_BLOCKER"
 
 
@@ -303,14 +306,11 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
             expected_source_carrier_sha=expected_source_carrier_sha,
             expected_cycle_contract_sha=expected_cycle_contract_sha)
         report=root/"whitecrow"/"whitecrow_d24_after_add006.json"
-        if wc["status"]=="REQUALIFIED_RESEARCH_MORE_D15_HOLD" and report.is_file():
+        if wc.get("whitecrow_admission")=="REAL_FIELDCORE_D24" and report.is_file():
             choice,agent=_native_artikl(root=root,source=ev,report_path=report,
                  report_sha=wc["whitecrow_report_sha256"],evidence_sha=esha,request=req,
                  imported_response=imported_artikl_response,
-                 imported_response_sha=imported_artikl_response_sha,
-                 revision_eligible=bool(
-                    wc.get("independent_primary_read_verified") is True
-                    and wc.get("scientific_source_depth_gate")=="PASS"))
+                 imported_response_sha=imported_artikl_response_sha)
             # Even a proposed revision is not a written/reviewed manuscript.
             # Source-depth D15 HOLD + an actual Artikl HOLD_BLOCKED is scientific
             # insufficiency, not an agent runtime error.
@@ -328,6 +328,7 @@ def run(*,input_manifest:Path,request_path:Path,transport_path:Path,
              "whitecrow_return":wc,
              "source_carrier_packet_sha256":expected_source_carrier_sha if source_carrier_packet else None,
              "artikl_research_decision":choice["decision"] if choice else None,
+             "editorial_candidate_creation_allowed":bool(choice and choice["decision"]=="REVISION_CANDIDATE"),
              "artikl_native":agent,"f4_full_manuscript_closed_loop":"NOT_PASSED",
              "independently_verified_full_primary":False,
              "scientific_novelty_accepted":False,"d25_manuscript_go":False,

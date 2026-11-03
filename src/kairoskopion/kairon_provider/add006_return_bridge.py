@@ -303,9 +303,11 @@ def bridge(*,evidence_path:Path,request_path:Path,transport_path:Path,
         report=mod.build_disciplinary_positioning_report(
             merged,semantic_action_mode="CRITIQUE",
             trigger_ref="ADD006:"+evidence["research_run_id"])
-        if report.get("research_readiness")!="BLOCKED_ON_DUE_DILIGENCE":
-            raise EvidenceBlocked("whitecrow_false_science_ready_from_metadata")
-        state="REQUALIFIED_RESEARCH_MORE_D15_HOLD"
+        # The field report describes the evidence; it does not grant editorial
+        # permission. Preserve its own classification without a second veto.
+        state=("REQUALIFIED_RESEARCH_MORE_D15_HOLD"
+               if report.get("research_readiness")=="BLOCKED_ON_DUE_DILIGENCE"
+               else "REQUALIFIED_RESEARCH_STATUS_REPORTED")
         if source_qa:
             _write_once(output_root/"source_body_extraction_QA.json",source_qa)
         rsha=_write_once(output_root/"whitecrow_d24_after_add006.json",report)

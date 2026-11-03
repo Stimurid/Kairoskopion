@@ -253,3 +253,38 @@ real scientific step is another bounded source-specific research need with
 full source-body/passage evidence and strongest closest-rival comparisons.
 Only then may Artikl choose a versioned scientific rewrite with independent
 reader and author HOLD.
+
+## 2026-11-04 / ARTIKL decision ownership correction (ADD-006)
+
+Prior F241 recorded a genuine **negative** registered Artikl evaluation but was
+**not an unbiased three-way decision**: `native_add006_factory.py` passed an
+outside `revision_eligible` boolean from WhiteCrow source-depth, injected it
+into the Artikl prompt, and then rejected `REVISION_CANDIDATE` if D15 had
+not declared the evidence sufficient. This mistakenly converted source-quality
+evaluation into editorial permission. Treat the historical F241 scientific
+receipt as immutable; do not recertify it as a genuinely independent
+three-way editorial trial.
+
+Current path: Indago returns typed findings and source provenance; WhiteCrow
+reports source depth/known unknowns without an editorial veto; Artikl makes
+the choice `MORE_RESEARCH | HOLD_BLOCKED | REVISION_CANDIDATE` using the
+actual argumentative content, the current author decisions and the source
+qualifications. Incomplete science **does not ban exploratory drafting**.
+For `REVISION_CANDIDATE`, the controller records
+`EDITORIAL_WORKING_REVISION_PROPOSED_NOT_YET_WRITTEN`, **not** D25
+`MANUSCRIPT_GO` and **not** a completed candidate. Writing and independent
+review remain separate executable tasks; they are **not proven completed**
+by this change.
+
+Keep lightweight provenance: request/return identity, source SHA, atomic
+claim/idempotency (avoid duplicate provider spend), accepted-author decision
+continuity and publication boundary (author consent, SEND and WORLD mutation).
+These describe trusted execution and external effects, not compulsory
+defensive paragraph-level editorial speech. D24/D15 adequacy and novelty
+status are **annotations about scientific statements**, not universal
+conditions for composing a working version.
+
+Acceptance tests cover both a partial-WhiteCrow `REVISION_CANDIDATE`
+and a `MORE_RESEARCH` outcome via the same native Factory coordinator,
+the actual generated Artikl prompt (no external `revision_eligible`),
+and a retained block only on premature D25/release claims.

@@ -42,7 +42,11 @@ def test_external_source_sha_tamper(tmp_path):
     with pytest.raises(EvidenceBlocked,match="trusted source pin mismatch"):
         f._pin(p,"0"*64)
 
-def test_one_new_dispatch_runs_native_once_then_cold_replay(tmp_path,monkeypatch):
+@pytest.mark.parametrize("decision,expected_status", [
+    ("MORE_RESEARCH","MORE_RESEARCH_AUTHOR_HOLD"),
+    ("REVISION_CANDIDATE","EDITORIAL_WORKING_REVISION_PROPOSED_NOT_YET_WRITTEN"),
+])
+def test_one_new_dispatch_runs_native_once_then_cold_replay(tmp_path,monkeypatch,decision,expected_status):
     d=tmp_path/"input";d.mkdir()
     out=tmp_path/"output"
     state=tmp_path/"native-state"
@@ -90,12 +94,13 @@ def test_one_new_dispatch_runs_native_once_then_cold_replay(tmp_path,monkeypatch
         report=rr/"whitecrow_d24_after_add006.json"
         report.write_text('{"research_readiness":"BLOCKED_ON_DUE_DILIGENCE"}',encoding="utf8")
         return {"status":"REQUALIFIED_RESEARCH_MORE_D15_HOLD",
+                "whitecrow_admission":"REAL_FIELDCORE_D24",
                 "whitecrow_report_sha256":digest(report),
                 "independent_primary_read_verified":False}
     def artikl_stub(**kwargs):
         root=kwargs["root"]
         (root/"native_artikl_stdout.json").write_text('{"synthetic":"not real agent"}',encoding="utf8")
-        return {"decision":"MORE_RESEARCH"},{
+        return {"decision":decision},{
             "stdout_sha256":digest(root/"native_artikl_stdout.json"),
             "invocation_class":"SYNTHETIC_TEST"}
     monkeypatch.setattr(f.subprocess,"run",executor)
@@ -109,9 +114,11 @@ def test_one_new_dispatch_runs_native_once_then_cold_replay(tmp_path,monkeypatch
         whitecrow_root=tmp_path/"wc",trusted_wc_commit="0"*40,
         trusted_wc_module_sha="0"*64,output_root=out)
     first=f.run(**kw)
-    assert first["status"]=="MORE_RESEARCH_AUTHOR_HOLD"
+    assert first["status"]==expected_status
     assert first["native_indago_executed_this_command"] is True
-    assert first["artikl_research_decision"]=="MORE_RESEARCH"
+    assert first["artikl_research_decision"]==decision
+    assert first["editorial_candidate_creation_allowed"]==(decision=="REVISION_CANDIDATE")
+    assert first["d25_manuscript_go"] is False
     assert first["f4_full_manuscript_closed_loop"]=="NOT_PASSED"
     assert len(calls)==1
     again=f.run(**kw)
@@ -123,11 +130,13 @@ def test_one_new_dispatch_runs_native_once_then_cold_replay(tmp_path,monkeypatch
     with pytest.raises(EvidenceBlocked,match="whitecrow_report_replay_tampered"):
         f.run(**kw)
 
-def test_scientific_revision_decision_requires_verified_whitecrow():
+def test_artikl_may_propose_working_revision_despite_partial_whitecrow():
     x=valid_reply();x["decision"]="REVISION_CANDIDATE";x["revision_allowed_now"]=True
-    with pytest.raises(EvidenceBlocked,match="unverified_revision"):
+    assert f._assert_science_choice(x,{},"b"*64,SHA)=="REVISION_CANDIDATE"
+    assert f._terminal_science_gate(finite=True,whitecrow_status="REQUALIFIED_RESEARCH_MORE_D15_HOLD",choice="REVISION_CANDIDATE")=="EDITORIAL_WORKING_REVISION_PROPOSED_NOT_YET_WRITTEN"
+    x["d25_manuscript_go"]=True
+    with pytest.raises(EvidenceBlocked,match="illegal_scientific_promotion"):
         f._assert_science_choice(x,{},"b"*64,SHA)
-    assert f._assert_science_choice(x,{},"b"*64,SHA,revision_eligible=True)=="REVISION_CANDIDATE"
 
 def test_actual_f241_prepare_exact_sources_bounded_single_request(tmp_path):
     ops=Path(r"C:/projects/trimurti/_ops/T3-TALK-20261019")
@@ -167,10 +176,37 @@ def test_actual_f241_prepare_exact_sources_bounded_single_request(tmp_path):
 def test_actual_artikl_evidence_hold_is_not_misreported_technical_failure():
     assert f._terminal_science_gate(
         finite=True,whitecrow_status="REQUALIFIED_RESEARCH_MORE_D15_HOLD",
-        choice="HOLD_BLOCKED")=="HOLD_INSUFFICIENT_EVIDENCE"
+        choice="HOLD_BLOCKED")=="EDITORIAL_HOLD_CHOSEN"
     assert f._terminal_science_gate(
         finite=True,whitecrow_status="REQUALIFIED_RESEARCH_MORE_D15_HOLD",
-        choice="MORE_RESEARCH")=="HOLD_INSUFFICIENT_EVIDENCE"
+        choice="MORE_RESEARCH")=="MORE_RESEARCH_RECOMMENDED_AUTHOR_HOLD"
     assert f._terminal_science_gate(
         finite=True,whitecrow_status="NATIVE_HUNT_BLOCKED_NOT_A_SCIENCE_RETURN",
         choice="HOLD_BLOCKED")=="HOLD_TECHNICAL_BLOCKER"
+
+def test_native_artikl_prompt_does_not_prejudge_revision(tmp_path,monkeypatch):
+    x=valid_reply()
+    x["decision"]="REVISION_CANDIDATE"
+    x["revision_allowed_now"]=True
+    output={"status":"ok","runId":"synthetic-editorial",
+            "result":{"payloads":[{"text":json.dumps(x)}],
+                      "meta":{"toolSummary":{"calls":3,"failures":0}}}}
+    recorded=[]
+    def executor(args,**kw):
+        recorded.append(args)
+        return SimpleNamespace(returncode=0,stdout=json.dumps(output).encode("utf8"),stderr=b"")
+    monkeypatch.setattr(f.shutil,"which",lambda name:"native-openclaw-for-test.cmd")
+    monkeypatch.setattr(f.subprocess,"run",executor)
+    decision,attestation=f._native_artikl(
+        root=tmp_path,source=tmp_path/"source.json",
+        report_path=tmp_path/"whitecrow.json",
+        report_sha=SHA,evidence_sha="b"*64,request={},
+        imported_response=None,imported_response_sha=None)
+    assert decision["decision"]=="REVISION_CANDIDATE"
+    assert attestation["invocation_class"]=="NEW_REGISTERED_ARTIKL_GATEWAY_INVOCATION"
+    assert len(recorded)==1
+    prompt=(tmp_path/"artikl_message.txt").read_text(encoding="utf8")
+    assert "REVISION_CANDIDATE" in prompt
+    assert "D24 and D15 provide source evaluations, never permission" in prompt
+    assert "revision_eligible" not in prompt
+    assert "Only publication or author acceptance needs" in prompt
