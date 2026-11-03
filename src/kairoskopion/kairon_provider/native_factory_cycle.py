@@ -99,6 +99,24 @@ def preflight_inputs(*,manifest:Path,original:Path,draft:Path,review:Path,
         raise EvidenceBlocked("artikl_currentness_authority_not_rc9")
     return m,docs
 
+def _native_plan_access(plan:dict,mode:str)->str:
+    if plan.get("result")=="ADMITTED_FOR_SEPARATE_NATIVE_HUNT":
+        return "CURRENT_LIVE_HUNT_ADMITTED"
+    # Historical evidence is immutable and independently verified by
+    # import_hunt. A temporary publisher/provider block must not erase it.
+    # This concession NEVER authorises a new live native provider call.
+    if mode=="REUSE_VERIFIED_NATIVE_HUNT" and all((
+        plan.get("result")=="BLOCKED_NATIVE_HUNT",
+        plan.get("native_authorities_live_verified") is True,
+        plan.get("native_task_eligible") is True,
+        plan.get("native_agent_isolated") is True,
+        plan.get("native_agent_block") is None,
+        not plan.get("native_agent_violations"),
+    )):
+        return "HISTORICAL_REPLAY_ONLY_CURRENT_HUNT_BLOCKED"
+    raise EvidenceBlocked("native_indago_not_admitted_or_authorities_stale")
+
+
 def _native_hunt(*,port_root:Path,task_id:str,root:Path,waves:int=1,timeout:int=290,
                  executor:Callable=subprocess.run)->tuple[str,dict]:
     # The service owns all host and authority controls; there is no --force,
@@ -178,8 +196,8 @@ def _artikl_prompt(*,m:dict,source_sha:str,draft_sha:str,review_sha:str,
       "read FULL SOURCE_ARTIKL files in required dependency order: ENTRY_MANIFEST.md, "
       "RELEASE_MANIFEST.md, BASE_COLD_REENTER.md, GATEWAY.md, LIVE_CORE.md, "
       "CAPABILITY_REGISTRY.md. D27 is NOT canonical, ARTIKL CURRENT rc9. "
-      "Read available local source evidence and independent reviewer if tools permit; "
-      "do not infer full paper reading from metadata. "
+      "Do NOT read full manuscript, prior reviewer or external papers in this narrow contract probe: host verified their SHA but their scientific claims remain unreviewed here. "
+      "Read the six canonical organ files only. Do not infer full paper reading from metadata. Return compact JSON: maximum 1400 characters and at most two specific missing-evidence items. "
       f"Factory case {m['case_id']}, route {m['route_id']}, task {m['task_id']}; "
       f"original source SHA {source_sha}; candidate SHA {draft_sha}; "
       f"independent reviewer SHA {review_sha}. "
@@ -226,9 +244,9 @@ def _native_artikl(*,m:dict,evidence:dict,need:dict,root:Path,
             raise EvidenceBlocked("native_openclaw_executable_missing")
         sid=str(uuid.uuid5(uuid.NAMESPACE_URL,sha256(msg.read_bytes())))
         cp=executor([exe,"agent","--agent","artikl","--json","--session-id",
-                    sid,"--timeout","180","--message-file",str(msg)],
+                    sid,"--timeout","240","--message-file",str(msg)],
                     capture_output=True,text=True,encoding="utf-8",
-                    errors="replace",timeout=245,check=False)
+                    errors="replace",timeout=310,check=False)
         _immutable(stdout,cp.stdout.encode("utf-8"))
         _immutable(stderr,cp.stderr.encode("utf-8"))
         if cp.returncode!=0:
@@ -285,10 +303,16 @@ def run(*,manifest_path:Path,original:Path,draft:Path,review:Path,
     try:
         with os.fdopen(fd,"w",encoding="ascii") as f:
             f.write("LOCKED_F2_F3_NO_SEND\n")
-        plan=native_indago_plan(port_root=port_root,task_id=m["task_id"],
-                                output_root=root/"indago-plan")
-        if plan.get("result")!="ADMITTED_FOR_SEPARATE_NATIVE_HUNT":
-            raise EvidenceBlocked("native_indago_not_currently_admitted")
+        plan_receipt=root/"indago-plan"/"indago-native-preflight.json"
+        # Replay of historical research must read the original authority
+        # receipt, not generate a new timestamp-dependent plan digest. A
+        # brand-new live hunt still requires fresh current admission.
+        if m["mode"]=="REUSE_VERIFIED_NATIVE_HUNT" and plan_receipt.exists():
+            plan=_readjson(plan_receipt)
+        else:
+            plan=native_indago_plan(port_root=port_root,task_id=m["task_id"],
+                                    output_root=root/"indago-plan")
+        plan_access=_native_plan_access(plan,m["mode"])
         if m["mode"]=="REUSE_VERIFIED_NATIVE_HUNT":
             huntid=m["historical_hunt_id"]
             huntmeta={"hunt_id":huntid,"hunt_executed_in_this_cycle":False,
@@ -327,7 +351,8 @@ def run(*,manifest_path:Path,original:Path,draft:Path,review:Path,
         state={"schema":RESULT_SCHEMA,"cycle_id":runid,"case_id":m["case_id"],
              "route_id":m["route_id"],"status":"SCIENTIFIC_RESEARCH_NEED_HOLD",
              "f1_one_command_actual":True,
-             "f2_native_indago_admission":"LIVE_VERIFIED",
+             "f2_native_indago_admission":plan_access,
+             "f2_current_plan_status":plan.get("native_plan_status"),
              "f2_native_indago_hunt":huntmeta,
              "f2_science_evidence_status":need["status"],
              "f3_native_artikl_agent_reply":"READ_ONLY_RESEARCH_NEED",

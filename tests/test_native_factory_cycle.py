@@ -131,3 +131,73 @@ def test_hunt_id_no_path_traversal():
     assert n._safe_hunt_name(HUNT)
     assert not n._safe_hunt_name("../etc/passwd")
     assert not n._safe_hunt_name("h-123")
+
+
+def test_native_hunt_executes_real_port_contract_once_then_reuses(tmp_path):
+    from types import SimpleNamespace
+    calls=[]
+    loc=tmp_path/"hunts"/HUNT
+    loc.mkdir(parents=True)
+    def executor(command,**kwargs):
+        calls.append(command)
+        assert command[:4]==[n.sys.executable,"-m","indago_port","hunt"]
+        assert "--task" in command and command[command.index("--task")+1]=="TRIMURTI_M108_C04_20261103"
+        assert "--force" not in command and "--offline" not in command
+        return SimpleNamespace(returncode=10,
+           stdout=json.dumps({"status":"PARTIAL","paths":{"dir":str(loc)}}),stderr="")
+    root=tmp_path/"out"
+    root.mkdir()
+    name,receipt=n._native_hunt(port_root=tmp_path,task_id="TRIMURTI_M108_C04_20261103",
+                                root=root,executor=executor,timeout=225)
+    assert name==HUNT and receipt["native_status"]=="PARTIAL"
+    assert receipt["hunt_executed_in_this_cycle"]
+    name2,receipt2=n._native_hunt(port_root=tmp_path,task_id="TRIMURTI_M108_C04_20261103",
+                                root=root,executor=executor,timeout=225)
+    assert name2==name and receipt2==receipt and len(calls)==1
+
+def test_unreceipted_native_hunt_is_never_silently_retried(tmp_path):
+    from types import SimpleNamespace
+    (tmp_path/"native-hunt.started").write_text("INVOKED_NATIVE_INDAGO_ONCE")
+    with pytest.raises(EvidenceBlocked,match="native_hunt_orphan_requires_operator_triage"):
+        n._native_hunt(port_root=tmp_path,task_id="TRIMURTI_M108_C04_20261103",
+                        root=tmp_path,timeout=225)
+
+def test_artikl_claiming_publish_privilege_is_blocked(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.setattr(n.shutil,"which",lambda name:"openclaw.cmd")
+    m={"task_id":"TRIMURTI_M108_C04_20261103","case_id":"T3-TALK-20261019",
+       "route_id":"C-GUARMEAS-JIBE-CRESTI"}
+    evidence={"native_hunt_id":HUNT,"native_status":"PARTIAL",
+              "counts":{"provider_calls":8,"new_verified":0}}
+    body={"schema":n.ARTIKL_CONTRACT,"task_id":m["task_id"],"agent_id":"artikl",
+       "organ_not_actor":True,"current_release":"ARTIKL 1.0.0-rc9",
+       "research_disposition":"EVIDENCE_DEPTH_HOLD",
+       "d25_state":"MANUSCRIPT_GO_FORBIDDEN",
+       "research_need":{"reason":"Missing primary sources","missing_evidence":["passage"]},
+       "can_proceed_to_full_manuscript":True,"author_gate":"HOLD",
+       "send":False,"world_mutation":False}
+    outer={"status":"ok","result":{"payloads":[{"text":json.dumps(body)}],
+           "meta":{"toolSummary":{"calls":1,"tools":["read"]}}}}
+    def executor(*args,**kwargs):
+        return SimpleNamespace(returncode=0,stdout=json.dumps(outer),stderr="")
+    with pytest.raises(EvidenceBlocked,match="native_artikl_untrusted_d25_claim"):
+        n._native_artikl(m=m,evidence=evidence,need={},root=tmp_path,
+          artikl_workspace=tmp_path,source_sha=H,draft_sha=H,review_sha=H,
+          executor=executor)
+
+
+def test_historical_native_reuse_allowed_under_provider_block_only():
+    x={"result":"BLOCKED_NATIVE_HUNT","native_plan_status":"BLOCKED",
+       "native_authorities_live_verified":True,"native_task_eligible":True,
+       "native_agent_isolated":True,"native_agent_block":None,
+       "native_agent_violations":[]}
+    assert n._native_plan_access(x,"REUSE_VERIFIED_NATIVE_HUNT")=="HISTORICAL_REPLAY_ONLY_CURRENT_HUNT_BLOCKED"
+    with pytest.raises(EvidenceBlocked,match="not_admitted"):
+        n._native_plan_access(x,"EXECUTE_BOUNDED_NATIVE_HUNT")
+    x["native_agent_block"]="AGENT_NOT_ISOLATED"
+    with pytest.raises(EvidenceBlocked,match="not_admitted"):
+        n._native_plan_access(x,"REUSE_VERIFIED_NATIVE_HUNT")
+    x["native_agent_block"]=None
+    x["native_authorities_live_verified"]=False
+    with pytest.raises(EvidenceBlocked,match="not_admitted"):
+        n._native_plan_access(x,"REUSE_VERIFIED_NATIVE_HUNT")
