@@ -189,3 +189,67 @@ AORUS `indago_port`. The next F4 step is to bind ADD-006 to that active
 host, ensure durable atomic claim before provider calls, preserve
 `research_request_id/dispatch_event_id` in a true native evidence return,
 then re-qualify via WhiteCrow without widening `CRITIQUE` or granting D25.
+
+
+## F240 / ADD-006 native organ chain — actual exercise 2026-11-03
+
+**The old F234 historical M108 replay is NOT F237 research.** This phase adds
+a separate `add006` CLI subcommand on the same existing
+`kairon_provider.manuscript_cycle_runner` rather than a parallel Factory.
+
+Path: pinned WhiteCrow F238 D24 `ResearchRequest` + exact one-shot transport →
+*real* `indago_port add006-oneshot` host in the isolated AORUS Indago checkout
+→ O_EXCL atomic `claim.json` under the existing `HuntLease`
+→ native hunt + append-only runtime receipts → complete/PARTIAL
+`indago.add006.evidence_return.v1` with original request/dispatch/run/transport
+SHA → *actual* pinned WhiteCrow D24
+`integrate_research_evidence_return()` / `build_disciplinary_positioning_report()`
+→ registered native OpenClaw `artikl` chooses
+`MORE_RESEARCH` / HOLD. No Codex substitute.
+
+Specific owner-private prior real run:
+`h-20261103T173837Z-trimurti_f237_c04_20261103-27094f`,
+`INDAGO:RUN:d427e0184c3c5639:staging-dry1`,
+transport sha `b0e4b15dcc7a03addf9e652a44c9ef374c64f837848f44dec1ab7c9ada6b4e29`,
+real EvidenceReturn sha
+`a2f2d98db59d8c971d75078b31e92cf54d6bf5174a362e09ff482e75e831c9c8`.
+8 actual provider calls, 2 waves: one completed, second timed out,
+`PARTIAL`, only false-positive lexical Crossref result and metadata.
+D15 full-original read not proven.
+
+The Indago-side ADD-006 worker lives on *isolated* AORUS worktree
+`F240_add006_isolation_fix`, commit `e3c507e4a27d331f58cadc180d71751afa54cefe`
+(no production merge): patched old tool-less-only isolation policy to match
+registered live `minimax/MiniMax-M3.1-Flash` workspaceOnly bounded tools,
+kept all five LIVE_VERIFIED authority gate, no `--force`, and fixed severe
+exactly-once hazards (a conflicting payload cannot reuse a claim; a second
+CLAIMED/RUNNING runner cannot send duplicate requests). Explicit recover from
+a prior `LIVE_HUNT_BLOCKED` allowed **only** after persistent zero-provider,
+no-hunt native evidence and same request/dispatch/run; no recovery after
+actual provider calls. 19 ADD006 unit tests passed.
+
+The new `native_add006_factory.py` is the transport-to-organ orchestrator.
+Its real-case input is an immutable externally pinned D24 request and
+transport, not a free-form model answer. It requires a host-owned claim SHA
+and corresponding append-only `direct_hunt_completed` receipt before
+scientific use. A native PARTIAL (or even native PASS) **does not certify**
+scholarly primary-text reading. D24 only returns a source-depth HOLD and
+Artikl must decide whether further research is required; without genuine
+science the system will not generate v0.6 or promote novelty.
+
+For staged acceptance the previously executed *actual* Indago + actual native
+Artikl stdout were replayed via **one command**, producing
+`MORE_RESEARCH_AUTHOR_HOLD`. This demonstrates the integration and replay
+but is **not falsely described as one fresh full unattended hunt**. A fresh
+manifest triggers `indago_port` from this same CLI, subject to all its
+real live authority and isolation controls. The native Artikl handler invokes
+OpenClaw for new cases and reuses an immutable SHA-bound transcript for an
+unchanged cold replay. A crash with unfinished model/hunt markers blocks
+for operator triage instead of blindly issuing duplicate provider calls.
+
+No journal send, no World mutation, 0 accepted article seeds / new W12;
+no cross-root production migration or full autorevision cycle F4. The next
+real scientific step is another bounded source-specific research need with
+full source-body/passage evidence and strongest closest-rival comparisons.
+Only then may Artikl choose a versioned scientific rewrite with independent
+reader and author HOLD.

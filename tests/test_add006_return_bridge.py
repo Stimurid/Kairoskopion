@@ -1,0 +1,110 @@
+"""Exact WhiteCrow ADD006 research-return bridge acceptance, no live hunt in tests."""
+import copy
+import hashlib
+import json
+from pathlib import Path
+import pytest
+
+from kairoskopion.kairon_provider.add006_return_bridge import bridge,_admit
+from kairoskopion.kairon_provider.publication_runner import EvidenceBlocked
+
+H="a"*64
+REQ="T3-F236-807df2a6d8f0-4867fa881a36:research-request"
+EVENT=REQ+":dispatch"
+RUN="INDAGO:RUN:d427e0184c3c5639:staging-dry1"
+def sha(b):return hashlib.sha256(b).hexdigest()
+def ev():
+    return {"schema":"indago.add006.evidence_return.v1","research_request_id":REQ,
+     "dispatch_event_id":EVENT,"research_run_id":RUN,"semantic_action_mode":"CRITIQUE",
+     "transport_sha256":H,"execution_mode":"ONE_SHOT_RESEARCH_REQUEST",
+     "writeback_destination":"INDAGO_HUNT_LEDGER_AND_HUNT_HISTORY",
+     "claim_state":"COMPLETED","run_status":"PARTIAL","provider_calls":4,
+     "hunt":{"hunt_id":"h-20261103T130000Z-legal-research-test-abcdef123"},
+     "read_depth":"METADATA_OR_LOCATOR","author_gate":"HOLD","send":False,
+     "world_mutation":False,"article_seed":False}
+
+def req():return {"research_request_id":REQ,"dispatch_event_id":EVENT,"semantic_action_mode":"CRITIQUE"}
+def test_weak_results_not_a_complete_scholarly_return():
+    with pytest.raises(EvidenceBlocked,match="no_real_hunt_witness"):
+        x=ev();x["hunt"]=None;_admit(x,req(),H)
+    with pytest.raises(EvidenceBlocked,match="add006_old_hunt_splice_forbidden"):
+        x=ev();x["hunt"]["hunt_id"]="h-20261003-m108-old";_admit(x,req(),H)
+    with pytest.raises(EvidenceBlocked,match="add006_semantic_escalation_forbidden"):
+        x=ev();x["semantic_action_mode"]="REASONING";_admit(x,req(),H)
+    with pytest.raises(EvidenceBlocked,match="add006_transport_sha_conflict"):
+        _admit(ev(),req(),"b"*64)
+    with pytest.raises(EvidenceBlocked,match="add006_request_id_conflict"):
+        x=ev();x["research_request_id"]="forged";_admit(x,req(),H)
+def test_genuine_blocked_hunt_not_science():
+    x=ev();x["claim_state"]="BLOCKED";x["run_status"]="LIVE_HUNT_BLOCKED";x["provider_calls"]=0;x["hunt"]=None
+    _admit(x,req(),H)
+    x["provider_calls"]=1
+    with pytest.raises(EvidenceBlocked,match="interrupted_nonzero_provider"):
+        _admit(x,req(),H)
+def test_author_and_world_protected():
+    for k,val in (("author_gate","GO"),("send",True),("world_mutation",True),("article_seed",True)):
+        x=ev();x[k]=val
+        with pytest.raises(EvidenceBlocked):_admit(x,req(),H)
+def test_original_request_to_whitecrow_real_code(tmp_path):
+    root=Path(r"C:/projects/trimurti/_ops/T3-TALK-20261019/F238_WHITECROW_ANCHORED_D24")
+    wc=Path(r"C:/projects/whitecrow-antonova-direct-20261019")
+    expected_commit="0bd96d098a65c2f6063d682e4f9e3e97c8034227"
+    modsha="265216755b06926414ff09ad38f1c79de531345a5d93b397cd7468141a0401af"
+    stage=root/"whitecrow_stage_receipt.json"
+    request=root/"research_request_pending.json"
+    trans=Path(r"C:/Users/Homee/.openclaw/hestia-body/INDAGO_STATE/add006_ops/F237_indago_one_shot_task_PENDING.txt")
+    baseline=root/"due_diligence_report.json"
+    sha_transport="b0e4b15dcc7a03addf9e652a44c9ef374c64f837848f44dec1ab7c9ada6b4e29"
+    assert sha(trans.read_bytes())==sha_transport
+    actual=_ev=ev()
+    actual["transport_sha256"]=sha_transport
+    path=tmp_path/"evidence.json";path.write_text(json.dumps(actual),encoding="utf-8")
+    claim_file=tmp_path/"claim.json"
+    claim_file.write_text(json.dumps({"state":"COMPLETED",
+        "research_request_id":REQ,"dispatch_event_id":EVENT,
+        "research_run_id":RUN,"transport_sha256":sha_transport,
+        "native_hunt_id":actual["hunt"]["hunt_id"]}),encoding="utf-8")
+    ledger_file=tmp_path/"ledger.jsonl"
+    ledger_file.write_text("[INDAGO_RUNTIME] "+json.dumps({
+        "kind":"direct_hunt_completed","research_request_id":REQ,
+        "dispatch_event_id":EVENT,"research_run_id":RUN,
+        "native_hunt_id":actual["hunt"]["hunt_id"]})+"\n",encoding="utf-8")
+    kw=dict(evidence_path=path,request_path=request,transport_path=trans,
+        whitecrow_root=wc,trusted_whitecrow_commit=expected_commit,
+        trusted_whitecrow_module_sha=modsha,expected_evidence_sha=sha(path.read_bytes()),
+        expected_request_sha=sha(request.read_bytes()),
+        expected_transport_sha=sha_transport,baseline_path=baseline,
+        stage_receipt_path=stage,expected_stage_receipt_sha=sha(stage.read_bytes()),
+        native_claim_path=claim_file,expected_native_claim_sha=sha(claim_file.read_bytes()),
+        native_ledger_path=ledger_file,expected_native_ledger_sha=sha(ledger_file.read_bytes()),
+        output_root=tmp_path/"out")
+    first=bridge(**kw)
+    assert first["status"]=="REQUALIFIED_RESEARCH_MORE_D15_HOLD"
+    assert first["whitecrow_admission"]=="REAL_FIELDCORE_D24"
+    assert first["independent_primary_read_verified"] is False
+    again=bridge(**kw)
+    assert first==again
+    report=json.loads((tmp_path/"out/whitecrow_d24_after_add006.json").read_text(encoding="utf-8"))
+    assert report["research_readiness"]=="BLOCKED_ON_DUE_DILIGENCE"
+    assert report["coverage_status"]!="HIGH"
+    modified=dict(kw)
+    modified["expected_evidence_sha"]="0"*64
+    with pytest.raises(EvidenceBlocked,match="source_hash_mismatch"):bridge(**modified)
+    blocked=dict(actual);blocked["claim_state"]="BLOCKED";blocked["run_status"]="LIVE_HUNT_BLOCKED";blocked["provider_calls"]=0;blocked["hunt"]=None
+    blocked_dir=tmp_path/"blocked-case";blocked_dir.mkdir()
+    bp=blocked_dir/"evidence_return.json";bp.write_text(json.dumps(blocked),encoding="utf-8")
+    bc=blocked_dir/"claim.json"
+    bc.write_text(json.dumps({"state":"BLOCKED","research_request_id":REQ,
+        "dispatch_event_id":EVENT,"research_run_id":RUN,
+        "transport_sha256":sha_transport}),encoding="utf-8")
+    bl=blocked_dir/"ledger.jsonl"
+    bl.write_text("[INDAGO_RUNTIME] "+json.dumps({"kind":"direct_hunt_failed",
+        "dispatch_event_id":EVENT,"research_run_id":RUN,"status":"LIVE_HUNT_BLOCKED"})+"\n",encoding="utf-8")
+    blocked_kw=dict(kw,evidence_path=bp,expected_evidence_sha=sha(bp.read_bytes()),
+        native_claim_path=bc,expected_native_claim_sha=sha(bc.read_bytes()),
+        native_ledger_path=bl,expected_native_ledger_sha=sha(bl.read_bytes()),
+        output_root=tmp_path/"blocked-out")
+    hold=bridge(**blocked_kw)
+    assert hold["status"]=="NATIVE_HUNT_BLOCKED_NOT_A_SCIENCE_RETURN"
+    assert hold["whitecrow_admission"]=="NOT_ADMITTED_HUNT_BLOCKED"
+    assert not (tmp_path/"blocked-out/whitecrow_d24_after_add006.json").exists()
