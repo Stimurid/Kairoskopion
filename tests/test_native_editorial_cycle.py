@@ -124,3 +124,46 @@ def test_one_real_file_draft_and_independent_review_captured_from_artikl_choice(
     assert result["send"] is False
     assert e.run(manifest,e.sha256(manifest.read_bytes()),root)["replay"]=="IDENTICAL_NO_NEW_MODEL_CALLS"
     assert seen==["decision","writer"]
+
+def test_gateway_cli_timeout_recovers_completed_original_run_without_second_model(tmp_path,monkeypatch):
+    sid="ca478241-54a5-5f55-b01c-74565617ad29"
+    rid="8a2aae1d-7c61-40f2-9025-d201b0561bec"
+    p=tmp_path/"decision.started"
+    p.write_text("NATIVE_ARTIKL_CALL "+sid+"\n",encoding="ascii")
+    fault={"ok":False,"runId":rid,"error":{"message":"gateway timeout after 360000ms"}}
+    (tmp_path/"decision.gateway.json").write_text(json.dumps(fault),encoding="utf8")
+    items=[
+      {"type":"model.completed","runId":rid,"sessionId":sid,
+       "data":{"timedOut":False,"aborted":False}},
+      {"type":"assistant.message","sessionId":sid,
+       "data":{"message":{"role":"assistant","__openclaw":{"runId":rid},
+                          "content":[{"type":"text","text":json.dumps(payload())}]}}},
+      {"type":"session.ended","sessionId":sid,"data":{"status":"success"}}
+    ]
+    (tmp_path/"decision.trajectory.events.jsonl").write_text(
+        "\n".join(json.dumps(v) for v in items)+"\n",encoding="utf8")
+    def fail(*args,**kwargs):
+        raise AssertionError("must never re-execute the paid model call")
+    monkeypatch.setattr(e.subprocess,"run",fail)
+    assert e.native_call(tmp_path,"decision","unused")["decision"]=="REVISION_CANDIDATE"
+    assert (tmp_path/"decision.trajectory.recovery_receipt.json").is_file()
+    assert e.native_call(tmp_path,"decision","unused")["decision"]=="REVISION_CANDIDATE"
+    # The original CLI gateway timeout receipt remains unchanged.
+    assert json.loads((tmp_path/"decision.gateway.json").read_text())==fault
+
+def test_gateway_recovery_rejects_foreign_completed_session(tmp_path):
+    sid="s1";rid="r1"
+    (tmp_path/"decision.started").write_text("NATIVE_ARTIKL_CALL "+sid+"\n")
+    failed={"ok":False,"runId":rid,"error":{"message":"gateway timeout"}}
+    events=[
+      {"type":"model.completed","runId":rid,"sessionId":"s2",
+       "data":{"timedOut":False,"aborted":False}},
+      {"type":"assistant.message","sessionId":"s2",
+       "data":{"message":{"role":"assistant","__openclaw":{"runId":rid},
+               "content":[{"type":"text","text":json.dumps(payload())}]}}},
+      {"type":"session.ended","sessionId":"s2","data":{"status":"success"}}]
+    (tmp_path/"decision.trajectory.events.jsonl").write_text(
+        "\n".join(json.dumps(v) for v in events)+"\n",encoding="utf8")
+    with pytest.raises(EvidenceBlocked,match="not_completed"):
+        e._recover_finished_gateway_turn(
+          tmp_path,"decision",json.dumps(failed).encode("utf8"))

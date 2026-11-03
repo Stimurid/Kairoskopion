@@ -57,6 +57,58 @@ def parse_gateway(blob:bytes)->dict:
     except (KeyError,ValueError,IndexError,TypeError) as e:
         raise EvidenceBlocked("registered_artikl_response_not_exact_JSON") from e
 
+def _recover_finished_gateway_turn(root:Path,stage:str,failed_gateway:bytes)->dict|None:
+    """Read existing completed native agent transcript; NEVER rerun the paid turn.
+
+    A CLI timeout is not a model decision. The corresponding Gateway run may
+    already have produced a completed assistant reply. Keep the error stdout
+    unchanged; accept only the matching final native session event.
+    """
+    archive=root/(stage+".trajectory.events.jsonl")
+    if not archive.is_file():
+        return None
+    try:outer=json.loads(failed_gateway.decode("utf-8-sig"))
+    except (UnicodeError,ValueError):
+        return None
+    run_id=outer.get("runId")
+    err=((outer.get("error") or {}).get("message") or "")
+    if outer.get("ok") is not False or not run_id or "gateway timeout" not in err:
+        return None
+    marker=(root/(stage+".started")).read_text(encoding="ascii")
+    session_id=marker.rsplit(" ",1)[-1].strip()
+    events=[json.loads(line) for line in archive.read_text(encoding="utf-8").splitlines() if line.strip()]
+    completed=[x for x in events if x.get("type")=="model.completed"
+               and x.get("runId")==run_id and x.get("sessionId")==session_id
+               and x.get("data",{}).get("timedOut") is False
+               and x.get("data",{}).get("aborted") is False]
+    ended=[x for x in events if x.get("type")=="session.ended"
+           and x.get("sessionId")==session_id
+           and x.get("data",{}).get("status")=="success"]
+    replies=[x for x in events if x.get("type")=="assistant.message"
+           and x.get("sessionId")==session_id
+           and (x.get("data",{}).get("message",{}).get("__openclaw") or {}).get("runId")==run_id
+           and x.get("data",{}).get("message",{}).get("role")=="assistant"]
+    if not (completed and ended and replies):
+        raise EvidenceBlocked("native_gateway_transcript_not_completed_for_original_run")
+    msgs=[y.get("text","") for y in replies[-1]["data"]["message"].get("content",[])
+          if y.get("type")=="text"]
+    if len(msgs)!=1:raise EvidenceBlocked("native_gateway_recovery_ambiguous_reply")
+    body=json.loads(msgs[0])
+    if not isinstance(body,dict):raise EvidenceBlocked("native_gateway_recovery_not_json_object")
+    receipt={"schema":"native-artikl-completed-gateway-turn-recovery-v1",
+             "agent_id":"artikl","gateway_run_id":run_id,
+             "session_id":session_id,"model_completed_without_abort":True,
+             "source_trajectory_sha256":sha256(archive.read_bytes()),
+             "source_native_gateway_error_sha256":sha256(failed_gateway),
+             "recovered_text_sha256":sha256(msgs[0].encode("utf-8")),
+             "new_model_calls":0}
+    save(root/(stage+".trajectory.recovered_text.json"),
+         (json.dumps(body,ensure_ascii=False,sort_keys=True,indent=2)+"\n").encode("utf-8"))
+    save(root/(stage+".trajectory.recovery_receipt.json"),
+         (json.dumps(receipt,ensure_ascii=False,sort_keys=True,indent=2)+"\n").encode("utf-8"))
+    return body
+
+
 def native_call(root:Path,stage:str,prompt:str,timeout:int=330)->dict:
     # One real native call per stage; a failed started stage is never silently
     # retried at another token cost.
@@ -78,8 +130,14 @@ def native_call(root:Path,stage:str,prompt:str,timeout:int=330)->dict:
         save(data,cp.stdout)
         if cp.returncode:
             raise EvidenceBlocked("native_artikl_exit_"+stage+"_"+str(cp.returncode))
-    val=parse_gateway(data.read_bytes())
-    return val
+    blob=data.read_bytes()
+    try:
+        return parse_gateway(blob)
+    except EvidenceBlocked:
+        recovered=_recover_finished_gateway_turn(root,stage,blob)
+        if recovered is not None:
+            return recovered
+        raise
 
 def _native_stage_attestation(root:Path,stage:str)->dict:
     b=(root/(stage+".gateway.json")).read_bytes()
