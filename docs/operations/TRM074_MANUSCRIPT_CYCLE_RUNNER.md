@@ -158,3 +158,34 @@ revision/reviewer cycle, and no automatic follow-up after critique. The next
 edge is a real admission-safe ADD-006 host pickup with original exact request
 lineage, bounded source acquisition and WhiteCrow qualification. Do not
 relabel historical M108 receipts as satisfying this new request.
+
+
+### F238 review-source quote admission (2026-11-03)
+
+The *actual* WhiteCrow-main D24 stage is now given the **full candidate
+manuscript file**, independently SHA-pinned alongside the exact M116 independent
+review. Its `_normalize_issues` verifies the reviewer's proposed candidate
+quotation occurs on the claimed 1-based line. Only those literally verifiable
+review findings are marked `EXACT_MANUSCRIPT_LINE`. The rest remain explicitly
+`UNVERIFIED_REVIEW_QUOTE_NOT_ADMITTED`, retained as unresolved reviewer
+questions but not laundered into validated manuscript evidence or "fixed"
+defects. This is not an automatic semantic validity claim.
+
+On the C04 v0.5 SHA `0a1cbd31...` and M116 review SHA `4867fa88...`,
+a genuine WhiteCrow FieldCore invocation returned **4/6** literal-anchored
+objections, **2/6** unverified quoted objections, readiness
+`BLOCKED_ON_DUE_DILIGENCE`, a lineage-preserving pending ResearchRequest, and
+zero new provider calls. The quote-admission audit and D24 source/code hash
+are persisted as immutable owner-private receipts. The previous F236 execution
+is historical and MUST NOT be overwritten because the stage contract changed.
+
+F237 canonical WhiteCrow transport serialization and the ADD-006 candidate
+one-shot parser have passed read-only tests, but **no current Indago host
+claimed the request**. The iMac legacy `house-portal/bin/indago-run.js`
+was directly inspected on 2026-11-03: state last written 2026-10-08 and no
+active service process; this obsolete carrier must not be patched or presented
+as the current host. Actual 2026-11-03 native M108 Indago execution ran on
+AORUS `indago_port`. The next F4 step is to bind ADD-006 to that active
+host, ensure durable atomic claim before provider calls, preserve
+`research_request_id/dispatch_event_id` in a true native evidence return,
+then re-qualify via WhiteCrow without widening `CRITIQUE` or granting D25.

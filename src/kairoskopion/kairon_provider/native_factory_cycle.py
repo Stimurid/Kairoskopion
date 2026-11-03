@@ -363,7 +363,7 @@ def run(*,manifest_path:Path,original:Path,draft:Path,review:Path,
                 trusted_git_commit=trusted_whitecrow_commit,
                 trusted_module_sha=trusted_whitecrow_module_sha,
                 review_file=review,trusted_review_sha=trusted_review_sha,
-                original_sha=trusted_source_sha,draft_sha=trusted_draft_sha,
+                draft_file=draft,original_sha=trusted_source_sha,draft_sha=trusted_draft_sha,
                 native_evidence=evidence,question=m["whitecrow_question"],
                 output_root=root/"whitecrow-d24")
             need["whitecrow_request_sha256"]=whitecrow["request_sha256"]

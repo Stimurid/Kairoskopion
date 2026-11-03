@@ -60,25 +60,35 @@ def _validate_source(root:Path,trusted_commit:str,trusted_module_sha:str)->dict:
     return {"git_commit":current,"module_sha256":sha256(p.read_bytes()),"dirty":False}
 
 
-def _normalize_issues(review:dict)->list[str]:
+def _normalize_issues(review:dict,draft_text:str)->tuple[list[dict],list[dict]]:
+    """Don't upgrade a reviewer's invented quote to a manuscript-grounded fact."""
     issues=review.get("new_major_issues") or []
     if not isinstance(issues,list) or not issues:
         raise EvidenceBlocked("whitecrow_m116_review_has_no_actual_issues")
-    out=[]
-    for x in issues:
+    lines=draft_text.splitlines()
+    accepted,unverified=[],[]
+    for i,x in enumerate(issues,1):
         if not isinstance(x,dict) or not isinstance(x.get("issue"),str):
             raise EvidenceBlocked("whitecrow_invalid_reviewer_issue")
-        item=x["issue"].strip()
-        if item and item not in out:
-            out.append(item)
-    if not out:
-        raise EvidenceBlocked("whitecrow_empty_scoped_issues")
-    return out[:15]
+        name=x["issue"].strip()
+        line=x.get("candidate_line")
+        quote=x.get("literal_quote")
+        if (not name or type(line) is not int or not (1<=line<=len(lines))
+            or not isinstance(quote,str) or not quote.strip()
+            or quote not in lines[line-1]):
+            unverified.append({"index":i,"issue":name[:300],
+                               "status":"UNVERIFIED_REVIEW_QUOTE_NOT_ADMITTED"})
+        elif not any(y["issue"]==name for y in accepted):
+            accepted.append({"issue":name,"line":line,"literal_quote":quote,
+                             "status":"EXACT_MANUSCRIPT_LINE"})
+    if not accepted:
+        raise EvidenceBlocked("whitecrow_no_literal_grounded_review_issues")
+    return accepted[:15],unverified
 
 
 def qualify(*,whitecrow_root:Path,trusted_git_commit:str,
             trusted_module_sha:str,review_file:Path,trusted_review_sha:str,
-            original_sha:str,draft_sha:str,native_evidence:dict,
+            draft_file:Path,original_sha:str,draft_sha:str,native_evidence:dict,
             question:str,output_root:Path)->dict:
     """Canonical D24 function invocation with source-pinned prior research and review."""
     if not question or len(question.strip())<35 or len(question)>1200:
@@ -86,6 +96,8 @@ def qualify(*,whitecrow_root:Path,trusted_git_commit:str,
     if not review_file.is_file() or sha256(review_file.read_bytes())!=trusted_review_sha:
         raise EvidenceBlocked("whitecrow_review_sha_mismatch")
     review=_read_json(review_file)
+    if not draft_file.is_file() or sha256(draft_file.read_bytes())!=draft_sha:
+        raise EvidenceBlocked("whitecrow_source_quoted_draft_sha_mismatch")
     if review.get("candidate_sha256")!=draft_sha or review.get("author_gate")!="HOLD":
         raise EvidenceBlocked("whitecrow_review_wrong_draft_or_author_boundary")
     if review.get("final_verdict")!="REVISION_REQUIRED":
@@ -118,7 +130,7 @@ def qualify(*,whitecrow_root:Path,trusted_git_commit:str,
     if imported!=(whitecrow_root.resolve()/WHITE_CROW_SOURCE).resolve():
         raise EvidenceBlocked("whitecrow_runtime_import_source_not_pinned")
 
-    issues=_normalize_issues(review)
+    issues,unverified_issues=_normalize_issues(review,draft_file.read_text(encoding="utf-8-sig"))
     base={
       "question":question.strip(),
       "read_bodies":[],
@@ -126,7 +138,8 @@ def qualify(*,whitecrow_root:Path,trusted_git_commit:str,
       "locator_hits":[{"source":"NATIVE_INDAGO_PRIOR_HUNT_METADATA_ONLY",
         "hunt_id":hunt_id,"provider_calls":counts.get("provider_calls"),
         "verified_primary_new":counts.get("new_verified",0)}],
-      "known_unknowns":issues,
+      "known_unknowns":[x["issue"] for x in issues]
+         + ["UNVERIFIED_REVIEW_QUOTE_NOT_GROUNDED: "+x["issue"] for x in unverified_issues],
       "coverage_evidence":{},
       "source_reliability_currentness":[{"source":"native_prior_hunt",
         "hunt_id":hunt_id,"run_status":native_status,
@@ -148,6 +161,13 @@ def qualify(*,whitecrow_root:Path,trusted_git_commit:str,
         raise EvidenceBlocked("whitecrow_semantic_action_mode_changed")
 
     output_root.mkdir(parents=True,exist_ok=True)
+    audit_sha=_emit_unique(output_root/"review_literal_quote_audit.json",{
+        "schema":"T3_F238_WHITECROW_REVIEW_QUOTE_ANTI_LAUNDERING_V1",
+        "draft_sha256":draft_sha,"independent_review_sha256":trusted_review_sha,
+        "exact_manuscript_line_issues":issues,
+        "not_literal_source_grounded":unverified_issues,
+        "source_verification_method":"exact_substring_at_claimed_1_based_line",
+        "not_a_scientific_semantic_pass":True})
     report_sha=_emit_unique(output_root/"due_diligence_report.json",report)
     request_sha=_emit_unique(output_root/"research_request_pending.json",request)
     receipt={
@@ -167,7 +187,10 @@ def qualify(*,whitecrow_root:Path,trusted_git_commit:str,
       "coverage_status":report["coverage_status"],
       "allowed_next_operations":report["allowed_next_operations"],
       "open_research_needs_count":len(report["open_research_needs"]),
-      "reviewer_concerns_preserved":len(issues),
+      "reviewer_concerns_preserved":len(issues)+len(unverified_issues),
+      "reviewer_grounded_quotes":len(issues),
+      "reviewer_unverified_quotes":len(unverified_issues),
+      "reviewer_literal_audit_sha256":audit_sha,
       "source_read_depth":"NATIVE_METADATA_ONLY_0_NEW_FULL_PRIMARY",
       "source_novelty_accepted":False,
       "field_requalified_after_read":False,
@@ -181,5 +204,6 @@ def qualify(*,whitecrow_root:Path,trusted_git_commit:str,
             "request_id":request["research_request_id"],
             "dispatch_event_id":request["dispatch_event_id"],
             "research_needs":len(report["open_research_needs"]),
+            "reviewer_literal_audit_sha256":audit_sha,
             "status":"D24_RESEARCH_REQUEST_PENDING_NOT_DISPATCHED",
             "author_gate":"HOLD","send":False}
