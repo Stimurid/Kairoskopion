@@ -303,3 +303,13 @@ The existing \`python -m kairoskopion.kairon_provider.manuscript_cycle_runner ed
 - This subcommand is a first concrete editor/writer/reviewer bridge in a real case. It does NOT alone prove the full unrelated-corpus/80-route Trimurti acceptance in owner issue #43.
 
 The actual 4 November 2026 first live case is owner-private at \`C:/projects/trimurti/_ops/T3-TALK-20261019/M117_FACTORY_NATIVE_EDITORIAL_20261104\`. Its manifest must be generated from the real source files, never from a text-only guess. A real first run and external original->version->review Git receipt are required before changing this section's status from \`CANDIDATE\` to \`REAL_CYCLE_PASS\`.
+
+## F4: return independent review to registered Artikl (same Factory)
+
+The existing `manuscript_cycle_runner` now has a bounded `editorial-return` entrypoint. It takes the verified C04 v0.6, M117 review, M117 provenance, original source, current science packet and WhiteCrow context by content SHA. It first calls native registered Artikl rc9 for its **own** choice: `REVISION_CANDIDATE | MORE_RESEARCH | KEEP_WORKING_DRAFT | PARK`. WhiteCrow source depth is evidence metadata, not an editor permission flag. D27 remains candidate-only.
+
+`python -m kairoskopion.kairon_provider.manuscript_cycle_runner editorial-return --manifest <private-manifest> --expected-manifest-sha <sha256> --output-root <private-f4-run>`
+
+If Artikl chooses revision, one native Artikl writer produces a complete new working Markdown file, then the existing manuscript intake verifies actual bytes and a separate read-only Codex process reads the full new version against v0.6 and M117. The result is never an author acceptance or submission. Non-revision choices are terminal for this bounded review-return invocation; `MORE_RESEARCH` yields a documented specific research need, **not** a fake executed hunt or an unapproved recursively dispatched job. A completed run replays with zero model calls. A half-finished native model request is never automatically repaid.
+
+The F4 acceptance needs a real Artikl review-return decision plus the correct physical consequence. Tests of a synthetic positive branch are not evidence that real Artikl chose revision. Complete machine-closure and a native deep-hunt continuation require separate real provenance and cannot be certified from this endpoint alone. New manuscript versions and reviewer receipts go to the existing private scientific Git; source bytes stay owner-private.
