@@ -35,7 +35,7 @@ def _original_session_store_recovery(root:Path,target:Path,
         materialization_gateway:Path,materialization_sha:str,
         trajectory:Path,trajectory_sha:str)->dict:
     """Read original failed call, genuine materialization write+read and trace.
-    
+
     No new manuscript is generated here; this is a strictly bounded readback of
     the exact same-session store value. Original pre-write SHA is unavailable,
     so the receipt does not claim a before-SHA identity comparison.
