@@ -199,7 +199,10 @@ def _writer_file_after_gateway_timeout(root: Path, path: Path) -> dict:
             "file_recovered_without_final_model_reply": True}
 
 
-def _independent_next_review(root: Path, m: dict, f: dict, target: Path) -> dict:
+def _independent_next_review(root: Path, m: dict, f: dict, target: Path,
+                             latest_whitecrow: Path | None = None,
+                             latest_evidence: Path | None = None,
+                             latest_decision: dict | None = None) -> dict:
     out = root/"review.json"
     if out.exists():
         return read(out)
@@ -227,6 +230,31 @@ def _independent_next_review(root: Path, m: dict, f: dict, target: Path) -> dict
       "M117_items=(list of {issue,status,delta}), "
       "next_action=(string), author_gate='HOLD', send=false."
     )
+    if latest_whitecrow is not None or latest_evidence is not None:
+        if latest_whitecrow is None or latest_evidence is None or not isinstance(latest_decision,dict):
+            raise EvidenceBlocked("F4_latest_science_review_context_incomplete")
+        if (latest_decision.get("decision")!="REVISION_CANDIDATE"
+            or latest_decision.get("whitecrow_report_sha256")!=sha256(latest_whitecrow.read_bytes())
+            or latest_decision.get("real_indago_evidence_sha256")!=sha256(latest_evidence.read_bytes())
+            or latest_decision.get("author_gate")!="HOLD"):
+            raise EvidenceBlocked("F4_latest_science_review_context_mismatch")
+        instructions += (
+            "\nPOST-RESEARCH SOURCE CONTEXT: Read the COMPLETE actual WhiteCrow "
+            "FieldCore D24 report at "+str(latest_whitecrow)
+            +" SHA256 "+sha256(latest_whitecrow.read_bytes())+". "
+            "Read the COMPLETE native Indago EvidenceReturn at "+str(latest_evidence)
+            +" SHA256 "+sha256(latest_evidence.read_bytes())+". "
+            "These are real executor results, NOT science saturation or proven primary "
+            "source depth. Distinguish candidates and metadata from full-source claims. "
+            "The registered Artikl rc9 explicitly selected REVISION_CANDIDATE, "
+            "not manuscript approval: "+json.dumps(latest_decision,ensure_ascii=False)
+            +". Check every new empirical assertion and named-source attribution "
+            "against verified passages; if unavailable mark UNVERIFIED. "
+            "Pay special attention to prospective eligibility vs retrospective "
+            "confirmation, W versus E0-E3 variables, rival mechanisms, failed "
+            "cases, and independent coding reliability. No fabricated novelty, "
+            "no D25 GO, no author acceptance.\n"
+        )
     save(root/"review.prompt.txt", instructions.encode("utf-8"))
     save(root/"review.started", b"ONE_CODEX_INDEPENDENT_REVIEW\n")
     command = [cli_app("codex"), "exec", "-C", str(Path(m["scientific_repo"])),
