@@ -31,11 +31,94 @@ def _pinned(path: Path, checksum: str) -> dict:
     return {"path": path, "sha256": checksum, "bytes": b}
 
 
+def _original_session_store_recovery(root:Path,target:Path,
+        materialization_gateway:Path,materialization_sha:str,
+        trajectory:Path,trajectory_sha:str)->dict:
+    """Read original failed call, genuine materialization write+read and trace.
+    
+    No new manuscript is generated here; this is a strictly bounded readback of
+    the exact same-session store value. Original pre-write SHA is unavailable,
+    so the receipt does not claim a before-SHA identity comparison.
+    """
+    _pinned(materialization_gateway,materialization_sha)
+    _pinned(trajectory,trajectory_sha)
+    first=read(root/"return_writer.gateway.json")
+    gateway_bytes=materialization_gateway.read_bytes()
+    recovered=json.loads(gateway_bytes.decode(
+        "utf-16" if gateway_bytes.startswith((bytes([255,254]),bytes([254,255]))) else "utf-8-sig"))
+    agent=((first.get("result") or {}).get("meta") or {}).get("agentMeta") or {}
+    receipt=agent.get("terminalReceipt") or {}
+    if (first.get("status")!="timeout"
+        or first.get("timeoutPhase")!="provider"
+        or first.get("providerStarted") is not True
+        or first.get("runId")!="c4ca772d-9d47-4357-bc6e-0d01e5cb36cd"
+        or agent.get("sessionId")!="f46cee06-b72a-59dd-95cc-10eaa559a4ec"
+        or receipt.get("runId")!=first.get("runId")
+        or "write" in (receipt.get("successfulToolNames") or [])):
+        raise EvidenceBlocked("science_revision_prior_timeout_proof_invalid")
+    ts=trajectory.read_text(encoding="utf-8")
+    if (not ts.startswith("{")
+        or '"type":"tool.result"' not in ts.replace(" ","")
+        or '"chars\\":48741' not in ts
+        or '"words\\":5789' not in ts):
+        raise EvidenceBlocked("science_revision_original_store_trace_not_proven")
+    summary=((recovered.get("result") or {}).get("meta") or {}).get("toolSummary") or {}
+    if (recovered.get("status")!="ok"
+        or summary.get("failures")!=0
+        or not {"write","read"}.issubset(set(summary.get("tools") or []))):
+        raise EvidenceBlocked("science_revision_materialization_execution_untrusted")
+    payloads=((recovered.get("result") or {}).get("payloads") or [])
+    if not payloads or not isinstance(payloads[0].get("text"),str):
+        raise EvidenceBlocked("science_revision_materialization_no_agent_receipt")
+    try:
+        details=json.loads(payloads[0]["text"])
+    except ValueError as exc:
+        raise EvidenceBlocked("science_revision_materialization_receipt_not_json") from exc
+    if (details.get("schema")!="T3_F4_ORIGINAL_SESSION_STORE_MATERIALIZATION_V1"
+        or details.get("status")!="WRITTEN_VERIFIED"
+        or details.get("source_run_id")!=first.get("runId")
+        or details.get("source_session_id")!=agent.get("sessionId")
+        or details.get("chars")!=48741
+        or details.get("author_gate")!="HOLD"
+        or details.get("send") is not False
+        or details.get("world_mutation") is not False):
+        raise EvidenceBlocked("science_revision_materialization_lineage_mismatch")
+    if not target.is_file():
+        raise EvidenceBlocked("science_revision_materialization_file_missing")
+    raw=target.read_bytes()
+    text=raw.decode("utf-8")
+    if (len(text)!=48741 or not 5788<=len(text.split())<=5789
+        or len(raw)<20000 or not text.startswith("# ")
+        or text.count("\n## ")<7 or "\ufffd" in text):
+        raise EvidenceBlocked("science_revision_materialization_byte_count_invalid")
+    info={
+      "schema":"T3_F4_SAME_SESSION_MATERIALIZED_ARTIKL_WORKING_DRAFT_V1",
+      "source_session_id":agent.get("sessionId"),
+      "source_run_id":first.get("runId"),
+      "failed_original_gateway_sha256":sha256((root/"return_writer.gateway.json").read_bytes()),
+      "source_trajectory_sha256":trajectory_sha,
+      "recovery_gateway_sha256":materialization_sha,
+      "source_store_char_count":48741,
+      "materialized_file_chars":len(text),
+      "materialized_file_words":len(text.split()),
+      "materialized_file_sha256":sha256(raw),
+      "original_store_content_sha256_available":False,
+      "source_by_session_continuity_not_byte_comparison":True,
+      "new_manuscript_model_generation_in_recovery":False,
+      "author_gate":"HOLD","send":False,"world_mutation":False,
+    }
+    emit(root/"return_writer_store_recovery_receipt.json",info)
+    return {"sha256":sha256(raw),"author_gate":"HOLD","send":False,
+            "recovered_original_session_store":True}
+
+
 def run(*, manifest: Path, manifest_sha: str, factory_state: Path,
         factory_sha: str, native_artikl_stdout: Path, artikl_sha: str,
         evidence: Path, evidence_sha: str, whitecrow_report: Path,
         report_sha: str, request: Path, request_sha: str,
-        output_root: Path) -> dict:
+        output_root: Path,
+        materialization_gateway: Path|None=None,materialization_sha: str|None=None,
+        original_trajectory: Path|None=None,trajectory_sha: str|None=None) -> dict:
     pinned = {
         "factory": _pinned(factory_state, factory_sha),
         "agent": _pinned(native_artikl_stdout, artikl_sha),
@@ -140,7 +223,13 @@ def run(*, manifest: Path, manifest_sha: str, factory_state: Path,
                                _writer_prompt(m,f,inner,target)+context,
                                timeout=480)
         except EvidenceBlocked:
-            writer=_writer_file_after_gateway_timeout(out,target)
+            if (materialization_gateway is not None and original_trajectory is not None
+                and materialization_sha is not None and trajectory_sha is not None):
+                writer=_original_session_store_recovery(
+                    out,target,materialization_gateway,materialization_sha,
+                    original_trajectory,trajectory_sha)
+            else:
+                writer=_writer_file_after_gateway_timeout(out,target)
         if not target.is_file():
             raise EvidenceBlocked("science_revision_writer_no_file")
         raw=target.read_bytes()
@@ -201,6 +290,10 @@ def main(argv:list[str]|None=None)->int:
     for name in ("manifest-sha","factory-sha","artikl-sha","evidence-sha",
                  "report-sha","request-sha"):
         p.add_argument("--"+name,required=True)
+    p.add_argument("--materialization-gateway",type=Path)
+    p.add_argument("--materialization-sha")
+    p.add_argument("--original-trajectory",type=Path)
+    p.add_argument("--trajectory-sha")
     a=p.parse_args(argv)
     try:
         result=run(manifest=a.manifest,manifest_sha=a.manifest_sha,
@@ -208,7 +301,10 @@ def main(argv:list[str]|None=None)->int:
             native_artikl_stdout=a.native_artikl_stdout,artikl_sha=a.artikl_sha,
             evidence=a.evidence,evidence_sha=a.evidence_sha,
             whitecrow_report=a.whitecrow_report,report_sha=a.report_sha,
-            request=a.request,request_sha=a.request_sha,output_root=a.out)
+            request=a.request,request_sha=a.request_sha,output_root=a.out,
+            materialization_gateway=a.materialization_gateway,
+            materialization_sha=a.materialization_sha,
+            original_trajectory=a.original_trajectory,trajectory_sha=a.trajectory_sha)
     except (OSError,ValueError,KeyError,EvidenceBlocked,subprocess.TimeoutExpired) as exc:
         print(json.dumps({"status":"WORKING_REVISION_HOLD",
             "reason":str(exc)[:300],"author_gate":"HOLD","send":False,

@@ -44,3 +44,35 @@ def test_f4_cannot_repurpose_more_research_as_revision(tmp_path):
          mock.patch.object(m,"native_call",side_effect=AssertionError("model must not run")):
         with pytest.raises(EvidenceBlocked,match="science_revision_native_artikl_chose_no_revision"):
             m.run(**PINS,output_root=tmp_path/"draft")
+
+
+def test_f4_original_stored_revision_recovery_is_byte_pinned(tmp_path):
+    from shutil import copyfile
+    root=tmp_path/"recovered"
+    root.mkdir()
+    original=ROOT/"F4_science_revision"
+    for name in ("return_writer.gateway.json","draft_v0_7.md"):
+        copyfile(original/name,root/name)
+    mat=ROOT/"F4_writer_materialize_gateway.json"
+    trace=ROOT/".openclaw"/"trajectory-exports"/"f4-author-revision-original-run"/"events.jsonl"
+    get=dict(
+        root=root,target=root/"draft_v0_7.md",
+        materialization_gateway=mat,
+        materialization_sha="f7606df1281113c1ce842c5950987375a18d8eb137250d2d380fa677b4be3041",
+        trajectory=trace,
+        trajectory_sha="4bcabfc70653aff19d3fd5cf5c5556b0fefd693720f77ffe90641207bf3d51cb",
+    )
+    ret=m._original_session_store_recovery(**get)
+    assert ret["sha256"]=="f666305599484901a0569d0fdf0a60a5272c3ea5ed269e5c7c9a3f7282d03c75"
+    import json
+    receipt=json.loads((root/"return_writer_store_recovery_receipt.json").read_text(encoding="utf-8"))
+    assert receipt["original_store_content_sha256_available"] is False
+    assert receipt["source_by_session_continuity_not_byte_comparison"] is True
+    assert receipt["materialized_file_chars"] == 48741
+    assert receipt["author_gate"]=="HOLD" and receipt["send"] is False
+    wrong=dict(get,materialization_sha="f"*64)
+    with pytest.raises(EvidenceBlocked):
+        m._original_session_store_recovery(**wrong)
+    (root/"draft_v0_7.md").write_text("# short",encoding="utf-8")
+    with pytest.raises(EvidenceBlocked,match="byte_count_invalid"):
+        m._original_session_store_recovery(**get)
