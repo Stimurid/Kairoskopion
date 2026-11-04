@@ -45,6 +45,9 @@ def test_decision_prompt_preserves_artikl_authority_no_external_veto(tmp_path):
     assert "NOT as permission" in prompt
     assert "Do not fabricate empirical validation" in prompt
     assert "D27 is only a candidate" in prompt
+    assert "NO TOOL CALLS" in prompt
+    assert "=== BEGIN COMPLETE BASELINE MANUSCRIPT" in prompt
+    assert "=== END M117 REVIEW; BEGIN PREVIOUS SCIENCE PACKET ===" in prompt
 
 
 @pytest.mark.parametrize("choice",["MORE_RESEARCH", "KEEP_WORKING_DRAFT", "PARK"])

@@ -71,49 +71,71 @@ def preflight(m: dict) -> dict:
 
 
 def _decision_prompt(m: dict, f: dict) -> str:
-    return (
-      "TRIMURTI F4. You are registered ARTIKL, release rc9. This is an actual "
-      "review-return decision in the existing Factory, not a task to write a "
-      "generic summary. Read your six current SOURCE_ARTIKL canonical files "
-      "from " + str(m["artikl_source_root"]) + ". Read the COMPLETE new C04 "
-      "working manuscript " + str(f["baseline"]["path"]) + " with exact SHA256 "
-      + f["baseline"]["sha256"] + ". Read the COMPLETE independent M117 review "
-      + str(f["review"]["path"]) + " exact SHA256 " + f["review"]["sha256"] + ". "
-      "Also read the original author C04 " + str(f["source"]["path"]) + ", "
-      "scientific grounding " + str(f["science"]["path"]) + ", and the prior "
-      "WhiteCrow return " + str(f["whitecrow"]["path"]) + " as evidence quality, "
-      "NOT as permission to think/write. Read M117 provenance "
-      + str(f["m117_provenance"]["path"]) + ". "
-      "M117 independent reviewer returned SCOPED_PASS, not novelty acceptance. "
-      "Its three open findings concern nearest-competitor fulltext, unexecuted "
-      "empirical program, and exact author-source version attribution. "
-      "Freely choose the NEXT INTELLECTUAL OPERATION on this working manuscript: "
-      "REVISION_CANDIDATE if you can improve the text now with explicit "
-      "limits; MORE_RESEARCH if a specific necessary scholarly question "
-      "needs investigation first; KEEP_WORKING_DRAFT if a new rewrite "
-      "would be unproductive and the existing version is useful pending "
-      "author/scientific work; PARK if this trajectory should stop. "
-      "Do not be constrained by any external D15/D24 source-depth veto. "
-      "Retain the author's strong organogenesis hypothesis, distinction "
-      "between making a capability and doing an operation, five protected "
-      "conceptual nuclei, and existing accepted author decisions. "
-      "Do not fabricate empirical validation, fulltext readings or quotations. "
-      "D27 is only a candidate, not canonical rc9. "
-      "Do not execute hunts or write files during this DECISION turn. "
-      "Return ONE exact JSON object (no fences), keys: "
-      "schema='trimurti-artikl-review-return-decision-v1', "
-      "agent_id='artikl', current_release='ARTIKL 1.0.0-rc9', "
-      "baseline_sha256='" + f["baseline"]["sha256"] + "', "
-      "independent_review_sha256='" + f["review"]["sha256"] + "', "
-      "decision='REVISION_CANDIDATE|MORE_RESEARCH|KEEP_WORKING_DRAFT|PARK', "
-      "reason=(specific substantive rationale), "
-      "planned_changes=(array of specific editorial tasks), "
-      "research_needs=(array of specific research tasks), "
-      "review_findings_used=(array of M117 issue kinds addressed), "
-      "author_gate='HOLD', send=false, world_mutation=false, "
-      "d25_manuscript_go=false."
-    )
+    """One bounded incremental return: host supplies full verified text in-band.
 
+    The previous M117 native Artikl already performed canonical rc9 reads.
+    The host preflight verified current six rc9 carriers and SHA-pinned files.
+    Repeating full-body exploration inside a short editorial decision can
+    exhaust the OpenClaw run budget without ever reaching a decision.
+    """
+    baseline = f["baseline"]["bytes"].decode("utf-8-sig")
+    review = f["review"]["bytes"].decode("utf-8-sig")
+    science = f["science"]["bytes"].decode("utf-8-sig")
+    provenance = f["m117_provenance"]["bytes"].decode("utf-8-sig")
+    header = (
+        "TRIMURTI F4 / registered ARTIKL rc9 / INCREMENTAL REVIEW RETURN.\n"
+        "The Factory host has verified all six current SOURCE_ARTIKL rc9 carriers "
+        "and the exact source, science, manuscript, M117 review and provenance SHA. "
+        "This is a continuation after M117's documented native Artikl rc9 invocation, "
+        "NOT a new cold entry, not a canonical release promotion.\n"
+        "The complete current manuscript, complete independent review and current "
+        "science/provenance material are EMBEDDED below. Do not spend this decision "
+        "stage searching for tools or rereading the same carriers. NO TOOL CALLS "
+        "are needed or authorized in this DECISION stage. Do not run a hunt, "
+        "write a manuscript, change files or modify Git here.\n"
+        "Source identity (prior author C04) SHA256: "
+        + f["source"]["sha256"] + ". Manuscript SHA256: "
+        + f["baseline"]["sha256"] + ". Review SHA256: "
+        + f["review"]["sha256"] + ".\n"
+        "Honor rc9 D14/D15/D18/D21 and D24 evidence characterization, "
+        "D25 author approval as separate authority. D27 is only a candidate. "
+        "Preserve the five protected conceptual nuclei and real author decisions; "
+        "do not drown organogenesis in defensive prose. The original author "
+        "carrier and WhiteCrow source-depth record were fully SHA-verified by "
+        "the host; do not pretend to have reread their complete contents in "
+        "this turn. WhiteCrow source quality is evidence information, NOT as permission to write.\n"
+        "The three remaining M117 scientific findings are fulltext nearest "
+        "competitor comparison, unexecuted empirical design, and exact "
+        "author-source passage/version citation. SCOPED_PASS is neither a novelty "
+        "certificate nor an author/publication decision.\n"
+        "Freely choose one next intellectual operation: REVISION_CANDIDATE, "
+        "MORE_RESEARCH, KEEP_WORKING_DRAFT, or PARK. No external source-depth "
+        "gate authorizes or forbids a working revision. Give actual intellectual "
+        "reasons, concrete changes/research needs and exactly which M117 findings "
+        "matter. Do not fabricate empirical validation, fulltext reads, data or claims of fixes.\n"
+        "Return ONLY one JSON object, no fences or explanatory text, with keys: "
+        "schema='trimurti-artikl-review-return-decision-v1', agent_id='artikl', "
+        "current_release='ARTIKL 1.0.0-rc9', "
+        "baseline_sha256='" + f["baseline"]["sha256"] + "', "
+        "independent_review_sha256='" + f["review"]["sha256"] + "', "
+        "decision=(one of the four exact choice strings), "
+        "reason=(specific substantive rationale at least 30 chars), "
+        "planned_changes=(array of strings), research_needs=(array of strings), "
+        "review_findings_used=(array of issue.kind values), "
+        "author_gate='HOLD', send=false, world_mutation=false, "
+        "d25_manuscript_go=false.\n"
+        "=== BEGIN COMPLETE BASELINE MANUSCRIPT C04 v0.6 ===\n"
+    )
+    return (header + baseline
+            + "\n=== END COMPLETE BASELINE; BEGIN COMPLETE M117 REVIEW ===\n"
+            + review
+            + "\n=== END M117 REVIEW; BEGIN PREVIOUS SCIENCE PACKET ===\n"
+            + science
+            + "\n=== END SCIENCE; BEGIN M117 PROVENANCE ===\n"
+            + provenance
+            + "\n=== END VERIFIED MATERIAL ===\n"
+            "Your immediate next message MUST be the single decision JSON, "
+            "without tool discovery or calls. Preserve AUTHOR HOLD.")
 
 def _writer_prompt(m: dict, f: dict, choice: dict, target: Path) -> str:
     return (
@@ -278,7 +300,7 @@ def run(manifest: Path, expected_manifest_sha: str, root: Path) -> dict:
     try:
         with os.fdopen(fd, "w") as fh:
             fh.write("RUNNING\n")
-        choice = native_call(root, "return_decision", _decision_prompt(m, f), timeout=420)
+        choice = native_call(root, "return_decision", _decision_prompt(m, f), timeout=240)
         if (choice.get("schema") != "trimurti-artikl-review-return-decision-v1"
             or choice.get("agent_id") != "artikl"
             or choice.get("current_release") != "ARTIKL 1.0.0-rc9"
