@@ -75,6 +75,72 @@ def _admit(evidence:dict, request:dict, transport_sha:str)->None:
             # May be an interrupted provider turn, not reusable evidence.
             raise EvidenceBlocked("add006_interrupted_nonzero_provider_requires_triage")
 
+def _validate_original_d24_stage(stage:dict, request:dict, *,
+    request_sha:str, transport_sha:str, baseline_sha:str,
+    whitecrow_commit:str, whitecrow_module_sha:str)->None:
+    if (stage.get("research_request_id")!=request.get("research_request_id")
+        or stage.get("dispatch_event_id")!=request.get("dispatch_event_id")
+        or stage.get("request_sha256")!=request_sha):
+        raise EvidenceBlocked("whitecrow_original_dispatch_identity_mismatch")
+    if stage.get("schema")=="T3_F4_M117_CANONICAL_D24_TO_INDAGO_HANDOFF_V1":
+        wc=stage.get("whitecrow_code") or {}
+        if (stage.get("status")!="PENDING_NOT_DISPATCHED"
+            or stage.get("indago_deep_hunt_execution")!="NOT_STARTED"
+            or stage.get("indago_transport_sha256")!=transport_sha
+            or stage.get("whitecrow_report_sha256")!=baseline_sha
+            or wc.get("git_commit")!=whitecrow_commit
+            or wc.get("module_sha256")!=whitecrow_module_sha
+            or wc.get("dirty") is not False
+            or stage.get("author_gate")!="HOLD"
+            or stage.get("send") is not False
+            or stage.get("world_mutation") is not False
+            or stage.get("new_native_hunts")!=0
+            or stage.get("not_a_science_approval") is not True):
+            raise EvidenceBlocked("f4_d24_handoff_stage_not_pinned")
+    elif stage.get("dispatch_status")!="NOT_DISPATCHED_FROM_THIS_RUN":
+        raise EvidenceBlocked("whitecrow_original_dispatch_identity_mismatch")
+
+
+def _native_completion_attested(events:list[dict],claim:dict,evidence:dict)->bool:
+    """Accept typed original or same-run recovered completion, never inferred success."""
+    hunt=evidence.get("hunt") or {}
+    actual=hunt.get("hunt_id")
+    if not actual or claim.get("state")!="COMPLETED" or claim.get("native_hunt_id")!=actual:
+        return False
+    if any(x.get("kind")=="direct_hunt_completed"
+           and x.get("native_hunt_id")==actual for x in events):
+        return True
+    # Recovery has its own typed terminal event, not the one-shot event. Its
+    # lineage, count reconciliation, interrupted segment and source SHA
+    # must also be pinned by the native claim and EvidenceReturn.
+    if evidence.get("research_depth_profile")!="NATIVE_INDAGO_PERPETUUM_RECOVERY":
+        return False
+    prior=evidence.get("recovered_locator_provider_calls")
+    fresh=evidence.get("new_provider_calls")
+    if (type(prior) is not int or type(fresh) is not int or prior<=0 or fresh<0
+        or evidence.get("duplicate_provider_calls")!=0
+        or evidence.get("provider_calls")!=prior+fresh):
+        return False
+    hashes=evidence.get("recovery_source_hashes")
+    if (not isinstance(hashes,dict) or not hashes
+        or hashes!=claim.get("recovery_source_hashes")):
+        return False
+    segments=evidence.get("perpetuum_segments")
+    if (not isinstance(segments,list) or len(segments)<2
+        or segments[0].get("status")!="INCOMPLETE_RECOVERED"
+        or segments[0].get("provider_calls")!=prior
+        or not any(s.get("hunt_id")==actual and s.get("status") in {"PASS","PARTIAL"}
+                   for s in segments[1:] if isinstance(s,dict))):
+        return False
+    return any(x.get("kind")=="direct_hunt_recovery_completed"
+               and x.get("mode")=="PERPETUUM_RECOVERY"
+               and x.get("status")==evidence.get("run_status")
+               and x.get("new_provider_calls")==fresh
+               and x.get("duplicate_provider_calls")==0
+               and x.get("author_gate")=="HOLD"
+               for x in events)
+
+
 def _verify_bounded_source_carriers(packet_path:Path,expected_packet_sha:str,expected_contract_sha:str|None)->dict:
     """Independent owner-side re-read of at most two complete scholarly PDFs.
 
@@ -191,11 +257,12 @@ def bridge(*,evidence_path:Path,request_path:Path,transport_path:Path,
         or sha256(stage_receipt_path.read_bytes())!=expected_stage_receipt_sha):
         raise EvidenceBlocked("whitecrow_original_stage_receipt_unpinned")
     stage=_read(stage_receipt_path)
-    if (stage.get("research_request_id")!=request.get("research_request_id")
-        or stage.get("dispatch_event_id")!=request.get("dispatch_event_id")
-        or stage.get("request_sha256")!=expected_request_sha
-        or stage.get("dispatch_status")!="NOT_DISPATCHED_FROM_THIS_RUN"):
-        raise EvidenceBlocked("whitecrow_original_dispatch_identity_mismatch")
+    _validate_original_d24_stage(
+        stage,request,request_sha=expected_request_sha,
+        transport_sha=expected_transport_sha,
+        baseline_sha=sha256(baseline_path.read_bytes()),
+        whitecrow_commit=trusted_whitecrow_commit,
+        whitecrow_module_sha=trusted_whitecrow_module_sha)
     # This F238 receipt pins the ResearchRequest; F237 separately serialised
     # the transport. Ensure the actual hashed transport repeats the same typed
     # ADD-006 dispatch identity and does not expand the CRITIQUE authority.
@@ -236,9 +303,7 @@ def bridge(*,evidence_path:Path,request_path:Path,transport_path:Path,
     complete=evidence["run_status"] in {"PASS","PARTIAL"}
     if complete:
         actual=(evidence.get("hunt") or {}).get("hunt_id")
-        if (claim.get("state")!="COMPLETED" or claim.get("native_hunt_id")!=actual
-            or not any(x.get("kind")=="direct_hunt_completed"
-                and x.get("native_hunt_id")==actual for x in events)):
+        if not _native_completion_attested(events,claim,evidence):
             raise EvidenceBlocked("native_completed_hunt_receipt_not_proven")
     elif not any(x.get("kind") in {"direct_hunt_failed","direct_hunt_unsupported"} for x in events):
         raise EvidenceBlocked("native_blocked_hunt_receipt_not_proven")

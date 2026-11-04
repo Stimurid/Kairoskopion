@@ -125,3 +125,78 @@ def test_f241_two_complete_original_pdfs_are_byte_and_page_bound_but_not_novelty
     assert all(x["verified_page_anchors_count"]==8 for x in r["source_originals_verified"])
     with pytest.raises(EvidenceBlocked,match="source_carrier_packet_unpinned_or_mutated"):
         _verify_bounded_source_carriers(p,"0"*64,None)
+
+
+def test_native_recovery_completion_requires_real_typed_receipt_and_sha_lineage():
+    from kairoskopion.kairon_provider.add006_return_bridge import _native_completion_attested
+    x=ev()
+    source_hashes={"wave1_evidence":"e"*64,"wave1_scene":"f"*64}
+    x.update({
+        "research_depth_profile":"NATIVE_INDAGO_PERPETUUM_RECOVERY",
+        "recovered_locator_provider_calls":6,"new_provider_calls":2,
+        "duplicate_provider_calls":0,"provider_calls":8,
+        "recovery_source_hashes":source_hashes,
+        "perpetuum_segments":[
+            {"segment":1,"status":"INCOMPLETE_RECOVERED","provider_calls":6,
+             "hunt_id":"h-stopped-before-model-answer"},
+            {"segment":2,"status":"PARTIAL","provider_calls":2,
+             "hunt_id":x["hunt"]["hunt_id"]}],
+    })
+    c={"state":"COMPLETED","native_hunt_id":x["hunt"]["hunt_id"],
+       "recovery_source_hashes":source_hashes}
+    done={"kind":"direct_hunt_recovery_completed","mode":"PERPETUUM_RECOVERY",
+          "status":"PARTIAL","new_provider_calls":2,
+          "duplicate_provider_calls":0,"author_gate":"HOLD"}
+    assert _native_completion_attested([done],c,x)
+    for name,wrong in [
+        ("duplicate_provider_calls",1),
+        ("provider_calls",7),
+        ("recovered_locator_provider_calls",0),
+        ("recovery_source_hashes",{"wave1_evidence":"0"*64}),
+        ("research_depth_profile","NATIVE_INDAGO_PERPETUUM_MULTISEGMENT"),
+    ]:
+        changed=copy.deepcopy(x);changed[name]=wrong
+        assert not _native_completion_attested([done],c,changed),name
+    wrong_claim=dict(c,native_hunt_id="h-another-run")
+    assert not _native_completion_attested([done],wrong_claim,x)
+    wrong_claim=dict(c,recovery_source_hashes={"wave1_evidence":"0"*64})
+    assert not _native_completion_attested([done],wrong_claim,x)
+    for k,bad in [("kind","direct_hunt_completed"),("mode","OTHER"),
+                  ("status","BLOCKED"),("new_provider_calls",3),
+                  ("duplicate_provider_calls",1),("author_gate","GO")]:
+        wrong=dict(done);wrong[k]=bad
+        assert not _native_completion_attested([wrong],c,x),k
+    assert _native_completion_attested([
+        {"kind":"direct_hunt_completed","native_hunt_id":x["hunt"]["hunt_id"]}],
+        c,x)
+
+
+def test_f4_native_m117_whitecrow_handoff_is_pinned_without_forging_f238_stage():
+    from kairoskopion.kairon_provider.add006_return_bridge import _validate_original_d24_stage
+    root=Path(r"C:/projects/trimurti/_ops/T3-TALK-20261019/F4_REVIEW_RETURN_20261104/runtime_compact/more_research_handoff")
+    stage=json.loads((root/"handoff_receipt.json").read_text(encoding="utf-8"))
+    request=json.loads((root/"research_request_PENDING.json").read_text(encoding="utf-8"))
+    whitecrow_sha=sha((root/"whitecrow_report.json").read_bytes())
+    kwargs=dict(request_sha=sha((root/"research_request_PENDING.json").read_bytes()),
+                transport_sha=sha((root/"indago_task_PENDING.txt").read_bytes()),
+                baseline_sha=whitecrow_sha,
+                whitecrow_commit="0bd96d098a65c2f6063d682e4f9e3e97c8034227",
+                whitecrow_module_sha="265216755b06926414ff09ad38f1c79de531345a5d93b397cd7468141a0401af")
+    assert kwargs["request_sha"]==stage["request_sha256"]
+    assert kwargs["baseline_sha"]==stage["whitecrow_report_sha256"]
+    _validate_original_d24_stage(stage,request,**kwargs)
+    for name,bad in [
+        ("status","DISPATCHED"),
+        ("indago_deep_hunt_execution","DONE"),
+        ("indago_transport_sha256","f"*64),
+        ("whitecrow_report_sha256","f"*64),
+        ("author_gate","GO"),
+        ("new_native_hunts",1),
+        ("not_a_science_approval",False),
+    ]:
+        modified=dict(stage);modified[name]=bad
+        with pytest.raises(EvidenceBlocked,match="f4_d24_handoff_stage_not_pinned"):
+            _validate_original_d24_stage(modified,request,**kwargs)
+    altered=dict(stage);altered["whitecrow_code"]={"git_commit":"wrong","module_sha256":"f"*64,"dirty":True}
+    with pytest.raises(EvidenceBlocked,match="f4_d24_handoff_stage_not_pinned"):
+        _validate_original_d24_stage(altered,request,**kwargs)
