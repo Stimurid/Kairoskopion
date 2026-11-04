@@ -368,14 +368,174 @@ def run(manifest: Path, expected_manifest_sha: str, root: Path) -> dict:
         lock.unlink(missing_ok=True)
 
 
+
+def prepare_more_research_handoff(
+    *, manifest: Path, expected_manifest_sha: str, root: Path,
+    whitecrow_root: Path, trusted_whitecrow_commit: str,
+    trusted_whitecrow_module_sha: str,
+) -> dict:
+    """No model calls: ARTIKL's verified choice -> canonical D24 -> ONE pending Indago request.
+
+    D24 describes the source gap; it DOES NOT veto Artikl's writing authority.
+    ResearchNeed != ResearchRequest != actual ResearchRun. Nothing is dispatched
+    from this operation, and the native Perpetuum hunt is not silently shortened.
+    """
+    import importlib
+    import sys
+    from .native_whitecrow_stage import _validate_source, WHITE_CROW_SOURCE
+
+    readsha(manifest, expected_manifest_sha)
+    m = read(manifest)
+    f = preflight(m)
+    root = root.resolve()
+    terminal_path = root/"review_return_receipt.json"
+    choice_path = root/"decision.json"
+    if not (terminal_path.is_file() and choice_path.is_file()):
+        raise EvidenceBlocked("no_completed_native_review_return_decision")
+    result = read(terminal_path)
+    choice = read(choice_path)
+    decision_sha = sha256(choice_path.read_bytes())
+    if (result.get("status") != "REVIEW_RETURN_MORE_RESEARCH_AUTHOR_HOLD"
+        or result.get("decision") != "MORE_RESEARCH"
+        or result.get("decision_sha256") != decision_sha
+        or result.get("manifest_sha256") != expected_manifest_sha
+        or result.get("M117_review_sha256") != f["review"]["sha256"]
+        or result.get("baseline_sha256") != f["baseline"]["sha256"]
+        or choice.get("decision") != "MORE_RESEARCH"
+        or choice.get("author_gate") != "HOLD"
+        or choice.get("send") is not False
+        or choice.get("world_mutation") is not False):
+        raise EvidenceBlocked("native_artikl_research_choice_not_authorized")
+    needs = choice.get("research_needs")
+    if (not isinstance(needs, list) or not 1 <= len(needs) <= 8
+        or any(not isinstance(q, str) or not 30 <= len(q.strip()) <= 1200 for q in needs)):
+        raise EvidenceBlocked("native_artikl_research_needs_missing")
+
+    # Validate the actual canonical WhiteCrow code, not a synthetic proxy.
+    pinned = _validate_source(
+        whitecrow_root, trusted_whitecrow_commit, trusted_whitecrow_module_sha)
+    module_root = str(whitecrow_root.resolve())
+    if module_root not in sys.path:
+        sys.path.insert(0, module_root)
+    wc = importlib.import_module("fieldcore.academic_due_diligence")
+    if Path(wc.__file__).resolve() != (
+        whitecrow_root.resolve()/WHITE_CROW_SOURCE).resolve():
+        raise EvidenceBlocked("whitecrow_runtime_source_not_pinned")
+
+    question = (
+        "Which published scientific mechanisms directly anticipate or refute "
+        "C04 v0.6's temporary organogenesis of an absent productive capability, "
+        "and which original-source citations and empirical conditions remain ungrounded?")
+    base = {
+        "question": question,
+        "read_bodies": [],
+        "primary_passages": [],
+        "locator_hits": [{
+            "source": "M117_INDEPENDENT_REVIEW",
+            "source_sha256": f["review"]["sha256"],
+            "read_depth": "FULL_MANUSCRIPT_REVIEW_NOT_PRIMARY_HUNT"}],
+        "coverage_evidence": {},
+        "known_unknowns": [str(q) for q in needs],
+        "open_research_needs": [{
+            "need_type": "SOURCE",
+            "question_or_gap": str(q),
+            "required_evidence_or_action":
+                "Check full original scholarly bodies and exact passage/page anchors; "
+                "return contrary results, limits and unknowns; do not certify novelty.",
+            "routing_target": "INDAGO",
+            "fallback_routing_target": "LITOPS",
+            "priority": "RESEARCH_REQUESTED_BY_ARTIKL",
+            "provenance": [{
+                "source": "NATIVE_ARTIKL_M117_REVIEW_RETURN",
+                "decision_sha256": decision_sha,
+                "baseline_sha256": f["baseline"]["sha256"],
+                "review_sha256": f["review"]["sha256"]}],
+        } for q in needs],
+    }
+    report = wc.build_disciplinary_positioning_report(
+        base, semantic_action_mode="CRITIQUE", trigger_ref="F4:"+decision_sha)
+    all_needs = report.get("open_research_needs") or []
+    if (report.get("research_readiness") != "BLOCKED_ON_DUE_DILIGENCE"
+        or len(all_needs) < len(needs)):
+        raise EvidenceBlocked("whitecrow_no_native_research_gap")
+
+    # Keep WhiteCrow's complete diagnostic; route only the EXACT four specific
+    # research needs from native Artikl, not three extra generic duplicates.
+    selected = dict(report)
+    selected["open_research_needs"] = all_needs[-len(needs):]
+    for q, item in zip(needs, selected["open_research_needs"]):
+        if item.get("question_or_gap") != q:
+            raise EvidenceBlocked("whitecrow_artikl_research_need_identity_lost")
+    request_prefix = (
+        "T3-F4-"+f["source"]["sha256"][:12]+"-"+decision_sha[:12])
+    request = wc.build_research_handoff(
+        selected, request_id=request_prefix)
+    if (not request
+        or request.get("execution_target") != "INDAGO"
+        or request.get("semantic_owner") != "ARTIKL_WHITECROW"
+        or request.get("semantic_action_mode") != "CRITIQUE"
+        or request.get("research_run_id") is not None
+        or len(request.get("research_needs") or []) != len(needs)):
+        raise EvidenceBlocked("whitecrow_request_did_not_preserve_artikl_choice")
+    transport = wc.render_indago_direct_hunt_task(
+        request, task_label="TRIMURTI_F4_M117_ARTIKL_REVIEW_RETURN")
+    handoff_dir = root/"more_research_handoff"
+    handoff_dir.mkdir(exist_ok=True)
+    report_sha = emit(handoff_dir/"whitecrow_report.json", report)
+    request_sha = emit(handoff_dir/"research_request_PENDING.json", request)
+    body = (transport.rstrip("\n")+"\n").encode("utf-8")
+    save(handoff_dir/"indago_task_PENDING.txt", body)
+    task_sha = sha256(body)
+    receipt = {
+        "schema": "T3_F4_M117_CANONICAL_D24_TO_INDAGO_HANDOFF_V1",
+        "case_id": m["case_id"],
+        "source_sha256": f["source"]["sha256"],
+        "baseline_sha256": f["baseline"]["sha256"],
+        "M117_review_sha256": f["review"]["sha256"],
+        "native_artikl_decision_sha256": decision_sha,
+        "whitecrow_code": pinned,
+        "whitecrow_report_sha256": report_sha,
+        "request_sha256": request_sha,
+        "research_request_id": request["research_request_id"],
+        "dispatch_event_id": request["dispatch_event_id"],
+        "indago_transport_sha256": task_sha,
+        "research_needs_count": len(needs),
+        "status": "PENDING_NOT_DISPATCHED",
+        "indago_deep_hunt_execution": "NOT_STARTED",
+        "new_native_hunts": 0,
+        "new_W12_routes": 0,
+        "author_gate": "HOLD",
+        "send": False,
+        "world_mutation": False,
+        "not_a_science_approval": True,
+    }
+    emit(handoff_dir/"handoff_receipt.json", receipt)
+    return receipt
+
+
+
 def main(argv: list[str] | None = None) -> int:
+    import sys
+    args = list(sys.argv[1:] if argv is None else argv)
+    handoff = bool(args and args[0] == "handoff")
+    if handoff:
+        args.pop(0)
     parser = argparse.ArgumentParser(prog="manuscript_cycle_runner editorial-return")
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--expected-manifest-sha", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
-    a = parser.parse_args(argv)
+    if handoff:
+        parser.add_argument("--whitecrow-root", type=Path, required=True)
+        parser.add_argument("--trusted-whitecrow-commit", required=True)
+        parser.add_argument("--trusted-whitecrow-module-sha", required=True)
+    a = parser.parse_args(args)
     try:
-        result = run(a.manifest, a.expected_manifest_sha, a.output_root)
+        result = (prepare_more_research_handoff(
+            manifest=a.manifest, expected_manifest_sha=a.expected_manifest_sha,
+            root=a.output_root, whitecrow_root=a.whitecrow_root,
+            trusted_whitecrow_commit=a.trusted_whitecrow_commit,
+            trusted_whitecrow_module_sha=a.trusted_whitecrow_module_sha)
+            if handoff else run(a.manifest, a.expected_manifest_sha, a.output_root))
     except (OSError, ValueError, KeyError, EvidenceBlocked, subprocess.TimeoutExpired) as ex:
         print(json.dumps({"status": "HOLD_RUNTIME_OR_EDITORIAL",
                           "reason": str(ex)[:300], "author_gate": "HOLD",

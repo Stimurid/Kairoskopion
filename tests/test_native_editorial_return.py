@@ -147,3 +147,39 @@ def test_native_timeout_cannot_reuse_foreign_or_unverified_written_file(tmp_path
     (root/"return_writer.gateway.json").write_text(json.dumps(outer),encoding="utf8")
     with pytest.raises(EvidenceBlocked,match="not_attested"):
         r._writer_file_after_gateway_timeout(root,file)
+
+
+def test_handoff_requires_a_real_completed_native_more_research_decision(tmp_path,monkeypatch):
+    mf,m,f=inputs(tmp_path)
+    monkeypatch.setattr(r,"preflight",lambda _m:f)
+    with pytest.raises(EvidenceBlocked,match="no_completed_native_review_return_decision"):
+        r.prepare_more_research_handoff(
+            manifest=mf,expected_manifest_sha=r.sha256(mf.read_bytes()),
+            root=tmp_path/"run",whitecrow_root=tmp_path,
+            trusted_whitecrow_commit="a"*40,
+            trusted_whitecrow_module_sha="b"*64)
+
+
+def test_handoff_cannot_redirect_a_native_park_to_indago(tmp_path,monkeypatch):
+    mf,m,f=inputs(tmp_path)
+    monkeypatch.setattr(r,"preflight",lambda _m:f)
+    root=tmp_path/"run"
+    root.mkdir()
+    choice=decision(f,"PARK")
+    (root/"decision.json").write_text(json.dumps(choice),encoding="utf-8")
+    state={
+        "status":"REVIEW_RETURN_PARK_AUTHOR_HOLD",
+        "decision":"PARK",
+        "decision_sha256":r.sha256((root/"decision.json").read_bytes()),
+        "manifest_sha256":r.sha256(mf.read_bytes()),
+        "M117_review_sha256":f["review"]["sha256"],
+        "baseline_sha256":f["baseline"]["sha256"],
+        "author_gate":"HOLD",
+    }
+    (root/"review_return_receipt.json").write_text(json.dumps(state),encoding="utf-8")
+    with pytest.raises(EvidenceBlocked,match="native_artikl_research_choice_not_authorized"):
+        r.prepare_more_research_handoff(
+            manifest=mf,expected_manifest_sha=r.sha256(mf.read_bytes()),
+            root=root,whitecrow_root=tmp_path,
+            trusted_whitecrow_commit="a"*40,
+            trusted_whitecrow_module_sha="b"*64)
