@@ -2002,6 +2002,19 @@ def cmd_cite_repair(args: argparse.Namespace) -> int:
     return repair_main(forwarded)
 
 
+def cmd_cite_workflow(args: argparse.Namespace) -> int:
+    """Artikl-owned citation intake and evidence-return handoff."""
+    from .services.citation_artikl_entry import main as entry_main
+
+    forwarded = ["--manuscript", args.manuscript,
+                 "--output-dir", args.output_dir]
+    if args.evidence_return:
+        forwarded.extend(["--evidence-return", args.evidence_return])
+    if args.witness_path:
+        forwarded.extend(["--witness-path", args.witness_path])
+    return entry_main(forwarded)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="kairoskopion",
@@ -2027,6 +2040,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     z0_parser.add_argument("--manuscript", required=True, help="Local .md/.txt/.docx/.pdf or structured .json")
     z0_parser.add_argument("--output-dir", required=True, help="Immutable local evidence directory")
+
+    cite_workflow_parser = sub.add_parser(
+        "cite-workflow",
+        help="Artikl Z0 -> recorded Indago EvidenceReturn -> independently attested R3 -> R2-R4",
+    )
+    cite_workflow_parser.add_argument("--manuscript", required=True)
+    cite_workflow_parser.add_argument("--output-dir", required=True)
+    cite_workflow_parser.add_argument("--evidence-return")
+    cite_workflow_parser.add_argument("--witness-path")
 
     repair_parser = sub.add_parser(
         "cite-repair",
@@ -2540,6 +2562,7 @@ def main(argv: list[str] | None = None) -> int:
         "trimurti-export-packet": cmd_trimurti_export_packet,
 
         "cite-intake": cmd_cite_intake,
+        "cite-workflow": cmd_cite_workflow,
         "cite-repair": cmd_cite_repair,
     }
 
